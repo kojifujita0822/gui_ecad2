@@ -74,39 +74,45 @@
         <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド) -->
         <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
             <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
+                        AutomationProperties.Name="新規作成 (Ctrl+N)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+N"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)"
+                        AutomationProperties.Name="開く (Ctrl+O)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+O"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)"
+                        AutomationProperties.Name="上書き保存 (Ctrl+S)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+S"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)"
+                        AutomationProperties.Name="元に戻す (Ctrl+Z)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Z"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)"
+                        AutomationProperties.Name="やり直し (Ctrl+Y)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Y"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)"
+                        AutomationProperties.Name="PDF出力 (Ctrl+P)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+P"/>
@@ -115,31 +121,36 @@
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
                 <!-- ラダー専用コマンド(プレースホルダ。機器配置ロジックは段階4以降で接続) -->
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
+                        AutomationProperties.Name="選択ツール (Esc)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
+                        AutomationProperties.Name="a接点配置 (F5)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
+                        AutomationProperties.Name="b接点配置 (F6)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
+                        AutomationProperties.Name="コイル配置 (F7)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
+                        AutomationProperties.Name="端子台配置 (F8)">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
