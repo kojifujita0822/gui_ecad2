@@ -57,12 +57,20 @@ public partial class MainWindow : Window
     }
 
     // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
-    // クリックで即配置)は廃止。実際の要素配置はSelectedCellに対してF5/F6/Shift+F5/Shift+F6
-    // キーまたは対応ツールバーボタンで行う(後続段階4-c/4-dで実装)。
+    // クリックで即配置)は廃止。ただしツールバーボタン経由(Tool.Mode==PlaceElement、殿裁定で
+    // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の
+    // 場合はクリック位置がそのまま配置位置になるため、その場でTryPlaceElementを呼ぶ。
+    // キーボードショートカット(F5等)は、SelectedCellが既にある前提でTryPlaceBuiltinから直接呼ぶ。
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         var position = e.GetPosition(LadderCanvasHost);
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
+
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement && _viewModel.Tool.PartId is string partId)
+        {
+            var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
+            if (entry is not null) TryPlaceElement(entry, _viewModel.Tool.IsOr);
+        }
     }
 
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
@@ -124,17 +132,24 @@ public partial class MainWindow : Window
     }
 
     // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通ハンドラ。Tagに図形名("a接点"等)、
-    // OR系は"OR:"接頭辞を付けて区別する(MainWindow.xaml参照)。
+    // OR系は"OR:"接頭辞を付けて区別する(MainWindow.xaml参照)。殿裁定によりボタンは「押下→ツール
+    // 選択状態→キャンバスクリックで位置確定→ダイアログ」という旧T-016寄りのフローに戻す
+    // (キーボードショートカットは従来通り「セル選択→キーで即ダイアログ」のまま、経路が異なる)。
+    // ゴースト(プレビュー)表示は簡易版としてステータスバー表示のみに留める(視覚プレビューはT-029)。
     private void BuiltinPlaceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;
         bool isOr = tag.StartsWith("OR:");
         string partName = isOr ? tag[3..] : tag;
-        TryPlaceBuiltin(partName, isOr);
+        var entry = _viewModel.PartPalette.Entries.FirstOrDefault(pe => pe.Category == "" && pe.Definition.Name == partName);
+        if (entry is null) return;
+
+        _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, PartId: entry.Definition.Id, IsOr: isOr);
+        _viewModel.StatusMessage = $"配置ツール: {partName}{(isOr ? "(OR)" : "")} - キャンバスをクリックして配置位置を指定してください";
     }
 
     // 図形名(基本図形のDefinition.Name)からPartFolderEntryを検索してTryPlaceElementを呼ぶ。
-    // F5/F6/Shift+F5/Shift+F6/F7/F8キー処理とツールバーボタン共通ハンドラの両方から使う。
+    // F5/F6/Shift+F5/Shift+F6/F7/F8キー処理専用(SelectedCellが既にある前提で即ダイアログを開く)。
     private void TryPlaceBuiltin(string partName, bool isOr)
     {
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);

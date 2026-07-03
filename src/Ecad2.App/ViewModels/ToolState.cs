@@ -11,12 +11,13 @@ namespace Ecad2.App.ViewModels;
 /// </summary>
 public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak }
 
-/// <summary>現在の配置ツール状態。Kind/PartId/Orient は Mode==PlaceElement のときのみ意味を持つ。</summary>
+/// <summary>現在の配置ツール状態。Kind/PartId/Orient/IsOr は Mode==PlaceElement のときのみ意味を持つ。</summary>
 public readonly record struct ToolState(
     ToolMode Mode,
     ElementKind? Kind = null,
     string? PartId = null,
-    string? Orient = null)
+    string? Orient = null,
+    bool IsOr = false)
 {
     public static ToolState SelectDefault => new(ToolMode.Select);
 }
