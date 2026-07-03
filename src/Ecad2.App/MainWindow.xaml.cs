@@ -23,7 +23,17 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new ViewModels.MainWindowViewModel();
         DataContext = _viewModel;
+        // シートナビゲーション(T-026)でCurrentSheetIndexが変わった時にキャンバスを再描画する。
+        // LadderCanvasはカスタムFrameworkElementでDraw()呼び出しが描画トリガーのため、
+        // バインディングだけでは自動再描画されない。
+        _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
+    }
+
+    private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet))
+            LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
     }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
@@ -35,13 +45,15 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // 左パレットの図形をクリックすると配置ツールを選択する。ListBoxItem.Selectedではなく
-    // PreviewMouseLeftButtonDownを使う理由: Selectedは同一アイテムの再選択時に発火しない
-    // (WPFの仕様)ため、それだと「同じ図形を連続で複数箇所へ配置する」操作ができなくなる。
-    private void PartPaletteItem_Clicked(object sender, MouseButtonEventArgs e)
+    // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
+    // ViewModelのRenameCommandへ委譲する。
+    private void RenameSheetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is ListBoxItem { DataContext: Ecad2.Persistence.PartFolderEntry entry })
-            _viewModel.PartPalette.SelectCommand.Execute(entry);
+        if (_viewModel.SheetNavigation.SelectedSheet is not Ecad2.Model.Sheet sheet) return;
+
+        var dialog = new Views.RenameDialog(sheet.Name) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.SheetNavigation.RenameCommand.Execute(dialog.NewName);
     }
 
     // 配置ツール選択中(Tool.Mode==PlaceElement)にキャンバスをクリックすると、その位置へ要素を
@@ -90,7 +102,7 @@ public partial class MainWindow : Window
 
     private void CyclePanelFocus()
     {
-        UIElement[] panels = { PartPaletteList, LadderCanvasHost, DeviceTableGrid };
+        UIElement[] panels = { SheetNavList, LadderCanvasHost, DeviceTableGrid };
 
         // FocusManager.GetFocusedElement(this) は Window スコープの論理フォーカスしか返さない。
         // CanvasArea(ScrollViewer)は FocusManager.IsFocusScope="True" で独立したFocusScopeのため、

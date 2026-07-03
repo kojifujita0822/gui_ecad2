@@ -170,27 +170,24 @@
                 <ColumnDefinition x:Name="RightPanelColumn" Width="280"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 左パレット: 部品選択。PartFolderStore(T-007)から読み込んだ図形一覧をクリックすると
-                 配置ツール(ToolState)が選択される。図形のビジュアルプレビューは別タスク、現状は
-                 名前テキストの一覧のみ。 -->
+            <!-- 左パレット: シートナビゲーション(T-026)。GuiEcadのナビツリー調査結果を踏襲し、
+                 実質フラットリスト(1シート=1ノード、階層なし)とする。部品選択は右パネルへ移設予定
+                 (T-026段階4、案B=状況依存切替)。 -->
             <Border x:Name="LeftPaletteArea" Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                <ListBox x:Name="PartPaletteList" ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
-                    <ListBox.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Margin="2">
-                                <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40"/>
-                                <TextBlock Text="{Binding Definition.Name}"/>
-                            </StackPanel>
-                        </DataTemplate>
-                    </ListBox.ItemTemplate>
-                    <ListBox.ItemContainerStyle>
-                        <Style TargetType="ListBoxItem">
-                            <!-- Selectedイベントは同一アイテムの再選択時に発火しない(WPFの仕様)ため、
-                                 「同じ図形を連続選択」できるようクリック自体を捕捉する。 -->
-                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartPaletteItem_Clicked"/>
-                        </Style>
-                    </ListBox.ItemContainerStyle>
-                </ListBox>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="シート" FontWeight="Bold" Margin="4"/>
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="4">
+                        <Button x:Name="AddSheetButton" Content="＋" Width="28" ToolTip="シート追加"
+                                Command="{Binding SheetNavigation.AddCommand}"/>
+                        <Button x:Name="DeleteSheetButton" Content="－" Width="28" Margin="4,0,0,0" ToolTip="シート削除"
+                                Command="{Binding SheetNavigation.DeleteCommand}"/>
+                        <Button x:Name="RenameSheetButton" Content="名前変更" Margin="4,0,0,0" ToolTip="シート名変更"
+                                Click="RenameSheetButton_Click"/>
+                    </StackPanel>
+                    <ListBox x:Name="SheetNavList" ItemsSource="{Binding SheetNavigation.Sheets}"
+                             SelectedItem="{Binding SheetNavigation.SelectedSheet}"
+                             DisplayMemberPath="Name" BorderThickness="0"/>
+                </DockPanel>
             </Border>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"/>

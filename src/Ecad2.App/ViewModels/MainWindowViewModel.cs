@@ -61,7 +61,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。</summary>
     public Sheet CurrentSheet => Document.Sheets[CurrentSheetIndex];
 
-    /// <summary>左パレット（部品選択）の子ViewModel。</summary>
+    /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
+    public SheetNavigationViewModel SheetNavigation { get; }
+
+    /// <summary>部品選択の子ViewModel（自作パーツ含む）。T-026段階4で右パネルへ配置予定。</summary>
     public PartPaletteViewModel PartPalette { get; }
 
     /// <summary>右パネル上段（機器表）の子ViewModel。</summary>
@@ -76,6 +79,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        SheetNavigation = new SheetNavigationViewModel(this);
         PartPalette = new PartPaletteViewModel(this);
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(Document.Devices);
