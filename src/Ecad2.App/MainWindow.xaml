@@ -294,7 +294,15 @@
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
+                <TextBlock Text="{Binding SelectedCellDisplay, StringFormat='選択セル: {0}'}"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
                 <TextBlock Text="{Binding CanvasScale, StringFormat='ズーム: {0:P0}'}"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="DarkRed"/>
             </StatusBarItem>
         </StatusBar>
     </Grid>

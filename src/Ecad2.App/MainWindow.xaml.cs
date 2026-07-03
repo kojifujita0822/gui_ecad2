@@ -56,29 +56,13 @@ public partial class MainWindow : Window
             _viewModel.SheetNavigation.RenameCommand.Execute(dialog.NewName);
     }
 
-    // 配置ツール選択中(Tool.Mode==PlaceElement)にキャンバスをクリックすると、その位置へ要素を
-    // 追加する(T-016)。占有マス重複は最小限のみ判定(既に要素がある位置には追加しない)。
-    // デバイス名の入力(浮動インラインボックス等)は別タスク(T-021)。
-    // 配置は単発とし、成功したらTool=SelectDefaultへ自動遷移する(design-brief 4節#2
-    // 「Enter/Escの一枚岩」のうちEnter=確定に相当する挙動の最小反映。連続配置はEnterによる
-    // 明示確定込みで別タスクT-021の検討事項とする)。
+    // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
+    // クリックで即配置)は廃止。実際の要素配置はSelectedCellに対してF5/F6/Shift+F5/Shift+F6
+    // キーまたは対応ツールバーボタンで行う(後続段階4-c/4-dで実装)。
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement) return;
-
         var position = e.GetPosition(LadderCanvasHost);
-        var gridPos = LadderCanvasHost.ToGridPos(position);
-
-        if (_viewModel.CurrentSheet.Elements.Any(el => el.Pos == gridPos)) return;
-
-        _viewModel.CurrentSheet.Elements.Add(new Ecad2.Model.ElementInstance
-        {
-            Pos = gridPos,
-            PartId = _viewModel.Tool.PartId,
-        });
-
-        LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
-        _viewModel.Tool = ViewModels.ToolState.SelectDefault;
+        _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
     }
 
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
@@ -99,6 +83,7 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
+                _viewModel.SelectedCell = null;
                 _viewModel.Tool = ViewModels.ToolState.SelectDefault;
                 e.Handled = true;
                 break;

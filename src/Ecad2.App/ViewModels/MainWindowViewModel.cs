@@ -63,6 +63,34 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。</summary>
     public Sheet CurrentSheet => Document.Sheets[CurrentSheetIndex];
 
+    private GridPos? _selectedCell;
+
+    /// <summary>
+    /// 現在選択中のセル位置(T-026段階4新配置フロー: クリックでセル選択→キー/ボタンで設置)。
+    /// 視覚的なハイライト表示は別タスク(T-027)。null=未選択。
+    /// </summary>
+    public GridPos? SelectedCell
+    {
+        get => _selectedCell;
+        set
+        {
+            if (SetProperty(ref _selectedCell, value))
+                OnPropertyChanged(nameof(SelectedCellDisplay));
+        }
+    }
+
+    /// <summary>SelectedCellのステータスバー表示用文字列。</summary>
+    public string SelectedCellDisplay => SelectedCell is { } pos ? $"行{pos.Row + 1}/列{pos.Column}" : "未選択";
+
+    private string _statusMessage = "";
+
+    /// <summary>ステータスバーへの一時的な案内メッセージ(例: セル未選択時の配置操作案内)。</summary>
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => SetProperty(ref _statusMessage, value);
+    }
+
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
     public SheetNavigationViewModel SheetNavigation { get; }
 
