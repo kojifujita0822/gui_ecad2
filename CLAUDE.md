@@ -10,7 +10,8 @@ GuiEcad（ラダー図 CAD）で得た知見を活かし、制御盤設計・ラ
 
 ## 現状
 - 技術スタック: **WPFに正式確定**（2026-07-03、殿裁定。詳細は `docs/ecad2-stack-decision-brief.md`）
-- 実装は雛形・アーキ設計に着手（`docs/todo.md` T-004）
+- UI/UX方針: **確定済み**（区画分け維持・視覚シンプル化・キーボード主体・GX Works3踏襲。詳細は `docs/ecad2-ui-ux-design-brief.md`）
+- 実装: GuiEcad実ソースの全層移植（T-007）・Ecad2.App骨格UI（T-009）・要素配置ロジック（T-016）完了。現在T-026（左パネルのナビツリー化）進行中。詳細・残課題は `docs/todo.md`
 - 4セッション体制（家老/侍/忍者/隠密）で並列運用。役割定義は `docs-notes/roles/{karo,samurai,ninja,onmitsu}.md`
 - 起動プロンプトは `prompts/startup-auto.md`（役割自動決定フロー）
 - 計画ドキュメントは `docs/` 配下に順次整備する（索引: `docs/README.md`、家老→各役への指示置き場: `docs/todo.md`）
