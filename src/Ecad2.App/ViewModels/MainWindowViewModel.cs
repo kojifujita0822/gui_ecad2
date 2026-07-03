@@ -39,10 +39,27 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 現在表示中のシート。段階4-a時点ではキャンバス描画の動作確認用ダミーデータを起動時に設定する。
-    /// 本実装（GcadSerializer.Load によるドキュメント読込）への置き換えは将来タスク。
+    /// 開いているドキュメント全体（複数シートを保持）。T-026時点ではダミーデータ(3シート)を
+    /// 起動時に設定する。GcadSerializer.Load によるドキュメント読込への置き換えは将来タスク(T-019)。
     /// </summary>
-    public Sheet CurrentSheet { get; } = CreateDummySheet();
+    public LadderDocument Document { get; } = CreateDummyDocument();
+
+    private int _currentSheetIndex;
+
+    /// <summary>現在表示中のシートのインデックス（Document.Sheets への添字）。左パレットのシート
+    /// ナビゲーション(T-026)からの選択で変更される。</summary>
+    public int CurrentSheetIndex
+    {
+        get => _currentSheetIndex;
+        set
+        {
+            if (SetProperty(ref _currentSheetIndex, value))
+                OnPropertyChanged(nameof(CurrentSheet));
+        }
+    }
+
+    /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。</summary>
+    public Sheet CurrentSheet => Document.Sheets[CurrentSheetIndex];
 
     /// <summary>左パレット（部品選択）の子ViewModel。</summary>
     public PartPaletteViewModel PartPalette { get; }
@@ -61,7 +78,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         PartPalette = new PartPaletteViewModel(this);
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
-        DeviceTable = new DeviceTableViewModel(CreateDummyDeviceTable());
+        DeviceTable = new DeviceTableViewModel(Document.Devices);
     }
 
     private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)
@@ -72,19 +89,42 @@ public sealed class MainWindowViewModel : ViewModelBase
         return library;
     }
 
-    private static Sheet CreateDummySheet() => new()
+    // シート切替(T-026段階2)の動作確認がしやすいよう、シートごとに異なる要素構成にしている。
+    private static LadderDocument CreateDummyDocument()
     {
-        Name = "シート1",
-        Grid = new GridSpec { Rows = 10, Columns = 20 },
-        Elements =
+        var document = new LadderDocument { Devices = CreateDummyDeviceTable() };
+        document.Sheets.Add(new Sheet
         {
-            new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 2), DeviceName = "X0" },
-            new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "X1" },
-            new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 8), DeviceName = "Y0" },
-        },
-    };
+            PageNumber = 1,
+            Name = "シート1",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+            Elements =
+            {
+                new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 2), DeviceName = "X0" },
+                new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "X1" },
+                new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 8), DeviceName = "Y0" },
+            },
+        });
+        document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+            Elements =
+            {
+                new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 4), DeviceName = "Y1" },
+            },
+        });
+        document.Sheets.Add(new Sheet
+        {
+            PageNumber = 3,
+            Name = "シート3",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        return document;
+    }
 
-    // 機器表の動作確認用ダミーデータ。CreateDummySheet の DeviceName と対応させている。
+    // 機器表の動作確認用ダミーデータ。CreateDummyDocument内の各シートのDeviceNameと対応させている。
     private static DeviceTable CreateDummyDeviceTable() => new()
     {
         ByName =
@@ -92,6 +132,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             ["X0"] = new Device { Name = "X0", Class = DeviceClass.PushButton },
             ["X1"] = new Device { Name = "X1", Class = DeviceClass.PushButton },
             ["Y0"] = new Device { Name = "Y0", Class = DeviceClass.Relay },
+            ["Y1"] = new Device { Name = "Y1", Class = DeviceClass.Relay },
         },
     };
 }
