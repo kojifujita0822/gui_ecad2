@@ -83,18 +83,23 @@ public partial class MainWindow : Window
 
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
     // #2「Enter/Escの一枚岩の意味テーブル」→ Escは常に1階層キャンセルとして配置ツールを選択モードへ戻す
-    // #3「パネル間ナビゲーションをTabと分離」→ F6で左パレット/キャンバス/右パネルを循環移動する
+    // #3「パネル間ナビゲーションをTabと分離」→ Shift+Tabで左パレット/キャンバス/右パネルを循環移動する
+    // (T-026段階4でF6から変更。F6はOR入力(Shift+F5=OR/Shift+F6=NOR)導入によりF5/F6系のキー体系と
+    // 衝突するため、殿裁定でパネル循環はShift+Tabへ移設。単体Tabはキャンバス内用途に温存)。
     // Enterによる「配置確定」は配置機能自体が未実装のため今回は対象外（将来タスク）。
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.Shift)
+        {
+            CyclePanelFocus();
+            e.Handled = true;
+            return;
+        }
+
         switch (e.Key)
         {
             case Key.Escape:
                 _viewModel.Tool = ViewModels.ToolState.SelectDefault;
-                e.Handled = true;
-                break;
-            case Key.F6:
-                CyclePanelFocus();
                 e.Handled = true;
                 break;
         }
