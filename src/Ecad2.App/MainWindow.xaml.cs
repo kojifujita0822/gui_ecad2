@@ -23,4 +23,14 @@ public partial class MainWindow : Window
         DataContext = viewModel;
         LadderCanvasHost.Draw(viewModel.CurrentSheet);
     }
+
+    // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
+    private void CanvasArea_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        if (Keyboard.Modifiers != ModifierKeys.Control) return;
+
+        var viewModel = (ViewModels.MainWindowViewModel)DataContext;
+        viewModel.CanvasScale += e.Delta > 0 ? 0.1 : -0.1;
+        e.Handled = true;
+    }
 }

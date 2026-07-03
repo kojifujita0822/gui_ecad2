@@ -20,6 +20,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _tool, value);
     }
 
+    private double _canvasScale = 1.0;
+
+    /// <summary>キャンバスの表示倍率（Ctrl+マウスホイールで変更）。0.25〜4.0の範囲にクランプする。</summary>
+    public double CanvasScale
+    {
+        get => _canvasScale;
+        set => SetProperty(ref _canvasScale, Math.Clamp(value, 0.25, 4.0));
+    }
+
     /// <summary>
     /// 現在表示中のシート。段階4-a時点ではキャンバス描画の動作確認用ダミーデータを起動時に設定する。
     /// 本実装（GcadSerializer.Load によるドキュメント読込）への置き換えは将来タスク。
