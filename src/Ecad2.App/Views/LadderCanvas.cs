@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 using Ecad2.Model;
 using Ecad2.Rendering;
@@ -10,6 +11,12 @@ namespace Ecad2.App.Views;
 /// ラダー図面を描画するキャンバス。T-002 PoCの SymbolCanvas パターン(DrawingVisualホスト)を踏襲した
 /// 新規実装。Ecad2.Core.Rendering.DiagramRenderer(上位描画器)と Ecad2.Rendering.Wpf.WpfRenderer
 /// (IRendererのWPF実装、T-007成果物)を使って Sheet を描画する。
+///
+/// フォーカス: Focusable=true とし、クリックで明示的にフォーカスを取得する
+/// (T-002/T-006で検証したFocusScope制御パターンの最小反映)。MainWindow.xaml側で
+/// このキャンバスを含む領域を FocusManager.IsFocusScope="True" として独立させている。
+/// 要素単位の選択・編集フォーカス制御（PreviewLostKeyboardFocusのキャンセル等）は
+/// 配置ツール機能の実装に合わせて将来追加する。
 /// </summary>
 public sealed class LadderCanvas : FrameworkElement
 {
@@ -23,6 +30,8 @@ public sealed class LadderCanvas : FrameworkElement
     public LadderCanvas()
     {
         _children = new VisualCollection(this);
+        Focusable = true;
+        PreviewMouseLeftButtonDown += (_, _) => Focus();
     }
 
     protected override int VisualChildrenCount => _children.Count;
