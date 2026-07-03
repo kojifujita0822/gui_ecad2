@@ -23,18 +23,22 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new ViewModels.MainWindowViewModel();
         DataContext = _viewModel;
-        // シートナビゲーション(T-026)でCurrentSheetIndexが変わった時にキャンバスを再描画する。
-        // LadderCanvasはカスタムFrameworkElementでDraw()呼び出しが描画トリガーのため、
-        // バインディングだけでは自動再描画されない。
+        // シートナビゲーション(T-026)でCurrentSheetIndexが変わった時、および選択セル(T-017/T-027)
+        // が変わった時にキャンバスを再描画する。LadderCanvasはカスタムFrameworkElementでDraw()
+        // 呼び出しが描画トリガーのため、バインディングだけでは自動再描画されない。
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
-        LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
+        RedrawCanvas();
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet))
-            LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell))
+            RedrawCanvas();
     }
+
+    private void RedrawCanvas()
+        => LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary, _viewModel.SelectedCell);
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
     private void CanvasArea_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -44,6 +48,11 @@ public partial class MainWindow : Window
         _viewModel.CanvasScale += e.Delta > 0 ? 0.1 : -0.1;
         e.Handled = true;
     }
+
+    // プロパティパネルのデバイス名編集(T-017)。ElementInstanceはINotifyPropertyChangedを実装
+    // していないため、値自体はSelectedElementDeviceNameのsetterで直接書き換わるが、キャンバス上の
+    // 表示(デバイス名ラベル)への反映にはDraw()の明示的な再呼び出しが要る(T-026のリネームバグと同種)。
+    private void DeviceNameBox_LostFocus(object sender, RoutedEventArgs e) => RedrawCanvas();
 
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
     // ViewModelのRenameCommandへ委譲する。
@@ -121,7 +130,33 @@ public partial class MainWindow : Window
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
+            case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
+                // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
+                // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
+                // キャンバスフォーカス時はScrollViewer(CanvasArea)の既定スクロールを上書きし、
+                // SelectedCellをセル単位で移動する(T-017)。
+                MoveSelectedCell(e.Key);
+                e.Handled = true;
+                break;
         }
+    }
+
+    private bool IsCanvasFocused() => IsWithin(LadderCanvasHost, Keyboard.FocusedElement as DependencyObject);
+
+    private void MoveSelectedCell(Key key)
+    {
+        var current = _viewModel.SelectedCell ?? new Ecad2.Model.GridPos(0, 0);
+        var grid = _viewModel.CurrentSheet.Grid;
+        int row = current.Row;
+        int column = current.Column;
+        switch (key)
+        {
+            case Key.Up: row = Math.Max(0, row - 1); break;
+            case Key.Down: row = Math.Min(grid.Rows - 1, row + 1); break;
+            case Key.Left: column = Math.Max(0, column - 1); break;
+            case Key.Right: column = Math.Min(grid.Columns, column + 1); break;
+        }
+        _viewModel.SelectedCell = new Ecad2.Model.GridPos(row, column);
     }
 
     // 選択ツール(Esc)ボタン。Window_PreviewKeyDownのEscケースと同じ操作。
@@ -195,7 +230,7 @@ public partial class MainWindow : Window
         _viewModel.StatusMessage = "";
         _viewModel.SelectedCell = null;
         _viewModel.Tool = ViewModels.ToolState.SelectDefault;
-        LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
+        RedrawCanvas();
     }
 
     private void CyclePanelFocus()

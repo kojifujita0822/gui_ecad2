@@ -81,12 +81,54 @@ public sealed class MainWindowViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _selectedCell, value))
+            {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
+                OnPropertyChanged(nameof(SelectedElement));
+                OnPropertyChanged(nameof(HasSelectedElement));
+                OnPropertyChanged(nameof(SelectedElementKindDisplay));
+                OnPropertyChanged(nameof(SelectedElementDeviceName));
+            }
         }
     }
 
     /// <summary>SelectedCellのステータスバー表示用文字列。</summary>
     public string SelectedCellDisplay => SelectedCell is { } pos ? $"行{pos.Row + 1}/列{pos.Column}" : "未選択";
+
+    /// <summary>SelectedCellの位置にある既存要素(T-017)。null=要素なし、または未選択。</summary>
+    public ElementInstance? SelectedElement
+        => SelectedCell is { } pos ? CurrentSheet.Elements.FirstOrDefault(el => el.Pos == pos) : null;
+
+    /// <summary>右パネル下段のプロパティ表示切替に使う(選択中セルに要素があるか)。</summary>
+    public bool HasSelectedElement => SelectedElement is not null;
+
+    /// <summary>SelectedElementの種別表示名。PartIdがあれば図形定義名、なければKindの文字列表現。</summary>
+    public string SelectedElementKindDisplay
+    {
+        get
+        {
+            var el = SelectedElement;
+            if (el is null) return "";
+            if (el.PartId is string partId)
+            {
+                var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
+                if (entry is not null) return entry.Definition.Name;
+            }
+            return el.Kind.ToString();
+        }
+    }
+
+    /// <summary>SelectedElementのデバイス名(T-017、プロパティパネルで編集可能)。</summary>
+    public string SelectedElementDeviceName
+    {
+        get => SelectedElement?.DeviceName ?? "";
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            string trimmed = value.Trim();
+            el.DeviceName = trimmed.Length > 0 ? trimmed : null;
+            OnPropertyChanged();
+        }
+    }
 
     private string _statusMessage = "";
 

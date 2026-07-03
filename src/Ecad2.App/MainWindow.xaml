@@ -10,8 +10,8 @@
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
-        <BooleanToVisibilityConverter x:Key="PartSelectionVisibility"/>
-        <converters:InverseBooleanToVisibilityConverter x:Key="InversePartSelectionVisibility"/>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -274,14 +274,21 @@
 
                     <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
                          Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全Entries)を表示し、
-                         それ以外はプロパティを表示する。キャンバス上の要素選択機能自体は未実装
-                         のため、プロパティ側は現時点でプレースホルダ表示のみ(選択連動は将来タスク)。 -->
+                         それ以外はプロパティを表示する。プロパティ側はさらにHasSelectedElementで
+                         「要素を選択してください」プレースホルダと選択中要素の詳細表示を切替える(T-017)。 -->
                     <Grid Grid.Row="2">
-                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InversePartSelectionVisibility}}">
+                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
                             <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
-                            <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"/>
+                            <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
+                                       Visibility="{Binding HasSelectedElement, Converter={StaticResource InverseBoolToVisibility}}"/>
+                            <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}"/>
+                                <TextBlock Text="デバイス名:" Margin="0,8,0,2"/>
+                                <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=LostFocus}"
+                                         LostFocus="DeviceNameBox_LostFocus"/>
+                            </StackPanel>
                         </DockPanel>
-                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource PartSelectionVisibility}}">
+                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock DockPanel.Dock="Top" Text="部品選択" FontWeight="Bold" Margin="4"/>
                             <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
                                 <ListBox.ItemTemplate>

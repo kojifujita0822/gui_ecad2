@@ -40,7 +40,11 @@ public sealed class LadderCanvas : FrameworkElement
     protected override int VisualChildrenCount => _children.Count;
     protected override Visual GetVisualChild(int index) => _children[index];
 
-    public void Draw(Sheet sheet, PartLibrary? library = null)
+    // 選択セルのハイライト枠線(T-017/T-027)。基本図形は全て1セル幅(BasicPartTemplates確認済み)
+    // のため、常に1セル分の矩形で描く。
+    private static readonly Pen SelectedCellPen = new(Brushes.OrangeRed, 2.0);
+
+    public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null)
     {
         _children.Clear();
 
@@ -58,6 +62,15 @@ public sealed class LadderCanvas : FrameworkElement
 
             var wpfRenderer = new WpfRenderer(dc);
             _renderer.Render(wpfRenderer, sheet, library);
+
+            if (selectedCell is { } cell)
+            {
+                var geo = _renderer.Geometry;
+                double x = geo.X(cell.Column) * MmToDip;
+                double y = (geo.YRow(cell.Row) - geo.CellMm / 2) * MmToDip;
+                double cellSize = geo.CellMm * MmToDip;
+                dc.DrawRectangle(null, SelectedCellPen, new Rect(x, y, cellSize, cellSize));
+            }
         }
         _children.Add(visual);
 
