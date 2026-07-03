@@ -13,11 +13,20 @@ public sealed class MainWindowViewModel : ViewModelBase
 {
     private ToolState _tool = ToolState.SelectDefault;
 
-    /// <summary>現在の配置ツール状態（単一の真実源）。</summary>
+    /// <summary>
+    /// 現在の配置ツール状態（単一の真実源）。ToolState は record struct のため、
+    /// SetProperty の構造的等価性チェックだと「同じ図形を再選択」等で値が変わらないケースに
+    /// PropertyChanged が発火せずUIが更新されないバグになる（忍者実機確認T-016で発見）。
+    /// このプロパティは常に通知する。
+    /// </summary>
     public ToolState Tool
     {
         get => _tool;
-        set => SetProperty(ref _tool, value);
+        set
+        {
+            _tool = value;
+            OnPropertyChanged();
+        }
     }
 
     private double _canvasScale = 1.0;
