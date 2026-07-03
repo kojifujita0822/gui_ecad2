@@ -91,7 +91,13 @@ public partial class MainWindow : Window
     private void CyclePanelFocus()
     {
         UIElement[] panels = { PartPaletteList, LadderCanvasHost, DeviceTableGrid };
-        var current = FocusManager.GetFocusedElement(this) as DependencyObject;
+
+        // FocusManager.GetFocusedElement(this) は Window スコープの論理フォーカスしか返さない。
+        // CanvasArea(ScrollViewer)は FocusManager.IsFocusScope="True" で独立したFocusScopeのため、
+        // その中(LadderCanvasHost)へフォーカスが移ってもWindowスコープの論理フォーカスは追随せず、
+        // 常に同じpanelへ戻ってしまう(忍者実機確認T-016で発見)。Keyboard.FocusedElementはスコープを
+        // 問わない実際のキーボードフォーカス要素を返すため、これを使う。
+        var current = Keyboard.FocusedElement as DependencyObject;
 
         int index = -1;
         for (int i = 0; i < panels.Length; i++)
@@ -99,9 +105,13 @@ public partial class MainWindow : Window
             if (IsWithin(panels[i], current)) { index = i; break; }
         }
         int next = (index + 1) % panels.Length;
-        // UIElement.Focus()は要素の状態によって静かに失敗することがある(その場合フォーカスが
-        // Windowへフォールバックし、循環が機能しなくなる)。Keyboard.Focus()の方が確実。
-        Keyboard.Focus(panels[next]);
+        var target = panels[next];
+
+        // 対象要素が独立したFocusScope内にある場合、Keyboard.Focus()だけでは実フォーカスが
+        // 移らないことがあるため、まずFocusScope自体にも論理フォーカスを設定しておく。
+        var scope = FocusManager.GetFocusScope(target);
+        FocusManager.SetFocusedElement(scope, target);
+        Keyboard.Focus(target);
     }
 
     private static bool IsWithin(DependencyObject root, DependencyObject? element)
