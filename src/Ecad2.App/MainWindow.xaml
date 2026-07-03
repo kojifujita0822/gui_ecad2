@@ -209,8 +209,39 @@
 
             <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch"/>
 
-            <!-- 右パネル: 機器表/プロパティ(段階6で実装) -->
-            <Border x:Name="RightPanelArea" Grid.Column="4" BorderBrush="Gray" BorderThickness="1,0,0,0"/>
+            <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
+                 上下2分割(GridSplitter)で常時同時参照可能にする(タブ切替不要)。 -->
+            <Border x:Name="RightPanelArea" Grid.Column="4" BorderBrush="Gray" BorderThickness="1,0,0,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*" MinHeight="80"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 上段: 機器表 -->
+                    <DockPanel Grid.Row="0">
+                        <TextBlock DockPanel.Dock="Top" Text="機器表" FontWeight="Bold" Margin="4"/>
+                        <DataGrid ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
+                                  IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="機器名" Binding="{Binding Name}"/>
+                                <DataGridTextColumn Header="種別" Binding="{Binding Class}"/>
+                                <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+                    </DockPanel>
+
+                    <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch"/>
+
+                    <!-- 下段: プロパティ。キャンバス上の要素選択機能は未実装のため、現時点はプレース
+                         ホルダ表示のみ。選択連動は将来タスク。 -->
+                    <DockPanel Grid.Row="2">
+                        <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
+                        <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"/>
+                    </DockPanel>
+                </Grid>
+            </Border>
         </Grid>
 
         <!-- 下部出力パネル(段階7で実装) -->

@@ -38,9 +38,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>左パレット（部品選択）の子ViewModel。</summary>
     public PartPaletteViewModel PartPalette { get; }
 
+    /// <summary>右パネル上段（機器表）の子ViewModel。</summary>
+    public DeviceTableViewModel DeviceTable { get; }
+
     public MainWindowViewModel()
     {
         PartPalette = new PartPaletteViewModel(this);
+        DeviceTable = new DeviceTableViewModel(CreateDummyDeviceTable());
     }
 
     private static Sheet CreateDummySheet() => new()
@@ -52,6 +56,17 @@ public sealed class MainWindowViewModel : ViewModelBase
             new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 2), DeviceName = "X0" },
             new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "X1" },
             new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 8), DeviceName = "Y0" },
+        },
+    };
+
+    // 機器表の動作確認用ダミーデータ。CreateDummySheet の DeviceName と対応させている。
+    private static DeviceTable CreateDummyDeviceTable() => new()
+    {
+        ByName =
+        {
+            ["X0"] = new Device { Name = "X0", Class = DeviceClass.PushButton },
+            ["X1"] = new Device { Name = "X1", Class = DeviceClass.PushButton },
+            ["Y0"] = new Device { Name = "Y0", Class = DeviceClass.Relay },
         },
     };
 }
