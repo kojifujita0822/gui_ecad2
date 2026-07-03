@@ -41,10 +41,26 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>右パネル上段（機器表）の子ViewModel。</summary>
     public DeviceTableViewModel DeviceTable { get; }
 
+    /// <summary>
+    /// 現在使用可能な自作パーツライブラリ。PartPalette.Entries（PartFolderStoreの列挙結果、
+    /// 基本図形もPartIdを持つ.gcadpartとして含む）から構築する。DiagramRenderer.Render /
+    /// LadderCanvas.Draw に渡し、要素配置時（T-016）の PartResolver 解決にも使う。
+    /// </summary>
+    public PartLibrary PartLibrary { get; }
+
     public MainWindowViewModel()
     {
         PartPalette = new PartPaletteViewModel(this);
+        PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(CreateDummyDeviceTable());
+    }
+
+    private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)
+    {
+        var library = new PartLibrary();
+        foreach (var entry in entries)
+            library.ById[entry.Definition.Id] = entry.Definition;
+        return library;
     }
 
     private static Sheet CreateDummySheet() => new()

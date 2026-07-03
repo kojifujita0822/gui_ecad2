@@ -23,7 +23,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = new ViewModels.MainWindowViewModel();
         DataContext = _viewModel;
-        LadderCanvasHost.Draw(_viewModel.CurrentSheet);
+        LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
     }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
