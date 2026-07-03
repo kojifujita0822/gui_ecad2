@@ -104,6 +104,9 @@ public partial class MainWindow : Window
             case Key.Escape:
                 _viewModel.SelectedCell = null;
                 _viewModel.Tool = ViewModels.ToolState.SelectDefault;
+                // BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")が
+                // キャンセル後も残り続けるバグの修正(忍者実機検証で発覚)。
+                _viewModel.StatusMessage = "";
                 e.Handled = true;
                 break;
             case Key.F5 when noModifier:
@@ -164,6 +167,7 @@ public partial class MainWindow : Window
     {
         _viewModel.SelectedCell = null;
         _viewModel.Tool = ViewModels.ToolState.SelectDefault;
+        _viewModel.StatusMessage = "";
     }
 
     // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通ハンドラ。Tagに図形名("a接点"等)、

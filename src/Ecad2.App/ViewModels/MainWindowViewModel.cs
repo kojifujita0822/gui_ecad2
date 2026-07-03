@@ -1,4 +1,5 @@
 using Ecad2.Model;
+using Ecad2.Simulation;
 
 namespace Ecad2.App.ViewModels;
 
@@ -101,7 +102,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>右パネル下段のプロパティ表示切替に使う(選択中セルに要素があるか)。</summary>
     public bool HasSelectedElement => SelectedElement is not null;
 
-    /// <summary>SelectedElementの種別表示名。PartIdがあれば図形定義名、なければKindの文字列表現。</summary>
+    /// <summary>SelectedElementの種別表示名。PartIdがあれば図形定義名、なければKindの日本語名
+    /// (ダミーデータ等、PartId無しでKindのみ設定された要素向け)。</summary>
     public string SelectedElementKindDisplay
     {
         get
@@ -113,20 +115,56 @@ public sealed class MainWindowViewModel : ViewModelBase
                 var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
                 if (entry is not null) return entry.Definition.Name;
             }
-            return el.Kind.ToString();
+            return KindDisplayName(el.Kind);
         }
     }
 
-    /// <summary>SelectedElementのデバイス名(T-017、プロパティパネルで編集可能)。</summary>
+    private static string KindDisplayName(ElementKind kind) => kind switch
+    {
+        ElementKind.ContactNO => "a接点",
+        ElementKind.ContactNC => "b接点",
+        ElementKind.Coil => "コイル",
+        ElementKind.Lamp => "ランプ",
+        ElementKind.PushButtonNO => "押しボタン(NO)",
+        ElementKind.PushButtonNC => "押しボタン(NC)",
+        ElementKind.SelectSwitch => "セレクトSW",
+        ElementKind.Terminal => "端子台",
+        ElementKind.Timer => "タイマ",
+        ElementKind.Counter => "カウンタ",
+        _ => kind.ToString(),
+    };
+
+    /// <summary>
+    /// SelectedElementのデバイス名(T-017、プロパティパネルで編集可能)。ElementInstance.DeviceName
+    /// を書き換えるだけでなく、Document.Devices(機器表)にも反映する。同名デバイスを参照する他要素
+    /// も含めた一括リネームはSimulation.DeviceRenamerに委譲する(既存デバイスの改名時)。新規デバイス
+    /// 名(Document.Devicesに未登録)の場合はDeviceClass.Otherで新規登録する(忍者実機検証で発覚:
+    /// 単純代入だけでは機器表に反映されないバグの修正)。
+    /// </summary>
     public string SelectedElementDeviceName
     {
         get => SelectedElement?.DeviceName ?? "";
         set
         {
             if (SelectedElement is not ElementInstance el) return;
-            string trimmed = value.Trim();
-            el.DeviceName = trimmed.Length > 0 ? trimmed : null;
+            string oldName = el.DeviceName ?? "";
+            string newName = value.Trim();
+            if (oldName == newName) return;
+
+            if (oldName.Length > 0 && newName.Length > 0)
+            {
+                DeviceRenamer.Rename(Document, oldName, newName);
+            }
+            else
+            {
+                el.DeviceName = newName.Length > 0 ? newName : null;
+                if (newName.Length > 0 && !Document.Devices.ByName.ContainsKey(newName))
+                    Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
+            }
+
             OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedElementKindDisplay));
+            DeviceTable.Refresh();
         }
     }
 
