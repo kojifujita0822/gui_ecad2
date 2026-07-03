@@ -6,20 +6,146 @@
         xmlns:local="clr-namespace:Ecad2.App"
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
+             (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
+             アイコンの絵柄は段階3では簡易プレースホルダ(Path Geometry)。本格意匠はT-013。 -->
+        <Style x:Key="ToolBarButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style x:Key="ToolBarIconStyle" TargetType="Path">
+            <Setter Property="Width" Value="18"/>
+            <Setter Property="Height" Value="18"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="Stroke" Value="Black"/>
+            <Setter Property="StrokeThickness" Value="1.4"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="ToolBarKeyLabelStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+        </Style>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>  <!-- メニューバー(段階3で実装) -->
-            <RowDefinition Height="Auto"/>  <!-- ツールバー(段階3で実装) -->
+            <RowDefinition Height="Auto"/>  <!-- メニューバー -->
+            <RowDefinition Height="Auto"/>  <!-- ツールバー(2段構成) -->
             <RowDefinition Height="*"/>     <!-- メイン作業域 -->
             <RowDefinition Height="Auto"/>  <!-- 下部出力パネル -->
             <RowDefinition Height="Auto"/>  <!-- ステータスバー -->
         </Grid.RowDefinitions>
 
-        <!-- メニューバー領域(プレースホルダ。段階3で実装) -->
-        <Border x:Name="MenuBarArea" Grid.Row="0" BorderBrush="Gray" BorderThickness="0,0,0,1" Height="24"/>
+        <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
+        <Menu x:Name="MenuBarArea" Grid.Row="0">
+            <MenuItem Header="ファイル(_F)">
+                <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N"/>
+                <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S"/>
+                <Separator/>
+                <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P"/>
+                <Separator/>
+                <MenuItem Header="終了(_X)"/>
+            </MenuItem>
+            <MenuItem Header="編集(_E)">
+                <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z"/>
+                <MenuItem Header="やり直し(_R)" InputGestureText="Ctrl+Y"/>
+                <Separator/>
+                <MenuItem Header="切り取り(_T)" InputGestureText="Ctrl+X"/>
+                <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C"/>
+                <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V"/>
+            </MenuItem>
+            <MenuItem Header="表示(_V)">
+                <MenuItem Header="グリッド表示(_G)"/>
+            </MenuItem>
+            <MenuItem Header="ツール(_T)">
+                <MenuItem Header="テストモード(_M)" InputGestureText="F5"/>
+            </MenuItem>
+            <MenuItem Header="ヘルプ(_H)">
+                <MenuItem Header="バージョン情報(_A)"/>
+            </MenuItem>
+        </Menu>
 
-        <!-- ツールバー領域(プレースホルダ。段階3で実装) -->
-        <Border x:Name="ToolBarArea" Grid.Row="1" BorderBrush="Gray" BorderThickness="0,0,0,1" Height="32"/>
+        <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド) -->
+        <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
+            <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+N"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+O"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+S"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Z"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Y"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+P"/>
+                    </StackPanel>
+                </Button>
+            </ToolBar>
+            <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
+                <!-- ラダー専用コマンド(プレースホルダ。機器配置ロジックは段階4以降で接続) -->
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
+                    </StackPanel>
+                </Button>
+            </ToolBar>
+        </ToolBarTray>
 
         <!-- メイン作業域: 左パレット / 中央キャンバス / 右パネル -->
         <Grid Grid.Row="2">
@@ -36,8 +162,10 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"/>
 
-            <!-- 中央キャンバス: 図面描画(段階4で実装) -->
-            <Border x:Name="CanvasArea" Grid.Column="2"/>
+            <!-- 中央キャンバス: 図面描画(段階4で実装)。現時点は配色検証のプレースホルダ表示のみ。
+                 空状態(プロジェクト未作成)=濃紺。ドキュメントを開いたら作業領域色(白+黒グリッド)へ
+                 動的切替する想定(段階4で実装)。 -->
+            <Border x:Name="CanvasArea" Grid.Column="2" Background="{StaticResource EmptyStateBackgroundBrush}"/>
 
             <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch"/>
 

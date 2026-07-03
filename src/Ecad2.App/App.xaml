@@ -4,6 +4,13 @@
              xmlns:local="clr-namespace:Ecad2.App"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <!--
+            GX Works3実機調査(T-012)より: 配色は状態依存。
+            空状態(プロジェクト未作成)=濃紺、作業領域(ラダーエディタ内部)=白+黒グリッド。
+            グリッド色はEcad2.Core.Rendering.DrawingTheme.GridGray(#D2D2D2)と一貫させる。
+        -->
+        <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#1E2A47"/>
+        <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="White"/>
+        <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#D2D2D2"/>
     </Application.Resources>
 </Application>
