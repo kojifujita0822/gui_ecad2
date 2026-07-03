@@ -366,22 +366,27 @@ public sealed class DiagramRenderer
 
     // 先頭要素の左母線延長区間 (0, lb] にある分岐点(縦コネクタ端点)のうち最も内側(右寄り)の境界。
     // 横線はそこで終端し母線へ延ばさない。境界0(母線)は対象外。なければ null（母線まで延ばす）。
+    // BottomRow側の行のみを対象にする: TopRow側(縦コネクタの起点行)は通常通り母線へつながる
+    // べきで、母線接続を省略してよいのは縦コネクタ経由でのみ接続されるBottomRow側だけ
+    // (以前はTopRow/BottomRowを区別せず両方を対象にしており、OR入力で基準行まで母線から
+    // 浮いて見えるバグになっていた。T-026実機検証で発覚)。
     private static double? LeftTerminator(Sheet sheet, int row, int lb)
     {
         double? best = null;
         foreach (var c in sheet.Connectors)
-            if ((c.TopRow == row || c.BottomRow == row) && c.Column > 0 && c.Column <= lb)
+            if (c.BottomRow == row && c.Column > 0 && c.Column <= lb)
                 best = best is null ? c.Column : Math.Max(best.Value, c.Column);
         return best;
     }
 
     // 末尾要素の右母線延長区間 [rb, columns) にある分岐点のうち最も内側(左寄り)の境界。
     // なければ null（母線まで延ばす）。rb 自身にある場合は rb を返し、横線は描かれない。
+    // LeftTerminatorと同様、BottomRow側の行のみを対象にする。
     private static double? RightTerminator(Sheet sheet, int row, int rb, int columns)
     {
         double? best = null;
         foreach (var c in sheet.Connectors)
-            if ((c.TopRow == row || c.BottomRow == row) && c.Column >= rb && c.Column < columns)
+            if (c.BottomRow == row && c.Column >= rb && c.Column < columns)
                 best = best is null ? c.Column : Math.Min(best.Value, c.Column);
         return best;
     }
