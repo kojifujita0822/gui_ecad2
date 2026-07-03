@@ -1,5 +1,3 @@
-using System.Windows.Input;
-using Ecad2.App.Commands;
 using Ecad2.Model;
 
 namespace Ecad2.App.ViewModels;
@@ -107,16 +105,48 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public PartLibrary PartLibrary { get; }
 
-    /// <summary>
-    /// ツールバー(T-026段階3)から組込み基本図形を配置ツールとして選択するコマンド。
-    /// CommandParameterに図形名(PartFolderStoreの基本図形カテゴリ内でのDefinition.Name。
-    /// 例:"a接点")を渡す。既存のPartPalette.SelectCommand(PartFolderEntry引数)と同じ
-    /// PartId方式にそのまま乗るため、PartResolver解決(T-016)も無変更で動く。
-    /// </summary>
-    public ICommand SelectBuiltinToolCommand { get; }
+    /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。</summary>
+    public bool IsSelectedCellOccupied()
+        => SelectedCell is { } pos && CurrentSheet.Elements.Any(el => el.Pos == pos);
 
-    /// <summary>選択ツール(Esc相当)へ戻すコマンド。Window_PreviewKeyDownのEscケースと同じ操作。</summary>
-    public ICommand SelectDefaultToolCommand { get; }
+    /// <summary>
+    /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、基準行
+    /// (SelectedCellより上にある直近の既存要素行、殿裁定で上方向限定)との間に縦コネクタを
+    /// 2本自動生成しOR(並列)接続にする。基準行内では新要素に列位置が最も近い要素を対応先とする。
+    /// </summary>
+    public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
+    {
+        if (SelectedCell is not { } pos) return;
+
+        const int cellWidth = 1; // 基本図形(BasicPartTemplates)は全て1セル幅
+        var newElement = new ElementInstance
+        {
+            Pos = pos,
+            PartId = partId,
+            DeviceName = deviceName.Length > 0 ? deviceName : null,
+        };
+        CurrentSheet.Elements.Add(newElement);
+
+        if (!isOr) return;
+
+        int? baseRow = CurrentSheet.Elements
+            .Where(el => el != newElement && el.Pos.Row < pos.Row)
+            .Select(el => (int?)el.Pos.Row)
+            .DefaultIfEmpty(null)
+            .Max();
+        if (baseRow is not int br) return;
+
+        var baseElement = CurrentSheet.Elements
+            .Where(el => el.Pos.Row == br)
+            .OrderBy(el => Math.Abs(el.Pos.Column - pos.Column))
+            .FirstOrDefault();
+        if (baseElement is null) return;
+
+        int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
+        int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
+        CurrentSheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
+        CurrentSheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
+    }
 
     public MainWindowViewModel()
     {
@@ -124,16 +154,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         PartPalette = new PartPaletteViewModel(this);
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(Document.Devices);
-
-        SelectBuiltinToolCommand = new RelayCommand(param =>
-        {
-            if (param is not string partName) return;
-            var entry = PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);
-            if (entry is not null)
-                Tool = new ToolState(ToolMode.PlaceElement, PartId: entry.Definition.Id);
-        });
-
-        SelectDefaultToolCommand = new RelayCommand(() => Tool = ToolState.SelectDefault);
     }
 
     private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)

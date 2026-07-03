@@ -121,13 +121,13 @@
                 </Button>
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
-                <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点、既存)、Shift+F5=OR(ORa接点)/
-                     Shift+F6=NOR(ORb接点、新規)というキー体系(殿裁定、T-026段階4)。ORa接点/ORb接点/
-                     自作パーツの3ボタンは本段階(4-2)では表示のみでコマンド未接続、後続段階で接続する。
-                     実キーボードショートカット自体のバインドも後続段階(4-5)で行う。 -->
+                <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点)、Shift+F5=OR(ORa接点)/
+                     Shift+F6=NOR(ORb接点)というキー体系(殿裁定、T-026段階4)。ボタンは「選択中セルへ
+                     ダイアログ経由で配置」に統一(キーボードショートカットと同じTryPlaceElementを
+                     Tag経由で呼ぶ、BuiltinPlaceButton_Click参照)。 -->
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
-                        Command="{Binding SelectDefaultToolCommand}">
+                        Click="SelectDefaultButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
@@ -135,7 +135,7 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
                         AutomationProperties.Name="a接点配置 (F5)"
-                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="a接点">
+                        Tag="a接点" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
@@ -143,7 +143,7 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
                         AutomationProperties.Name="b接点配置 (F6)"
-                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="b接点">
+                        Tag="b接点" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
@@ -151,7 +151,7 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
                         AutomationProperties.Name="コイル配置 (F7)"
-                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="コイル">
+                        Tag="コイル" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
@@ -159,7 +159,7 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
                         AutomationProperties.Name="端子台配置 (F8)"
-                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="端子台">
+                        Tag="端子台" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
@@ -167,14 +167,16 @@
                 </Button>
                 <Separator/>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR a接点配置 (Shift+F5)"
-                        AutomationProperties.Name="OR a接点配置 (Shift+F5)">
+                        AutomationProperties.Name="OR a接点配置 (Shift+F5)"
+                        Tag="OR:a接点" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M16,4 L16,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF5"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR b接点配置 (Shift+F6)"
-                        AutomationProperties.Name="OR b接点配置 (Shift+F6)">
+                        AutomationProperties.Name="OR b接点配置 (Shift+F6)"
+                        Tag="OR:b接点" Click="BuiltinPlaceButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3 M16,4 L16,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF6"/>
