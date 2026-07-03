@@ -168,6 +168,40 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// SelectedElement(選択中の要素)を削除する(T-017追加スコープ、Deleteキー)。SelectedCell自体は
+    /// 維持する(削除後もハイライト位置・矢印キー操作の起点を保つ、GX Works3等の一般的な挙動)。
+    /// 削除した要素のDeviceNameを、Document.Sheets全体で他のどの要素も参照しなくなった場合は
+    /// 機器表(Document.Devices)からも該当エントリを削除する(既存のDeviceRenamerに削除系メソッドは
+    /// 無かったため新規実装)。戻り値は実際に削除したか。
+    /// </summary>
+    public bool DeleteSelectedElement()
+    {
+        if (SelectedElement is not ElementInstance el) return false;
+
+        string? deviceName = el.DeviceName;
+        CurrentSheet.Elements.Remove(el);
+
+        if (deviceName is not null)
+        {
+            bool stillReferenced = Document.Sheets.Any(s =>
+                s.Elements.Any(e => string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)));
+            if (!stillReferenced)
+            {
+                var key = Document.Devices.ByName.Keys
+                    .FirstOrDefault(k => string.Equals(k, deviceName, StringComparison.OrdinalIgnoreCase));
+                if (key is not null) Document.Devices.ByName.Remove(key);
+            }
+        }
+
+        OnPropertyChanged(nameof(SelectedElement));
+        OnPropertyChanged(nameof(HasSelectedElement));
+        OnPropertyChanged(nameof(SelectedElementKindDisplay));
+        OnPropertyChanged(nameof(SelectedElementDeviceName));
+        DeviceTable.Refresh();
+        return true;
+    }
+
     private string _statusMessage = "";
 
     /// <summary>ステータスバーへの一時的な案内メッセージ(例: セル未選択時の配置操作案内)。</summary>

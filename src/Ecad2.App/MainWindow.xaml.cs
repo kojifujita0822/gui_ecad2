@@ -141,6 +141,13 @@ public partial class MainWindow : Window
                 MoveSelectedCell(e.Key);
                 e.Handled = true;
                 break;
+            case Key.Delete when noModifier && IsCanvasFocused():
+                // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
+                // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
+                if (_viewModel.DeleteSelectedElement())
+                    RedrawCanvas();
+                e.Handled = true;
+                break;
         }
     }
 
