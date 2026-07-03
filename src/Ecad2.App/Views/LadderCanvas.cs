@@ -54,4 +54,16 @@ public sealed class LadderCanvas : FrameworkElement
         Height = size.Height * MmToDip;
         InvalidateMeasure();
     }
+
+    /// <summary>
+    /// このキャンバス自身のローカル座標系（DIP単位、LayoutTransform適用前の内部座標）を
+    /// グリッド座標へ変換する。要素配置（T-016）のクリック位置判定に使う。
+    /// </summary>
+    public GridPos ToGridPos(Point localPositionDip)
+    {
+        double xMm = localPositionDip.X / MmToDip;
+        double yMm = localPositionDip.Y / MmToDip;
+        var geo = _renderer.Geometry;
+        return new GridPos(geo.RowAt(yMm), geo.ColAt(xMm));
+    }
 }

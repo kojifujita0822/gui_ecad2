@@ -42,6 +42,28 @@ public partial class MainWindow : Window
             _viewModel.PartPalette.SelectCommand.Execute(entry);
     }
 
+    // 配置ツール選択中(Tool.Mode==PlaceElement)にキャンバスをクリックすると、その位置へ要素を
+    // 追加する(T-016)。占有マス重複は最小限のみ判定(既に要素がある位置には追加しない)。
+    // デバイス名の入力(浮動インラインボックス等)は別タスク(T-021)、配置後のTool継続/リセットの
+    // 挙動整備は段階cで扱う。
+    private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement) return;
+
+        var position = e.GetPosition(LadderCanvasHost);
+        var gridPos = LadderCanvasHost.ToGridPos(position);
+
+        if (_viewModel.CurrentSheet.Elements.Any(el => el.Pos == gridPos)) return;
+
+        _viewModel.CurrentSheet.Elements.Add(new Ecad2.Model.ElementInstance
+        {
+            Pos = gridPos,
+            PartId = _viewModel.Tool.PartId,
+        });
+
+        LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
+    }
+
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
     // #2「Enter/Escの一枚岩の意味テーブル」→ Escは常に1階層キャンセルとして配置ツールを選択モードへ戻す
     // #3「パネル間ナビゲーションをTabと分離」→ F6で左パレット/キャンバス/右パネルを循環移動する

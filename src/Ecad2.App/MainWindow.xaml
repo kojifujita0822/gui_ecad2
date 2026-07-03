@@ -201,7 +201,7 @@
                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                           PreviewMouseWheel="CanvasArea_PreviewMouseWheel"
                           FocusManager.IsFocusScope="True">
-                <views:LadderCanvas x:Name="LadderCanvasHost">
+                <views:LadderCanvas x:Name="LadderCanvasHost" PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp">
                     <views:LadderCanvas.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
                     </views:LadderCanvas.LayoutTransform>
