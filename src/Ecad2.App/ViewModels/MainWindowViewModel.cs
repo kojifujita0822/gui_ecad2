@@ -1,3 +1,5 @@
+using Ecad2.Model;
+
 namespace Ecad2.App.ViewModels;
 
 /// <summary>
@@ -17,4 +19,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _tool;
         set => SetProperty(ref _tool, value);
     }
+
+    /// <summary>
+    /// 現在表示中のシート。段階4-a時点ではキャンバス描画の動作確認用ダミーデータを起動時に設定する。
+    /// 本実装（GcadSerializer.Load によるドキュメント読込）への置き換えは将来タスク。
+    /// </summary>
+    public Sheet CurrentSheet { get; } = CreateDummySheet();
+
+    private static Sheet CreateDummySheet() => new()
+    {
+        Name = "シート1",
+        Grid = new GridSpec { Rows = 10, Columns = 20 },
+        Elements =
+        {
+            new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 2), DeviceName = "X0" },
+            new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "X1" },
+            new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 8), DeviceName = "Y0" },
+        },
+    };
 }

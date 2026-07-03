@@ -4,6 +4,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Ecad2.App"
+        xmlns:views="clr-namespace:Ecad2.App.Views"
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen">
     <Window.Resources>
@@ -162,10 +163,13 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"/>
 
-            <!-- 中央キャンバス: 図面描画(段階4で実装)。現時点は配色検証のプレースホルダ表示のみ。
-                 空状態(プロジェクト未作成)=濃紺。ドキュメントを開いたら作業領域色(白+黒グリッド)へ
-                 動的切替する想定(段階4で実装)。 -->
-            <Border x:Name="CanvasArea" Grid.Column="2" Background="{StaticResource EmptyStateBackgroundBrush}"/>
+            <!-- 中央キャンバス: 図面描画。段階4-aではダミーデータを常時表示するため作業領域色(白)を
+                 適用。ドキュメント未作成時に空状態色(濃紺)へ切替える動的対応は将来タスク(ドキュメント
+                 管理の実装に合わせて反映)。 -->
+            <ScrollViewer x:Name="CanvasArea" Grid.Column="2" Background="{StaticResource WorkAreaBackgroundBrush}"
+                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                <views:LadderCanvas x:Name="LadderCanvasHost"/>
+            </ScrollViewer>
 
             <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch"/>
 

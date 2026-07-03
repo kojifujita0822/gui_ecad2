@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
-        DataContext = new ViewModels.MainWindowViewModel();
+        var viewModel = new ViewModels.MainWindowViewModel();
+        DataContext = viewModel;
+        LadderCanvasHost.Draw(viewModel.CurrentSheet);
     }
 }
