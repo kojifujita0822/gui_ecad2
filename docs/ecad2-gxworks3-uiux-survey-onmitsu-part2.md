@@ -45,3 +45,25 @@
 - ツールバーの正確なボタン数（画像から数えられる範囲に留まる）
 - ラダー要素（接点・コイル）のオンラインモニタ中の導通色（今回のスクリーンショットはオフライン編集画面のみ）
 - メインツールバーアイコンの線画/塗りつぶしの技術的実装詳細
+
+---
+
+## 付録: GX Works3の技術スタック調査（インストールフォルダのファイル解析）
+
+> ユーザーからの追加質問「このソフトはどんな技術スタックで制作されているか」を受け実施。
+> ecad2のUI視覚デザイン参考調査（T-010/T-012）と直接の関連はないが、先行製品の技術基盤を
+> 知る一次資料として有用なため付記する。
+
+**結論**: ネイティブC++（MFC/ATL、x86 32bit）のコアに、.NET Framework（WinForms）のプラグイン群を大量にロードする**ハイブリッド構成**。WPFではない。
+
+**根拠**:
+- `GXW3.exe`自体はネイティブバイナリ（.NETアセンブリではない、x86 32bit）。`mfc100.dll`/`mfc140.dll`（MFC）、`atl100.dll`（ATL）を使用。
+- `GXW3.exe.config`から、.NET側は**Syncfusion**（`Syncfusion.Diagram.Base/Windows` — 三菱独自ラッパー`MitsubishiElectric.iQWorks.Syncfusion.Diagram.*`が存在し、おそらくラダー図の描画基盤）を使用と判明。
+- 加えて**DevExpress v10.2**（XtraGrid/XtraEditors/XtraLayout）、**Infragistics v13.1**（UltraWinToolbars/UltraWinStatusBar）、**ComponentOne（GrapeCity）FlexGrid v4.6**という3社の商用WinFormsコンポーネントライブラリを併用。
+- `GOLD Engine.dll`/`GoldParserEngine.dll` — GOLD Parserという構文解析エンジンを使用（命令語/ST言語のパース用と推測、未確認）。
+- `CpuBinAdapterNative.dll`はファイル名に"Native"とあるが実体はC++/CLIのmixed-modeアセンブリ（.NETアセンブリとして読み込み可能）— ネイティブ⇔.NET間の橋渡し層と推測。
+- `WorkWindowPlugin`/`DialogPlugin`/`DockingWindowPlugin`/`CommandPlugin`/`FrameWindowPlugin`等、100以上のプラグインDLLをprobing pathで動的ロードする大規模プラグインアーキテクチャ。
+
+**推奨案**: 先行製品(GX Works3)はWPFではなくWinForms＋複数ベンダーの商用UIライブラリ併用という、2010年代前半の技術構成だった。ecad2のWPF選定はむしろGX Works3より新しい技術基盤を採用する判断であり、問題ないと考えられる。「ラダー図の描画に専用Diagramコンポーネント(Syncfusion)を使っていた」という点は、ecad2の自前2D描画実装の設計参考になり得る。
+
+**不明点**: .NET Frameworkの正確な対象バージョン（DevExpress v10.2/Infragistics v13.1のリリース時期から.NET Framework 4.0〜4.5系と推測されるが未検証）、GOLD Parserの具体的な用途、ネイティブ/マネージド間の呼び出し方式の詳細。
