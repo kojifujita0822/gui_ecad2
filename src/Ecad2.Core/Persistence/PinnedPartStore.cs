@@ -11,7 +11,7 @@ public sealed class PinnedPartStore
     public static PinnedPartStore CreateDefault()
     {
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        return new PinnedPartStore(Path.Combine(docs, "GuiEcad", "pinned-parts.json"));
+        return new PinnedPartStore(Path.Combine(docs, "Ecad2", "pinned-parts.json"));
     }
 
     public HashSet<string> Load()

@@ -26,11 +26,11 @@ public sealed class PartFolderStore
         CustomDir = Path.Combine(rootDir, CustomFolderName);
     }
 
-    /// <summary>既定の保存先（マイドキュメント\GuiEcad\図形）でストアを作る。</summary>
+    /// <summary>既定の保存先（マイドキュメント\Ecad2\図形）でストアを作る。</summary>
     public static PartFolderStore CreateDefault()
     {
         var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-        return new PartFolderStore(Path.Combine(docs, "GuiEcad", "図形"));
+        return new PartFolderStore(Path.Combine(docs, "Ecad2", "図形"));
     }
 
     /// <summary>ルートと自作フォルダを作成（既存なら何もしない）。</summary>
