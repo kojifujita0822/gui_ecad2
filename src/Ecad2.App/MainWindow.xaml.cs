@@ -41,4 +41,47 @@ public partial class MainWindow : Window
         if (sender is ListBoxItem { DataContext: Ecad2.Persistence.PartFolderEntry entry })
             _viewModel.PartPalette.SelectCommand.Execute(entry);
     }
+
+    // design-brief 4節の7原則の全体配線（段階8、最小実装）:
+    // #2「Enter/Escの一枚岩の意味テーブル」→ Escは常に1階層キャンセルとして配置ツールを選択モードへ戻す
+    // #3「パネル間ナビゲーションをTabと分離」→ F6で左パレット/キャンバス/右パネルを循環移動する
+    // Enterによる「配置確定」は配置機能自体が未実装のため今回は対象外（将来タスク）。
+    private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case Key.Escape:
+                _viewModel.Tool = ViewModels.ToolState.SelectDefault;
+                e.Handled = true;
+                break;
+            case Key.F6:
+                CyclePanelFocus();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private void CyclePanelFocus()
+    {
+        UIElement[] panels = { PartPaletteList, LadderCanvasHost, DeviceTableGrid };
+        var current = FocusManager.GetFocusedElement(this) as DependencyObject;
+
+        int index = -1;
+        for (int i = 0; i < panels.Length; i++)
+        {
+            if (IsWithin(panels[i], current)) { index = i; break; }
+        }
+        int next = (index + 1) % panels.Length;
+        panels[next].Focus();
+    }
+
+    private static bool IsWithin(DependencyObject root, DependencyObject? element)
+    {
+        while (element is not null)
+        {
+            if (ReferenceEquals(element, root)) return true;
+            element = VisualTreeHelper.GetParent(element);
+        }
+        return false;
+    }
 }

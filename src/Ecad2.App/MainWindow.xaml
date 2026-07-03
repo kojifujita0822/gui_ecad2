@@ -6,7 +6,8 @@
         xmlns:local="clr-namespace:Ecad2.App"
         xmlns:views="clr-namespace:Ecad2.App.Views"
         mc:Ignorable="d"
-        Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen">
+        Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -173,7 +174,7 @@
                  配置ツール(ToolState)が選択される。図形のビジュアルプレビューは別タスク、現状は
                  名前テキストの一覧のみ。 -->
             <Border x:Name="LeftPaletteArea" Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                <ListBox ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
+                <ListBox x:Name="PartPaletteList" ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal" Margin="2">
@@ -222,7 +223,7 @@
                     <!-- 上段: 機器表 -->
                     <DockPanel Grid.Row="0">
                         <TextBlock DockPanel.Dock="Top" Text="機器表" FontWeight="Bold" Margin="4"/>
-                        <DataGrid ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
+                        <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
                                   IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="機器名" Binding="{Binding Name}"/>
