@@ -1,0 +1,4 @@
+bin/
+obj/
+*.user
+poc/wpf-focus-poc/WpfFocusPoc/poc-output.pdf

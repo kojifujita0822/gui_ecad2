@@ -1,0 +1,77 @@
+<Window x:Class="WpfFocusPoc.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:WpfFocusPoc"
+        mc:Ignorable="d"
+        Title="ecad2 WPF PoC (T-002)" Height="600" Width="900">
+    <TabControl>
+
+        <!-- 1. フォーカス保持PoC -->
+        <TabItem Header="1. フォーカス保持">
+            <Grid Margin="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="0,0,0,10"
+                           Text="左の図形をマウスでクリック→離す（PointerPressed→PointerReleased）操作を行い、フォーカスが図形側の FocusScope に保持されるかを検証する。「編集モード中」がONの間は PreviewLostKeyboardFocus で e.Handled=true にしてフォーカス喪失をキャンセルする。"/>
+
+                <CheckBox x:Name="EditModeCheckBox" Grid.Row="1" Grid.ColumnSpan="2" Content="編集モード中（フォーカス喪失をキャンセルする）" Margin="0,0,0,10"/>
+
+                <Border Grid.Row="2" Grid.Column="0" BorderBrush="Gray" BorderThickness="1" Margin="0,0,5,0"
+                        x:Name="ShapeScopeBorder" FocusManager.IsFocusScope="True">
+                    <StackPanel x:Name="ShapePanel" Margin="10"/>
+                </Border>
+
+                <Grid Grid.Row="2" Grid.Column="1" Margin="5,0,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <TextBlock Grid.Row="0" Text="プロパティパネル（通常はフォーカスを奪う側）"/>
+                    <TextBox x:Name="PropertyTextBox" Grid.Row="1" Margin="0,5"/>
+                    <Button x:Name="DummyButton" Grid.Row="2" Content="ダミーボタン" Margin="0,5" HorizontalAlignment="Left" Padding="8,2"/>
+                    <ListBox x:Name="FocusLog" Grid.Row="3" Margin="0,10,0,0"/>
+                </Grid>
+            </Grid>
+        </TabItem>
+
+        <!-- 2. 大量記号描画PoC -->
+        <TabItem Header="2. 大量記号描画">
+            <DockPanel Margin="10">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Margin="0,0,0,10">
+                    <TextBlock Text="記号数:" VerticalAlignment="Center"/>
+                    <TextBox x:Name="SymbolCountBox" Width="80" Margin="5,0" Text="5000"/>
+                    <Button x:Name="DrawSymbolsButton" Content="描画実行" Click="DrawSymbolsButton_Click" Padding="8,2"/>
+                    <TextBlock x:Name="DrawTimeText" Margin="15,0,0,0" VerticalAlignment="Center"/>
+                </StackPanel>
+                <Border BorderBrush="Gray" BorderThickness="1">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <local:SymbolCanvas x:Name="SymbolCanvasControl"/>
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+        </TabItem>
+
+        <!-- 3. PDF出力PoC -->
+        <TabItem Header="3. PDF出力">
+            <StackPanel Margin="10">
+                <TextBlock Text="記号数:"/>
+                <TextBox x:Name="PdfSymbolCountBox" Width="80" Text="200" HorizontalAlignment="Left" Margin="0,5"/>
+                <Button x:Name="ExportPdfButton" Content="PDF出力" Click="ExportPdfButton_Click" HorizontalAlignment="Left" Margin="0,10" Padding="8,2"/>
+                <TextBlock x:Name="PdfResultText" Margin="0,10,0,0" TextWrapping="Wrap"/>
+            </StackPanel>
+        </TabItem>
+
+    </TabControl>
+</Window>
