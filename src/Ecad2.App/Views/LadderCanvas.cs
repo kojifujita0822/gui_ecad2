@@ -25,7 +25,10 @@ public sealed class LadderCanvas : FrameworkElement
     private const double MmToDip = 96.0 / 25.4;
 
     private readonly VisualCollection _children;
-    private readonly DiagramRenderer _renderer = new();
+    // ShowGrid=true: 作図ガイドの薄いグリッド線を画面表示する(T-030、殿裁定)。実機テストで
+    // 行位置を目視で合わせやすくする狙い。PDF出力(Ecad2.Pdf)側は別のDiagramRendererインスタンス
+    // を使うため、ここでの設定は画面表示にのみ影響する。
+    private readonly DiagramRenderer _renderer = new(options: new Ecad2.Rendering.RenderOptions { ShowGrid = true });
 
     public LadderCanvas()
     {
