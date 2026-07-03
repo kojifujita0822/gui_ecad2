@@ -41,17 +41,25 @@ public sealed class LadderCanvas : FrameworkElement
     {
         _children.Clear();
 
+        var size = _renderer.PageSize(sheet);
+        double widthDip = size.Width * MmToDip;
+        double heightDip = size.Height * MmToDip;
+
         var visual = new DrawingVisual();
         using (DrawingContext dc = visual.RenderOpen())
         {
+            // DrawingVisualは実際に何か描画された領域のみがヒットテスト対象になる(WPFの仕様)。
+            // 罫線・要素が無い空きセルもクリックで拾えるよう、まず透明な背景矩形をページ全体に
+            // 描画しておく(T-026 OR入力実機検証で発覚: 空き行が常にヒットテスト対象外だった)。
+            dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, widthDip, heightDip));
+
             var wpfRenderer = new WpfRenderer(dc);
             _renderer.Render(wpfRenderer, sheet, library);
         }
         _children.Add(visual);
 
-        var size = _renderer.PageSize(sheet);
-        Width = size.Width * MmToDip;
-        Height = size.Height * MmToDip;
+        Width = widthDip;
+        Height = heightDip;
         InvalidateMeasure();
     }
 
