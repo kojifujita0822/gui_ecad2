@@ -122,8 +122,11 @@ public sealed class DiagramRenderer
                            bool enableBorder = false)
     {
         if (enableBorder) return new Size2D(PageW, PageH);
-        int maxRow = 0;
-        foreach (var e in sheet.Elements) maxRow = Math.Max(maxRow, e.Pos.Row);
+        // TotalRows(sheet)はGrid.Rows(論理グリッド行数)と実際の要素最大行+1の大きい方を返す。
+        // 以前はここで要素の最大行のみを見ていたため、要素が少ないシートでキャンバス実サイズが
+        // Grid.Rowsより極端に小さくなり、空の行へのヒットテストが届かないバグがあった
+        // (T-026 OR入力実機検証で発覚、忍者報告のCanvasHeight異常値から判明)。
+        int maxRow = TotalRows(sheet) - 1;
         // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
         // テキスト幅は概算（行コメントのフォント 3.0mm・全角想定で 1 文字 ≒ 3.3mm）。
         double maxRungLen = sheet.RungComments
