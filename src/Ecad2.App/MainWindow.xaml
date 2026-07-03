@@ -121,10 +121,10 @@
                 </Button>
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
-                <!-- ラダー専用コマンド(T-026段階3で実接続)。ボタンのF5/F7/F8表記はGX Works3踏襲の
-                     マウス操作案内(design-brief 9節)だが、実際のキーボードショートカット自体の
-                     バインドは範囲外(将来タスクT-021)。F6のみ表記が既存のパネルフォーカス循環キー
-                     (Window_PreviewKeyDown)と重複するため、実キーバインドを行う際は要調整。 -->
+                <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点、既存)、Shift+F5=OR(ORa接点)/
+                     Shift+F6=NOR(ORb接点、新規)というキー体系(殿裁定、T-026段階4)。ORa接点/ORb接点/
+                     自作パーツの3ボタンは本段階(4-2)では表示のみでコマンド未接続、後続段階で接続する。
+                     実キーボードショートカット自体のバインドも後続段階(4-5)で行う。 -->
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
                         Command="{Binding SelectDefaultToolCommand}">
@@ -163,6 +163,28 @@
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR a接点配置 (Shift+F5)"
+                        AutomationProperties.Name="OR a接点配置 (Shift+F5)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M16,4 L16,14"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF5"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR b接点配置 (Shift+F6)"
+                        AutomationProperties.Name="OR b接点配置 (Shift+F6)">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3 M16,4 L16,14"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF6"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="自作パーツ">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="部品"/>
                     </StackPanel>
                 </Button>
             </ToolBar>
