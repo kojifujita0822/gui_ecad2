@@ -1,3 +1,5 @@
+using Ecad2.Model;
+
 namespace Ecad2.Rendering;
 
 // すべてワールド座標 = mm(double)。各バックエンドが mm→デバイス単位へ変換する。
@@ -7,7 +9,6 @@ public readonly record struct Rect2D(double X, double Y, double Width, double He
 public readonly record struct Color(byte A, byte R, byte G, byte B);
 
 public enum LineCap { Butt, Round, Square }
-public enum LineStyle { Solid, Dashed, Dotted }
 public enum HAlign { Left, Center, Right }
 public enum VAlign { Top, Middle, Baseline, Bottom }
 
