@@ -6,7 +6,9 @@
         xmlns:local="clr-namespace:WpfFocusPoc"
         mc:Ignorable="d"
         Title="ecad2 WPF PoC (T-002)" Height="600" Width="900">
-    <TabControl>
+    <TabControl x:Name="MainTabControl"
+                PreviewMouseLeftButtonDown="MainTabControl_PreviewMouseLeftButtonDown"
+                PreviewKeyDown="MainTabControl_PreviewKeyDown">
 
         <!-- 1. フォーカス保持PoC -->
         <TabItem Header="1. フォーカス保持">
@@ -22,7 +24,7 @@
                 </Grid.RowDefinitions>
 
                 <TextBlock Grid.Row="0" Grid.ColumnSpan="2" TextWrapping="Wrap" Margin="0,0,0,10"
-                           Text="左の図形をマウスでクリック→離す（PointerPressed→PointerReleased）操作を行い、フォーカスが図形側の FocusScope に保持されるかを検証する。「編集モード中」がONの間は PreviewLostKeyboardFocus で e.Handled=true にしてフォーカス喪失をキャンセルする。"/>
+                           Text="左の図形をマウスでクリック→離す（PointerPressed→PointerReleased）操作を行い、フォーカスが図形側の FocusScope に保持されるかを検証する。「編集モード中」がONの間は PreviewLostKeyboardFocus で e.Handled=true にしてフォーカス喪失をキャンセルする（同一FocusScope内）。加えて、タブ切替はビジュアルツリーからの離脱を伴い e.Handled=true では防げないため、編集モード中はタブヘッダのクリック／Ctrl+Tab操作自体をブロックする（T-006）。"/>
 
                 <CheckBox x:Name="EditModeCheckBox" Grid.Row="1" Grid.ColumnSpan="2" Content="編集モード中（フォーカス喪失をキャンセルする）" Margin="0,0,0,10"/>
 

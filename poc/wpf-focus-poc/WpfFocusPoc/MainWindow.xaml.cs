@@ -86,6 +86,54 @@ public partial class MainWindow : Window
         FocusLog.Items.Insert(0, $"[{DateTime.Now:HH:mm:ss.fff}] {message}");
     }
 
+    // T-006: タブ切替はビジュアルツリーからの離脱を伴うため PreviewLostKeyboardFocus の
+    // e.Handled=true では防げない。編集モード中はタブ切替の「操作自体」をブロックする。
+    private void MainTabControl_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (EditModeCheckBox.IsChecked != true)
+        {
+            return;
+        }
+
+        if (e.OriginalSource is DependencyObject source && FindAncestor<TabItem>(source) is TabItem tabItem
+            && !ReferenceEquals(tabItem, MainTabControl.SelectedItem))
+        {
+            e.Handled = true;
+            Log($"タブ切替をブロック: 編集モード中のため \"{tabItem.Header}\" への切替をキャンセル");
+        }
+    }
+
+    private void MainTabControl_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (EditModeCheckBox.IsChecked != true)
+        {
+            return;
+        }
+
+        bool isTabSwitchKey = e.Key == Key.Tab && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        bool isCtrlPageKey = e.Key is Key.PageUp or Key.PageDown && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+
+        if (isTabSwitchKey || isCtrlPageKey)
+        {
+            e.Handled = true;
+            Log($"タブ切替をブロック: 編集モード中のためキー操作({e.Key})によるタブ切替をキャンセル");
+        }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        DependencyObject? current = source;
+        while (current is not null)
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
     private void DrawSymbolsButton_Click(object sender, RoutedEventArgs e)
     {
         if (!int.TryParse(SymbolCountBox.Text, out int count) || count <= 0)
