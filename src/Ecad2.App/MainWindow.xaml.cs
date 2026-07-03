@@ -90,27 +90,27 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.F5 when noModifier:
-                TryPlaceElement("a接点", isOr: false);
+                TryPlaceBuiltin("a接点", isOr: false);
                 e.Handled = true;
                 break;
             case Key.F6 when noModifier:
-                TryPlaceElement("b接点", isOr: false);
+                TryPlaceBuiltin("b接点", isOr: false);
                 e.Handled = true;
                 break;
             case Key.F5 when shift:
-                TryPlaceElement("a接点", isOr: true);
+                TryPlaceBuiltin("a接点", isOr: true);
                 e.Handled = true;
                 break;
             case Key.F6 when shift:
-                TryPlaceElement("b接点", isOr: true);
+                TryPlaceBuiltin("b接点", isOr: true);
                 e.Handled = true;
                 break;
             case Key.F7 when noModifier:
-                TryPlaceElement("コイル", isOr: false);
+                TryPlaceBuiltin("コイル", isOr: false);
                 e.Handled = true;
                 break;
             case Key.F8 when noModifier:
-                TryPlaceElement("端子台", isOr: false);
+                TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
         }
@@ -130,13 +130,37 @@ public partial class MainWindow : Window
         if (sender is not Button { Tag: string tag }) return;
         bool isOr = tag.StartsWith("OR:");
         string partName = isOr ? tag[3..] : tag;
-        TryPlaceElement(partName, isOr);
+        TryPlaceBuiltin(partName, isOr);
     }
 
-    // 選択中セル(SelectedCell)へ組込み基本図形を配置する(T-026段階4新配置フロー)。
-    // 未選択・空き行チェック→浮動インライン入力ダイアログ(種別+デバイス名)→OKで確定配置。
-    // isOr=trueの場合、実際のOR接続処理(基準行判定・縦コネクタ生成)はViewModel側の責務。
-    private void TryPlaceElement(string partName, bool isOr)
+    // 図形名(基本図形のDefinition.Name)からPartFolderEntryを検索してTryPlaceElementを呼ぶ。
+    // F5/F6/Shift+F5/Shift+F6/F7/F8キー処理とツールバーボタン共通ハンドラの両方から使う。
+    private void TryPlaceBuiltin(string partName, bool isOr)
+    {
+        var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);
+        if (entry is not null) TryPlaceElement(entry, isOr);
+    }
+
+    // 自作パーツボタン(T-026段階4-7、案B)。Tool.Mode=PlaceElementにすることで右パネル下段を
+    // 部品選択表示へ切替える(パネルを開くための明示的な入口、鶏卵問題の回避)。
+    private void OpenPartSelectionButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement);
+    }
+
+    // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
+    // ListBoxItem.Selectedが同一アイテム再選択時に発火しない(WPFの仕様、T-016で確認済み)ため。
+    private void PartSelectionItem_Clicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is ListBoxItem { DataContext: Ecad2.Persistence.PartFolderEntry entry })
+            TryPlaceElement(entry, isOr: false);
+    }
+
+    // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
+    // 浮動インライン入力ダイアログ(種別+デバイス名)→OKで確定配置。isOr=trueの場合、実際のOR接続
+    // 処理(基準行判定・縦コネクタ生成)はViewModel側の責務。配置完了後は右パネルをプロパティ表示へ
+    // 戻す(Tool=SelectDefault、IsPartSelectionVisible連動)。
+    private void TryPlaceElement(Ecad2.Persistence.PartFolderEntry initialEntry, bool isOr)
     {
         if (_viewModel.SelectedCell is null)
         {
@@ -149,16 +173,13 @@ public partial class MainWindow : Window
             return;
         }
 
-        var basicEntries = _viewModel.PartPalette.Entries.Where(e => e.Category == "").ToList();
-        var initialEntry = basicEntries.FirstOrDefault(e => e.Definition.Name == partName);
-        if (initialEntry is null) return;
-
-        var dialog = new Views.ElementPlacementDialog(basicEntries, initialEntry.Definition.Id) { Owner = this };
+        var dialog = new Views.ElementPlacementDialog(_viewModel.PartPalette.Entries, initialEntry.Definition.Id) { Owner = this };
         if (dialog.ShowDialog() != true || dialog.SelectedPartId is null) return;
 
         _viewModel.PlaceElementAtSelectedCell(dialog.SelectedPartId, dialog.DeviceName, isOr);
         _viewModel.StatusMessage = "";
         _viewModel.SelectedCell = null;
+        _viewModel.Tool = ViewModels.ToolState.SelectDefault;
         LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary);
     }
 

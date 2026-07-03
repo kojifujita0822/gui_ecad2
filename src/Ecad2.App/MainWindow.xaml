@@ -5,10 +5,14 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:Ecad2.App"
         xmlns:views="clr-namespace:Ecad2.App.Views"
+        xmlns:converters="clr-namespace:Ecad2.App.Converters"
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="PartSelectionVisibility"/>
+        <converters:InverseBooleanToVisibilityConverter x:Key="InversePartSelectionVisibility"/>
+
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
              アイコンの絵柄は段階3では簡易プレースホルダ(Path Geometry)。本格意匠はT-013。 -->
@@ -183,7 +187,9 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="自作パーツ">
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="自作パーツ"
+                        AutomationProperties.Name="自作パーツ"
+                        Click="OpenPartSelectionButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="部品"/>
@@ -266,12 +272,34 @@
 
                     <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch"/>
 
-                    <!-- 下段: プロパティ。キャンバス上の要素選択機能は未実装のため、現時点はプレース
-                         ホルダ表示のみ。選択連動は将来タスク。 -->
-                    <DockPanel Grid.Row="2">
-                        <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
-                        <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"/>
-                    </DockPanel>
+                    <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
+                         Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全Entries)を表示し、
+                         それ以外はプロパティを表示する。キャンバス上の要素選択機能自体は未実装
+                         のため、プロパティ側は現時点でプレースホルダ表示のみ(選択連動は将来タスク)。 -->
+                    <Grid Grid.Row="2">
+                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InversePartSelectionVisibility}}">
+                            <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
+                            <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"/>
+                        </DockPanel>
+                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource PartSelectionVisibility}}">
+                            <TextBlock DockPanel.Dock="Top" Text="部品選択" FontWeight="Bold" Margin="4"/>
+                            <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="2">
+                                            <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40"/>
+                                            <TextBlock Text="{Binding Definition.Name}"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartSelectionItem_Clicked"/>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                            </ListBox>
+                        </DockPanel>
+                    </Grid>
                 </Grid>
             </Border>
         </Grid>

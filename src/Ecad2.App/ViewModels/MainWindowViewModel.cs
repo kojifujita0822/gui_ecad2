@@ -26,8 +26,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             _tool = value;
             OnPropertyChanged();
+            OnPropertyChanged(nameof(IsPartSelectionVisible));
         }
     }
+
+    /// <summary>
+    /// 右パネル下段の状況依存切替(T-026段階4-7、案B)。Tool.Mode==PlaceElementの間は
+    /// 自作パーツ選択を表示し、それ以外はプロパティを表示する。自作パーツボタン押下で
+    /// Tool.Mode=PlaceElement(PartId未確定)にすることでパネルを開く(鶏卵問題の回避)。
+    /// </summary>
+    public bool IsPartSelectionVisible => Tool.Mode == ToolMode.PlaceElement;
 
     private double _canvasScale = 1.0;
 
@@ -151,7 +159,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         SheetNavigation = new SheetNavigationViewModel(this);
-        PartPalette = new PartPaletteViewModel(this);
+        PartPalette = new PartPaletteViewModel();
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(Document.Devices);
     }
