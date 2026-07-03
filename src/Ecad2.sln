@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.Core", "Ecad2.Core\Ecad2.Core.csproj", "{1AC14E7D-797F-4B3C-8455-0A7559747CC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.Rendering.Wpf", "Ecad2.Rendering.Wpf\Ecad2.Rendering.Wpf.csproj", "{CF733C1E-8523-456B-BFF8-312534808BC9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.Pdf", "Ecad2.Pdf\Ecad2.Pdf.csproj", "{2A94629E-9460-4B98-A255-E6D46A46CC52}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.App", "Ecad2.App\Ecad2.App.csproj", "{635D7CA2-4751-427F-A8DB-1B6072148C2C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.Core.Tests", "..\tests\Ecad2.Core.Tests\Ecad2.Core.Tests.csproj", "{76C09B6A-B21E-4CBD-991E-AF616BEC116C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1AC14E7D-797F-4B3C-8455-0A7559747CC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AC14E7D-797F-4B3C-8455-0A7559747CC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AC14E7D-797F-4B3C-8455-0A7559747CC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AC14E7D-797F-4B3C-8455-0A7559747CC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CF733C1E-8523-456B-BFF8-312534808BC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CF733C1E-8523-456B-BFF8-312534808BC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CF733C1E-8523-456B-BFF8-312534808BC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CF733C1E-8523-456B-BFF8-312534808BC9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2A94629E-9460-4B98-A255-E6D46A46CC52}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2A94629E-9460-4B98-A255-E6D46A46CC52}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2A94629E-9460-4B98-A255-E6D46A46CC52}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2A94629E-9460-4B98-A255-E6D46A46CC52}.Release|Any CPU.Build.0 = Release|Any CPU
+		{635D7CA2-4751-427F-A8DB-1B6072148C2C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{635D7CA2-4751-427F-A8DB-1B6072148C2C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{635D7CA2-4751-427F-A8DB-1B6072148C2C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{635D7CA2-4751-427F-A8DB-1B6072148C2C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
