@@ -1,0 +1,25 @@
+# docs 索引
+
+ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
+
+## 現況（最重要）
+
+- **[ecad2-stack-decision-brief.md](ecad2-stack-decision-brief.md)** — 技術スタック決定ブリーフ。現時点の到達点はここ。**未確定・殿の裁定待ち**（WPF本命・Qt対抗・Avaloniaクロス保険）。
+
+## 各family調査（決定ブリーフの元資料）
+
+- [ecad2-keyboard-requirements.md](ecad2-keyboard-requirements.md) — キーボード要件（忍者）
+- [ecad2-framework-survey-onmitsu.md](ecad2-framework-survey-onmitsu.md) — .NET系調査（隠密）
+- [ecad2-stack-web-crossplatform.md](ecad2-stack-web-crossplatform.md) — Web＆クロスプラットフォーム系調査（忍者）
+- [ecad2-stack-native-lightweight.md](ecad2-stack-native-lightweight.md) — ネイティブ/軽量系調査（侍）
+
+## 運用
+
+- [todo.md](todo.md) — タスク台帳。家老が采配してよい根拠はここに Approved/In-progress とある行だけ。各役は起動時にここを確認する。
+- [proposed.md](proposed.md) — 範囲外の気づき・提案の置き場（未承認・着手禁止）。殿の承認が付いたものだけ todo.md へ移す。
+
+## 関連（docs-notes配下）
+
+- `docs-notes/handover-next-session.md` — 次回セッションへの引き継ぎメモ
+- `docs-notes/roles/{karo,samurai,ninja,onmitsu}.md` — 役割定義
+- `prompts/startup-auto.md` — 起動プロンプト（役割自動決定フロー）
