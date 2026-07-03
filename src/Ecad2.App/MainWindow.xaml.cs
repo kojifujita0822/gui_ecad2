@@ -35,8 +35,10 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    // 左パレットの図形をクリックすると配置ツールを選択する。
-    private void PartPaletteItem_Selected(object sender, RoutedEventArgs e)
+    // 左パレットの図形をクリックすると配置ツールを選択する。ListBoxItem.Selectedではなく
+    // PreviewMouseLeftButtonDownを使う理由: Selectedは同一アイテムの再選択時に発火しない
+    // (WPFの仕様)ため、それだと「同じ図形を連続で複数箇所へ配置する」操作ができなくなる。
+    private void PartPaletteItem_Clicked(object sender, MouseButtonEventArgs e)
     {
         if (sender is ListBoxItem { DataContext: Ecad2.Persistence.PartFolderEntry entry })
             _viewModel.PartPalette.SelectCommand.Execute(entry);
@@ -97,7 +99,9 @@ public partial class MainWindow : Window
             if (IsWithin(panels[i], current)) { index = i; break; }
         }
         int next = (index + 1) % panels.Length;
-        panels[next].Focus();
+        // UIElement.Focus()は要素の状態によって静かに失敗することがある(その場合フォーカスが
+        // Windowへフォールバックし、循環が機能しなくなる)。Keyboard.Focus()の方が確実。
+        Keyboard.Focus(panels[next]);
     }
 
     private static bool IsWithin(DependencyObject root, DependencyObject? element)

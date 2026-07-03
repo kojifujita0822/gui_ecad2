@@ -185,7 +185,9 @@
                     </ListBox.ItemTemplate>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
-                            <EventSetter Event="Selected" Handler="PartPaletteItem_Selected"/>
+                            <!-- Selectedイベントは同一アイテムの再選択時に発火しない(WPFの仕様)ため、
+                                 「同じ図形を連続選択」できるようクリック自体を捕捉する。 -->
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartPaletteItem_Clicked"/>
                         </Style>
                     </ListBox.ItemContainerStyle>
                 </ListBox>
