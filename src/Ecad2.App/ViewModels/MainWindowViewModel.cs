@@ -35,6 +35,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public Sheet CurrentSheet { get; } = CreateDummySheet();
 
+    /// <summary>左パレット（部品選択）の子ViewModel。</summary>
+    public PartPaletteViewModel PartPalette { get; }
+
+    public MainWindowViewModel()
+    {
+        PartPalette = new PartPaletteViewModel(this);
+    }
+
     private static Sheet CreateDummySheet() => new()
     {
         Name = "シート1",

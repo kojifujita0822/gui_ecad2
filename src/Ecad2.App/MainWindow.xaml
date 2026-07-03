@@ -169,8 +169,26 @@
                 <ColumnDefinition x:Name="RightPanelColumn" Width="280"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 左パレット: 部品選択(段階5で実装) -->
-            <Border x:Name="LeftPaletteArea" Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0"/>
+            <!-- 左パレット: 部品選択。PartFolderStore(T-007)から読み込んだ図形一覧をクリックすると
+                 配置ツール(ToolState)が選択される。図形のビジュアルプレビューは別タスク、現状は
+                 名前テキストの一覧のみ。 -->
+            <Border x:Name="LeftPaletteArea" Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0">
+                <ListBox ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Margin="2">
+                                <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40"/>
+                                <TextBlock Text="{Binding Definition.Name}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <EventSetter Event="Selected" Handler="PartPaletteItem_Selected"/>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
+            </Border>
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"/>
 
