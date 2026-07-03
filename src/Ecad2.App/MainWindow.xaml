@@ -121,37 +121,45 @@
                 </Button>
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
-                <!-- ラダー専用コマンド(プレースホルダ。機器配置ロジックは段階4以降で接続) -->
+                <!-- ラダー専用コマンド(T-026段階3で実接続)。ボタンのF5/F7/F8表記はGX Works3踏襲の
+                     マウス操作案内(design-brief 9節)だが、実際のキーボードショートカット自体の
+                     バインドは範囲外(将来タスクT-021)。F6のみ表記が既存のパネルフォーカス循環キー
+                     (Window_PreviewKeyDown)と重複するため、実キーバインドを行う際は要調整。 -->
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
-                        AutomationProperties.Name="選択ツール (Esc)">
+                        AutomationProperties.Name="選択ツール (Esc)"
+                        Command="{Binding SelectDefaultToolCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
-                        AutomationProperties.Name="a接点配置 (F5)">
+                        AutomationProperties.Name="a接点配置 (F5)"
+                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="a接点">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
-                        AutomationProperties.Name="b接点配置 (F6)">
+                        AutomationProperties.Name="b接点配置 (F6)"
+                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="b接点">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
-                        AutomationProperties.Name="コイル配置 (F7)">
+                        AutomationProperties.Name="コイル配置 (F7)"
+                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="コイル">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
-                        AutomationProperties.Name="端子台配置 (F8)">
+                        AutomationProperties.Name="端子台配置 (F8)"
+                        Command="{Binding SelectBuiltinToolCommand}" CommandParameter="端子台">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>

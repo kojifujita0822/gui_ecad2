@@ -1,3 +1,5 @@
+using System.Windows.Input;
+using Ecad2.App.Commands;
 using Ecad2.Model;
 
 namespace Ecad2.App.ViewModels;
@@ -77,12 +79,33 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public PartLibrary PartLibrary { get; }
 
+    /// <summary>
+    /// ツールバー(T-026段階3)から組込み基本図形を配置ツールとして選択するコマンド。
+    /// CommandParameterに図形名(PartFolderStoreの基本図形カテゴリ内でのDefinition.Name。
+    /// 例:"a接点")を渡す。既存のPartPalette.SelectCommand(PartFolderEntry引数)と同じ
+    /// PartId方式にそのまま乗るため、PartResolver解決(T-016)も無変更で動く。
+    /// </summary>
+    public ICommand SelectBuiltinToolCommand { get; }
+
+    /// <summary>選択ツール(Esc相当)へ戻すコマンド。Window_PreviewKeyDownのEscケースと同じ操作。</summary>
+    public ICommand SelectDefaultToolCommand { get; }
+
     public MainWindowViewModel()
     {
         SheetNavigation = new SheetNavigationViewModel(this);
         PartPalette = new PartPaletteViewModel(this);
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(Document.Devices);
+
+        SelectBuiltinToolCommand = new RelayCommand(param =>
+        {
+            if (param is not string partName) return;
+            var entry = PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);
+            if (entry is not null)
+                Tool = new ToolState(ToolMode.PlaceElement, PartId: entry.Definition.Id);
+        });
+
+        SelectDefaultToolCommand = new RelayCommand(() => Tool = ToolState.SelectDefault);
     }
 
     private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)
