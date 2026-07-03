@@ -244,10 +244,28 @@
             </Border>
         </Grid>
 
-        <!-- 下部出力パネル(段階7で実装) -->
-        <Border x:Name="OutputPanelArea" Grid.Row="3" BorderBrush="Gray" BorderThickness="0,1,0,0" Height="160"/>
+        <!-- 下部出力パネル: メッセージ一覧の骨格。DesignRuleCheck(T-007移植済み)との接続は
+             機能実装(将来タスク)を伴うため、現状は空状態プレースホルダのみ。 -->
+        <DockPanel x:Name="OutputPanelArea" Grid.Row="3" Height="160">
+            <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
+                <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"/>
+            </Border>
+            <ListView>
+                <ListViewItem Foreground="Gray">問題は見つかりませんでした</ListViewItem>
+            </ListView>
+        </DockPanel>
 
-        <!-- ステータスバー(段階7で実装) -->
-        <Border x:Name="StatusBarArea" Grid.Row="4" BorderBrush="Gray" BorderThickness="0,1,0,0" Height="24"/>
+        <!-- ステータスバー: design-brief 4節#6「モード可視化の多重化」。現在の配置ツールモードと
+             ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
+             本実装向け機能に依存するため将来タスク。 -->
+        <StatusBar x:Name="StatusBarArea" Grid.Row="4">
+            <StatusBarItem>
+                <TextBlock Text="{Binding Tool.Mode, StringFormat='ツール: {0}'}"/>
+            </StatusBarItem>
+            <Separator/>
+            <StatusBarItem>
+                <TextBlock Text="{Binding CanvasScale, StringFormat='ズーム: {0:P0}'}"/>
+            </StatusBarItem>
+        </StatusBar>
     </Grid>
 </Window>
