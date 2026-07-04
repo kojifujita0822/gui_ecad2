@@ -54,7 +54,7 @@
         <Menu x:Name="MenuBarArea" Grid.Row="0">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N"/>
-                <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O"/>
+                <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
                 <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S" Click="SaveButton_Click"/>
                 <Separator/>
                 <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P"/>
@@ -92,7 +92,7 @@
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)"
-                        AutomationProperties.Name="開く (Ctrl+O)">
+                        AutomationProperties.Name="開く (Ctrl+O)" Click="OpenButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+O"/>

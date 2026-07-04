@@ -8,7 +8,7 @@ namespace Ecad2.App.ViewModels;
 /// </summary>
 public sealed class DeviceTableViewModel : ViewModelBase
 {
-    private readonly DeviceTable _table;
+    private DeviceTable _table;
 
     public IReadOnlyList<Device> Devices { get; private set; }
 
@@ -27,6 +27,13 @@ public sealed class DeviceTableViewModel : ViewModelBase
     {
         Devices = BuildList();
         OnPropertyChanged(nameof(Devices));
+    }
+
+    /// <summary>参照先のDeviceTableを丸ごと差し替える(T-019: 新規/開くでDocumentを差し替えた際に使う)。</summary>
+    public void Rebind(DeviceTable table)
+    {
+        _table = table;
+        Refresh();
     }
 
     private IReadOnlyList<Device> BuildList()

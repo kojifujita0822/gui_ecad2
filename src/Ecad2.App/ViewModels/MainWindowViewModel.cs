@@ -312,6 +312,38 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>指定パスの.GCADファイルを読み込み、現在のDocumentを丸ごと差し替える(T-019)。
+    /// I/O・スキーマ不一致例外はそのままView層へ伝播させる(SaveToFileと同方針)。</summary>
+    public void LoadFromFile(string path)
+    {
+        var document = Persistence.GcadSerializer.Load(path);
+        ReplaceDocument(document, path);
+    }
+
+    /// <summary>Documentを丸ごと差し替え、関連する子ViewModel・選択状態を再同期する
+    /// (T-019: 新規/開く共通の単一ゲートウェイ。文書破棄操作の入口を分散させない、
+    /// GuiEcadの反省 docs/ecad2-guiecad-code-survey-onmitsu.md T-024節を踏まえる)。</summary>
+    private void ReplaceDocument(LadderDocument newDocument, string? filePath)
+    {
+        Document = newDocument;
+        CurrentFilePath = filePath;
+        _currentSheetIndex = 0;
+        _selectedCell = null;
+        OnPropertyChanged(nameof(Document));
+        OnPropertyChanged(nameof(CurrentFilePath));
+        OnPropertyChanged(nameof(CurrentSheetIndex));
+        OnPropertyChanged(nameof(CurrentSheet));
+        OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(SelectedCell));
+        OnPropertyChanged(nameof(SelectedCellDisplay));
+        OnPropertyChanged(nameof(SelectedElement));
+        OnPropertyChanged(nameof(HasSelectedElement));
+        OnPropertyChanged(nameof(SelectedElementKindDisplay));
+        OnPropertyChanged(nameof(SelectedElementDeviceName));
+        SheetNavigation.ResetSheets();
+        DeviceTable.Rebind(newDocument.Devices);
+    }
+
     public MainWindowViewModel()
     {
         SheetNavigation = new SheetNavigationViewModel(this);

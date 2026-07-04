@@ -101,6 +101,24 @@ public partial class MainWindow : Window
         }
     }
 
+    // 開く(T-019)。未保存確認フローは今回未実装(家老裁可済みの暫定、殿起床後に別途諮る)。
+    // I/O・スキーマ不一致例外は読み込みエラーダイアログへ変換し、Document自体は差し替えない
+    // (LoadFromFileが例外を投げた場合ReplaceDocumentは未実行のため、現在のドキュメントを保つ)。
+    private void OpenButton_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = GcadFileFilter, DefaultExt = ".gcad" };
+        if (dialog.ShowDialog(this) != true) return;
+
+        try
+        {
+            _viewModel.LoadFromFile(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"開くのに失敗しました。\n{ex.Message}", "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
     // クリックで即配置)は廃止。ただしツールバーボタン経由(Tool.Mode==PlaceElement、殿裁定で
     // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の
@@ -223,6 +241,10 @@ public partial class MainWindow : Window
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
                 // T-019: メニュー/ツールバーのInputGestureText表示(Ctrl+S)と整合させる。
                 SaveDocument();
+                e.Handled = true;
+                break;
+            case Key.O when Keyboard.Modifiers == ModifierKeys.Control:
+                OpenButton_Click(sender, e);
                 e.Handled = true;
                 break;
         }

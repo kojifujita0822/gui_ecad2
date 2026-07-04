@@ -42,6 +42,14 @@ public sealed class SheetNavigationViewModel : ViewModelBase
     /// SelectedSheetのバインディング(左パネルの選択ハイライト)を同期させるために呼ぶ。</summary>
     public void RefreshSelectedSheet() => OnPropertyChanged(nameof(SelectedSheet));
 
+    /// <summary>Document丸ごと差し替え(T-019: 新規/開く)後、SheetsをDocument.Sheetsへ再同期する。</summary>
+    public void ResetSheets()
+    {
+        Sheets.Clear();
+        foreach (var sheet in _owner.Document.Sheets) Sheets.Add(sheet);
+        OnPropertyChanged(nameof(SelectedSheet));
+    }
+
     public ICommand AddCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand RenameCommand { get; }
