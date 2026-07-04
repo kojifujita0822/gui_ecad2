@@ -206,11 +206,24 @@ public partial class MainWindow : Window
         _viewModel.SelectedCell = newCell;
 
         // 増分(v, T-021): 矢印移動時のカーソル追従スクロール(論点5、パン=矢印追従+ホイール)。
-        // CellRectDipはLayoutTransform適用前のローカルDIP座標だが、BringIntoViewの
-        // RequestBringIntoView経路ではScrollContentPresenter.MakeVisibleが要素→ビューポートの
-        // 変換(ズームのScaleTransform含む)を行うため、ローカル座標のまま渡してよい。
-        // スクロール量は「見えるまで最小限」のWPF標準挙動(分岐C、家老承認済み)。
-        LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(newCell));
+        // 修正2(差し戻し1周目): グリッド端でクランプされ実移動が無い場合(newCell==current)は
+        // BringIntoViewを呼ばない。無条件発火だと、端で矢印を押しても手動スクロール中のビューを
+        // 同位置へ強制的に引き戻してしまう(隠密レビュー指摘)。GridPosはrecord structゆえ != は値比較。
+        if (newCell != current)
+        {
+            // 修正1(差し戻し1周目): 右母線位置(Column==grid.Columns、Element.cs:39「右母線=Columns」)
+            // ではCellRectDipが右母線の外側の余白矩形を返し、BringIntoViewが余白へ能動スクロールする。
+            // スクロール座標に限り最終セル列(Columns-1)へクランプして余白送りを防ぐ。選択セル・
+            // ハイライトのColumn==Columnsはそのまま維持する(CellRectDip本体はハイライト描画・T-023
+            // Automation Peerと共有のため変更せず、呼び出し側で調整=家老指示)。
+            int viewColumn = Math.Min(newCell.Column, grid.Columns - 1);
+            var viewCell = new Ecad2.Model.GridPos(newCell.Row, viewColumn);
+            // CellRectDipはLayoutTransform適用前のローカルDIP座標。BringIntoViewのRequestBringIntoView
+            // 経路でMakeVisibleがズームのScaleTransformを含む変換を行うため、ローカル座標のまま渡す
+            // 想定(ズーム≠100%時の座標一致は理論確認のみ、忍者の実機検証で最終確認する)。
+            // スクロール量は「見えるまで最小限」のWPF標準挙動(分岐C、家老承認済み)。
+            LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(viewCell));
+        }
     }
 
     // 選択ツールボタン(ツールバーのEsc相当ボタン)の即時処理。選択セル・ツール・案内メッセージを
