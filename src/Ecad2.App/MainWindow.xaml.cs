@@ -95,17 +95,21 @@ public partial class MainWindow : Window
             TrySaveToFile(dialog.FileName);
     }
 
-    // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する
-    // (隠密調査 docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。
+    // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する(隠密調査
+    // docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。修正(往復2周目、忍者実機検出):
+    // 開く側と同じ欠陥(ex.Messageの生の技術的文面をそのまま表示)が無いよう、一般向け日本語文面
+    // ＋対象パスのみを表示する(ex変数は本文に使わないためcatch (Exception)で受ける)。
     private void TrySaveToFile(string path)
     {
         try
         {
             _viewModel.SaveToFile(path);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            MessageBox.Show(this, $"保存に失敗しました。\n{ex.Message}", "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this,
+                $"ファイルを保存できませんでした。保存先の権限やディスクの空き容量をご確認ください。\n{path}",
+                "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
@@ -124,9 +128,14 @@ public partial class MainWindow : Window
         {
             _viewModel.LoadFromFile(dialog.FileName);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            MessageBox.Show(this, $"開くのに失敗しました。\n{ex.Message}", "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            // 修正(往復2周目、忍者実機検出): GcadSerializer.Deserializeが投げるJsonException等の
+            // 生の技術的例外文面(英語)がex.Message経由でそのまま表示されていた欠陥を修正。
+            // 一般向け日本語文面＋対象パスのみを表示する(プラン段階2の意図どおり)。
+            MessageBox.Show(this,
+                $"ファイルを読み込めませんでした。ファイルが壊れているか、対応していない形式の可能性があります。\n{dialog.FileName}",
+                "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
