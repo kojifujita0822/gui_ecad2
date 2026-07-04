@@ -113,6 +113,9 @@ public partial class MainWindow : Window
                 // BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")が
                 // キャンセル後も残り続けるバグの修正(忍者実機検証で発覚)。
                 _viewModel.StatusMessage = "";
+                // SelectDefaultButton_Clickと同じ操作のため、フォーカス復帰も合わせる(隠密レビュー
+                // 観点2と同種、忍者実機検証で再現確認、往復3周目)。
+                FocusCanvas();
                 e.Handled = true;
                 break;
             case Key.F5 when noModifier:
@@ -244,6 +247,9 @@ public partial class MainWindow : Window
     private void OpenPartSelectionButton_Click(object sender, RoutedEventArgs e)
     {
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement);
+        // BuiltinPlaceButton_Clickと同じ罠(ボタンクリック後にフォーカスが残る)への対処
+        // (忍者実機検証で再現確認、往復3周目)。
+        FocusCanvas();
     }
 
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
