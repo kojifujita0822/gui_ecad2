@@ -65,6 +65,42 @@ public partial class MainWindow : Window
             _viewModel.SheetNavigation.RenameCommand.Execute(dialog.NewName);
     }
 
+    private const string GcadFileFilter = "GCADファイル (*.gcad)|*.gcad";
+
+    // 上書き保存(T-019)。ファイルダイアログ表示はView側の責務、実際の保存(GcadSerializer呼び出し)
+    // はViewModelのSaveToFileへ委譲する。パス未確定(新規作成後の初回保存)は名前を付けて保存へ
+    // フォールバックする(標準的な挙動)。
+    private void SaveButton_Click(object sender, RoutedEventArgs e) => SaveDocument();
+
+    private void SaveDocument()
+    {
+        if (_viewModel.CurrentFilePath is string path)
+            TrySaveToFile(path);
+        else
+            SaveDocumentAs();
+    }
+
+    private void SaveDocumentAs()
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog { Filter = GcadFileFilter, DefaultExt = ".gcad" };
+        if (dialog.ShowDialog(this) == true)
+            TrySaveToFile(dialog.FileName);
+    }
+
+    // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する
+    // (隠密調査 docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。
+    private void TrySaveToFile(string path)
+    {
+        try
+        {
+            _viewModel.SaveToFile(path);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, $"保存に失敗しました。\n{ex.Message}", "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
     // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
     // クリックで即配置)は廃止。ただしツールバーボタン経由(Tool.Mode==PlaceElement、殿裁定で
     // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の
@@ -182,6 +218,11 @@ public partial class MainWindow : Window
                 // 前提。配置本体はクリック配置と共通のTryPlaceActiveToolへ委譲する。Enterがこの4条件で
                 // 成立しないときは配置以外(将来用途)へ委ねるためHandledにしない。
                 TryPlaceActiveTool();
+                e.Handled = true;
+                break;
+            case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-019: メニュー/ツールバーのInputGestureText表示(Ctrl+S)と整合させる。
+                SaveDocument();
                 e.Handled = true;
                 break;
         }

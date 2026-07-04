@@ -55,7 +55,7 @@
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O"/>
-                <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S"/>
+                <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S" Click="SaveButton_Click"/>
                 <Separator/>
                 <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P"/>
                 <Separator/>
@@ -99,7 +99,7 @@
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)"
-                        AutomationProperties.Name="上書き保存 (Ctrl+S)">
+                        AutomationProperties.Name="上書き保存 (Ctrl+S)" Click="SaveButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+S"/>

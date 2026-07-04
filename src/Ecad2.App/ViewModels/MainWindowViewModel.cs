@@ -299,6 +299,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         CurrentSheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
     }
 
+    /// <summary>現在のDocumentを指定パスへ.GCAD形式で保存する(T-019)。CurrentFilePathを更新する。
+    /// I/O例外はそのまま呼び出し元(View層)へ伝播させ、技術的例外文面をユーザーへ出す変換は
+    /// View側の責務とする(隠密調査 docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。</summary>
+    public void SaveToFile(string path)
+    {
+        Persistence.GcadSerializer.Save(Document, path);
+        if (CurrentFilePath != path)
+        {
+            CurrentFilePath = path;
+            OnPropertyChanged(nameof(CurrentFilePath));
+        }
+    }
+
     public MainWindowViewModel()
     {
         SheetNavigation = new SheetNavigationViewModel(this);
