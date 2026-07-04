@@ -108,12 +108,28 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                // 選択ツールボタンと同じ操作のため共通のActivateSelectDefault()を使う(増分vi、
-                // BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")がキャンセル
-                // 後も残り続けるバグの修正=忍者実機検証で発覚、も込み)。Escapeはボタンのマウス/
-                // キーボード二重発火問題を持たないグローバルショートカットのため、フォーカス復帰は
-                // 常時実行する(隠密の設計集約プラン根拠3のとおり変更不要)。
-                ActivateSelectDefault();
+                // 増分(iv, T-021): Esc多段階4層(論点3、殿裁定)。1回のEscで内側から1層だけ戻す。
+                // 層1(ダイアログ内テキスト編集中の編集キャンセル)はモーダル表示中は本ハンドラ自体が
+                // 呼ばれないため対象外。ElementPlacementDialogのIsCancel="True"ボタン(WPF標準規約)で
+                // 既に実現済み(層1は本ケースの範囲外)。
+                if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement)
+                {
+                    // 層2: 配置モード中 → 選択モードへ戻す。SelectedCellは保持し、続けて別ツールで
+                    // 同じセルへ配置し直せるようにする。
+                    _viewModel.Tool = ViewModels.ToolState.SelectDefault;
+                    _viewModel.StatusMessage = "";
+                }
+                else if (_viewModel.SelectedCell is not null)
+                {
+                    // 層3: 要素選択中 → 選択解除のみ。TryPlaceElementのエラーメッセージ
+                    // ("選択したセルには既に要素があります"等)が残っていた場合もここで払拭する
+                    // (T-017由来の残留教訓)。
+                    _viewModel.SelectedCell = null;
+                    _viewModel.StatusMessage = "";
+                }
+                // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
+                // Escapeはボタンのマウス/キーボード二重発火問題を持たないグローバルショートカットの
+                // ため、フォーカス復帰は全層で常時実行する(隠密の設計集約プラン根拠3のとおり変更不要)。
                 FocusCanvas();
                 e.Handled = true;
                 break;
