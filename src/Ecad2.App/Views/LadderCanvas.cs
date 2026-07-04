@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
 using System.Windows.Input;
 using System.Windows.Media;
 using Ecad2.Model;
@@ -44,8 +45,23 @@ public sealed class LadderCanvas : FrameworkElement
     // のため、常に1セル分の矩形で描く。
     private static readonly Pen SelectedCellPen = new(Brushes.OrangeRed, 2.0);
 
+    // 直近のDraw()呼び出し内容(T-023)。LadderCanvasAutomationPeer/SymbolAutomationPeerが
+    // Draw()の呼び出しタイミングと無関係にいつでも参照できるよう、キャンバス自身の状態として保持する
+    // (Drawはビュー外部(MainWindow)から都度呼ばれる素通しメソッドのため、他に保持場所が無い)。
+    private Sheet? _lastSheet;
+    private PartLibrary? _lastLibrary;
+    private GridPos? _lastSelectedCell;
+
+    internal Sheet? CurrentSheet => _lastSheet;
+    internal GridPos? SelectedCellForAutomation => _lastSelectedCell;
+
+    protected override AutomationPeer OnCreateAutomationPeer() => new LadderCanvasAutomationPeer(this);
+
     public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null)
     {
+        _lastSheet = sheet;
+        _lastLibrary = library;
+        _lastSelectedCell = selectedCell;
         _children.Clear();
 
         var size = _renderer.PageSize(sheet);
@@ -64,13 +80,7 @@ public sealed class LadderCanvas : FrameworkElement
             _renderer.Render(wpfRenderer, sheet, library);
 
             if (selectedCell is { } cell)
-            {
-                var geo = _renderer.Geometry;
-                double x = geo.X(cell.Column) * MmToDip;
-                double y = (geo.YRow(cell.Row) - geo.CellMm / 2) * MmToDip;
-                double cellSize = geo.CellMm * MmToDip;
-                dc.DrawRectangle(null, SelectedCellPen, new Rect(x, y, cellSize, cellSize));
-            }
+                dc.DrawRectangle(null, SelectedCellPen, CellRectDip(cell));
         }
         _children.Add(visual);
 
@@ -90,4 +100,43 @@ public sealed class LadderCanvas : FrameworkElement
         var geo = _renderer.Geometry;
         return new GridPos(geo.RowAt(yMm), geo.ColAt(xMm));
     }
+
+    /// <summary>グリッドセル1つ分のローカル矩形(DIP単位)。選択ハイライト描画とSymbolAutomationPeer
+    /// のGetBoundingRectangleCore(T-023)の両方で使う共通座標計算。</summary>
+    internal Rect CellRectDip(GridPos cell)
+    {
+        var geo = _renderer.Geometry;
+        double x = geo.X(cell.Column) * MmToDip;
+        double y = (geo.YRow(cell.Row) - geo.CellMm / 2) * MmToDip;
+        double cellSize = geo.CellMm * MmToDip;
+        return new Rect(x, y, cellSize, cellSize);
+    }
+
+    /// <summary>
+    /// 要素の表示名解決(T-023、UI Automation Name用)。MainWindowViewModel.
+    /// SelectedElementKindDisplay/KindDisplayNameと同じ規則(PartIdがあれば図形定義名、無ければ
+    /// Kindの日本語ラダー用語)を踏襲する(T-031方針: UI表示は日本語ラダー用語で統一)。
+    /// </summary>
+    internal string DisplayNameFor(ElementInstance element)
+    {
+        if (element.PartId is string partId && _lastLibrary is not null
+            && _lastLibrary.ById.TryGetValue(partId, out var def))
+            return def.Name;
+        return KindDisplayName(element.Kind);
+    }
+
+    private static string KindDisplayName(ElementKind kind) => kind switch
+    {
+        ElementKind.ContactNO => "a接点",
+        ElementKind.ContactNC => "b接点",
+        ElementKind.Coil => "コイル",
+        ElementKind.Lamp => "ランプ",
+        ElementKind.PushButtonNO => "押しボタン(NO)",
+        ElementKind.PushButtonNC => "押しボタン(NC)",
+        ElementKind.SelectSwitch => "セレクトSW",
+        ElementKind.Terminal => "端子台",
+        ElementKind.Timer => "タイマ",
+        ElementKind.Counter => "カウンタ",
+        _ => kind.ToString(),
+    };
 }
