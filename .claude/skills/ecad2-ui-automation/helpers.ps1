@@ -24,9 +24,13 @@ public class Ecad2Native {
     public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+    [DllImport("user32.dll")]
+    public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
     public const uint MOUSEEVENTF_LEFTDOWN = 0x02;
     public const uint MOUSEEVENTF_LEFTUP = 0x04;
     public const uint MOUSEEVENTF_WHEEL = 0x0800;
+    public const byte VK_CONTROL = 0x11;
+    public const uint KEYEVENTF_KEYUP = 0x0002;
     public static void Click(int x, int y) {
         SetCursorPos(x, y);
         System.Threading.Thread.Sleep(150);
@@ -40,6 +44,21 @@ public class Ecad2Native {
         System.Threading.Thread.Sleep(150);
         mouse_event(MOUSEEVENTF_WHEEL, 0, 0, (uint)delta, UIntPtr.Zero);
         System.Threading.Thread.Sleep(150);
+    }
+    // Ctrl+ホイールはWPFのInputManagerがCtrl押下状態をキーボードAPI経由でしか検知しないため、
+    // mouse_event単体のScroll()とは別にCtrl押下を明示的に挟む合成が要る（2026-07-05、T-021ズーム検証で実証）。
+    public static void CtrlScroll(int x, int y, int clicks, int delayMs) {
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(100);
+        keybd_event(VK_CONTROL, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(50);
+        int direction = clicks >= 0 ? 1 : -1;
+        int count = clicks >= 0 ? clicks : -clicks;
+        for (int i = 0; i < count; i++) {
+            mouse_event(MOUSEEVENTF_WHEEL, 0, 0, (uint)(direction * 120), UIntPtr.Zero);
+            System.Threading.Thread.Sleep(delayMs);
+        }
+        keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
 }
 "@
@@ -211,6 +230,21 @@ function Invoke-Ecad2Scroll {
     param([Parameter(Mandatory)][int]$X, [Parameter(Mandatory)][int]$Y, [int]$Delta = -120, [int]$Times = 1)
     Set-Ecad2Foreground
     for ($i = 0; $i -lt $Times; $i++) { [Ecad2Native]::Scroll($X, $Y, $Delta) }
+}
+
+# Ctrl+ホイールでのズーム操作を合成する（Ctrl+マウスホイールでのズームUI検証用）。
+# 通常のホイールイベント(mouse_event)だけではCtrl修飾が反映されないため、keybd_eventでの
+# 明示的なCtrl押下/解放を挟む。$Clicks正=ズームイン(上方向)、負=ズームアウト(下方向)。
+# 座標はスクリーン絶対座標（Get-Ecad2ElementCenter等で対象要素の中心を求めて渡すこと）。
+function Invoke-Ecad2CtrlScroll {
+    param(
+        [Parameter(Mandatory)][int]$ScreenX,
+        [Parameter(Mandatory)][int]$ScreenY,
+        [Parameter(Mandatory)][int]$Clicks,
+        [int]$DelayMs = 80
+    )
+    Set-Ecad2Foreground
+    [Ecad2Native]::CtrlScroll($ScreenX, $ScreenY, $Clicks, $DelayMs)
 }
 
 # キー送信（WPFアプリのためSendKeysが機能する。GuiEcad=WinUI3では届かなかったのと対照的）。
