@@ -279,23 +279,6 @@ public partial class MainWindow : Window
         _toolButtonKeyboardClickSource = null;
     }
 
-    // Space押下でボタンが押下状態になった後、フォーカス喪失でClickがキャンセルされた場合の掃除
-    // (増分vi差し戻し2周目、隠密レビュー穴2対応)。ButtonBase標準はこの場合Clickを発火させない
-    // ため、ConsumeToolButtonFocusRestore側では記録をクリアできず、LostKeyboardFocusが唯一の
-    // 掃除どころになる。対象3ボタン共通のためToolButtonPreviewKeyDownと同様に単一ハンドラへ集約。
-    //
-    // 増分(vi)差し戻し3周目(案A、殿承認2026-07-04): SpaceのReleaseMouseCapture→
-    // Keyboard.Focus(null)によるフォーカス喪失はe.NewFocusがnullになる一時的な内部経路であり、
-    // 真のキャンセルではない(隠密の原因調査)。従来はこれを本物のキャンセルと誤認して記録を
-    // クリアしてしまい、直後のClickでConsumeToolButtonFocusRestoreがマウス起因と誤判定していた
-    // (Space/Enter非対称バグ)。NewFocusが具体的要素(キャンバス・他ボタン等)の場合のみ真の
-    // フォーカス移動とみなしクリアする。
-    private void ToolButtonLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        if (e.NewFocus is null) return;
-        if (ReferenceEquals(_toolButtonKeyboardClickSource, sender)) _toolButtonKeyboardClickSource = null;
-    }
-
     // マウス押下時の安全側の掃除(増分vi差し戻し2周目、隠密改善案4)。8ボタン個別配線ではなく
     // Windowレベルの単一ハンドラへ集約する(動作は変更なし、配線箇所のみ整理)。新たなマウス押下が
     // window内のどこであれ発生した時点で記録をクリアし、直後のClickをマウス起因として正しく
