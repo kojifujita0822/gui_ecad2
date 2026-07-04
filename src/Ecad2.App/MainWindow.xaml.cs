@@ -37,8 +37,16 @@ public partial class MainWindow : Window
             RedrawCanvas();
     }
 
+    // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullになる。
+    // 前回シートの描画がキャンバスに残り続けないよう明示的にClearする(空状態=濃紺はT-020の
+    // ScrollViewer背景切替が担うが、その上に前回図面が重なって見えるのを防ぐ)。
     private void RedrawCanvas()
-        => LadderCanvasHost.Draw(_viewModel.CurrentSheet, _viewModel.PartLibrary, _viewModel.SelectedCell);
+    {
+        if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
+            LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell);
+        else
+            LadderCanvasHost.Clear();
+    }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
     private void CanvasArea_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
@@ -100,6 +108,9 @@ public partial class MainWindow : Window
             MessageBox.Show(this, $"保存に失敗しました。\n{ex.Message}", "保存エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
+
+    // 新規作成(T-019)。未保存確認フローは今回未実装(家老裁可済みの暫定、殿起床後に別途諮る)。
+    private void NewButton_Click(object sender, RoutedEventArgs e) => _viewModel.NewDocument();
 
     // 開く(T-019)。未保存確認フローは今回未実装(家老裁可済みの暫定、殿起床後に別途諮る)。
     // I/O・スキーマ不一致例外は読み込みエラーダイアログへ変換し、Document自体は差し替えない
@@ -247,6 +258,10 @@ public partial class MainWindow : Window
                 OpenButton_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.N when Keyboard.Modifiers == ModifierKeys.Control:
+                NewButton_Click(sender, e);
+                e.Handled = true;
+                break;
         }
     }
 
@@ -254,8 +269,12 @@ public partial class MainWindow : Window
 
     private void MoveSelectedCell(Key key)
     {
+        // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullのため、
+        // 移動先のGridが存在せず無視する(キャンバスにフォーカスは当たりうるため、ここでの防御が要る)。
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet currentSheet) return;
+
         var current = _viewModel.SelectedCell ?? new Ecad2.Model.GridPos(0, 0);
-        var grid = _viewModel.CurrentSheet.Grid;
+        var grid = currentSheet.Grid;
         int row = current.Row;
         int column = current.Column;
         switch (key)

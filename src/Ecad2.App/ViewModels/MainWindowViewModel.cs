@@ -81,8 +81,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。</summary>
-    public Sheet CurrentSheet => Document.Sheets[CurrentSheetIndex];
+    /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。
+    /// Document.Sheets.Count==0(T-019「新規」の暫定挙動)の間はnull。</summary>
+    public Sheet? CurrentSheet
+        => CurrentSheetIndex >= 0 && CurrentSheetIndex < Document.Sheets.Count ? Document.Sheets[CurrentSheetIndex] : null;
 
     /// <summary>
     /// プロジェクト(ドキュメント)が実在するか(T-020)。GX Works3踏襲の空状態(濃紺)⇔作業領域(白＋黒
@@ -123,7 +125,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>SelectedCellの位置にある既存要素(T-017)。null=要素なし、または未選択。</summary>
     public ElementInstance? SelectedElement
-        => SelectedCell is { } pos ? CurrentSheet.Elements.FirstOrDefault(el => el.Pos == pos) : null;
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet ? sheet.Elements.FirstOrDefault(el => el.Pos == pos) : null;
 
     /// <summary>右パネル下段のプロパティ表示切替に使う(選択中セルに要素があるか)。</summary>
     public bool HasSelectedElement => SelectedElement is not null;
@@ -203,10 +205,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public bool DeleteSelectedElement()
     {
-        if (SelectedElement is not ElementInstance el) return false;
+        if (CurrentSheet is not Sheet sheet || SelectedElement is not ElementInstance el) return false;
 
         string? deviceName = el.DeviceName;
-        CurrentSheet.Elements.Remove(el);
+        sheet.Elements.Remove(el);
 
         if (deviceName is not null)
         {
@@ -258,7 +260,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。</summary>
     public bool IsSelectedCellOccupied()
-        => SelectedCell is { } pos && CurrentSheet.Elements.Any(el => el.Pos == pos);
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && sheet.Elements.Any(el => el.Pos == pos);
 
     /// <summary>
     /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、基準行
@@ -267,7 +269,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
     {
-        if (SelectedCell is not { } pos) return;
+        if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
 
         const int cellWidth = 1; // 基本図形(BasicPartTemplates)は全て1セル幅
         var newElement = new ElementInstance
@@ -276,18 +278,18 @@ public sealed class MainWindowViewModel : ViewModelBase
             PartId = partId,
             DeviceName = deviceName.Length > 0 ? deviceName : null,
         };
-        CurrentSheet.Elements.Add(newElement);
+        sheet.Elements.Add(newElement);
 
         if (!isOr) return;
 
-        int? baseRow = CurrentSheet.Elements
+        int? baseRow = sheet.Elements
             .Where(el => el != newElement && el.Pos.Row < pos.Row)
             .Select(el => (int?)el.Pos.Row)
             .DefaultIfEmpty(null)
             .Max();
         if (baseRow is not int br) return;
 
-        var baseElement = CurrentSheet.Elements
+        var baseElement = sheet.Elements
             .Where(el => el.Pos.Row == br)
             .OrderBy(el => Math.Abs(el.Pos.Column - pos.Column))
             .FirstOrDefault();
@@ -295,8 +297,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
         int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
-        CurrentSheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
-        CurrentSheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
+        sheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
+        sheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
     }
 
     /// <summary>現在のDocumentを指定パスへ.GCAD形式で保存する(T-019)。CurrentFilePathを更新する。
@@ -319,6 +321,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         var document = Persistence.GcadSerializer.Load(path);
         ReplaceDocument(document, path);
     }
+
+    /// <summary>新規作成(T-019)。空(Sheets=0)のドキュメントへ差し替える。新規時の初期状態
+    /// (Sheets 0枚か1枚か)はUI/UX分岐として保留中のため暫定実装(家老裁可2026-07-05)。
+    /// 未保存確認は行わない(現状は保存機能自体が無く全データ揮発のため、悪化ではないとして
+    /// 家老裁可済み。Dirty判定導入は殿起床後に別途諮る)。</summary>
+    public void NewDocument() => ReplaceDocument(new LadderDocument(), filePath: null);
 
     /// <summary>Documentを丸ごと差し替え、関連する子ViewModel・選択状態を再同期する
     /// (T-019: 新規/開く共通の単一ゲートウェイ。文書破棄操作の入口を分散させない、

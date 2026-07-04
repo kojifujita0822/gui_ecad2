@@ -89,6 +89,19 @@ public sealed class LadderCanvas : FrameworkElement
         InvalidateMeasure();
     }
 
+    /// <summary>描画内容を消去する(T-019: Document.Sheets.Count==0の空状態で使う。
+    /// 前回シートの残像を残さない)。</summary>
+    public void Clear()
+    {
+        _lastSheet = null;
+        _lastLibrary = null;
+        _lastSelectedCell = null;
+        _children.Clear();
+        Width = 0;
+        Height = 0;
+        InvalidateMeasure();
+    }
+
     /// <summary>
     /// このキャンバス自身のローカル座標系（DIP単位、LayoutTransform適用前の内部座標）を
     /// グリッド座標へ変換する。要素配置（T-016）のクリック位置判定に使う。

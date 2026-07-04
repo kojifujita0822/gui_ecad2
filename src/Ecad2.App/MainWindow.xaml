@@ -53,7 +53,7 @@
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
         <Menu x:Name="MenuBarArea" Grid.Row="0">
             <MenuItem Header="ファイル(_F)">
-                <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N"/>
+                <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N" Click="NewButton_Click"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
                 <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S" Click="SaveButton_Click"/>
                 <Separator/>
@@ -85,7 +85,7 @@
         <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
             <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
-                        AutomationProperties.Name="新規作成 (Ctrl+N)">
+                        AutomationProperties.Name="新規作成 (Ctrl+N)" Click="NewButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+N"/>
