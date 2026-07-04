@@ -201,7 +201,15 @@ public partial class MainWindow : Window
             case Key.Left: column = Math.Max(0, column - 1); break;
             case Key.Right: column = Math.Min(grid.Columns, column + 1); break;
         }
-        _viewModel.SelectedCell = new Ecad2.Model.GridPos(row, column);
+        var newCell = new Ecad2.Model.GridPos(row, column);
+        _viewModel.SelectedCell = newCell;
+
+        // 増分(v, T-021): 矢印移動時のカーソル追従スクロール(論点5、パン=矢印追従+ホイール)。
+        // CellRectDipはLayoutTransform適用前のローカルDIP座標だが、BringIntoViewの
+        // RequestBringIntoView経路ではScrollContentPresenter.MakeVisibleが要素→ビューポートの
+        // 変換(ズームのScaleTransform含む)を行うため、ローカル座標のまま渡してよい。
+        // スクロール量は「見えるまで最小限」のWPF標準挙動(分岐C、家老承認済み)。
+        LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(newCell));
     }
 
     // 選択ツール(Esc)ボタン。Window_PreviewKeyDownのEscケースと同じ操作。
