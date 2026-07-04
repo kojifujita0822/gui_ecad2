@@ -222,7 +222,23 @@ public partial class MainWindow : Window
             // 経路でMakeVisibleがズームのScaleTransformを含む変換を行うため、ローカル座標のまま渡す
             // 想定(ズーム≠100%時の座標一致は理論確認のみ、忍者の実機検証で最終確認する)。
             // スクロール量は「見えるまで最小限」のWPF標準挙動(分岐C、家老承認済み)。
-            LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(viewCell));
+            var viewRect = LadderCanvasHost.CellRectDip(viewCell);
+            // 増分(v)追加修正(殿指示): 左端(Column 0)・右端(Column Columns-1)到達時は、セルだけ
+            // 見えても母線が画面外のままだと視認しづらいため、BringIntoView対象を母線側へ
+            // セル1個分広げる。2条件は独立判定のため、Columns==1のような極小グリッドでも
+            // 両母線が同時に見える範囲になる。行方向は対象外(殿指示)。
+            double viewLeft = viewRect.X;
+            double viewWidth = viewRect.Width;
+            if (viewColumn == 0)
+            {
+                viewLeft -= viewRect.Width;
+                viewWidth += viewRect.Width;
+            }
+            if (viewColumn == grid.Columns - 1)
+            {
+                viewWidth += viewRect.Width;
+            }
+            LadderCanvasHost.BringIntoView(new Rect(viewLeft, viewRect.Y, viewWidth, viewRect.Height));
         }
     }
 
