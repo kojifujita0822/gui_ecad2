@@ -209,6 +209,21 @@ public partial class MainWindow : Window
 
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, PartId: entry.Definition.Id, IsOr: isOr);
         _viewModel.StatusMessage = $"配置ツール: {partName}{(isOr ? "(OR)" : "")} - キャンバスをクリックして配置位置を指定してください";
+
+        // ツールバーボタンでツール選択後、フォーカスがボタンに残るとEnter配置(案X, T-021)が効かない
+        // (キャンバスフォーカスがEnterのガード条件のため)。キャンバスへフォーカスを戻し、F5等のキー
+        // ボード選択と同じく「ツール選択方法によらずEnterで配置できる」を成立させる(忍者実機検証で発見)。
+        FocusCanvas();
+    }
+
+    // LadderCanvasHostへ確実にフォーカスを移す。CanvasArea(ScrollViewer)はFocusManager.IsFocusScope
+    // ="True"の独立FocusScopeのため、Keyboard.Focus()単体では実フォーカスが移らないことがある
+    // (T-016の罠。CyclePanelFocusと同じくFocusManager.SetFocusedElementを先に呼ぶ2段方式で回避する)。
+    private void FocusCanvas()
+    {
+        var scope = FocusManager.GetFocusScope(LadderCanvasHost);
+        FocusManager.SetFocusedElement(scope, LadderCanvasHost);
+        Keyboard.Focus(LadderCanvasHost);
     }
 
     // 図形名(基本図形のDefinition.Name)からPartFolderEntryを検索してTryPlaceElementを呼ぶ。
