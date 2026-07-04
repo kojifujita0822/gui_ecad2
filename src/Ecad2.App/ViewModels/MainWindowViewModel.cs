@@ -59,6 +59,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 上書き保存が可能か(パスがあるか)の判定に使う。</summary>
     public string? CurrentFilePath { get; private set; }
 
+    private bool _isDirty;
+
+    /// <summary>未保存の変更があるか(T-019)。新規/開くでの上書き確認に使う。GuiEcadはUndo履歴depth
+    /// との差分で判定し、Undo対象外の変更(シート追加/削除等)へのMarkDirty()呼び忘れが構造的欠陥
+    /// だった(docs/ecad2-guiecad-code-survey-onmitsu.md T-024節)。ecad2はUndo機能自体が未実装
+    /// なため、変更操作の入口(要素配置/削除/デバイス名変更、シート追加/削除/改名)で明示的に
+    /// MarkDirty()を呼ぶ方式を採る。ReplaceDocument・保存成功時にfalseへ戻す。</summary>
+    public bool IsDirty
+    {
+        get => _isDirty;
+        private set => SetProperty(ref _isDirty, value);
+    }
+
+    /// <summary>ドキュメントに未保存の変更が生じたことを記録する(T-019)。</summary>
+    public void MarkDirty() => IsDirty = true;
+
     private int _currentSheetIndex;
 
     /// <summary>現在表示中のシートのインデックス（Document.Sheets への添字）。左パレットのシート
@@ -97,6 +113,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 自然に機能する。
     /// </summary>
     public bool HasProject => Document.Sheets.Count > 0;
+
+    /// <summary>Document.Sheets.Countの増減を伴う操作(SheetNavigationViewModelのシート追加/削除等)
+    /// の後に呼ぶ(T-019、殿実機検出の修正)。HasProjectはReplaceDocument内でのみ明示通知しており、
+    /// シート追加/削除がDocument.Sheetsを直接操作するSheetNavigationViewModel側からは通知されず、
+    /// Sheets=0(濃紺)からシート追加しても画面が作業領域色へ切り替わらない欠陥があった。</summary>
+    public void NotifyHasProjectChanged() => OnPropertyChanged(nameof(HasProject));
 
     private GridPos? _selectedCell;
 
@@ -190,6 +212,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                     Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
             }
 
+            MarkDirty();
             OnPropertyChanged();
             OnPropertyChanged(nameof(SelectedElementKindDisplay));
             DeviceTable.Refresh();
@@ -209,6 +232,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         string? deviceName = el.DeviceName;
         sheet.Elements.Remove(el);
+        MarkDirty();
 
         if (deviceName is not null)
         {
@@ -279,6 +303,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             DeviceName = deviceName.Length > 0 ? deviceName : null,
         };
         sheet.Elements.Add(newElement);
+        MarkDirty();
 
         if (!isOr) return;
 
@@ -312,6 +337,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             CurrentFilePath = path;
             OnPropertyChanged(nameof(CurrentFilePath));
         }
+        IsDirty = false;
     }
 
     /// <summary>指定パスの.GCADファイルを読み込み、現在のDocumentを丸ごと差し替える(T-019)。
@@ -322,11 +348,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         ReplaceDocument(document, path);
     }
 
-    /// <summary>新規作成(T-019)。空(Sheets=0)のドキュメントへ差し替える。新規時の初期状態
-    /// (Sheets 0枚か1枚か)はUI/UX分岐として保留中のため暫定実装(家老裁可2026-07-05)。
-    /// 未保存確認は行わない(現状は保存機能自体が無く全データ揮発のため、悪化ではないとして
-    /// 家老裁可済み。Dirty判定導入は殿起床後に別途諮る)。</summary>
-    public void NewDocument() => ReplaceDocument(new LadderDocument(), filePath: null);
+    /// <summary>新規作成(T-019)。即1シート生成済みのドキュメントへ差し替える(殿裁定2026-07-05、
+    /// GX Works3流儀。Sheets=0の空ドキュメントで開始する暫定実装から変更)。呼び出し元(View層)は
+    /// 未保存確認(IsDirty)を先に行うこと。</summary>
+    public void NewDocument()
+    {
+        var document = new LadderDocument();
+        document.Sheets.Add(new Sheet
+        {
+            PageNumber = 1,
+            Name = "シート1",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        ReplaceDocument(document, filePath: null);
+    }
 
     /// <summary>Documentを丸ごと差し替え、関連する子ViewModel・選択状態を再同期する
     /// (T-019: 新規/開く共通の単一ゲートウェイ。文書破棄操作の入口を分散させない、
@@ -357,6 +392,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         StatusMessage = "";
         Tool = ToolState.SelectDefault;
         OutputPanel.ClearResults();
+        // 新規/開く直後は未保存の変更が無い状態(IsDirty=false)から始まる。
+        IsDirty = false;
     }
 
     public MainWindowViewModel()

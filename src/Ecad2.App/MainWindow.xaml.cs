@@ -113,14 +113,20 @@ public partial class MainWindow : Window
         }
     }
 
-    // 新規作成(T-019)。未保存確認フローは今回未実装(家老裁可済みの暫定、殿起床後に別途諮る)。
-    private void NewButton_Click(object sender, RoutedEventArgs e) => _viewModel.NewDocument();
+    // 新規作成(T-019)。未保存の変更(IsDirty)があれば確認を挟む(殿裁定2026-07-05)。
+    private void NewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (!ConfirmDiscardIfDirty()) return;
+        _viewModel.NewDocument();
+    }
 
-    // 開く(T-019)。未保存確認フローは今回未実装(家老裁可済みの暫定、殿起床後に別途諮る)。
+    // 開く(T-019)。未保存の変更(IsDirty)があれば確認を挟む(殿裁定2026-07-05)。
     // I/O・スキーマ不一致例外は読み込みエラーダイアログへ変換し、Document自体は差し替えない
     // (LoadFromFileが例外を投げた場合ReplaceDocumentは未実行のため、現在のドキュメントを保つ)。
     private void OpenButton_Click(object sender, RoutedEventArgs e)
     {
+        if (!ConfirmDiscardIfDirty()) return;
+
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = GcadFileFilter, DefaultExt = ".gcad" };
         if (dialog.ShowDialog(this) != true) return;
 
@@ -136,6 +142,31 @@ public partial class MainWindow : Window
             MessageBox.Show(this,
                 $"ファイルを読み込めませんでした。ファイルが壊れているか、対応していない形式の可能性があります。\n{dialog.FileName}",
                 "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    // 未保存の変更(IsDirty)があれば保存/破棄/キャンセルの3択を提示する(T-019、殿裁定2026-07-05。
+    // 新規/開くの文書破棄操作を単一ゲートウェイに通す、docs/ecad2-guiecad-code-survey-onmitsu.md
+    // T-024節推奨に基づく)。戻り値: true=文書破棄して続行可、false=中止(呼び出し元は何もしない)。
+    private bool ConfirmDiscardIfDirty()
+    {
+        if (!_viewModel.IsDirty) return true;
+
+        var result = MessageBox.Show(this,
+            "現在のドキュメントには保存されていない変更があります。保存しますか？",
+            "確認", MessageBoxButton.YesNoCancel, MessageBoxImage.Warning);
+
+        switch (result)
+        {
+            case MessageBoxResult.Yes:
+                SaveDocument();
+                // 名前を付けて保存のダイアログをキャンセルした、または保存に失敗した場合は
+                // IsDirtyがtrueのまま残るため、その場合は遷移を中止する。
+                return !_viewModel.IsDirty;
+            case MessageBoxResult.No:
+                return true;
+            default:
+                return false;
         }
     }
 

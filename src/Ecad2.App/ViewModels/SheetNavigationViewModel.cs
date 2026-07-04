@@ -70,6 +70,11 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             };
             _owner.Document.Sheets.Add(sheet);
             Sheets.Add(sheet);
+            _owner.MarkDirty();
+            // 殿実機検出の修正: HasProjectはReplaceDocument内でのみ明示通知されるため、
+            // Sheets=0(濃紺)からここでシート追加してもHasProjectの変更がUIへ伝わらず、
+            // 画面が濃紺のまま作業領域色へ切り替わらなかった。
+            _owner.NotifyHasProjectChanged();
 
             // ObservableCollectionへのAdd直後は、ListBoxがまだ新しいアイテムのUI要素を生成し
             // 終えていないため、この場で同期的にSelectedSheetを設定すると視覚上の選択ハイライトが
@@ -89,6 +94,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 _owner.Document.Sheets.RemoveAt(index);
                 Sheets.RemoveAt(index);
                 _owner.CurrentSheetIndex = Math.Min(index, Sheets.Count - 1);
+                _owner.MarkDirty();
+                // 家老裁定: Sheets数を変える全経路で通知発火の不変条件を揃える(AddCommandと同型の
+                // 欠陥、現状のガードにより到達不能でも将来ガード変更時の再発を防ぐため揃えておく)。
+                _owner.NotifyHasProjectChanged();
                 OnPropertyChanged(nameof(SelectedSheet));
             },
             () => Sheets.Count > 1);
@@ -108,6 +117,7 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             int index = Sheets.IndexOf(sheet);
             if (index < 0) return;
 
+            _owner.MarkDirty();
             Sheets.RemoveAt(index);
             Sheets.Insert(index, sheet);
             System.Windows.Application.Current.Dispatcher.BeginInvoke(
