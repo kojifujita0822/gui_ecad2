@@ -48,10 +48,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 開いているドキュメント全体（複数シートを保持）。T-026時点ではダミーデータ(3シート)を
-    /// 起動時に設定する。GcadSerializer.Load によるドキュメント読込への置き換えは将来タスク(T-019)。
+    /// 開いているドキュメント全体（複数シートを保持）。起動時はダミーデータ(3シート)。
+    /// 新規/開く(T-019)ではReplaceDocumentで丸ごと差し替える。setterは外部非公開とし、
+    /// 差し替え経路をReplaceDocumentへ一本化する(GuiEcadの反省: 文書破棄操作が複数入口に
+    /// 分散し確認漏れが生じた、docs/ecad2-guiecad-code-survey-onmitsu.md T-024節)。
     /// </summary>
-    public LadderDocument Document { get; } = CreateDummyDocument();
+    public LadderDocument Document { get; private set; } = CreateDummyDocument();
+
+    /// <summary>現在開いている.GCADファイルのパス(T-019)。新規作成/未保存はnull。
+    /// 上書き保存が可能か(パスがあるか)の判定に使う。</summary>
+    public string? CurrentFilePath { get; private set; }
 
     private int _currentSheetIndex;
 
