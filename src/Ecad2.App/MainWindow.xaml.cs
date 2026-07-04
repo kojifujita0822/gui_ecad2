@@ -192,6 +192,11 @@ public partial class MainWindow : Window
         _viewModel.SelectedCell = null;
         _viewModel.Tool = ViewModels.ToolState.SelectDefault;
         _viewModel.StatusMessage = "";
+        // 選択ツールボタンをマウスクリックした場合もフォーカスがボタンに残ると、矢印キー移動
+        // (MoveSelectedCell)やDelete等のキャンバスフォーカス依存操作(IsCanvasFocused()ガード)が
+        // 効かなくなる。キャンバスへフォーカスを戻す(隠密レビュー観点2、Enter配置固有でなく
+        // キャンバスフォーカス依存操作全般の問題)。
+        FocusCanvas();
     }
 
     // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通ハンドラ。Tagに図形名("a接点"等)、
@@ -293,8 +298,9 @@ public partial class MainWindow : Window
         // メソッド経由のため、両経路で連続配置の挙動に揃う。
         // 増分(iii, T-021): ダイアログを閉じた後、フォーカスをキャンバスへ明示復帰する(OK確定・
         // キャンセル両経路)。PoC(poc/t021-enter-placement-poc)で暗黙委譲でも戻ることは確認済みだが、
-        // 環境差への保険として明示し確実化する。
-        Keyboard.Focus(LadderCanvasHost);
+        // 環境差への保険として明示し確実化する。独立FocusScopeの罠(T-016)を避けるため素の
+        // Keyboard.Focusではなく2段方式のFocusCanvasに統一(隠密レビュー観点3)。
+        FocusCanvas();
     }
 
     private void CyclePanelFocus()
