@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T-021 筆頭PoC(スパイク): 選択セルEnter→配置→モーダルダイアログ命名→Enter確定→
+    キャンバスへフォーカス確実復帰→続けて矢印→Enterで次配置、の一気通貫ループを検証する。
+    poc/隔離ルールに従い本体src/とは独立(家老裁量Q1=poc/隔離)。本体依存を持たない自己完結構成。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>

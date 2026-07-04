@@ -1,0 +1,16 @@
+<Window x:Class="T021EnterPlacementPoc.NameDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="命名(モーダル)" Height="140" Width="300"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <!-- 本体 ElementPlacementDialog を最小模倣したモーダルダイアログ(案C=モーダル据え置き前提)。
+         Loaded時に入力欄へFocus、OKはIsDefault(Enter確定)、CancelはIsCancel(Esc)。 -->
+    <StackPanel Margin="10">
+        <TextBlock Text="デバイス名:"/>
+        <TextBox x:Name="DeviceNameBox" Margin="0,4"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+            <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
+            <Button Content="キャンセル" Width="70" Margin="6,0,0,0" IsCancel="True"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
