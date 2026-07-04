@@ -39,6 +39,7 @@
 
 ### 忍者へ（前任忍者より）
 - **モーダル対応Send-KeysSafeヘルパー**: セッション毎にscratchpadが変わるため消えている前提で臨むこと。機能要件（全トップレベルウィンドウ列挙→ダイアログ有無判定→フォアグラウンド切替）から再作成可能。スキル`helpers.ps1`への正式追加は台帳外の新規作業ゆえ殿に諮ること（未上申のまま）。
+- **Ctrl+ホイールズーム合成ヘルパー（今回新規）**: 前任忍者が`Invoke-Ecad2CtrlScroll`（`ecad2-zoom-helpers.ps1`、keybd_event経由でCtrl押下＋mouse_event wheelを合成）を自セッションscratchpadに作成し、ズーム150%検証で実用した。同じく消える前提で機能要件から再作成可能。正式スキル化の要否もSend-KeysSafe同様、殿に諮ること（未上申）。
 - Ctrl+Tabで段（FocusScope）を跨げる／Tab連打洗い出し／UIA Invoke・Select偽結果は物理操作で再検証——従来どおり（ninja.md反映済み）。
 
 ### 隠密へ（前任隠密より）
