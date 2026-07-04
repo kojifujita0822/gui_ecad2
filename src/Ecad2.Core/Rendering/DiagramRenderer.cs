@@ -898,18 +898,31 @@ public sealed class DiagramRenderer
     }
 
     /// <summary>配置プレビュー用に1要素を指定色（半透明可）で描く。Render の後に呼ぶこと
-    /// （_lib・_rowBase=0 などの描画状態を再利用する）。グリッド座標 e.Pos に従う。</summary>
-    public void DrawPreview(IRenderer r, ElementInstance e, Color color)
+    /// （_lib・_rowBase=0 などの描画状態を再利用する）。グリッド座標 e.Pos に従う。
+    /// libraryを渡すと、Renderを経ていない単発呼び出し(T-015: 部品選択リストのサムネイル生成)
+    /// でも自作パーツを正しく解決できるよう、呼び出し中だけ_libを一時差し替える。DiagramRenderer
+    /// はUIスレッド単一使用が前提(インスタンスは共有せず呼び出し元ごとに使う想定)であり、
+    /// この一時差し替えはスレッドセーフではない(将来並行描画を導入する際は要再検討)。</summary>
+    public void DrawPreview(IRenderer r, ElementInstance e, Color color, PartLibrary? library = null)
     {
-        int lb = LeftBoundary(e);
-        double width = e.CellWidth * Cell;
-        var stroke = _theme.Get(StrokeRole.SymbolOutline) with { Color = color };
-        var part = _lib?.Get(e.PartId);
-        r.PushTransform(X(lb), YRow(e.Pos.Row));
-        if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
-        else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, null,
-                               e.Params.GetValueOrDefault(ParamKeys.Type), e.Params.GetValueOrDefault(ParamKeys.Orient));
-        r.PopTransform();
+        var savedLib = _lib;
+        if (library is not null) _lib = library;
+        try
+        {
+            int lb = LeftBoundary(e);
+            double width = e.CellWidth * Cell;
+            var stroke = _theme.Get(StrokeRole.SymbolOutline) with { Color = color };
+            var part = _lib?.Get(e.PartId);
+            r.PushTransform(X(lb), YRow(e.Pos.Row));
+            if (part is not null) PartDrawing.Draw(r, _theme, part, Cell, stroke);
+            else SymbolGlyphs.Draw(r, stroke, e.Kind, width, Cell, null,
+                                   e.Params.GetValueOrDefault(ParamKeys.Type), e.Params.GetValueOrDefault(ParamKeys.Orient));
+            r.PopTransform();
+        }
+        finally
+        {
+            _lib = savedLib;
+        }
     }
 
     // 機器名ラベルを記号の上・中央に描く。
