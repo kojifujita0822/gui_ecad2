@@ -108,13 +108,12 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                _viewModel.SelectedCell = null;
-                _viewModel.Tool = ViewModels.ToolState.SelectDefault;
-                // BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")が
-                // キャンセル後も残り続けるバグの修正(忍者実機検証で発覚)。
-                _viewModel.StatusMessage = "";
-                // SelectDefaultButton_Clickと同じ操作のため、フォーカス復帰も合わせる(隠密レビュー
-                // 観点2と同種、忍者実機検証で再現確認、往復3周目)。
+                // 選択ツールボタン(マウス経路)と同じ操作のため共通のActivateSelectDefault()を使う
+                // (増分vi、BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")が
+                // キャンセル後も残り続けるバグの修正=忍者実機検証で発覚、も込み)。Escapeはボタンの
+                // マウス/キーボード二重発火問題を持たないグローバルショートカットのため、フォーカス
+                // 復帰は常時実行する(隠密の設計集約プラン根拠3のとおり変更不要)。
+                ActivateSelectDefault();
                 FocusCanvas();
                 e.Handled = true;
                 break;
@@ -190,38 +189,71 @@ public partial class MainWindow : Window
     }
 
     // 選択ツール(Esc)ボタン。Window_PreviewKeyDownのEscケースと同じ操作。
-    private void SelectDefaultButton_Click(object sender, RoutedEventArgs e)
+    //
+    // 増分(vi, T-021設計集約プラン、隠密案(a)+(c)ハイブリッド): マウス操作(PreviewMouseLeftButtonUp)
+    // とキーボード操作(PreviewKeyDown、Enter/Space)を最初から別ハンドラに分離する。Clickイベント
+    // 自体はマウス/キーボードいずれが発火源か判別する情報を持たないため(隠密調査で確認)、判別ではなく
+    // 経路そのものを分ける。マウス経路のみFocusCanvas()を呼び、キーボード経路では呼ばない
+    // (キーボードでツールバー内をナビゲーション中にフォーカスが強制的にキャンバスへ奪われる副作用=
+    // 懸念4を解消するため)。
+    private void ActivateSelectDefault()
     {
         _viewModel.SelectedCell = null;
         _viewModel.Tool = ViewModels.ToolState.SelectDefault;
         _viewModel.StatusMessage = "";
-        // 選択ツールボタンをマウスクリックした場合もフォーカスがボタンに残ると、矢印キー移動
-        // (MoveSelectedCell)やDelete等のキャンバスフォーカス依存操作(IsCanvasFocused()ガード)が
-        // 効かなくなる。キャンバスへフォーカスを戻す(隠密レビュー観点2、Enter配置固有でなく
-        // キャンバスフォーカス依存操作全般の問題)。
+    }
+
+    private void SelectDefaultButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        ActivateSelectDefault();
         FocusCanvas();
     }
 
-    // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通ハンドラ。Tagに図形名("a接点"等)、
+    private void SelectDefaultButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter && e.Key != Key.Space) return;
+        ActivateSelectDefault();
+        e.Handled = true;
+    }
+
+    // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通処理。Tagに図形名("a接点"等)、
     // OR系は"OR:"接頭辞を付けて区別する(MainWindow.xaml参照)。殿裁定によりボタンは「押下→ツール
     // 選択状態→キャンバスクリックで位置確定→ダイアログ」という旧T-016寄りのフローに戻す
     // (キーボードショートカットは従来通り「セル選択→キーで即ダイアログ」のまま、経路が異なる)。
     // ゴースト(プレビュー)表示は簡易版としてステータスバー表示のみに留める(視覚プレビューはT-029)。
-    private void BuiltinPlaceButton_Click(object sender, RoutedEventArgs e)
+    private void ActivateBuiltinTool(string partName, bool isOr)
     {
-        if (sender is not Button { Tag: string tag }) return;
-        bool isOr = tag.StartsWith("OR:");
-        string partName = isOr ? tag[3..] : tag;
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(pe => pe.Category == "" && pe.Definition.Name == partName);
         if (entry is null) return;
 
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, PartId: entry.Definition.Id, IsOr: isOr);
         _viewModel.StatusMessage = $"配置ツール: {partName}{(isOr ? "(OR)" : "")} - キャンバスをクリックして配置位置を指定してください";
+    }
 
+    private static (string PartName, bool IsOr) ParseBuiltinTag(string tag)
+    {
+        bool isOr = tag.StartsWith("OR:");
+        return (isOr ? tag[3..] : tag, isOr);
+    }
+
+    private void BuiltinPlaceButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Button { Tag: string tag }) return;
+        var (partName, isOr) = ParseBuiltinTag(tag);
+        ActivateBuiltinTool(partName, isOr);
         // ツールバーボタンでツール選択後、フォーカスがボタンに残るとEnter配置(案X, T-021)が効かない
         // (キャンバスフォーカスがEnterのガード条件のため)。キャンバスへフォーカスを戻し、F5等のキー
         // ボード選択と同じく「ツール選択方法によらずEnterで配置できる」を成立させる(忍者実機検証で発見)。
         FocusCanvas();
+    }
+
+    private void BuiltinPlaceButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter && e.Key != Key.Space) return;
+        if (sender is not Button { Tag: string tag }) return;
+        var (partName, isOr) = ParseBuiltinTag(tag);
+        ActivateBuiltinTool(partName, isOr);
+        e.Handled = true;
     }
 
     // LadderCanvasHostへ確実にフォーカスを移す。CanvasArea(ScrollViewer)はFocusManager.IsFocusScope
@@ -244,12 +276,23 @@ public partial class MainWindow : Window
 
     // 自作パーツボタン(T-026段階4-7、案B)。Tool.Mode=PlaceElementにすることで右パネル下段を
     // 部品選択表示へ切替える(パネルを開くための明示的な入口、鶏卵問題の回避)。
-    private void OpenPartSelectionButton_Click(object sender, RoutedEventArgs e)
+    // マウス/キーボード分離は上記2ボタンと同じ理由(増分vi、懸念4解消)。
+    private void ActivateOpenPartSelection()
     {
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement);
-        // BuiltinPlaceButton_Clickと同じ罠(ボタンクリック後にフォーカスが残る)への対処
-        // (忍者実機検証で再現確認、往復3周目)。
+    }
+
+    private void OpenPartSelectionButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        ActivateOpenPartSelection();
         FocusCanvas();
+    }
+
+    private void OpenPartSelectionButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter && e.Key != Key.Space) return;
+        ActivateOpenPartSelection();
+        e.Handled = true;
     }
 
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
