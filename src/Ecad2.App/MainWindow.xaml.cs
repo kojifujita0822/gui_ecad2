@@ -227,14 +227,18 @@ public partial class MainWindow : Window
             // 見えても母線が画面外のままだと視認しづらいため、BringIntoView対象を母線側へ
             // セル1個分広げる。2条件は独立判定のため、Columns==1のような極小グリッドでも
             // 両母線が同時に見える範囲になる。行方向は対象外(殿指示)。
+            // 修正(隠密レビュー340f53d指摘#1): widenは今回の操作で列が実際に変化した場合に限る。
+            // 列値だけで判定すると、列端に留まったままUp/Downで行だけ動かした際にも毎回発火し、
+            // 手動横スクロール位置を引き戻しうる(増分(v)のnewCell!=currentガードと同種の回帰)。
+            bool columnChanged = newCell.Column != current.Column;
             double viewLeft = viewRect.X;
             double viewWidth = viewRect.Width;
-            if (viewColumn == 0)
+            if (columnChanged && viewColumn == 0)
             {
                 viewLeft -= viewRect.Width;
                 viewWidth += viewRect.Width;
             }
-            if (viewColumn == grid.Columns - 1)
+            if (columnChanged && viewColumn == grid.Columns - 1)
             {
                 viewWidth += viewRect.Width;
             }
