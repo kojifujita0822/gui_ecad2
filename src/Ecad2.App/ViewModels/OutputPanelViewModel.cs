@@ -55,6 +55,14 @@ public sealed class OutputPanelViewModel : ViewModelBase
         JumpTo(diagnostic.Locations[0], diagnostic.DeviceName);
     }
 
+    /// <summary>DRC結果をクリアする(T-019: 新規/開くでDocumentを差し替えた際、旧文書の結果が
+    /// 出力パネルに残留し誤ジャンプ・沈黙する不整合を防ぐ、隠密レビュー指摘)。</summary>
+    public void ClearResults()
+    {
+        Diagnostics.Clear();
+        SelectedDiagnostic = null;
+    }
+
     private void RunDrc()
     {
         var results = new List<Diagnostic>();

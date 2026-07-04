@@ -350,6 +350,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         SheetNavigation.ResetSheets();
         DeviceTable.Rebind(newDocument.Devices);
+        // 隠密レビュー指摘(#1 CONFIRMED/#2 CONFIRMED軽微/#3 PLAUSIBLE→格上げ): 旧文書に紐づく
+        // 状態を明示的にリセットしないと、新規/開く後もDRC結果の誤ジャンプ・沈黙、ステータス
+        // メッセージ残留、前文書のツール種別での配置ダイアログ開始が起こりうる。既存setter経由で
+        // 設定し(#4の教訓: フィールド直接代入+手動通知の重複管理を増やさない)通知を一本化する。
+        StatusMessage = "";
+        Tool = ToolState.SelectDefault;
+        OutputPanel.ClearResults();
     }
 
     public MainWindowViewModel()
