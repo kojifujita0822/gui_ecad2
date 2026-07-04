@@ -12,6 +12,9 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+        <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
+        <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
+        <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -69,6 +72,7 @@
                 <MenuItem Header="グリッド表示(_G)"/>
             </MenuItem>
             <MenuItem Header="ツール(_T)">
+                <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>
                 <MenuItem Header="テストモード(_M)" InputGestureText="F5"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
@@ -311,15 +315,35 @@
             </Border>
         </Grid>
 
-        <!-- 下部出力パネル: メッセージ一覧の骨格。DesignRuleCheck(T-007移植済み)との接続は
-             機能実装(将来タスク)を伴うため、現状は空状態プレースホルダのみ。 -->
+        <!-- 下部出力パネル: DesignRuleCheck(T-007移植済み)の結果を構造化DataGridで表示する(T-018、
+             殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
+             行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
+             (OutputPanelViewModel.SelectedDiagnostic参照)。 -->
         <DockPanel x:Name="OutputPanelArea" Grid.Row="3" Height="160">
             <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
                 <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"/>
             </Border>
-            <ListView>
-                <ListViewItem Foreground="Gray">問題は見つかりませんでした</ListViewItem>
-            </ListView>
+            <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
+                      SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
+                                        Width="60">
+                        <DataGridTextColumn.ElementStyle>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Foreground" Value="{Binding Severity, Converter={StaticResource SeverityToBrush}}"/>
+                                <Setter Property="FontWeight" Value="Bold"/>
+                            </Style>
+                        </DataGridTextColumn.ElementStyle>
+                    </DataGridTextColumn>
+                    <DataGridTextColumn Header="コード" Binding="{Binding Code}" Width="110"/>
+                    <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="80"/>
+                    <DataGridTextColumn Header="メッセージ" Binding="{Binding Message}" Width="*"/>
+                    <DataGridTextColumn Header="該当箇所" Binding="{Binding Locations, Converter={StaticResource LocationsToText}}"
+                                        Width="140"/>
+                </DataGrid.Columns>
+            </DataGrid>
         </DockPanel>
 
         <!-- ステータスバー: design-brief 4節#6「モード可視化の多重化」。現在の配置ツールモードと

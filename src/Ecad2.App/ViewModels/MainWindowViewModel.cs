@@ -220,6 +220,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>右パネル上段（機器表）の子ViewModel。</summary>
     public DeviceTableViewModel DeviceTable { get; }
 
+    /// <summary>下部出力パネル（DesignRuleCheck結果表示）の子ViewModel。</summary>
+    public OutputPanelViewModel OutputPanel { get; }
+
     /// <summary>
     /// 現在使用可能な自作パーツライブラリ。PartPalette.Entries（PartFolderStoreの列挙結果、
     /// 基本図形もPartIdを持つ.gcadpartとして含む）から構築する。DiagramRenderer.Render /
@@ -276,6 +279,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         PartPalette = new PartPaletteViewModel();
         PartLibrary = BuildPartLibrary(PartPalette.Entries);
         DeviceTable = new DeviceTableViewModel(Document.Devices);
+        OutputPanel = new OutputPanelViewModel(this);
     }
 
     private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)
