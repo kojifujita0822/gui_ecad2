@@ -74,12 +74,18 @@ public partial class MainWindow : Window
     {
         var position = e.GetPosition(LadderCanvasHost);
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
+        TryPlaceActiveTool();
+    }
 
-        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement && _viewModel.Tool.PartId is string partId)
-        {
-            var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
-            if (entry is not null) TryPlaceElement(entry, _viewModel.Tool.IsOr);
-        }
+    // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
+    // クリック配置(LadderCanvasHost_PreviewMouseLeftButtonUp)とEnter配置(増分i・案X、T-021)の共通経路
+    // (家老采配「両経路で挙動を揃える」)。SelectedCellのnull/占有チェックはTryPlaceElement側で行う。
+    private void TryPlaceActiveTool()
+    {
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement || _viewModel.Tool.PartId is not string partId)
+            return;
+        var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
+        if (entry is not null) TryPlaceElement(entry, _viewModel.Tool.IsOr);
     }
 
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
@@ -146,6 +152,17 @@ public partial class MainWindow : Window
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
                 if (_viewModel.DeleteSelectedElement())
                     RedrawCanvas();
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement
+                    && _viewModel.Tool.PartId is not null
+                    && _viewModel.SelectedCell is not null:
+                // 増分(i, T-021・案X): 選択セルでEnter→アクティブツールの要素を配置する(殿裁定)。
+                // ツールバーボタンで種別選択済み(Tool.Mode==PlaceElement && PartId)かつセル選択済みの
+                // 前提。配置本体はクリック配置と共通のTryPlaceActiveToolへ委譲する。Enterがこの4条件で
+                // 成立しないときは配置以外(将来用途)へ委ねるためHandledにしない。
+                TryPlaceActiveTool();
                 e.Handled = true;
                 break;
         }
@@ -244,13 +261,25 @@ public partial class MainWindow : Window
         }
 
         var dialog = new Views.ElementPlacementDialog(_viewModel.PartPalette.Entries, initialEntry.Definition.Id) { Owner = this };
-        if (dialog.ShowDialog() != true || dialog.SelectedPartId is null) return;
+        // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
+        // ダイアログをOK確定した場合のみ行う。Esc/キャンセルでは要素を一切作らないため、未命名の
+        // 孤立要素は構造上残らない(現行の「OK後に配置」構造がそのまま原子的取消を満たす)。
+        if (dialog.ShowDialog() == true && dialog.SelectedPartId is string partId)
+        {
+            _viewModel.PlaceElementAtSelectedCell(partId, dialog.DeviceName, isOr);
+            _viewModel.StatusMessage = "";
+            RedrawCanvas();
+        }
 
-        _viewModel.PlaceElementAtSelectedCell(dialog.SelectedPartId, dialog.DeviceName, isOr);
-        _viewModel.StatusMessage = "";
-        _viewModel.SelectedCell = null;
-        _viewModel.Tool = ViewModels.ToolState.SelectDefault;
-        RedrawCanvas();
+        // 分岐A(殿裁定=ツール保持で連続配置, T-021): 配置後もTool/SelectedCellをリセットしない。
+        // 「移動(矢印)→配置(Enter)→命名→確定→また移動…」の一気通貫(案X)を継続できるよう、
+        // アクティブツールと選択セル(次の移動起点)を保持する。ツール解除はEsc(Window_PreviewKeyDownの
+        // Escapeケース)に委ねる。クリック配置経路(LadderCanvasHost_PreviewMouseLeftButtonUp)も本
+        // メソッド経由のため、両経路で連続配置の挙動に揃う。
+        // 増分(iii, T-021): ダイアログを閉じた後、フォーカスをキャンバスへ明示復帰する(OK確定・
+        // キャンセル両経路)。PoC(poc/t021-enter-placement-poc)で暗黙委譲でも戻ることは確認済みだが、
+        // 環境差への保険として明示し確実化する。
+        Keyboard.Focus(LadderCanvasHost);
     }
 
     private void CyclePanelFocus()
