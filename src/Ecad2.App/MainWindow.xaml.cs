@@ -209,7 +209,7 @@ public partial class MainWindow : Window
     private void SelectDefaultButton_Click(object sender, RoutedEventArgs e)
     {
         ActivateSelectDefault();
-        ConsumeToolButtonFocusRestore();
+        ConsumeToolButtonFocusRestore(sender);
     }
 
     // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通処理。Tagに図形名("a接点"等)、
@@ -242,34 +242,48 @@ public partial class MainWindow : Window
         // フォーカスを戻し、F5等のキーボード選択と同じく「ツール選択方法によらずEnterで配置できる」
         // を成立させる(忍者実機検証で発見)。キーボード操作(フラグ有)ではツールバー内ナビゲーション
         // を維持するため戻さない(懸念4)。
-        ConsumeToolButtonFocusRestore();
+        ConsumeToolButtonFocusRestore(sender);
     }
 
-    // キーボード(Enter/Space)由来のツールバーボタン活性化かどうかのフラグ(増分vi差し戻し1周目)。
-    // 対象3ボタン(選択ツール/a接点等/自作パーツ)で共有する。同時に複数ボタンを押すことは無いため
-    // 単一フィールドで足りる。
-    private bool _toolButtonActivatedByKeyboard;
+    // キーボード(Enter/Space)由来のツールバーボタン活性化を記録する「由来ボタン参照」
+    // (増分vi差し戻し2周目、隠密レビュー穴1対応)。boolフラグだと「ボタンAをSpaceで押下中に
+    // ボタンBをマウスクリック」のような場合にB側のClickがA由来のフラグを誤って消費してしまう
+    // (attribution swap)。senderそのものを記録し、Clickハンドラ側で「記録==sender」の場合のみ
+    // キーボード由来と判定することでボタン間の取り違えを構造的に防ぐ。
+    private object? _toolButtonKeyboardClickSource;
 
-    // 対象3ボタン共通のPreviewKeyDown。本体はフラグ立てのみで3ボタンとも完全に同一のため、
+    // 対象3ボタン共通のPreviewKeyDown。本体はsenderの記録のみで3ボタンとも完全に同一のため、
     // ボタンごとに分けず単一ハンドラへ集約する(隠密レビュー指摘6)。
     private void ToolButtonPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter || e.Key == Key.Space) _toolButtonActivatedByKeyboard = true;
+        if (e.Key == Key.Enter || e.Key == Key.Space) _toolButtonKeyboardClickSource = sender;
     }
 
-    // フラグが立っていなければ(マウス操作)キャンバスへフォーカスを戻し、立っていれば(キーボード
-    // 操作)ツールバー内ナビゲーション維持のため戻さない。呼び出し後は必ずフラグを消費(リセット)する。
-    private void ConsumeToolButtonFocusRestore()
+    // 記録されたボタンと今回のClickのsenderが一致する場合のみキーボード由来と判定し、
+    // キャンバスへのフォーカス復帰(FocusCanvas)をスキップする(ツールバー内ナビゲーション維持、
+    // 懸念4)。一致・不一致いずれの場合も記録は必ずクリアする(取り違え防止、隠密レビュー穴1)。
+    private void ConsumeToolButtonFocusRestore(object sender)
     {
-        if (!_toolButtonActivatedByKeyboard) FocusCanvas();
-        _toolButtonActivatedByKeyboard = false;
+        bool isKeyboardOrigin = ReferenceEquals(_toolButtonKeyboardClickSource, sender);
+        if (!isKeyboardOrigin) FocusCanvas();
+        _toolButtonKeyboardClickSource = null;
     }
 
-    // Space押下でボタンが押下状態になった後、フォーカス移動等でClickがキャンセルされた場合に
-    // フラグが残ってしまう事態への安全側の掃除。新たなマウス押下が始まった時点で必ずクリアし、
-    // 直後のClickをマウス起因として正しく扱えるようにする(増分vi差し戻し1周目、家老裁定)。
-    private void ToolButtonPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        => _toolButtonActivatedByKeyboard = false;
+    // Space押下でボタンが押下状態になった後、フォーカス喪失でClickがキャンセルされた場合の掃除
+    // (増分vi差し戻し2周目、隠密レビュー穴2対応)。ButtonBase標準はこの場合Clickを発火させない
+    // ため、ConsumeToolButtonFocusRestore側では記録をクリアできず、LostKeyboardFocusが唯一の
+    // 掃除どころになる。対象3ボタン共通のためToolButtonPreviewKeyDownと同様に単一ハンドラへ集約。
+    private void ToolButtonLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (ReferenceEquals(_toolButtonKeyboardClickSource, sender)) _toolButtonKeyboardClickSource = null;
+    }
+
+    // マウス押下時の安全側の掃除(増分vi差し戻し2周目、隠密改善案4)。8ボタン個別配線ではなく
+    // Windowレベルの単一ハンドラへ集約する(動作は変更なし、配線箇所のみ整理)。新たなマウス押下が
+    // window内のどこであれ発生した時点で記録をクリアし、直後のClickをマウス起因として正しく
+    // 扱えるようにする。
+    private void Window_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _toolButtonKeyboardClickSource = null;
 
     // LadderCanvasHostへ確実にフォーカスを移す。CanvasArea(ScrollViewer)はFocusManager.IsFocusScope
     // ="True"の独立FocusScopeのため、Keyboard.Focus()単体では実フォーカスが移らないことがある
@@ -300,7 +314,7 @@ public partial class MainWindow : Window
     private void OpenPartSelectionButton_Click(object sender, RoutedEventArgs e)
     {
         ActivateOpenPartSelection();
-        ConsumeToolButtonFocusRestore();
+        ConsumeToolButtonFocusRestore(sender);
     }
 
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
