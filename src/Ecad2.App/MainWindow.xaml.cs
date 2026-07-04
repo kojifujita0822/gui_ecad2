@@ -112,20 +112,21 @@ public partial class MainWindow : Window
                 // 層1(ダイアログ内テキスト編集中の編集キャンセル)はモーダル表示中は本ハンドラ自体が
                 // 呼ばれないため対象外。ElementPlacementDialogのIsCancel="True"ボタン(WPF標準規約)で
                 // 既に実現済み(層1は本ケースの範囲外)。
+                // StatusMessageのクリアは層に依らず全Esc押下で一度だけ行う(層2/層3内に重複させない)。
+                // F5〜F8のTryPlaceBuiltinはTool.Mode=PlaceElementを経ずにエラーメッセージ
+                // ("配置するセルを先に選択してください"等)を設定しうるため、層2/層3のどちらの条件も
+                // 満たさず層4へ落ちてもメッセージが残らぬよう、条件分岐の外でクリアする(隠密レビュー指摘)。
+                _viewModel.StatusMessage = "";
                 if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement)
                 {
                     // 層2: 配置モード中 → 選択モードへ戻す。SelectedCellは保持し、続けて別ツールで
                     // 同じセルへ配置し直せるようにする。
                     _viewModel.Tool = ViewModels.ToolState.SelectDefault;
-                    _viewModel.StatusMessage = "";
                 }
                 else if (_viewModel.SelectedCell is not null)
                 {
-                    // 層3: 要素選択中 → 選択解除のみ。TryPlaceElementのエラーメッセージ
-                    // ("選択したセルには既に要素があります"等)が残っていた場合もここで払拭する
-                    // (T-017由来の残留教訓)。
+                    // 層3: 要素選択中 → 選択解除のみ。
                     _viewModel.SelectedCell = null;
-                    _viewModel.StatusMessage = "";
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
                 // Escapeはボタンのマウス/キーボード二重発火問題を持たないグローバルショートカットの
@@ -212,7 +213,9 @@ public partial class MainWindow : Window
         LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(newCell));
     }
 
-    // 選択ツール(Esc)ボタン。Window_PreviewKeyDownのEscケースと同じ操作。
+    // 選択ツールボタン(ツールバーのEsc相当ボタン)の即時処理。選択セル・ツール・案内メッセージを
+    // 一括で全解除する。Window_PreviewKeyDownのEscキーは増分(iv)で段階的(1回1層)になったため
+    // 「同じ操作」ではない。ボタンは即時全解除、Escキーは内→外へ1層ずつ戻す。
     //
     // 増分(vi, T-021設計集約プラン、隠密案(a)+(c)ハイブリッド、差し戻し1周目で改訂): 当初
     // PreviewMouseLeftButtonUp/PreviewKeyDownへ経路そのものを分離する案を試みたが、隠密の
