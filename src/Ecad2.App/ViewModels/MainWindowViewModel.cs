@@ -56,14 +56,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int _currentSheetIndex;
 
     /// <summary>現在表示中のシートのインデックス（Document.Sheets への添字）。左パレットのシート
-    /// ナビゲーション(T-026)からの選択で変更される。</summary>
+    /// ナビゲーション(T-026)からの選択、およびDRC出力パネルの行選択によるジャンプ(T-018)で
+    /// 変更される。</summary>
     public int CurrentSheetIndex
     {
         get => _currentSheetIndex;
         set
         {
-            if (SetProperty(ref _currentSheetIndex, value))
-                OnPropertyChanged(nameof(CurrentSheet));
+            if (!SetProperty(ref _currentSheetIndex, value)) return;
+            OnPropertyChanged(nameof(CurrentSheet));
+            // シート切替時、前シートのSelectedCell(ハイライト・プロパティパネル)を持ち越さない
+            // (T-018忍者実機検証で発見: 空シートへ切替えてもハイライト・プロパティ内容が残存するバグ)。
+            SelectedCell = null;
+            // SheetNavigation.SelectedSheetはCurrentSheetIndexを読むだけの導出プロパティのため、
+            // DRC出力パネルのジャンプ(T-018)等、シートナビ経由以外でCurrentSheetIndexが変わった際は
+            // 左パレットの選択ハイライトが追従しない(T-018忍者実機検証で発見)。ここで明示的に通知する。
+            SheetNavigation.RefreshSelectedSheet();
         }
     }
 

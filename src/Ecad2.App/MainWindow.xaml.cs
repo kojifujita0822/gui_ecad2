@@ -217,6 +217,15 @@ public partial class MainWindow : Window
             TryPlaceElement(entry, isOr: false);
     }
 
+    // 下部出力パネル(DRC結果)の行クリック(T-018)。DataGridRow.PreviewMouseLeftButtonDownを使う
+    // 理由はPartSelectionItem_Clickedと同じ(同一行の再選択でSelectedItemバインディングが更新
+    // されず、ジャンプが再実行されない事象が忍者実機検証で発見されたため)。
+    private void OutputGridRow_Clicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is DataGridRow { Item: Ecad2.Simulation.Diagnostic diagnostic })
+            _viewModel.OutputPanel.JumpToDiagnostic(diagnostic);
+    }
+
     // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
     // 浮動インライン入力ダイアログ(種別+デバイス名)→OKで確定配置。isOr=trueの場合、実際のOR接続
     // 処理(基準行判定・縦コネクタ生成)はViewModel側の責務。配置完了後は右パネルをプロパティ表示へ

@@ -43,6 +43,18 @@ public sealed class OutputPanelViewModel : ViewModelBase
         RunDrcCommand = new RelayCommand(RunDrc);
     }
 
+    /// <summary>
+    /// 診断行クリックから直接呼ぶジャンプ実行(T-018忍者実機検証で発見)。DataGridは既に選択中の
+    /// 行を再クリックしても選択状態が変化しないと判定しSelectedItemバインディングが更新されない
+    /// (T-016のPartSelectionItem_Clickedと同種、WPFの既知の仕様)。SelectedDiagnosticのsetterに
+    /// 頼らず、行のPreviewMouseLeftButtonDownから確実にジャンプさせるための公開メソッド。
+    /// </summary>
+    public void JumpToDiagnostic(Diagnostic diagnostic)
+    {
+        if (diagnostic.Locations.Count == 0) return;
+        JumpTo(diagnostic.Locations[0], diagnostic.DeviceName);
+    }
+
     private void RunDrc()
     {
         var results = new List<Diagnostic>();

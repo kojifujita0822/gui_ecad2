@@ -327,6 +327,13 @@
                       SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
                       AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.RowStyle>
+                    <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
+                         T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
+                    <Style TargetType="DataGridRow">
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
+                    </Style>
+                </DataGrid.RowStyle>
                 <DataGrid.Columns>
                     <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
                                         Width="60">

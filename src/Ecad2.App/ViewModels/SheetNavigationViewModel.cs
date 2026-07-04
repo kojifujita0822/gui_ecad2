@@ -38,6 +38,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
         }
     }
 
+    /// <summary>CurrentSheetIndexが外部(DRC出力パネルのジャンプ等、T-018)から変更された際、
+    /// SelectedSheetのバインディング(左パネルの選択ハイライト)を同期させるために呼ぶ。</summary>
+    public void RefreshSelectedSheet() => OnPropertyChanged(nameof(SelectedSheet));
+
     public ICommand AddCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand RenameCommand { get; }
