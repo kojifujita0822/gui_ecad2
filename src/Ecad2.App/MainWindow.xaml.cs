@@ -515,10 +515,12 @@ public partial class MainWindow : Window
 
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
     // ListBoxItem.Selectedが同一アイテム再選択時に発火しない(WPFの仕様、T-016で確認済み)ため。
+    // DataContextはPartSelectionList表示専用のサムネイル付きラッパー(T-015)、配置処理へは
+    // 元のPartFolderEntry(.Entry)を渡す。
     private void PartSelectionItem_Clicked(object sender, MouseButtonEventArgs e)
     {
-        if (sender is ListBoxItem { DataContext: Ecad2.Persistence.PartFolderEntry entry })
-            TryPlaceElement(entry, isOr: false);
+        if (sender is ListBoxItem { DataContext: ViewModels.PartSelectionEntryViewModel entry })
+            TryPlaceElement(entry.Entry, isOr: false);
     }
 
     // 下部出力パネル(DRC結果)の行クリック(T-018)。DataGridRow.PreviewMouseLeftButtonDownを使う

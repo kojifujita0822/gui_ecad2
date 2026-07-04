@@ -322,12 +322,13 @@
                         </DockPanel>
                         <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">
                             <TextBlock DockPanel.Dock="Top" Text="部品選択" FontWeight="Bold" Margin="4"/>
-                            <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.Entries}" BorderThickness="0">
+                            <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.SelectionEntries}" BorderThickness="0">
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Margin="2">
-                                            <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40"/>
-                                            <TextBlock Text="{Binding Definition.Name}"/>
+                                            <Image Source="{Binding Thumbnail}" Width="24" Height="24" Margin="0,0,4,0"/>
+                                            <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Definition.Name}" VerticalAlignment="Center"/>
                                         </StackPanel>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
