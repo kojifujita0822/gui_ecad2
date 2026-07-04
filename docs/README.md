@@ -17,6 +17,7 @@ ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
 
 - [todo.md](todo.md) — タスク台帳。家老が采配してよい根拠はここに Approved/In-progress とある行だけ。各役は起動時にここを確認する。
 - [proposed.md](proposed.md) — 範囲外の気づき・提案の置き場（未承認・着手禁止）。殿の承認が付いたものだけ todo.md へ移す。
+- [observations.md](observations.md) — 経過観察一覧（修正しない合意済みの事象を1件1行で記録）。
 
 ## 関連（docs-notes配下）
 
