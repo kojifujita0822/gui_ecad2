@@ -82,6 +82,11 @@ public partial class MainWindow : Window
 
     private void SaveDocument()
     {
+        // 隠密レビュー指摘(往復2周目、見落とし): Sheets=0(濃紺)では保存操作を無効化する
+        // (家老既定案、殿帰宅後に実挙動確認)。Ctrl+S/ツールバー/メニューいずれもここを通るため
+        // 単一の関門になる。IsEnabledバインディングと二重防御。
+        if (!_viewModel.HasProject) return;
+
         if (_viewModel.CurrentFilePath is string path)
             TrySaveToFile(path);
         else

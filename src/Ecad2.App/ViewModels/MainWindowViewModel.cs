@@ -118,6 +118,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// Sheets=0(濃紺)からシート追加しても画面が作業領域色へ切り替わらない欠陥があった。</summary>
     public void NotifyHasProjectChanged() => OnPropertyChanged(nameof(HasProject));
 
+    /// <summary>Sheets 0→1遷移(起動直後濃紺スタートから最初のシート追加、殿裁定2026-07-05)後に
+    /// 呼ぶ(隠密レビュー指摘、往復2周目回帰)。CurrentSheetIndexの既定値が0のため、追加後に
+    /// SelectedSheet=先頭シートを設定してもCurrentSheetIndexが0→0で「変化なし」と判定され
+    /// CurrentSheetのPropertyChangedが発火せず、RedrawCanvasが呼ばれず画面が空白のままになる。
+    /// CurrentSheetIndexの番兵値化(-1化、影響範囲が広い)は見送り、この経路でのみ明示発火する。</summary>
+    public void NotifyCurrentSheetChanged() => OnPropertyChanged(nameof(CurrentSheet));
+
     private GridPos? _selectedCell;
 
     /// <summary>

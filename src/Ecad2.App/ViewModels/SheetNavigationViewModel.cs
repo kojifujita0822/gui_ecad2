@@ -61,6 +61,7 @@ public sealed class SheetNavigationViewModel : ViewModelBase
 
         AddCommand = new RelayCommand(() =>
         {
+            bool wasEmpty = _owner.Document.Sheets.Count == 0;
             int pageNumber = _owner.Document.Sheets.Count + 1;
             var sheet = new Sheet
             {
@@ -75,6 +76,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // Sheets=0(濃紺)からここでシート追加してもHasProjectの変更がUIへ伝わらず、
             // 画面が濃紺のまま作業領域色へ切り替わらなかった。
             _owner.NotifyHasProjectChanged();
+            // 隠密レビュー指摘(往復2周目回帰): Sheets 0→1遷移時はCurrentSheetIndexが0→0のまま
+            // 変化しないためCurrentSheetのPropertyChangedが不発になり、RedrawCanvasが呼ばれず
+            // キャンバスが空白のままになる。この経路でのみ明示発火する。
+            if (wasEmpty) _owner.NotifyCurrentSheetChanged();
 
             // ObservableCollectionへのAdd直後は、ListBoxがまだ新しいアイテムのUI要素を生成し
             // 終えていないため、この場で同期的にSelectedSheetを設定すると視覚上の選択ハイライトが
