@@ -78,6 +78,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。</summary>
     public Sheet CurrentSheet => Document.Sheets[CurrentSheetIndex];
 
+    /// <summary>
+    /// プロジェクト(ドキュメント)が実在するか(T-020)。GX Works3踏襲の空状態(濃紺)⇔作業領域(白＋黒
+    /// グリッド)の状態依存配色(App.xaml の EmptyStateBackgroundBrush/WorkAreaBackgroundBrush、
+    /// 殿裁定)を切替えるための状態。GuiEcadには「未作成の空状態」という概念自体が無かったため、
+    /// ecad2で新規導入する(docs/ecad2-preimplementation-survey-onmitsu.md T-020節)。ドキュメント
+    /// 管理(新規/開く/保存、T-019)が未実装のため、現状はDocumentが常時ダミーの3シートを持ち、
+    /// シート削除も最後の1枚を残すガードがあるため実際には常にtrueのまま(現行UIから空状態には
+    /// 到達しない、暫定固定)。T-019で「新規」フローがSheets.Countを0にできるようになった時点で
+    /// 自然に機能する。
+    /// </summary>
+    public bool HasProject => Document.Sheets.Count > 0;
+
     private GridPos? _selectedCell;
 
     /// <summary>

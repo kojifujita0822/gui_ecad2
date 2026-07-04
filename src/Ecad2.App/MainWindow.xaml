@@ -234,14 +234,28 @@
 
             <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"/>
 
-            <!-- 中央キャンバス: 図面描画。段階4-aではダミーデータを常時表示するため作業領域色(白)を
-                 適用。ドキュメント未作成時に空状態色(濃紺)へ切替える動的対応は将来タスク(ドキュメント
-                 管理の実装に合わせて反映)。段階4-b: Ctrl+マウスホイールで拡大縮小(ScaleTransform)。
-                 キーボードでのズーム操作は段階8(キーボード規約の全体配線)でまとめて対応する。 -->
-            <ScrollViewer x:Name="CanvasArea" Grid.Column="2" Background="{StaticResource WorkAreaBackgroundBrush}"
+            <!-- 中央キャンバス: 図面描画。空状態(濃紺)⇔作業領域(白)の状態依存配色はHasProject
+                 バインディング経由で切替わる(T-020、ScrollViewer.Style参照)。Ctrl+マウスホイールで
+                 拡大縮小(ScaleTransform)。キーボードでのズーム操作は段階8(キーボード規約の全体配線)
+                 でまとめて対応する。 -->
+            <ScrollViewer x:Name="CanvasArea" Grid.Column="2"
                           HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
                           PreviewMouseWheel="CanvasArea_PreviewMouseWheel"
                           FocusManager.IsFocusScope="True">
+                <ScrollViewer.Style>
+                    <!-- 空状態(濃紺)⇔作業領域(白)の状態依存配色(T-020、殿裁定=GX Works3踏襲)。
+                         HasProject=falseの間(ドキュメント未作成)はEmptyStateBackgroundBrushに切替わる。
+                         現状はドキュメント管理(T-019)未実装のためHasProjectは常時true=作業領域色のまま
+                         (暫定固定、MainWindowViewModel.HasProject参照)。 -->
+                    <Style TargetType="ScrollViewer">
+                        <Setter Property="Background" Value="{StaticResource WorkAreaBackgroundBrush}"/>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding HasProject}" Value="False">
+                                <Setter Property="Background" Value="{StaticResource EmptyStateBackgroundBrush}"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ScrollViewer.Style>
                 <views:LadderCanvas x:Name="LadderCanvasHost" PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp">
                     <views:LadderCanvas.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
