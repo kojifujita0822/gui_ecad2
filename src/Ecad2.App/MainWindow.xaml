@@ -307,7 +307,7 @@
                         </DataGrid>
                     </DockPanel>
 
-                    <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch"/>
+                    <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
 
                     <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
                          Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全Entries)を表示し、

@@ -262,10 +262,20 @@ public partial class MainWindow : Window
     // 記録されたボタンと今回のClickのsenderが一致する場合のみキーボード由来と判定し、
     // キャンバスへのフォーカス復帰(FocusCanvas)をスキップする(ツールバー内ナビゲーション維持、
     // 懸念4)。一致・不一致いずれの場合も記録は必ずクリアする(取り違え防止、隠密レビュー穴1)。
+    //
+    // 増分(vi)差し戻し3周目(案A、殿承認2026-07-04): キーボード由来と判定した場合、
+    // FocusCanvasスキップに加えてボタン自身へ明示的にフォーカスを戻す。ButtonBaseはSpace押下
+    // 時に限りOnKeyUp内でReleaseMouseCapture→Keyboard.Focus(null)という内部経路を通り、Click
+    // 発火の直前に一瞬フォーカスを失う(隠密の原因調査)。この掃除を怠るとフォーカスが宙に浮き
+    // 「ツールバーに留まる」が実質不成立になるため、明示的に戻して担保する。Enterではフォーカスは
+    // 元々ボタン上にあるため、この呼び出しは冪等・無害。
     private void ConsumeToolButtonFocusRestore(object sender)
     {
         bool isKeyboardOrigin = ReferenceEquals(_toolButtonKeyboardClickSource, sender);
-        if (!isKeyboardOrigin) FocusCanvas();
+        if (isKeyboardOrigin)
+            (sender as UIElement)?.Focus();
+        else
+            FocusCanvas();
         _toolButtonKeyboardClickSource = null;
     }
 
@@ -273,8 +283,16 @@ public partial class MainWindow : Window
     // (増分vi差し戻し2周目、隠密レビュー穴2対応)。ButtonBase標準はこの場合Clickを発火させない
     // ため、ConsumeToolButtonFocusRestore側では記録をクリアできず、LostKeyboardFocusが唯一の
     // 掃除どころになる。対象3ボタン共通のためToolButtonPreviewKeyDownと同様に単一ハンドラへ集約。
+    //
+    // 増分(vi)差し戻し3周目(案A、殿承認2026-07-04): SpaceのReleaseMouseCapture→
+    // Keyboard.Focus(null)によるフォーカス喪失はe.NewFocusがnullになる一時的な内部経路であり、
+    // 真のキャンセルではない(隠密の原因調査)。従来はこれを本物のキャンセルと誤認して記録を
+    // クリアしてしまい、直後のClickでConsumeToolButtonFocusRestoreがマウス起因と誤判定していた
+    // (Space/Enter非対称バグ)。NewFocusが具体的要素(キャンバス・他ボタン等)の場合のみ真の
+    // フォーカス移動とみなしクリアする。
     private void ToolButtonLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
+        if (e.NewFocus is null) return;
         if (ReferenceEquals(_toolButtonKeyboardClickSource, sender)) _toolButtonKeyboardClickSource = null;
     }
 
