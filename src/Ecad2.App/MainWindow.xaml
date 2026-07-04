@@ -135,8 +135,9 @@
                      Tag経由で呼ぶ、BuiltinPlaceButton_Click参照)。 -->
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
-                        PreviewMouseLeftButtonUp="SelectDefaultButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="SelectDefaultButton_PreviewKeyDown">
+                        Click="SelectDefaultButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
@@ -144,8 +145,9 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
                         AutomationProperties.Name="a接点配置 (F5)"
-                        Tag="a接点" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="a接点" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
@@ -153,8 +155,9 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
                         AutomationProperties.Name="b接点配置 (F6)"
-                        Tag="b接点" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="b接点" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
@@ -162,8 +165,9 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
                         AutomationProperties.Name="コイル配置 (F7)"
-                        Tag="コイル" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="コイル" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
@@ -171,8 +175,9 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
                         AutomationProperties.Name="端子台配置 (F8)"
-                        Tag="端子台" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="端子台" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
@@ -181,8 +186,9 @@
                 <Separator/>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR a接点配置 (Shift+F5)"
                         AutomationProperties.Name="OR a接点配置 (Shift+F5)"
-                        Tag="OR:a接点" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="OR:a接点" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M16,4 L16,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF5"/>
@@ -190,8 +196,9 @@
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR b接点配置 (Shift+F6)"
                         AutomationProperties.Name="OR b接点配置 (Shift+F6)"
-                        Tag="OR:b接点" PreviewMouseLeftButtonUp="BuiltinPlaceButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="BuiltinPlaceButton_PreviewKeyDown">
+                        Tag="OR:b接点" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3 M16,4 L16,14"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF6"/>
@@ -200,8 +207,9 @@
                 <Separator/>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="自作パーツ"
                         AutomationProperties.Name="自作パーツ"
-                        PreviewMouseLeftButtonUp="OpenPartSelectionButton_PreviewMouseLeftButtonUp"
-                        PreviewKeyDown="OpenPartSelectionButton_PreviewKeyDown">
+                        Click="OpenPartSelectionButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        PreviewMouseLeftButtonDown="ToolButtonPreviewMouseLeftButtonDown">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="部品"/>

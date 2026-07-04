@@ -108,11 +108,11 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                // 選択ツールボタン(マウス経路)と同じ操作のため共通のActivateSelectDefault()を使う
-                // (増分vi、BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")が
-                // キャンセル後も残り続けるバグの修正=忍者実機検証で発覚、も込み)。Escapeはボタンの
-                // マウス/キーボード二重発火問題を持たないグローバルショートカットのため、フォーカス
-                // 復帰は常時実行する(隠密の設計集約プラン根拠3のとおり変更不要)。
+                // 選択ツールボタンと同じ操作のため共通のActivateSelectDefault()を使う(増分vi、
+                // BuiltinPlaceButton_Clickでセットした案内メッセージ("配置ツール: ...")がキャンセル
+                // 後も残り続けるバグの修正=忍者実機検証で発覚、も込み)。Escapeはボタンのマウス/
+                // キーボード二重発火問題を持たないグローバルショートカットのため、フォーカス復帰は
+                // 常時実行する(隠密の設計集約プラン根拠3のとおり変更不要)。
                 ActivateSelectDefault();
                 FocusCanvas();
                 e.Handled = true;
@@ -190,12 +190,15 @@ public partial class MainWindow : Window
 
     // 選択ツール(Esc)ボタン。Window_PreviewKeyDownのEscケースと同じ操作。
     //
-    // 増分(vi, T-021設計集約プラン、隠密案(a)+(c)ハイブリッド): マウス操作(PreviewMouseLeftButtonUp)
-    // とキーボード操作(PreviewKeyDown、Enter/Space)を最初から別ハンドラに分離する。Clickイベント
-    // 自体はマウス/キーボードいずれが発火源か判別する情報を持たないため(隠密調査で確認)、判別ではなく
-    // 経路そのものを分ける。マウス経路のみFocusCanvas()を呼び、キーボード経路では呼ばない
-    // (キーボードでツールバー内をナビゲーション中にフォーカスが強制的にキャンバスへ奪われる副作用=
-    // 懸念4を解消するため)。
+    // 増分(vi, T-021設計集約プラン、隠密案(a)+(c)ハイブリッド、差し戻し1周目で改訂): 当初
+    // PreviewMouseLeftButtonUp/PreviewKeyDownへ経路そのものを分離する案を試みたが、隠密の
+    // コードレビューでUI Automation Invoke()の無反応・マウスキャプチャ意味論の喪失・キーリピート
+    // 誤爆・Spaceキャンセル猶予の喪失、の4点が判明したため撤回(いずれもButtonBase標準のClick
+    // 発火経路を迂回したことに起因)。Clickイベントは維持し、PreviewKeyDown(Enter/Space)では
+    // 共通処理を呼ばず「キーボード由来フラグ」を立てるだけに留める。Click発火自体はButtonBase
+    // 標準(マウスIsPressed判定・キーリピート耐性・Spaceキャンセル猶予)に委ねることで4点とも解消し、
+    // Clickハンドラ側でフラグの有無によりFocusCanvas()の要否を判定する(フラグ有=キーボード起因
+    // →ツールバー内ナビゲーション維持のためFocusCanvas()を呼ばない、懸念4の解消は維持)。
     private void ActivateSelectDefault()
     {
         _viewModel.SelectedCell = null;
@@ -203,17 +206,10 @@ public partial class MainWindow : Window
         _viewModel.StatusMessage = "";
     }
 
-    private void SelectDefaultButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void SelectDefaultButton_Click(object sender, RoutedEventArgs e)
     {
         ActivateSelectDefault();
-        FocusCanvas();
-    }
-
-    private void SelectDefaultButton_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter && e.Key != Key.Space) return;
-        ActivateSelectDefault();
-        e.Handled = true;
+        ConsumeToolButtonFocusRestore();
     }
 
     // a接点/b接点/コイル/端子台/ORa接点/ORb接点ボタン共通処理。Tagに図形名("a接点"等)、
@@ -236,25 +232,44 @@ public partial class MainWindow : Window
         return (isOr ? tag[3..] : tag, isOr);
     }
 
-    private void BuiltinPlaceButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void BuiltinPlaceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;
         var (partName, isOr) = ParseBuiltinTag(tag);
         ActivateBuiltinTool(partName, isOr);
         // ツールバーボタンでツール選択後、フォーカスがボタンに残るとEnter配置(案X, T-021)が効かない
-        // (キャンバスフォーカスがEnterのガード条件のため)。キャンバスへフォーカスを戻し、F5等のキー
-        // ボード選択と同じく「ツール選択方法によらずEnterで配置できる」を成立させる(忍者実機検証で発見)。
-        FocusCanvas();
+        // (キャンバスフォーカスがEnterのガード条件のため)。マウス操作(フラグ無し)ならキャンバスへ
+        // フォーカスを戻し、F5等のキーボード選択と同じく「ツール選択方法によらずEnterで配置できる」
+        // を成立させる(忍者実機検証で発見)。キーボード操作(フラグ有)ではツールバー内ナビゲーション
+        // を維持するため戻さない(懸念4)。
+        ConsumeToolButtonFocusRestore();
     }
 
-    private void BuiltinPlaceButton_PreviewKeyDown(object sender, KeyEventArgs e)
+    // キーボード(Enter/Space)由来のツールバーボタン活性化かどうかのフラグ(増分vi差し戻し1周目)。
+    // 対象3ボタン(選択ツール/a接点等/自作パーツ)で共有する。同時に複数ボタンを押すことは無いため
+    // 単一フィールドで足りる。
+    private bool _toolButtonActivatedByKeyboard;
+
+    // 対象3ボタン共通のPreviewKeyDown。本体はフラグ立てのみで3ボタンとも完全に同一のため、
+    // ボタンごとに分けず単一ハンドラへ集約する(隠密レビュー指摘6)。
+    private void ToolButtonPreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.Enter && e.Key != Key.Space) return;
-        if (sender is not Button { Tag: string tag }) return;
-        var (partName, isOr) = ParseBuiltinTag(tag);
-        ActivateBuiltinTool(partName, isOr);
-        e.Handled = true;
+        if (e.Key == Key.Enter || e.Key == Key.Space) _toolButtonActivatedByKeyboard = true;
     }
+
+    // フラグが立っていなければ(マウス操作)キャンバスへフォーカスを戻し、立っていれば(キーボード
+    // 操作)ツールバー内ナビゲーション維持のため戻さない。呼び出し後は必ずフラグを消費(リセット)する。
+    private void ConsumeToolButtonFocusRestore()
+    {
+        if (!_toolButtonActivatedByKeyboard) FocusCanvas();
+        _toolButtonActivatedByKeyboard = false;
+    }
+
+    // Space押下でボタンが押下状態になった後、フォーカス移動等でClickがキャンセルされた場合に
+    // フラグが残ってしまう事態への安全側の掃除。新たなマウス押下が始まった時点で必ずクリアし、
+    // 直後のClickをマウス起因として正しく扱えるようにする(増分vi差し戻し1周目、家老裁定)。
+    private void ToolButtonPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        => _toolButtonActivatedByKeyboard = false;
 
     // LadderCanvasHostへ確実にフォーカスを移す。CanvasArea(ScrollViewer)はFocusManager.IsFocusScope
     // ="True"の独立FocusScopeのため、Keyboard.Focus()単体では実フォーカスが移らないことがある
@@ -282,17 +297,10 @@ public partial class MainWindow : Window
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement);
     }
 
-    private void OpenPartSelectionButton_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    private void OpenPartSelectionButton_Click(object sender, RoutedEventArgs e)
     {
         ActivateOpenPartSelection();
-        FocusCanvas();
-    }
-
-    private void OpenPartSelectionButton_PreviewKeyDown(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Enter && e.Key != Key.Space) return;
-        ActivateOpenPartSelection();
-        e.Handled = true;
+        ConsumeToolButtonFocusRestore();
     }
 
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
