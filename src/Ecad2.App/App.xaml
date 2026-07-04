@@ -9,7 +9,8 @@
             空状態(プロジェクト未作成)=濃紺、作業領域(ラダーエディタ内部)=白+黒グリッド。
             グリッド色はEcad2.Core.Rendering.DrawingTheme.GridGray(#D2D2D2)と一貫させる。
         -->
-        <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#1E2A47"/>
+        <!-- 濃紺の明度調整(殿裁定2026-07-05): #1E2A47→#24325A(「ほんの少しだけ明るく」)。 -->
+        <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#24325A"/>
         <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="White"/>
         <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#D2D2D2"/>
     </Application.Resources>

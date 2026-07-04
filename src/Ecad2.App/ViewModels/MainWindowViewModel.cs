@@ -48,12 +48,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// 開いているドキュメント全体（複数シートを保持）。起動時はダミーデータ(3シート)。
-    /// 新規/開く(T-019)ではReplaceDocumentで丸ごと差し替える。setterは外部非公開とし、
-    /// 差し替え経路をReplaceDocumentへ一本化する(GuiEcadの反省: 文書破棄操作が複数入口に
-    /// 分散し確認漏れが生じた、docs/ecad2-guiecad-code-survey-onmitsu.md T-024節)。
+    /// 開いているドキュメント全体（複数シートを保持）。起動直後は空(Sheets=0、HasProject=false=
+    /// 濃紺スタート、殿裁定2026-07-05)。新規/開く(T-019)ではReplaceDocumentで丸ごと差し替える。
+    /// setterは外部非公開とし、差し替え経路をReplaceDocumentへ一本化する(GuiEcadの反省: 文書破棄
+    /// 操作が複数入口に分散し確認漏れが生じた、docs/ecad2-guiecad-code-survey-onmitsu.md T-024節)。
     /// </summary>
-    public LadderDocument Document { get; private set; } = CreateDummyDocument();
+    public LadderDocument Document { get; private set; } = new();
 
     /// <summary>現在開いている.GCADファイルのパス(T-019)。新規作成/未保存はnull。
     /// 上書き保存が可能か(パスがあるか)の判定に使う。</summary>
@@ -98,7 +98,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。
-    /// Document.Sheets.Count==0(T-019「新規」の暫定挙動)の間はnull。</summary>
+    /// Document.Sheets.Count==0(起動直後の濃紺スタート、殿裁定2026-07-05)の間はnull。</summary>
     public Sheet? CurrentSheet
         => CurrentSheetIndex >= 0 && CurrentSheetIndex < Document.Sheets.Count ? Document.Sheets[CurrentSheetIndex] : null;
 
@@ -106,11 +106,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// プロジェクト(ドキュメント)が実在するか(T-020)。GX Works3踏襲の空状態(濃紺)⇔作業領域(白＋黒
     /// グリッド)の状態依存配色(App.xaml の EmptyStateBackgroundBrush/WorkAreaBackgroundBrush、
     /// 殿裁定)を切替えるための状態。GuiEcadには「未作成の空状態」という概念自体が無かったため、
-    /// ecad2で新規導入する(docs/ecad2-preimplementation-survey-onmitsu.md T-020節)。ドキュメント
-    /// 管理(新規/開く/保存、T-019)が未実装のため、現状はDocumentが常時ダミーの3シートを持ち、
-    /// シート削除も最後の1枚を残すガードがあるため実際には常にtrueのまま(現行UIから空状態には
-    /// 到達しない、暫定固定)。T-019で「新規」フローがSheets.Countを0にできるようになった時点で
-    /// 自然に機能する。
+    /// ecad2で新規導入する(docs/ecad2-preimplementation-survey-onmitsu.md T-020節)。起動直後は
+    /// Documentが空(Sheets=0)のためfalse=濃紺スタート(殿裁定2026-07-05)、新規(1シート生成)/開く
+    /// でtrueへ切替わる。
     /// </summary>
     public bool HasProject => Document.Sheets.Count > 0;
 
@@ -413,50 +411,4 @@ public sealed class MainWindowViewModel : ViewModelBase
         return library;
     }
 
-    // シート切替(T-026段階2)の動作確認がしやすいよう、シートごとに異なる要素構成にしている。
-    private static LadderDocument CreateDummyDocument()
-    {
-        var document = new LadderDocument { Devices = CreateDummyDeviceTable() };
-        document.Sheets.Add(new Sheet
-        {
-            PageNumber = 1,
-            Name = "シート1",
-            Grid = new GridSpec { Rows = 10, Columns = 20 },
-            Elements =
-            {
-                new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 2), DeviceName = "X0" },
-                new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "X1" },
-                new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 8), DeviceName = "Y0" },
-            },
-        });
-        document.Sheets.Add(new Sheet
-        {
-            PageNumber = 2,
-            Name = "シート2",
-            Grid = new GridSpec { Rows = 10, Columns = 20 },
-            Elements =
-            {
-                new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 4), DeviceName = "Y1" },
-            },
-        });
-        document.Sheets.Add(new Sheet
-        {
-            PageNumber = 3,
-            Name = "シート3",
-            Grid = new GridSpec { Rows = 10, Columns = 20 },
-        });
-        return document;
-    }
-
-    // 機器表の動作確認用ダミーデータ。CreateDummyDocument内の各シートのDeviceNameと対応させている。
-    private static DeviceTable CreateDummyDeviceTable() => new()
-    {
-        ByName =
-        {
-            ["X0"] = new Device { Name = "X0", Class = DeviceClass.PushButton },
-            ["X1"] = new Device { Name = "X1", Class = DeviceClass.PushButton },
-            ["Y0"] = new Device { Name = "Y0", Class = DeviceClass.Relay },
-            ["Y1"] = new Device { Name = "Y1", Class = DeviceClass.Relay },
-        },
-    };
 }

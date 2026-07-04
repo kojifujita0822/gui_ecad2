@@ -112,7 +112,9 @@ public sealed class SheetNavigationViewModel : ViewModelBase
         {
             if (SelectedSheet is not Sheet sheet || param is not string newName) return;
             string trimmed = newName.Trim();
-            if (trimmed.Length == 0) return;
+            // 隠密レビュー指摘(往復1周目、軽微): 同名リネーム(実質無変更)ではMarkDirtyを呼ばない
+            // (SelectedElementDeviceNameセッターの同値ガードと対称)。
+            if (trimmed.Length == 0 || trimmed == sheet.Name) return;
             sheet.Name = trimmed;
             int index = Sheets.IndexOf(sheet);
             if (index < 0) return;

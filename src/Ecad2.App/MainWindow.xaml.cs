@@ -170,6 +170,14 @@ public partial class MainWindow : Window
         }
     }
 
+    // ウィンドウを閉じる操作(×ボタン/Alt+F4)にも未保存確認を適用する(隠密レビュー指摘、往復1周目:
+    // GuiEcadのOnMenuRestart同様「文書破棄を伴う入口の一つに確認漏れ」があった)。新規/開くと同じ
+    // ConfirmDiscardIfDirtyを流用し、キャンセル/保存中止時はクローズ自体を取り消す。
+    private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (!ConfirmDiscardIfDirty()) e.Cancel = true;
+    }
+
     // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
     // クリックで即配置)は廃止。ただしツールバーボタン経由(Tool.Mode==PlaceElement、殿裁定で
     // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の

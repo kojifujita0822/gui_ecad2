@@ -9,7 +9,8 @@
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown"
-        PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown">
+        PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
+        Closing="Window_Closing">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
@@ -256,8 +257,9 @@
                 <ScrollViewer.Style>
                     <!-- 空状態(濃紺)⇔作業領域(白)の状態依存配色(T-020、殿裁定=GX Works3踏襲)。
                          HasProject=falseの間(ドキュメント未作成)はEmptyStateBackgroundBrushに切替わる。
-                         現状はドキュメント管理(T-019)未実装のためHasProjectは常時true=作業領域色のまま
-                         (暫定固定、MainWindowViewModel.HasProject参照)。 -->
+                         起動直後はDocument.Sheets=0(HasProject=false)で開始し濃紺スタート(殿裁定
+                         2026-07-05)、新規/開くで白の作業領域へ遷移する(MainWindowViewModel.
+                         HasProject/NotifyHasProjectChanged参照)。 -->
                     <Style TargetType="ScrollViewer">
                         <Setter Property="Background" Value="{StaticResource WorkAreaBackgroundBrush}"/>
                         <Style.Triggers>
