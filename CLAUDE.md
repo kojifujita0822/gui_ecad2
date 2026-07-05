@@ -16,6 +16,16 @@ GuiEcad（ラダー図 CAD）で得た知見を活かし、制御盤設計・ラ
 - 起動プロンプトは `prompts/startup-auto.md`（役割自動決定フロー）
 - 計画ドキュメントは `docs/` 配下に順次整備する（索引: `docs/README.md`、家老→各役への指示置き場: `docs/todo.md`）
 
+## 探索の委譲
+
+- 読み取り専用の探索(複数ファイル grep / 仕様調査 /
+  ログ調査 / Web リサーチ)は subagent へ委譲する
+  - 意味理解を伴う調査 → explorer
+  - 機械的な grep 列挙・件数集計 → scanner
+- 読み取りツールを連続 8 回以上使う見込み、
+  または 5 ファイル以上を読む探索は委譲必須
+- subagent は構造化サマリ(path:line + 判定)のみ返す
+
 ## 運用ルール
 - 実装ディレクトリへの書き込みは侍に一元化し、他役は調査・確認に専念する
 - 担当パス（本実装）: `src/Ecad2.sln` ／ `src/Ecad2.Core/`（Model/Simulation/Rendering/Persistence）／ `src/Ecad2.Rendering.Wpf/` ／ `src/Ecad2.Pdf/` ／ `src/Ecad2.App/` ／ `tests/Ecad2.Core.Tests/`
