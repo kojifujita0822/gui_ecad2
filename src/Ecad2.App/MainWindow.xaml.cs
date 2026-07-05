@@ -71,10 +71,15 @@ public partial class MainWindow : Window
 
     // Enterキーでの即時確定(殿の期待仕様)。Tab・クリック等によるフォーカス移動はLostKeyboardFocus
     // でカバーされるため、ここではEnter押下時のみUpdateSource()を呼ぶ(フォーカスは維持したまま)。
+    // RedrawCanvas()もLostKeyboardFocus経路と同様に呼び、キャンバス上のデバイス名ラベル表示を
+    // 即時反映する(隠密レビュー指摘)。
     private void DeviceNameBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
+        {
             DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+            RedrawCanvas();
+        }
     }
 
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
@@ -241,13 +246,20 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
-                // T-036追加修正(殿裁定=Esc入力破棄): デバイス名編集中のEscはUpdateSourceせず
-                // UpdateTarget()でTextBox表示を元の値へ戻す。本ハンドラはPreviewKeyDown(Tunneling)
-                // でDeviceNameBox自身のPreviewKeyDownより先に発火し、下記FocusCanvas()が
-                // LostKeyboardFocus経由でUpdateSource()を誘発してしまうため、それより前に
-                // 表示を戻しておく必要がある(DeviceNameBox側にEsc処理を置いても手遅れ)。
+                // T-036追加修正(殿裁定=Esc入力破棄、隠密レビュー指摘=Esc層消費): デバイス名編集中の
+                // Escは表示復元(UpdateTarget())+フォーカス復帰のみの独立した1層として消費し、
+                // 下記の層2/3/4処理(選択解除等)へは落とさない(T-021「1回のEscは1層だけ」の原則に
+                // 整合。選択・プロパティパネルは保持され、次のEscで従来どおり選択解除が働く)。
+                // 本ハンドラはPreviewKeyDown(Tunneling)でDeviceNameBox自身のPreviewKeyDownより先に
+                // 発火し、FocusCanvas()がLostKeyboardFocus経由でUpdateSource()を誘発してしまうため、
+                // それより前に表示を戻す必要がある(DeviceNameBox側にEsc処理を置いても手遅れ)。
                 if (Keyboard.FocusedElement == DeviceNameBox)
+                {
                     DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateTarget();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // 増分(iv, T-021): Esc多段階4層(論点3、殿裁定)。1回のEscで内側から1層だけ戻す。
                 // 層1(ダイアログ内テキスト編集中の編集キャンセル)はモーダル表示中は本ハンドラ自体が
                 // 呼ばれないため対象外。ElementPlacementDialogのIsCancel="True"ボタン(WPF標準規約)で
