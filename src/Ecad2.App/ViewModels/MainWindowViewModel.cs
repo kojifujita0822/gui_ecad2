@@ -213,8 +213,25 @@ public sealed class MainWindowViewModel : ViewModelBase
             else
             {
                 el.DeviceName = newName.Length > 0 ? newName : null;
-                if (newName.Length > 0 && !Document.Devices.ByName.ContainsKey(newName))
-                    Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
+                if (newName.Length > 0)
+                {
+                    if (!Document.Devices.ByName.ContainsKey(newName))
+                        Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
+                }
+                else if (oldName.Length > 0)
+                {
+                    // 空文字確定(旧名を手放す場合)。DeleteSelectedElementと同一ポリシー: 他要素から
+                    // まだ参照されていれば機器表エントリを保持、参照が無ければ削除する(忍者実機検証で
+                    // 発覚: 機器表への孤立残存バグの修正、T-036)。
+                    bool stillReferenced = Document.Sheets.Any(s =>
+                        s.Elements.Any(e => string.Equals(e.DeviceName, oldName, StringComparison.OrdinalIgnoreCase)));
+                    if (!stillReferenced)
+                    {
+                        var key = Document.Devices.ByName.Keys
+                            .FirstOrDefault(k => string.Equals(k, oldName, StringComparison.OrdinalIgnoreCase));
+                        if (key is not null) Document.Devices.ByName.Remove(key);
+                    }
+                }
             }
 
             MarkDirty();
