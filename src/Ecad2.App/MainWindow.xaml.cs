@@ -493,8 +493,16 @@ public partial class MainWindow : Window
 
     // 図形名(基本図形のDefinition.Name)からPartFolderEntryを検索してTryPlaceElementを呼ぶ。
     // F5/F6/Shift+F5/Shift+F6/F7/F8キー処理専用(SelectedCellが既にある前提で即ダイアログを開く)。
+    // ツールバーボタンはHasProject連動でIsEnabled=falseになるがキーボードショートカットは
+    // ボタンの活性状態と独立に発火するため、ここでHasProjectを明示ガードする(殿実機確認で
+    // 発覚した通知漏れ対処、T-019追加増分)。
     private void TryPlaceBuiltin(string partName, bool isOr)
     {
+        if (!_viewModel.HasProject)
+        {
+            _viewModel.StatusMessage = "シートがありません。新規作成（Ctrl+N）から始めてください";
+            return;
+        }
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);
         if (entry is not null) TryPlaceElement(entry, isOr);
     }
