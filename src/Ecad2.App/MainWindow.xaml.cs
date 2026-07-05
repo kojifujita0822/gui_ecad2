@@ -241,6 +241,13 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
+                // T-036追加修正(殿裁定=Esc入力破棄): デバイス名編集中のEscはUpdateSourceせず
+                // UpdateTarget()でTextBox表示を元の値へ戻す。本ハンドラはPreviewKeyDown(Tunneling)
+                // でDeviceNameBox自身のPreviewKeyDownより先に発火し、下記FocusCanvas()が
+                // LostKeyboardFocus経由でUpdateSource()を誘発してしまうため、それより前に
+                // 表示を戻しておく必要がある(DeviceNameBox側にEsc処理を置いても手遅れ)。
+                if (Keyboard.FocusedElement == DeviceNameBox)
+                    DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateTarget();
                 // 増分(iv, T-021): Esc多段階4層(論点3、殿裁定)。1回のEscで内側から1層だけ戻す。
                 // 層1(ダイアログ内テキスト編集中の編集キャンセル)はモーダル表示中は本ハンドラ自体が
                 // 呼ばれないため対象外。ElementPlacementDialogのIsCancel="True"ボタン(WPF標準規約)で
