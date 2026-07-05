@@ -38,6 +38,7 @@
 - T-015のサムネイル実装：DrawPreviewの_lib一時差し替えは**UIスレッド単一・使い捨てインスタンス前提**（コメント明記済み）。Entries/SelectionEntriesは並行管理（同期漏れ注意、`docs/ecad2-t015-review-onmitsu.md` #5）。PartLibrary構築はPartPaletteViewModel.Libraryに一本化済み（2d5f3dc）。
 - SelectedCellの直接代入+手動通知列挙（ReplaceDocument内）は将来リスクの設計メモ（`docs/ecad2-t019-review-onmitsu.md` #4）。setter側に通知を足すときは要追随。
 - フォーカス制御の流儀（T-021）は台帳T-021行に保全済み。
+- **前任侍の退出時の勘所2点（2026-07-05、原文保全）**：(1)**ReplaceDocumentは「文書に紐づく状態」リセットの単一責務点**（StatusMessage/Tool/DRC結果/IsDirty集約済み）。今後この種の状態を追加する際は必ずここへリセットを追加すること——隠密指摘で2度同じ穴（通知漏れ）を踏んだ経緯あり。(2)**CurrentSheetIndexの既定値0が「シート無し」とも「先頭シート選択中」とも解釈できる意味論的重複が通知漏れの温床**（NotifyHasProjectChanged/NotifyCurrentSheetChangedの個別対応で凌いだが、番兵値化(-1)は見送ったまま）。今後シート操作系を触る際はこの罠に注意。
 
 ### 忍者へ（前任忍者より）
 - ズームヘルパーはスキル化済み（`ecad2-ui-automation`のInvoke-Ecad2CtrlScroll）。再作成不要。
