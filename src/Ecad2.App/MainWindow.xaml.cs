@@ -60,7 +60,22 @@ public partial class MainWindow : Window
     // プロパティパネルのデバイス名編集(T-017)。ElementInstanceはINotifyPropertyChangedを実装
     // していないため、値自体はSelectedElementDeviceNameのsetterで直接書き換わるが、キャンバス上の
     // 表示(デバイス名ラベル)への反映にはDraw()の明示的な再呼び出しが要る(T-026のリネームバグと同種)。
-    private void DeviceNameBox_LostFocus(object sender, RoutedEventArgs e) => RedrawCanvas();
+    // UpdateSourceTrigger=LostFocus(論理フォーカス)はCanvasArea等の独立FocusScope跨ぎで発火しない
+    // ため(殿実機確認で発覚した回帰、診断ログで実測確認済み)、Explicit化しLostKeyboardFocus(物理
+    // フォーカス喪失、スコープを跨いでも必ず発火)で明示的にUpdateSource()を呼ぶ(T-036追加修正)。
+    private void DeviceNameBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        RedrawCanvas();
+    }
+
+    // Enterキーでの即時確定(殿の期待仕様)。Tab・クリック等によるフォーカス移動はLostKeyboardFocus
+    // でカバーされるため、ここではEnter押下時のみUpdateSource()を呼ぶ(フォーカスは維持したまま)。
+    private void DeviceNameBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+            DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+    }
 
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
     // ViewModelのRenameCommandへ委譲する。
