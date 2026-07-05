@@ -18,6 +18,13 @@ internal static class TraceLog
     // 状態遷移でありT-016/T-018等の実バグ調査に直結した実績があるため除外しない。
     private static readonly HashSet<string> HighFrequencyProperties = new() { "CanvasScale" };
 
+    // 環境変数を無効化する意図の値の集合(隠密レビューfinding4: != "0"だけだと"false"/"off"/"no"を
+    // 無効化として扱えない)。大小文字を区別しない。
+    private static readonly HashSet<string> DisableEnvValues = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "0", "false", "off", "no",
+    };
+
     private static readonly string LogPath = Path.Combine(Path.GetTempPath(), "ecad2-trace.log");
 
     private static bool _initialized;
@@ -32,7 +39,8 @@ internal static class TraceLog
         _initialized = true;
 
         bool viaArg = args.Any(a => string.Equals(a, ArgName, StringComparison.OrdinalIgnoreCase));
-        bool viaEnv = Environment.GetEnvironmentVariable(EnvVarName) is { Length: > 0 } env && env != "0";
+        bool viaEnv = Environment.GetEnvironmentVariable(EnvVarName) is { Length: > 0 } env
+            && !DisableEnvValues.Contains(env.Trim());
         IsEnabled = viaArg || viaEnv;
 
         if (IsEnabled) Write($"==== session start {DateTime.Now:O} ====");
@@ -45,8 +53,16 @@ internal static class TraceLog
     public static void LogPropertyChanged(object source, string? propertyName, object? oldValue)
     {
         if (!IsEnabled || propertyName is null || HighFrequencyProperties.Contains(propertyName)) return;
-        object? newValue = source.GetType().GetProperty(propertyName)?.GetValue(source);
-        Write($"event=PropertyChanged source={Quote(source.GetType().Name)} property={Quote(propertyName)} old={Quote(oldValue)} new={Quote(newValue)}");
+        try
+        {
+            object? newValue = source.GetType().GetProperty(propertyName)?.GetValue(source);
+            Write($"event=PropertyChanged source={Quote(source.GetType().Name)} property={Quote(propertyName)} old={Quote(oldValue)} new={Quote(newValue)}");
+        }
+        catch
+        {
+            // ベストエフォート(隠密レビューfinding1): トレースログ自体の失敗が本来の処理
+            // (PropertyChanged発火・T-036修正・Command実行)を道連れにしてはならない。
+        }
     }
 
     /// <summary>App側のGotKeyboardFocus/LostKeyboardFocusクラスハンドラからのフック(案B (b))。</summary>
@@ -63,7 +79,29 @@ internal static class TraceLog
         Write($"event=Click element={Quote(elementIdentity)} type={Quote(elementType)}");
     }
 
-    private static string Quote(object? value) => $"\"{value}\"";
+    // nullと空文字列を区別し(隠密レビューfinding5)、値中の"\/改行をエスケープしてkey=value形式の
+    // 1行1イベント設計(Write参照)を壊さないようにする。
+    private static string Quote(object? value)
+    {
+        if (value is null) return "null";
+        string escaped = value.ToString()!
+            .Replace("\\", "\\\\")
+            .Replace("\"", "\\\"")
+            .Replace("\r", "\\r")
+            .Replace("\n", "\\n");
+        return $"\"{escaped}\"";
+    }
 
-    private static void Write(string line) => File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {line}\n");
+    private static void Write(string line)
+    {
+        try
+        {
+            File.AppendAllText(LogPath, $"{DateTime.Now:HH:mm:ss.fff} {line}\n");
+        }
+        catch
+        {
+            // ベストエフォート(隠密レビューfinding1): ログ書込失敗(複数インスタンス同時起動時の
+            // ファイル共有違反等)が本来の処理を道連れにしてはならない。
+        }
+    }
 }

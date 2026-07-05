@@ -15,13 +15,17 @@ public partial class App : Application
 {
     protected override void OnStartup(StartupEventArgs e)
     {
+        // 隠密レビューfinding2: DispatcherUnhandledExceptionの購読をTraceLog初期化より前に
+        // 移し、起動シーケンスの安全網に空白ができないようにする(finding1のtry/catch隔離と
+        // 二重の安全策)。
+        DispatcherUnhandledException += OnDispatcherUnhandledException;
+
         // T-039: TraceLogの初期化・クラスハンドラ登録はbase.OnStartup(e)（StartupUriによる
         // MainWindow構築）より前に行い、起動直後のフォーカス遷移も取りこぼさないようにする。
         TraceLog.Initialize(e.Args);
         if (TraceLog.IsEnabled) RegisterTraceClassHandlers();
 
         base.OnStartup(e);
-        DispatcherUnhandledException += OnDispatcherUnhandledException;
     }
 
     // T-039(案B、殿裁定2026-07-05): (b)フォーカス遷移・(c)Clickハンドラ発火をクラスハンドラで
@@ -31,24 +35,40 @@ public partial class App : Application
     // 祖先を辿るたびの重複記録(忍者の現場意見「高頻度・低有用イベントの垂れ流し」懸念)を防ぐ。
     private static void RegisterTraceClassHandlers()
     {
+        // handledEventsToo: true(隠密レビューfinding6)。省略時の既定falseだと、将来何らかの経路で
+        // イベントがHandled=trueにされた操作がトレースから静かに漏れ、「全操作を横断捕捉する」
+        // という触れ込みと矛盾するため。
         EventManager.RegisterClassHandler(typeof(UIElement), UIElement.GotKeyboardFocusEvent,
-            new KeyboardFocusChangedEventHandler(OnTraceFocusChanged));
+            new KeyboardFocusChangedEventHandler(OnTraceFocusChanged), handledEventsToo: true);
         EventManager.RegisterClassHandler(typeof(UIElement), UIElement.LostKeyboardFocusEvent,
-            new KeyboardFocusChangedEventHandler(OnTraceFocusChanged));
+            new KeyboardFocusChangedEventHandler(OnTraceFocusChanged), handledEventsToo: true);
         EventManager.RegisterClassHandler(typeof(ButtonBase), ButtonBase.ClickEvent,
-            new RoutedEventHandler(OnTraceButtonClick));
+            new RoutedEventHandler(OnTraceButtonClick), handledEventsToo: true);
+    }
+
+    // バブリング途中の祖先要素での重複記録を防ぐ共通ガード(隠密レビューfinding9:
+    // OnTraceFocusChanged/OnTraceButtonClickで同一のReferenceEqualsチェックが重複していた)。
+    private static bool IsOriginalSourceTarget(object sender, object originalSource, out UIElement element)
+    {
+        if (ReferenceEquals(sender, originalSource) && originalSource is UIElement el)
+        {
+            element = el;
+            return true;
+        }
+        element = null!;
+        return false;
     }
 
     private static void OnTraceFocusChanged(object sender, KeyboardFocusChangedEventArgs e)
     {
-        if (!ReferenceEquals(sender, e.OriginalSource) || e.OriginalSource is not UIElement element) return;
+        if (!IsOriginalSourceTarget(sender, e.OriginalSource, out var element)) return;
         string eventName = e.RoutedEvent == UIElement.GotKeyboardFocusEvent ? "GotKeyboardFocus" : "LostKeyboardFocus";
         TraceLog.LogFocus(eventName, ElementIdentity(element), element.GetType().Name);
     }
 
     private static void OnTraceButtonClick(object sender, RoutedEventArgs e)
     {
-        if (!ReferenceEquals(sender, e.OriginalSource) || e.OriginalSource is not UIElement element) return;
+        if (!IsOriginalSourceTarget(sender, e.OriginalSource, out var element)) return;
         TraceLog.LogClick(ElementIdentity(element), element.GetType().Name);
     }
 

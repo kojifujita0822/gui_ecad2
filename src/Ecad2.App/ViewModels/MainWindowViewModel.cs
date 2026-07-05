@@ -25,8 +25,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _tool;
         set
         {
+            var oldValue = _tool;
             _tool = value;
-            OnPropertyChanged();
+            OnPropertyChanged(nameof(Tool), oldValue);
             OnPropertyChanged(nameof(IsPartSelectionVisible));
         }
     }
@@ -235,7 +236,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
 
             MarkDirty();
-            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedElementDeviceName), oldName);
             OnPropertyChanged(nameof(SelectedElementKindDisplay));
             DeviceTable.Refresh();
         }
@@ -397,16 +398,23 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// GuiEcadの反省 docs/ecad2-guiecad-code-survey-onmitsu.md T-024節を踏まえる)。</summary>
     private void ReplaceDocument(LadderDocument newDocument, string? filePath)
     {
+        var oldDocument = Document;
+        var oldFilePath = CurrentFilePath;
+        var oldSheetIndex = _currentSheetIndex;
+        var oldSelectedCell = _selectedCell;
+
         Document = newDocument;
         CurrentFilePath = filePath;
         _currentSheetIndex = 0;
         _selectedCell = null;
-        OnPropertyChanged(nameof(Document));
-        OnPropertyChanged(nameof(CurrentFilePath));
-        OnPropertyChanged(nameof(CurrentSheetIndex));
+        // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
+        // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
+        OnPropertyChanged(nameof(Document), oldDocument);
+        OnPropertyChanged(nameof(CurrentFilePath), oldFilePath);
+        OnPropertyChanged(nameof(CurrentSheetIndex), oldSheetIndex);
         OnPropertyChanged(nameof(CurrentSheet));
         OnPropertyChanged(nameof(HasProject));
-        OnPropertyChanged(nameof(SelectedCell));
+        OnPropertyChanged(nameof(SelectedCell), oldSelectedCell);
         OnPropertyChanged(nameof(SelectedCellDisplay));
         OnPropertyChanged(nameof(SelectedElement));
         OnPropertyChanged(nameof(HasSelectedElement));
