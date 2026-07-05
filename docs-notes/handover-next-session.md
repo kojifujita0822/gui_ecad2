@@ -34,7 +34,8 @@
 ## 各役への申し送り
 
 ### 侍へ（前任侍より）
-- T-019の暫定実装は「確認なし破棄」（Dirty判定なし）。殿裁定が出たら未保存確認フローの追加実装が入る見込み。ReplaceDocumentが新規/開く/保存の単一ゲートウェイなので、Dirty判定もそこに集約するのが素直。
+- ~~T-019の暫定実装は「確認なし破棄」~~→**殿裁定反映済み（2026-07-05）**：未保存確認3択（ConfirmDiscardIfDirty、New/Open/Closingの3入口）・新規=1シート生成・起動濃紺#24325A・保存はHasProjectガード+IsEnabledの二重防御まで実装完了（fdc994d）。Dirty判定はMarkDirty明示呼び出し方式（変更操作6箇所+シート操作、呼び忘れリスクはP-008参照）。
+- T-015のサムネイル実装：DrawPreviewの_lib一時差し替えは**UIスレッド単一・使い捨てインスタンス前提**（コメント明記済み）。Entries/SelectionEntriesは並行管理（同期漏れ注意、`docs/ecad2-t015-review-onmitsu.md` #5）。PartLibrary構築はPartPaletteViewModel.Libraryに一本化済み（2d5f3dc）。
 - SelectedCellの直接代入+手動通知列挙（ReplaceDocument内）は将来リスクの設計メモ（`docs/ecad2-t019-review-onmitsu.md` #4）。setter側に通知を足すときは要追随。
 - フォーカス制御の流儀（T-021）は台帳T-021行に保全済み。
 
