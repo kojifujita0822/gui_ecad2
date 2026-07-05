@@ -310,6 +310,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         sheet.Elements.Add(newElement);
         MarkDirty();
 
+        // 機器表(Document.Devices)への登録(T-036、殿承認2026-07-05)。SelectedElementDeviceNameの
+        // setterと同じ流儀: 新規デバイス名(未登録)のみDeviceClass.Otherで追加し、既存デバイス名なら
+        // 既存エントリを維持(上書きしない)。デバイス名空欄の場合は機器表を一切操作しない。
+        if (deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName))
+            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = DeviceClass.Other };
+        DeviceTable.Refresh();
+
         if (!isOr) return;
 
         int? baseRow = sheet.Elements
