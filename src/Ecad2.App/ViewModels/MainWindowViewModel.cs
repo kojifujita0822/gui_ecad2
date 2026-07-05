@@ -281,8 +281,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public OutputPanelViewModel OutputPanel { get; }
 
     /// <summary>
-    /// 現在使用可能な自作パーツライブラリ。PartPalette.Entries（PartFolderStoreの列挙結果、
-    /// 基本図形もPartIdを持つ.gcadpartとして含む）から構築する。DiagramRenderer.Render /
+    /// 現在使用可能な自作パーツライブラリ。PartPalette.Library(T-015隠密レビュー指摘#2で
+    /// PartPaletteViewModel側に構築を一本化)をそのまま参照する。DiagramRenderer.Render /
     /// LadderCanvas.Draw に渡し、要素配置時（T-016）の PartResolver 解決にも使う。
     /// </summary>
     public PartLibrary PartLibrary { get; }
@@ -405,17 +405,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         SheetNavigation = new SheetNavigationViewModel(this);
         PartPalette = new PartPaletteViewModel();
-        PartLibrary = BuildPartLibrary(PartPalette.Entries);
+        // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
+        // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。
+        PartLibrary = PartPalette.Library;
         DeviceTable = new DeviceTableViewModel(Document.Devices);
         OutputPanel = new OutputPanelViewModel(this);
     }
-
-    private static PartLibrary BuildPartLibrary(IReadOnlyList<Persistence.PartFolderEntry> entries)
-    {
-        var library = new PartLibrary();
-        foreach (var entry in entries)
-            library.ById[entry.Definition.Id] = entry.Definition;
-        return library;
-    }
-
 }

@@ -14,6 +14,12 @@ public sealed class PartPaletteViewModel : ViewModelBase
 {
     public IReadOnlyList<PartFolderEntry> Entries { get; }
 
+    /// <summary>Entriesから構築したPartLibrary(T-015隠密レビュー指摘#2: 従来MainWindowViewModel.
+    /// BuildPartLibraryが同一ロジックを重複実装していたため、構築元であるここへ一本化した)。
+    /// DiagramRenderer.Render/要素配置時のPartResolver解決、SelectionEntriesのサムネイル生成の
+    /// 両方で共有する。</summary>
+    public PartLibrary Library { get; }
+
     /// <summary>右パネル「部品選択」リスト(PartSelectionList)表示専用(T-015、サムネイル付き)。
     /// Entriesと1:1対応。ElementPlacementDialog等の他の利用箇所への影響を避けるため、Entries自体
     /// の型は変えずここに並行して持たせる。起動時一括生成(パーツ数が少数のためKISS、T-002 PoCの
@@ -27,10 +33,10 @@ public sealed class PartPaletteViewModel : ViewModelBase
         store.SeedBasics();
         Entries = store.Enumerate();
 
-        var library = new PartLibrary();
-        foreach (var entry in Entries) library.ById[entry.Definition.Id] = entry.Definition;
+        Library = new PartLibrary();
+        foreach (var entry in Entries) Library.ById[entry.Definition.Id] = entry.Definition;
         SelectionEntries = Entries
-            .Select(entry => new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, library)))
+            .Select(entry => new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library)))
             .ToList();
     }
 }
