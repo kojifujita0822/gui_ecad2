@@ -15,5 +15,7 @@
 | P-007 | 忍者（T-021増分(v)追加修正の実機検証中） | ズーム操作直後に選択が未選択に戻る現象を観測→**忍者訂正（2026-07-05）：自作UI Automation合成ヘルパー（Ctrl+ホイール合成）固有の副作用と判明、アプリの実挙動ではない**。詳細: `docs-notes/ecad2-t021-increment-v-additional-fix-verification-ninja.md` | T-021範囲外の気づき | - | withdrawn（対応不要、2026-07-05忍者訂正） |
 | P-008 | 隠密（T-019追加実装d9aa49bレビュー） | IsDirty/MarkDirty方式は「新規変更操作追加時の呼び忘れ」の構造的リスクを抱える（GuiEcadの同型問題の前例あり、本コミット自体もNotifyHasProjectChanged漏れの前例を含む）が、対象がEcad2.App層のためテストが0件。最低限の回帰テスト追加（App層ViewModelテストの新設=tests体系の追加を伴う）を提案 | T-019範囲外の品質改善提案 | 中（テストプロジェクト新設+ViewModelのテスト容易性確認） | pending |
 | P-009 | 隠密（T-015レビュー） | `.gcadpart`ファイルをエクスプローラでコピーすると`PartDefinition.Id`（生成時Guid固定）が重複したまま残り、PartLibrary構築が後勝ち上書きのため、コピー後に片方だけ編集すると誤ったサムネイル・定義参照が生じうる。対処は読込時のID重複検出・再採番等、データ形式・読込仕様に触れる設計判断が必要 | T-015範囲外（既存のID管理構造の問題がサムネイル表示で顕在化） | 小〜中（重複検出+再採番の設計次第） | pending |
+| P-010 | 忍者（T-015実機検証） | 部品選択リストの固定種（`BasicPartTemplates.All()`）とツールバー固定ボタンのラインナップが不一致——ツールバーにはORa/ORb配置ボタン（Shift+F5/F6）があるが、リストにはORa/ORbが無く代わりに「セレクトSW」が含まれる。T-007移植（88ea0fd）由来の既存構成。どちらのラインナップに揃えるかはUI/UX判断 | T-015範囲外（既存構成の不一致がサムネイル追加で可視化） | 小（テンプレート定義の追加/整理） | pending |
+| P-011 | 忍者（T-015実機検証） | 要素配置時に機器表（DeviceTableGrid）へデバイス名が反映されない——`PlaceElementAtSelectedCell`（T-026由来）が`sheet.Elements.Add`と`MarkDirty`のみで`Document.Devices`登録・機器表Refreshを呼ばず、プロパティパネルでのデバイス名編集時のみ反映される。部品選択リスト・ツールバー直接配置とも同一。配置直後から機器表に載るべきか否かの仕様確認含む | T-015範囲外（T-026由来の既存欠陥） | 小（配置経路への登録処理追加） | pending |
 
 <!-- 判断: pending（承認待ち） / approved → 移送先 T-ID / rejected -->
