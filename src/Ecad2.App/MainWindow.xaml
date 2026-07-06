@@ -460,7 +460,7 @@
             </StatusBarItem>
         </StatusBar>
 
-        <!-- T-033増分1/2: 配置後入力の非モーダル浮動インラインバー(同一Window内オーバーレイ、
+        <!-- T-033増分1/2/3: 配置後入力の非モーダル浮動インラインバー(同一Window内オーバーレイ、
              隠密所見によりPopup不採用。docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md参照)。
              増分2(殿注文、構想図docs/images/t033-gxworks3-inline-input-reference.png踏襲):
              (1)選択セル直下への表示位置(コードビハインドのPositionPlacementBar算出、
@@ -469,8 +469,8 @@
              (ViewModel単一の真実源、隠密レビュー指摘)へバインドし、MainContentAreaのIsEnabledと
              連動させることで、キーボード(Window_PreviewKeyDown冒頭の早期リターン)・マウスの
              両経路を同時に無効化する(殿裁定=現行モーダル同等の使用感)。構想図左端[小アイコン類]は
-             機能未定(殿裁定2026-07-07=見た目だけ構想図と一致させる、押下無反応のプレースホルダ)、
-             末尾[拡張表示]は増分3スコープのためいずれも本増分では非機能のまま配置する。 -->
+             機能未定(殿裁定2026-07-07=見た目だけ構想図と一致させる、押下無反応のプレースホルダ)。
+             末尾[拡張表示]は増分3で配置のみ実装(詳細画面はT-028で別途実装予定、本増分では押下無反応)。 -->
         <Border x:Name="ElementPlacementBar" Grid.Row="2" Background="White" BorderBrush="Gray"
                 BorderThickness="1" Padding="6" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Visibility="{Binding IsPlacementBarVisible, Converter={StaticResource BoolToVisibility}}"
@@ -497,7 +497,14 @@
                 <TextBox x:Name="PlacementDeviceNameBox" Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
                          AutomationProperties.Name="デバイス名"/>
                 <Button Content="OK" Width="60" VerticalAlignment="Center" IsDefault="True" Click="PlacementOkButton_Click" Margin="0,0,4,0"/>
-                <Button Content="キャンセル" Width="76" VerticalAlignment="Center" IsCancel="True" Click="PlacementCancelButton_Click"/>
+                <Button Content="キャンセル" Width="76" VerticalAlignment="Center" IsCancel="True" Click="PlacementCancelButton_Click" Margin="0,0,8,0"/>
+                <!-- 拡張表示ボタン(T-033増分3): 構想図末尾の[拡張表示]の配置のみ。詳細画面はT-028で
+                     別途実装予定のため、本増分ではClickハンドラ未配線・押下無反応(左端の小アイコン類と
+                     同様の暫定状態)。ただしTabオーダーからは除外しない(小アイコン類との相違点、侍技術
+                     裁量): 小アイコン類は恒久的に非機能なプレースホルダだが、本ボタンはT-028で実機能を
+                     持つ予定の本物のボタンであり、今の内からTabオーダーに含めておけば実装後に配線を
+                     変える必要がない。押しても反応が無い暫定状態はT-028までの一時的な粗さに留まる。 -->
+                <Button Content="拡張表示" VerticalAlignment="Center" AutomationProperties.Name="拡張表示"/>
             </StackPanel>
         </Border>
     </Grid>
