@@ -234,6 +234,14 @@ public partial class MainWindow : Window
     // F5=AND(a接点)/F6=NAND(b接点)/Shift+F5=OR(ORa接点)/Shift+F6=NOR(ORb接点)キー体系(殿裁定)。
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        // T-033増分1(殿裁定2026-07-07、PoC所見): 非モーダル化により本ハンドラがバー表示中も
+        // 発火してしまう(モーダルWindow時代は別Windowのため到達しなかった)。バー表示中はF5〜F8等の
+        // 配置ショートカット・Escapeの多層キャンセル等、本メソッドのグローバルショートカットを
+        // 一切無効化し、現行モーダル同等の使用感(誤押しによる意図せぬ確定・取消を避ける安全側)を
+        // 保つ。Esc/Enterによるバー自身の確定・取消はIsCancel/IsDefault(PlacementOkButton_Click/
+        // PlacementCancelButton_Click)が別経路で処理するため、本ガードの影響を受けない。
+        if (ElementPlacementBar.Visibility == Visibility.Visible) return;
+
         if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.Shift)
         {
             CyclePanelFocus();
@@ -261,9 +269,9 @@ public partial class MainWindow : Window
                     break;
                 }
                 // 増分(iv, T-021): Esc多段階4層(論点3、殿裁定)。1回のEscで内側から1層だけ戻す。
-                // 層1(ダイアログ内テキスト編集中の編集キャンセル)はモーダル表示中は本ハンドラ自体が
-                // 呼ばれないため対象外。ElementPlacementDialogのIsCancel="True"ボタン(WPF標準規約)で
-                // 既に実現済み(層1は本ケースの範囲外)。
+                // 層1(配置バー内テキスト編集中の編集キャンセル)は、本ハンドラ冒頭のバー表示中
+                // 早期リターン(T-033増分1)により、バー表示中は本switch自体に到達しないため対象外。
+                // 配置バーのIsCancel="True"ボタン(WPF標準規約)で既に実現済み(層1は本ケースの範囲外)。
                 // StatusMessageのクリアは層に依らず全Esc押下で一度だけ行う(層2/層3内に重複させない)。
                 // F5〜F8のTryPlaceBuiltinはTool.Mode=PlaceElementを経ずにエラーメッセージ
                 // ("配置するセルを先に選択してください"等)を設定しうるため、層2/層3のどちらの条件も
@@ -574,10 +582,15 @@ public partial class MainWindow : Window
             _viewModel.OutputPanel.JumpToDiagnostic(diagnostic);
     }
 
+    // T-033増分1(PoC成立、docs/ecad2-t033-poc-result-samurai.md): 旧`isOr`初期値をバー確定まで
+    // 保持するためのフィールド(旧ローカル変数相当。非モーダル化でOK確定処理が別メソッドへ分離した
+    // ため、TryPlaceElement呼び出し時のisOrをここへ一時保持する)。
+    private bool _placementIsOr;
+
     // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
-    // 浮動インライン入力ダイアログ(種別+デバイス名)→OKで確定配置。isOr=trueの場合、実際のOR接続
-    // 処理(基準行判定・縦コネクタ生成)はViewModel側の責務。配置完了後は右パネルをプロパティ表示へ
-    // 戻す(Tool=SelectDefault、IsPartSelectionVisible連動)。
+    // 浮動インラインバー(種別+デバイス名、T-033増分1で同一Window内オーバーレイの非モーダル化)を
+    // 選択セル付近に表示→OKで確定配置。isOr=trueの場合、実際のOR接続処理(基準行判定・縦コネクタ
+    // 生成)はViewModel側の責務。
     private void TryPlaceElement(Ecad2.Persistence.PartFolderEntry initialEntry, bool isOr)
     {
         if (_viewModel.SelectedCell is null)
@@ -591,36 +604,53 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new Views.ElementPlacementDialog(_viewModel.PartPalette.Entries, initialEntry.Definition.Id) { Owner = this };
-        // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
-        // ダイアログをOK確定した場合のみ行う。Esc/キャンセルでは要素を一切作らないため、未命名の
-        // 孤立要素は構造上残らない(現行の「OK後に配置」構造がそのまま原子的取消を満たす)。
-        if (dialog.ShowDialog() == true && dialog.SelectedPartId is string partId)
+        // T-033増分1: 非モーダル化により`ShowDialog()`の同期戻り値待ちが失われるため、OK/キャンセル
+        // 確定処理はPlacementOkButton_Click/PlacementCancelButton_Clickへ移設した(旧
+        // `if (dialog.ShowDialog() == true ...)`の同期構造からの構造変更、プラン3.3節参照)。
+        _placementIsOr = isOr;
+        PlacementPartComboBox.ItemsSource = _viewModel.PartPalette.Entries;
+        PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.Entries
+            .FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id)
+            ?? _viewModel.PartPalette.Entries.FirstOrDefault();
+        PlacementDeviceNameBox.Text = "";
+        ElementPlacementBar.Visibility = Visibility.Visible;
+        PlacementDeviceNameBox.Focus();
+    }
+
+    // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
+    // OK確定した場合のみ行う。Esc/キャンセル(PlacementCancelButton_Click)では要素を一切作らない
+    // ため、未命名の孤立要素は構造上残らない(現行の「OK後に配置」構造がそのまま原子的取消を満たす)。
+    private void PlacementOkButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (PlacementPartComboBox.SelectedItem is Ecad2.Persistence.PartFolderEntry entry)
         {
-            // 隠密レビュー指摘(T-037往復1周目): ダイアログ内でパーツ種別を切り替えられるため、
-            // isOr(クリック時の初期値)がpartId(ダイアログ確定時の最終選択)と食い違いうる。
-            // 最終確定パーツがOR対象(a接点/b接点)であればOR保持の意図は自然に成立するため
-            // isOrを維持し、OR対象外(セレクトSW・端子台等)へ切り替えられた場合はOR接続自体が
-            // 無意味かつ誤動作(隠密指摘の失敗シナリオ)になるためisOrを無効化する。往復2周目:
-            // Role判定(ContactNO/NC)だとセレクトSWも巻き込むため、PartDefinition.IsOrEligible
-            // (電気的Role非依存の専用フラグ)へ置換。
-            var selectedEntry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
-            bool isOrEligible = selectedEntry is not null && selectedEntry.Definition.IsOrEligible;
-            bool effectiveIsOr = isOr && isOrEligible;
-            _viewModel.PlaceElementAtSelectedCell(partId, dialog.DeviceName, effectiveIsOr);
+            // 隠密レビュー指摘(T-037往復1周目): バー内でパーツ種別を切り替えられるため、
+            // isOr(初期値)が確定時の最終選択(entry)と食い違いうる。最終確定パーツがOR対象
+            // (a接点/b接点)であればOR保持の意図は自然に成立するためisOrを維持し、OR対象外
+            // (セレクトSW・端子台等)へ切り替えられた場合はOR接続自体が無意味かつ誤動作になる
+            // ためisOrを無効化する(PartDefinition.IsOrEligible=電気的Role非依存の専用フラグで判定)。
+            bool effectiveIsOr = _placementIsOr && entry.Definition.IsOrEligible;
+            _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, PlacementDeviceNameBox.Text.Trim(), effectiveIsOr);
             _viewModel.StatusMessage = "";
             RedrawCanvas();
         }
+        ClosePlacementBar();
+    }
 
-        // 分岐A(殿裁定=ツール保持で連続配置, T-021): 配置後もTool/SelectedCellをリセットしない。
-        // 「移動(矢印)→配置(Enter)→命名→確定→また移動…」の一気通貫(案X)を継続できるよう、
-        // アクティブツールと選択セル(次の移動起点)を保持する。ツール解除はEsc(Window_PreviewKeyDownの
-        // Escapeケース)に委ねる。クリック配置経路(LadderCanvasHost_PreviewMouseLeftButtonUp)も本
-        // メソッド経由のため、両経路で連続配置の挙動に揃う。
-        // 増分(iii, T-021): ダイアログを閉じた後、フォーカスをキャンバスへ明示復帰する(OK確定・
-        // キャンセル両経路)。PoC(poc/t021-enter-placement-poc)で暗黙委譲でも戻ることは確認済みだが、
-        // 環境差への保険として明示し確実化する。独立FocusScopeの罠(T-016)を避けるため素の
-        // Keyboard.Focusではなく2段方式のFocusCanvasに統一(隠密レビュー観点3)。
+    private void PlacementCancelButton_Click(object sender, RoutedEventArgs e) => ClosePlacementBar();
+
+    // 分岐A(殿裁定=ツール保持で連続配置, T-021): 配置後もTool/SelectedCellをリセットしない。
+    // 「移動(矢印)→配置(Enter)→命名→確定→また移動…」の一気通貫(案X)を継続できるよう、
+    // アクティブツールと選択セル(次の移動起点)を保持する。ツール解除はEsc(Window_PreviewKeyDownの
+    // Escapeケース)に委ねる。クリック配置経路(LadderCanvasHost_PreviewMouseLeftButtonUp)も
+    // TryPlaceElement経由のため、両経路で連続配置の挙動に揃う。
+    // T-033増分1(PoC所見): バーを閉じた後、フォーカスをキャンバスへ明示復帰する処理をここへ
+    // 一箇所集約する(OK確定・キャンセル両経路。T-021モグラ叩きの教訓=遷移点は複数箇所に分散させない。
+    // PoCで暗黙委譲では戻らないことを確認済みのため、明示呼び出しは保険ではなく必須)。独立FocusScope
+    // の罠(T-016)を避けるため素のKeyboard.Focusではなく2段方式のFocusCanvasに統一(隠密レビュー観点3)。
+    private void ClosePlacementBar()
+    {
+        ElementPlacementBar.Visibility = Visibility.Collapsed;
         FocusCanvas();
     }
 

@@ -438,5 +438,26 @@
                 <TextBlock Text="{Binding StatusMessage}" Foreground="DarkRed"/>
             </StatusBarItem>
         </StatusBar>
+
+        <!-- T-033増分1: 配置後入力の非モーダル浮動インラインバー(同一Window内オーバーレイ、
+             隠密所見によりPopup不採用。docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md参照)。
+             現行ElementPlacementDialog(モーダルWindow)の縦積みレイアウトをそのまま移植し、
+             非モーダル化の構造変更のみを増分1の対象とする(位置・レイアウト変更は増分2)。
+             メイン作業域(Row=2)の中央に固定表示。PoC所見どおりバー表示中はWindow_PreviewKeyDown
+             冒頭で全グローバルショートカットを無効化する(殿裁定=現行モーダル同等の使用感)。 -->
+        <Border x:Name="ElementPlacementBar" Grid.Row="2" Background="White" BorderBrush="Gray"
+                BorderThickness="1" Padding="12" HorizontalAlignment="Center" VerticalAlignment="Center"
+                Visibility="Collapsed" Panel.ZIndex="100">
+            <StackPanel>
+                <TextBlock Text="種別:" Margin="0,0,0,4"/>
+                <ComboBox x:Name="PlacementPartComboBox" DisplayMemberPath="Definition.Name" Width="200" Margin="0,0,0,12"/>
+                <TextBlock Text="デバイス名:" Margin="0,0,0,4"/>
+                <TextBox x:Name="PlacementDeviceNameBox" Margin="0,0,0,12"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="OK" Width="70" IsDefault="True" Click="PlacementOkButton_Click"/>
+                    <Button Content="キャンセル" Width="70" Margin="8,0,0,0" IsCancel="True" Click="PlacementCancelButton_Click"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
     </Grid>
 </Window>
