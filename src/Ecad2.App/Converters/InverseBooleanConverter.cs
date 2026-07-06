@@ -5,7 +5,8 @@ namespace Ecad2.App.Converters;
 
 /// <summary>
 /// bool→boolの単純な反転。T-033増分1: 配置バー表示中(IsPlacementBarVisible=true)はメイン
-/// コンテンツのIsEnabledをfalseにする(バー表示状態と真逆の値が要る箇所向け、隠密レビュー指摘)。
+/// コンテンツ(MainWindow.xaml MainContentArea、増分2でラッパーGrid一元化)のIsEnabledを
+/// falseにする(バー表示状態と真逆の値が要る箇所向け、隠密レビュー指摘)。
 /// </summary>
 public sealed class InverseBooleanConverter : IValueConverter
 {

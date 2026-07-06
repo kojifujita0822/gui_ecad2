@@ -598,7 +598,7 @@ public partial class MainWindow : Window
     // 生成)はViewModel側の責務。
     private void TryPlaceElement(Ecad2.Persistence.PartFolderEntry initialEntry, bool isOr)
     {
-        if (_viewModel.SelectedCell is null)
+        if (_viewModel.SelectedCell is not { } cell)
         {
             _viewModel.StatusMessage = "配置するセルを先に選択してください";
             return;
@@ -619,11 +619,38 @@ public partial class MainWindow : Window
             ?? _viewModel.PartPalette.Entries.FirstOrDefault();
         PlacementDeviceNameBox.Text = "";
         _viewModel.IsPlacementBarVisible = true;
+        PositionPlacementBar(cell);
         // 隠密レビュー指摘(観点3、Microsoft Learn「Focus Overview - WPF」一次情報): Collapsed→
         // Visible直後はMeasure/Arrange未完了のため、Focus()の同期呼び出しは失敗しうる(例外も
         // フィードバックも無く気づかれにくい)。レイアウトパス完了後に確実にフォーカスするため
         // Dispatcher.BeginInvokeへ委譲する。
         Dispatcher.BeginInvoke(new Action(() => PlacementDeviceNameBox.Focus()), DispatcherPriority.Loaded);
+    }
+
+    // T-033増分2(殿注文1): 配置バーを選択セルの直下へ表示する。CellRectDipはLayoutTransform
+    // 適用前のローカルDIP座標のため、TranslatePointでMainWorkAreaGrid(バーと同じGrid.Row="2"の
+    // 座標系、ラッパー導入後も原点は不変)へ変換する。TranslatePointはズーム(LayoutTransform)・
+    // ScrollViewerのスクロールオフセットの両方を実際の描画位置として反映する(PointToScreenと同じ
+    // 変換機構、SymbolAutomationPeer.GetBoundingRectangleCore参照)。
+    //
+    // バーの実サイズはVisibility=Visible反映後でないと取得できない(WPF仕様: Collapsed中の
+    // Measure()はDesiredSizeを強制的に0,0にする)。呼び出し元でIsPlacementBarVisible=trueを
+    // 先に設定してから本メソッドを呼ぶ前提。
+    private void PositionPlacementBar(Ecad2.Model.GridPos cell)
+    {
+        var localRect = LadderCanvasHost.CellRectDip(cell);
+        var topLeft = LadderCanvasHost.TranslatePoint(new Point(localRect.X, localRect.Bottom), MainWorkAreaGrid);
+
+        ElementPlacementBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Size barSize = ElementPlacementBar.DesiredSize;
+
+        // 画面端クランプ(殿注文2): 右端・下端でバーがMainWorkAreaGridの外へはみ出さないようにする。
+        double maxX = Math.Max(0, MainWorkAreaGrid.ActualWidth - barSize.Width);
+        double maxY = Math.Max(0, MainWorkAreaGrid.ActualHeight - barSize.Height);
+        double x = Math.Clamp(topLeft.X, 0, maxX);
+        double y = Math.Clamp(topLeft.Y, 0, maxY);
+
+        ElementPlacementBar.Margin = new Thickness(x, y, 0, 0);
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
