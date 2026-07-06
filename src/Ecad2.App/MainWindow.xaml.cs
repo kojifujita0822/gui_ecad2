@@ -650,6 +650,10 @@ public partial class MainWindow : Window
         var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
         var workAreaOrigin = MainWorkAreaGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
 
+        // 診断ログ一次パスCONFIRMED(docs-notes/ecad2-t033-diag-pass1-diagnosis-samurai.md): 前回呼び出し
+        // 終了時のMarginが残留したままMeasure()すると、WPF仕様(DesiredSize=content+Margin)により前回の
+        // 位置が今回の測定結果を汚染する自己参照フィードバックループが生じる。測定前にリセットする。
+        ElementPlacementBar.Margin = new Thickness(0);
         ElementPlacementBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = ElementPlacementBar.DesiredSize;
 
