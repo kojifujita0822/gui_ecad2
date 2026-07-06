@@ -28,9 +28,13 @@ public sealed class PartPaletteViewModel : ViewModelBase
     /// 追加するため、Entriesとの1:1対応はここで崩れる(隠密調査所見、実害なし)。</summary>
     public IReadOnlyList<PartSelectionEntryViewModel> SelectionEntries { get; }
 
-    public PartPaletteViewModel()
+    /// <summary>本番用。実MyDocuments配下(PartFolderStore.CreateDefault())を使う。</summary>
+    public PartPaletteViewModel() : this(PartFolderStore.CreateDefault()) { }
+
+    /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
+    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。</summary>
+    public PartPaletteViewModel(PartFolderStore store)
     {
-        var store = PartFolderStore.CreateDefault();
         store.EnsureFolders();
         store.SeedBasics();
         var enumeration = store.Enumerate();

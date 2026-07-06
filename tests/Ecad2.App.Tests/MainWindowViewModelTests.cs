@@ -9,12 +9,12 @@ namespace Ecad2.App.Tests;
 /// 明示MarkDirty方式は変更操作の入口ごとに呼び忘れる構造的リスクがあるため(docs/todo.md T-034備考)、
 /// 各入口で最低限の検証を行う。
 /// </summary>
-public class MainWindowViewModelTests
+public class MainWindowViewModelTests : ViewModelTestBase
 {
     [Fact]
     public void Constructor_InitialState_HasProjectIsFalseAndNotDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
 
         Assert.False(vm.HasProject);
         Assert.False(vm.IsDirty);
@@ -23,7 +23,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void NewDocument_SetsHasProjectTrueAndNotDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
 
         vm.NewDocument();
 
@@ -34,7 +34,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void PlaceElementAtSelectedCell_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.SelectedCell = new GridPos(0, 0);
 
@@ -46,7 +46,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void DeleteSelectedElement_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.SelectedCell = new GridPos(0, 0);
         vm.PlaceElementAtSelectedCell("contact-no", "X001", isOr: false);
@@ -61,7 +61,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void SelectedElementDeviceName_Set_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.SelectedCell = new GridPos(0, 0);
         vm.PlaceElementAtSelectedCell("contact-no", "X001", isOr: false);
@@ -89,7 +89,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void SaveToFile_ClearsDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.SelectedCell = new GridPos(0, 0);
         vm.PlaceElementAtSelectedCell("contact-no", "X001", isOr: false);
@@ -111,7 +111,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void LoadFromFile_ReplacesDocumentAndClearsDirty()
     {
-        var source = new MainWindowViewModel();
+        var source = CreateViewModel();
         source.NewDocument();
         source.SelectedCell = new GridPos(0, 0);
         source.PlaceElementAtSelectedCell("contact-no", "X001", isOr: false);
@@ -120,7 +120,7 @@ public class MainWindowViewModelTests
 
         try
         {
-            var vm = new MainWindowViewModel();
+            var vm = CreateViewModel();
             vm.LoadFromFile(path);
 
             Assert.True(vm.HasProject);

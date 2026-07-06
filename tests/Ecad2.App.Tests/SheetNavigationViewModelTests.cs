@@ -13,12 +13,12 @@ namespace Ecad2.App.Tests;
 /// (隠密レビューT-034往復1周目で実機実証済みの手法。P-016=Dispatcher依存の根本解消が
 /// 完了するまでの暫定策)。
 /// </summary>
-public class SheetNavigationViewModelTests
+public class SheetNavigationViewModelTests : ViewModelTestBase
 {
     [Fact]
     public void DeleteCommand_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.Document.Sheets.Add(new Sheet
         {
@@ -40,7 +40,7 @@ public class SheetNavigationViewModelTests
     [Fact]
     public void DeleteCommand_CanExecute_FalseWhenOnlyOneSheet()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
 
         Assert.False(vm.SheetNavigation.DeleteCommand.CanExecute(null));
@@ -49,7 +49,7 @@ public class SheetNavigationViewModelTests
     [Fact]
     public void DeleteCommand_CanExecute_TrueWhenMultipleSheets()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
         vm.Document.Sheets.Add(new Sheet
         {
@@ -65,7 +65,7 @@ public class SheetNavigationViewModelTests
     [Fact]
     public void AddCommand_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
 
         try { vm.SheetNavigation.AddCommand.Execute(null); }
@@ -77,7 +77,7 @@ public class SheetNavigationViewModelTests
     [Fact]
     public void RenameCommand_MarksDirty()
     {
-        var vm = new MainWindowViewModel();
+        var vm = CreateViewModel();
         vm.NewDocument();
 
         try { vm.SheetNavigation.RenameCommand.Execute("新シート名"); }

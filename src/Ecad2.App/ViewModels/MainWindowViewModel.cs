@@ -1,5 +1,6 @@
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
+using Ecad2.Persistence;
 using Ecad2.Simulation;
 
 namespace Ecad2.App.ViewModels;
@@ -441,10 +442,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         IsDirty = false;
     }
 
-    public MainWindowViewModel()
+    /// <summary>本番用。実MyDocuments配下(PartFolderStore.CreateDefault())を使う。</summary>
+    public MainWindowViewModel() : this(PartFolderStore.CreateDefault()) { }
+
+    /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
+    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。</summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore)
     {
         SheetNavigation = new SheetNavigationViewModel(this);
-        PartPalette = new PartPaletteViewModel();
+        PartPalette = new PartPaletteViewModel(partFolderStore);
         // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
         // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。
         PartLibrary = PartPalette.Library;
