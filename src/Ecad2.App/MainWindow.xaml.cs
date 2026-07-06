@@ -678,13 +678,15 @@ public partial class MainWindow : Window
             "workAreaOrigin=({8:F2},{9:F2}) workAreaSize=({10:F2},{11:F2}) " +
             "barDesiredSize=({12:F2},{13:F2}) barActualSize=({14:F2},{15:F2}) " +
             "scrollOffset=({16:F2},{17:F2}) preClamp=({18:F2},{19:F2}) " +
-            "clampMax=({20:F2},{21:F2}) postClamp=({22:F2},{23:F2})",
+            "clampMax=({20:F2},{21:F2}) postClamp=({22:F2},{23:F2}) " +
+            "canvasHostIsArrangeValid={24} canvasHostIsMeasureValid={25} barIsMeasureValid={26}",
             DateTime.Now, cell.Row, cell.Column, _viewModel.CanvasScale,
             translateIn.X, translateIn.Y, translateOut.X, translateOut.Y,
             workAreaOrigin.X, workAreaOrigin.Y, MainWorkAreaGrid.ActualWidth, MainWorkAreaGrid.ActualHeight,
             barDesiredSize.Width, barDesiredSize.Height, ElementPlacementBar.ActualWidth, ElementPlacementBar.ActualHeight,
             CanvasArea.HorizontalOffset, CanvasArea.VerticalOffset, translateOut.X, translateOut.Y,
-            maxX, maxY, postClampX, postClampY);
+            maxX, maxY, postClampX, postClampY,
+            LadderCanvasHost.IsArrangeValid, LadderCanvasHost.IsMeasureValid, ElementPlacementBar.IsMeasureValid);
         System.IO.File.AppendAllText(
             System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log"),
             line + Environment.NewLine);
