@@ -597,7 +597,17 @@ public partial class MainWindow : Window
         // 孤立要素は構造上残らない(現行の「OK後に配置」構造がそのまま原子的取消を満たす)。
         if (dialog.ShowDialog() == true && dialog.SelectedPartId is string partId)
         {
-            _viewModel.PlaceElementAtSelectedCell(partId, dialog.DeviceName, isOr);
+            // 隠密レビュー指摘(T-037往復1周目): ダイアログ内でパーツ種別を切り替えられるため、
+            // isOr(クリック時の初期値)がpartId(ダイアログ確定時の最終選択)と食い違いうる。
+            // 最終確定パーツが接点系(a接点/b接点)であればOR保持の意図は自然に成立するため
+            // isOrを維持し、非接点系(端子台等)へ切り替えられた場合はOR接続自体が無意味かつ
+            // 誤動作(隠密指摘の失敗シナリオ)になるためisOrを無効化する。
+            var selectedEntry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
+            bool isContact = selectedEntry is not null
+                && (selectedEntry.Definition.Role == Ecad2.Model.PartRole.ContactNO
+                    || selectedEntry.Definition.Role == Ecad2.Model.PartRole.ContactNC);
+            bool effectiveIsOr = isOr && isContact;
+            _viewModel.PlaceElementAtSelectedCell(partId, dialog.DeviceName, effectiveIsOr);
             _viewModel.StatusMessage = "";
             RedrawCanvas();
         }
