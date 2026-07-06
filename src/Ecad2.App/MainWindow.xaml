@@ -40,6 +40,20 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,1,0,0"/>
         </Style>
+
+        <!-- 2段目(配置系)専用スタイル(T-040、殿裁定=GX様式化の対象は2段目限定)。
+             1段目(新規/開く/保存等)は上記ToolBarButtonStyle等のまま据え置く。 -->
+        <Style x:Key="PlacementToolBarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolBarButtonStyle}">
+            <Setter Property="Width" Value="36"/>
+            <Setter Property="Height" Value="36"/>
+        </Style>
+        <Style x:Key="PlacementToolBarIconStyle" TargetType="Path" BasedOn="{StaticResource ToolBarIconStyle}">
+            <Setter Property="Width" Value="14"/>
+            <Setter Property="Height" Value="14"/>
+        </Style>
+        <Style x:Key="PlacementToolBarKeyLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource ToolBarKeyLabelStyle}">
+            <Setter Property="FontSize" Value="8"/>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -135,87 +149,89 @@
                 <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点)、Shift+F5=OR(ORa接点)/
                      Shift+F6=NOR(ORb接点)というキー体系(殿裁定、T-026段階4)。ボタンは「選択中セルへ
                      ダイアログ経由で配置」に統一(キーボードショートカットと同じTryPlaceElementを
-                     Tag経由で呼ぶ、BuiltinPlaceButton_Click参照)。 -->
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
+                     Tag経由で呼ぶ、BuiltinPlaceButton_Click参照)。並び順・サイズ・キー凡例表記は
+                     GX Works3様式へ統一(T-040、殿裁定=基本キーの直後にそのShift版を並べる)。
+                     ツールチップ・AutomationProperties.Nameは正式名称(Shift+F5等)を維持し、
+                     ボタン上のキー凡例のみ短縮表記(sF5等)にする(忍者のUIA検証互換への配慮)。 -->
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
                         Click="SelectDefaultButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Esc"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M3,2 L3,16 L7,13 L9,17 L11,16 L9,12 L14,12 Z"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="Esc"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="a接点配置 (F5)"
                         AutomationProperties.Name="a接点配置 (F5)"
                         Tag="a接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F5"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F5"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
-                        AutomationProperties.Name="b接点配置 (F6)"
-                        Tag="b接点" Click="BuiltinPlaceButton_Click"
-                        PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F6"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
-                        AutomationProperties.Name="コイル配置 (F7)"
-                        Tag="コイル" Click="BuiltinPlaceButton_Click"
-                        PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F7"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
-                        AutomationProperties.Name="端子台配置 (F8)"
-                        Tag="端子台" Click="BuiltinPlaceButton_Click"
-                        PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="F8"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR a接点配置 (Shift+F5)"
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="OR a接点配置 (Shift+F5)"
                         AutomationProperties.Name="OR a接点配置 (Shift+F5)"
                         Tag="OR:a接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M16,4 L16,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF5"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M16,4 L16,14"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF5"/>
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="OR b接点配置 (Shift+F6)"
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="b接点配置 (F6)"
+                        AutomationProperties.Name="b接点配置 (F6)"
+                        Tag="b接点" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F6"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="OR b接点配置 (Shift+F6)"
                         AutomationProperties.Name="OR b接点配置 (Shift+F6)"
                         Tag="OR:b接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3 M16,4 L16,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="ShF6"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3 M16,4 L16,14"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF6"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="コイル配置 (F7)"
+                        AutomationProperties.Name="コイル配置 (F7)"
+                        Tag="コイル" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M9,9 A4,4 0 1 1 8.999,9"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F7"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="端子台配置 (F8)"
+                        AutomationProperties.Name="端子台配置 (F8)"
+                        Tag="端子台" Click="BuiltinPlaceButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F8"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="自作パーツ"
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ"
                         AutomationProperties.Name="自作パーツ"
                         Click="OpenPartSelectionButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="部品"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>
                     </StackPanel>
                 </Button>
             </ToolBar>
