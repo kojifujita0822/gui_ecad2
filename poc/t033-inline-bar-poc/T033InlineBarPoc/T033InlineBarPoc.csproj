@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T-033 PoC: 非モーダル浮動インラインバー(Popup)で、モーダルElementPlacementDialogと同等の
+    Enter確定/Esc取消/フォーカス復帰が成り立つか、バー表示中に他のグローバルショートカットが
+    誤って反応しないかを検証する。poc/隔離ルールに従い本体src/とは独立、自己完結構成。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+</Project>
