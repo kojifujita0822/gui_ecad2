@@ -36,6 +36,7 @@ public static class BasicPartTemplates
         WidthCells = 1,
         HeightCells = 1,
         Role = PartRole.ContactNO,
+        IsOrEligible = true,
         Ports = TwoPorts(),
         Primitives =
         {
@@ -54,6 +55,7 @@ public static class BasicPartTemplates
         WidthCells = 1,
         HeightCells = 1,
         Role = PartRole.ContactNC,
+        IsOrEligible = true,
         Ports = TwoPorts(),
         Primitives =
         {

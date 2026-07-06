@@ -49,12 +49,11 @@ public sealed class PartPaletteViewModel : ViewModelBase
 
         // T-037(殿裁定=案A): ツールバーのOR a接点/OR b接点(Shift+F5/F6)と同じ選択肢を部品選択
         // リストにも追加する(隠密調査案1)。専用図形は持たず、既存a接点/b接点のPartFolderEntryを
-        // IsOr=trueでラップした論理エントリを追加するのみ(Core層無変更)。対象判定はName文字列
-        // 一致ではなくPartDefinition.Role(隠密レビュー指摘: T-035のファイルコピーでId再採番後も
-        // Nameは残る挙動と組むとName一致は同名重複表示を招く。Roleも複製で値は変わらないが、
-        // 文字列表記ゆれ・多言語化・リネームには強い型安全な代替)。
-        foreach (var entry in Entries.Where(e => e.Category == ""
-            && (e.Definition.Role == PartRole.ContactNO || e.Definition.Role == PartRole.ContactNC)))
+        // IsOr=trueでラップした論理エントリを追加するのみ。対象判定はName文字列一致ではなく
+        // PartDefinition.IsOrEligible(往復2周目: Role判定だとセレクトSWもContactNO扱いのため
+        // 巻き込まれ「ORセレクトSW」が出現した。殿裁定=ORa/ORbのみに絞るため、電気的Role非依存の
+        // 専用フラグへ置換。Id・Nameに依存しないためコピー・再採番・リネームでも判定が揺らがない)。
+        foreach (var entry in Entries.Where(e => e.Category == "" && e.Definition.IsOrEligible))
             selectionEntries.Add(new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library, isOr: true), isOr: true));
 
         SelectionEntries = selectionEntries;

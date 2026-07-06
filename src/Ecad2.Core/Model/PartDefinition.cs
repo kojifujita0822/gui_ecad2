@@ -41,6 +41,10 @@ public sealed class PartDefinition
     public int WidthCells { get; set; } = 1;
     public int HeightCells { get; set; } = 1;
     public PartRole Role { get; set; } = PartRole.ContactNO;
+    /// <summary>部品選択リストのOR入力（ORa/ORb）対象とするか。電気的Role（ContactNO/NC）とは
+    /// 独立した分類——セレクトSW等はシミュレーション上ContactNO扱いだがOR対象ではないため、
+    /// Role単独では区別できない（T-037往復2周目）。</summary>
+    public bool IsOrEligible { get; set; }
     /// <summary>接続点。2端子役割は先頭=NetA・末尾=NetB（境界オフセット昇順を想定）。</summary>
     public List<PortDef> Ports { get; set; } = new();
     public List<PartPrimitive> Primitives { get; set; } = new();

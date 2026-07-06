@@ -599,14 +599,14 @@ public partial class MainWindow : Window
         {
             // 隠密レビュー指摘(T-037往復1周目): ダイアログ内でパーツ種別を切り替えられるため、
             // isOr(クリック時の初期値)がpartId(ダイアログ確定時の最終選択)と食い違いうる。
-            // 最終確定パーツが接点系(a接点/b接点)であればOR保持の意図は自然に成立するため
-            // isOrを維持し、非接点系(端子台等)へ切り替えられた場合はOR接続自体が無意味かつ
-            // 誤動作(隠密指摘の失敗シナリオ)になるためisOrを無効化する。
+            // 最終確定パーツがOR対象(a接点/b接点)であればOR保持の意図は自然に成立するため
+            // isOrを維持し、OR対象外(セレクトSW・端子台等)へ切り替えられた場合はOR接続自体が
+            // 無意味かつ誤動作(隠密指摘の失敗シナリオ)になるためisOrを無効化する。往復2周目:
+            // Role判定(ContactNO/NC)だとセレクトSWも巻き込むため、PartDefinition.IsOrEligible
+            // (電気的Role非依存の専用フラグ)へ置換。
             var selectedEntry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
-            bool isContact = selectedEntry is not null
-                && (selectedEntry.Definition.Role == Ecad2.Model.PartRole.ContactNO
-                    || selectedEntry.Definition.Role == Ecad2.Model.PartRole.ContactNC);
-            bool effectiveIsOr = isOr && isContact;
+            bool isOrEligible = selectedEntry is not null && selectedEntry.Definition.IsOrEligible;
+            bool effectiveIsOr = isOr && isOrEligible;
             _viewModel.PlaceElementAtSelectedCell(partId, dialog.DeviceName, effectiveIsOr);
             _viewModel.StatusMessage = "";
             RedrawCanvas();
