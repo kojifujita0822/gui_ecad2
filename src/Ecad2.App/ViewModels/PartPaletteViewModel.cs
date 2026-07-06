@@ -22,9 +22,10 @@ public sealed class PartPaletteViewModel : ViewModelBase
     public PartLibrary Library { get; }
 
     /// <summary>右パネル「部品選択」リスト(PartSelectionList)表示専用(T-015、サムネイル付き)。
-    /// Entriesと1:1対応。ElementPlacementDialog等の他の利用箇所への影響を避けるため、Entries自体
-    /// の型は変えずここに並行して持たせる。起動時一括生成(パーツ数が少数のためKISS、T-002 PoCの
-    /// 実績から見て軽量と推定。増えて問題化したら遅延生成へ切替を検討)。</summary>
+    /// ElementPlacementDialog等の他の利用箇所への影響を避けるため、Entries自体の型は変えずここに
+    /// 並行して持たせる。起動時一括生成(パーツ数が少数のためKISS、T-002 PoCの実績から見て軽量と
+    /// 推定。増えて問題化したら遅延生成へ切替を検討)。T-037(殿裁定=案A)によりORa/ORb論理エントリを
+    /// 追加するため、Entriesとの1:1対応はここで崩れる(隠密調査所見、実害なし)。</summary>
     public IReadOnlyList<PartSelectionEntryViewModel> SelectionEntries { get; }
 
     public PartPaletteViewModel()
@@ -41,8 +42,17 @@ public sealed class PartPaletteViewModel : ViewModelBase
 
         Library = new PartLibrary();
         foreach (var entry in Entries) Library.ById[entry.Definition.Id] = entry.Definition;
-        SelectionEntries = Entries
+
+        var selectionEntries = Entries
             .Select(entry => new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library)))
             .ToList();
+
+        // T-037(殿裁定=案A): ツールバーのOR a接点/OR b接点(Shift+F5/F6)と同じ選択肢を部品選択
+        // リストにも追加する(隠密調査案1)。専用図形は持たず、既存a接点/b接点のPartFolderEntryを
+        // IsOr=trueでラップした論理エントリを追加するのみ(Core層無変更)。
+        foreach (var entry in Entries.Where(e => e.Category == "" && (e.Definition.Name == "a接点" || e.Definition.Name == "b接点")))
+            selectionEntries.Add(new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library, isOr: true), isOr: true));
+
+        SelectionEntries = selectionEntries;
     }
 }

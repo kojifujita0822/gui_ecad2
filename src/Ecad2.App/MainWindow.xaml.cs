@@ -562,7 +562,7 @@ public partial class MainWindow : Window
     private void PartSelectionItem_Clicked(object sender, MouseButtonEventArgs e)
     {
         if (sender is ListBoxItem { DataContext: ViewModels.PartSelectionEntryViewModel entry })
-            TryPlaceElement(entry.Entry, isOr: false);
+            TryPlaceElement(entry.Entry, entry.IsOr);
     }
 
     // 下部出力パネル(DRC結果)の行クリック(T-018)。DataGridRow.PreviewMouseLeftButtonDownを使う

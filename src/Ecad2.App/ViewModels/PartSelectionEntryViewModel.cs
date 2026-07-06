@@ -16,9 +16,19 @@ public sealed class PartSelectionEntryViewModel
     public PartDefinition Definition => Entry.Definition;
     public ImageSource Thumbnail { get; }
 
-    public PartSelectionEntryViewModel(PartFolderEntry entry, ImageSource thumbnail)
+    /// <summary>OR接続配置用の論理エントリか(T-037、殿裁定=案A)。true時は配置操作(TryPlaceElement)
+    /// のisOr引数へそのまま渡す。Entry(PartFolderEntry)自体は通常版と共有し、Core層は無変更
+    /// (隠密調査`docs/ecad2-p010-or-fixed-parts-investigation-onmitsu.md`の案1どおり)。</summary>
+    public bool IsOr { get; }
+
+    /// <summary>リスト表示名(T-037)。IsOr時は「OR」を前置し、ニーモニック命名規則
+    /// (design-brief 11節、「ORa接点」「ORb接点」等の日本語ラダー用語で統一)に合わせる。</summary>
+    public string DisplayName => IsOr ? "OR" + Definition.Name : Definition.Name;
+
+    public PartSelectionEntryViewModel(PartFolderEntry entry, ImageSource thumbnail, bool isOr = false)
     {
         Entry = entry;
         Thumbnail = thumbnail;
+        IsOr = isOr;
     }
 }
