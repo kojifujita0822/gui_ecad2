@@ -28,5 +28,5 @@ GuiEcad（ラダー図 CAD）で得た知見を活かし、制御盤設計・ラ
 
 ## 運用ルール
 - 実装ディレクトリへの書き込みは侍に一元化し、他役は調査・確認に専念する
-- 担当パス（本実装）: `src/Ecad2.sln` ／ `src/Ecad2.Core/`（Model/Simulation/Rendering/Persistence）／ `src/Ecad2.Rendering.Wpf/` ／ `src/Ecad2.Pdf/` ／ `src/Ecad2.App/` ／ `tests/Ecad2.Core.Tests/`
+- 担当パス（本実装）: `src/Ecad2.sln` ／ `src/Ecad2.Core/`（Model/Simulation/Rendering/Persistence）／ `src/Ecad2.Rendering.Wpf/` ／ `src/Ecad2.Pdf/` ／ `src/Ecad2.App/` ／ `tests/Ecad2.Core.Tests/` ／ `tests/Ecad2.App.Tests/`
 - `poc/` は実験場として本実装とは別に維持する
