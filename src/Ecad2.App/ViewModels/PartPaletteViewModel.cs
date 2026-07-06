@@ -1,3 +1,4 @@
+using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
 using Ecad2.Rendering.Wpf;
@@ -31,7 +32,11 @@ public sealed class PartPaletteViewModel : ViewModelBase
         var store = PartFolderStore.CreateDefault();
         store.EnsureFolders();
         store.SeedBasics();
-        Entries = store.Enumerate();
+        var enumeration = store.Enumerate();
+        Entries = enumeration.Entries;
+        // T-035: ファイルコピー等によるPartDefinition.Id重複が検出・再採番された件数をトレースする。
+        if (enumeration.ReassignedCount > 0)
+            TraceLog.LogPartIdReassigned(enumeration.ReassignedCount);
 
         Library = new PartLibrary();
         foreach (var entry in Entries) Library.ById[entry.Definition.Id] = entry.Definition;

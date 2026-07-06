@@ -5,6 +5,10 @@ namespace Ecad2.Persistence;
 /// <summary>走査結果の1件。<paramref name="Category"/> は「図形/」からの相対カテゴリ（直下="" / 自作="自作"）。</summary>
 public sealed record PartFolderEntry(string Category, string FilePath, PartDefinition Definition);
 
+/// <summary>Enumerate()の結果。ファイルコピー等でPartDefinition.Idが重複していた場合の再採番件数を
+/// ReassignedCountで返す(T-035、呼び出し元がTraceLog等へ記録する際に使う)。</summary>
+public readonly record struct PartEnumerationResult(IReadOnlyList<PartFolderEntry> Entries, int ReassignedCount);
+
 /// <summary>
 /// 図形を実フォルダで一元管理するストア。
 /// ルート「図形/」直下に基本図形、「図形/自作/」に自作図形を 1図形=1ファイル（.gcadpart）で置く。
@@ -40,17 +44,42 @@ public sealed class PartFolderStore
         Directory.CreateDirectory(CustomDir);
     }
 
-    /// <summary>全 .gcadpart を相対カテゴリ付きで列挙する（UI 階層構築の元データ）。読込失敗ファイルは無視。</summary>
-    public IReadOnlyList<PartFolderEntry> Enumerate()
+    /// <summary>全 .gcadpart を相対カテゴリ付きで列挙する（UI 階層構築の元データ）。読込失敗ファイルは無視。
+    /// ファイルコピー等でPartDefinition.Idが重複していた場合、先に見つかったファイルのIdを維持し、
+    /// 後発のファイルのみ新しいIdへ再採番してファイルへ書き戻す(T-035、殿裁定「読込時に重複検出+
+    /// 再採番」)。列挙順序はOS依存で不安定なため、ファイルパス順にソートしてから処理し「先勝ち」を
+    /// 決定論的にする。</summary>
+    public PartEnumerationResult Enumerate()
     {
         var result = new List<PartFolderEntry>();
-        if (!Directory.Exists(RootDir)) return result;
+        if (!Directory.Exists(RootDir)) return new PartEnumerationResult(result, 0);
 
-        foreach (var file in Directory.EnumerateFiles(RootDir, "*" + PartExtension, SearchOption.AllDirectories))
+        var files = Directory.EnumerateFiles(RootDir, "*" + PartExtension, SearchOption.AllDirectories)
+            .OrderBy(f => f, StringComparer.OrdinalIgnoreCase);
+
+        var seenIds = new HashSet<string>();
+        int reassignedCount = 0;
+
+        foreach (var file in files)
         {
             PartDefinition def;
             try { def = PartLibrarySerializer.LoadOne(file); }
             catch { continue; }   // 壊れたファイルはスキップ（起動を止めない）
+
+            if (!seenIds.Add(def.Id))
+            {
+                // ID重複検出。先に見つかった方のIdは維持し、後発のこのファイルのみ新Idへ再採番する。
+                // 書き戻し(SaveOne)は1ファイル単位で例外隔離する(T-039の教訓: 読み取り専用フォルダ・
+                // ロック中ファイル等で起動時列挙が丸ごと死んではならない)。書き戻しに失敗した場合、
+                // 今回のセッションはメモリ上のdef.Idのみ再採番された状態で継続し(重複は解消される)、
+                // 次回起動時にはファイルが未更新のためまた同じ重複が検出され、その時また別Idへ
+                // 再採番され得る。
+                def.Id = Guid.NewGuid().ToString("N");
+                seenIds.Add(def.Id);
+                reassignedCount++;
+                try { PartLibrarySerializer.SaveOne(def, file); }
+                catch { /* ベストエフォート。次回起動時の再解決に委ねる */ }
+            }
 
             var dir = Path.GetDirectoryName(file) ?? RootDir;
             string category = Path.GetRelativePath(RootDir, dir);
@@ -58,10 +87,11 @@ public sealed class PartFolderStore
             result.Add(new PartFolderEntry(category.Replace('\\', '/'), file, def));
         }
 
-        return result
+        var sorted = result
             .OrderBy(e => e.Category, StringComparer.OrdinalIgnoreCase)
             .ThenBy(e => e.Definition.Name, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        return new PartEnumerationResult(sorted, reassignedCount);
     }
 
     /// <summary>自作図形を「図形/自作/&lt;名前&gt;.gcadpart」へ保存し、書き出したパスを返す。</summary>
