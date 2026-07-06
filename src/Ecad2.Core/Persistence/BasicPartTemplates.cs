@@ -11,6 +11,12 @@ namespace Ecad2.Persistence;
 /// </summary>
 public static class BasicPartTemplates
 {
+    /// <summary>a接点の固定Id。T-037往復3周目: 旧版JSON(IsOrEligible導入前)の後方互換補正
+    /// (<see cref="PartFolderStore.Enumerate"/>)で参照する。</summary>
+    public const string ContactNOId = "basic-contact-no";
+    /// <summary>b接点の固定Id。用途は<see cref="ContactNOId"/>と同じ。</summary>
+    public const string ContactNCId = "basic-contact-nc";
+
     /// <summary>2端子（左=NetA / 右=NetB）の標準ポート。1セル幅の図形で共通。</summary>
     private static List<PortDef> TwoPorts() => new()
     {
@@ -31,7 +37,7 @@ public static class BasicPartTemplates
     // a接点(NO): 2ブレード＋左右リード
     private static PartDefinition ContactNO() => new()
     {
-        Id = "basic-contact-no",
+        Id = ContactNOId,
         Name = "a接点",
         WidthCells = 1,
         HeightCells = 1,
@@ -50,7 +56,7 @@ public static class BasicPartTemplates
     // b接点(NC): 斜線＋左右リード＋2ブレード（b接点NEW.gcadpart 由来）
     private static PartDefinition ContactNC() => new()
     {
-        Id = "basic-contact-nc",
+        Id = ContactNCId,
         Name = "b接点",
         WidthCells = 1,
         HeightCells = 1,

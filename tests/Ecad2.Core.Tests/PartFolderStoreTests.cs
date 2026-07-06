@@ -151,6 +151,119 @@ public class PartFolderStoreTests
     }
 
     [Fact]
+    public void Enumerate_LegacyContactJsonWithoutIsOrEligible_BackfillsTrueAndSaves()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // T-037往復3周目: IsOrEligible導入(往復2周目)より前の旧版JSON(当該キー無し)を
+            // 固定Id(a接点)で再現する。実機(殿PC OneDriveリダイレクト先)で検出された実例。
+            string path = Path.Combine(tempDir, "a接点.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.ContactNOId}}","name":"a接点"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var entry = result.Entries.Single();
+            Assert.True(entry.Definition.IsOrEligible);
+
+            var reloaded = PartLibrarySerializer.LoadOne(path);
+            Assert.True(reloaded.IsOrEligible);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_LegacySelectSwitchJsonWithoutIsOrEligible_StaysFalse()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // セレクトSWはRole=ContactNOだがOR対象外(往復2周目の主題)。固定Id補正の対象を
+            // a接点/b接点のみに限定していることの再混入防止を確認する。
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, """{"id":"basic-select-switch","name":"セレクトSW"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.False(result.Entries.Single().Definition.IsOrEligible);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_LegacyContactJsonReadOnly_BackfillsInMemoryWithoutThrowing()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            string path = Path.Combine(tempDir, "b接点.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.ContactNCId}}","name":"b接点"}""");
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+
+            var store = new PartFolderStore(tempDir);
+            PartEnumerationResult result;
+            try
+            {
+                result = store.Enumerate();
+            }
+            finally
+            {
+                File.SetAttributes(path, FileAttributes.Normal);
+            }
+
+            // 書き戻し失敗(読み取り専用)でも例外は外へ伝播せず、メモリ上は補正済みで継続する
+            // (OneDrive同期中のロック等を想定、家老指摘の安全側処理)。
+            Assert.True(result.Entries.Single().Definition.IsOrEligible);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_LegacyContactCopy_ReassignsIdButKeepsIsOrEligibleTrueForBoth()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // コピー耐性の確認: 旧版JSON(isOrEligibleキー無し)の複製で同一Idが重複したケース。
+            // Id重複チェックより前に固定Id補正を行うため、後発ファイル(コピー)が新Idへ再採番
+            // されても、書き戻される内容には補正後のtrue(a接点由来)が引き継がれるはず。
+            string pathOriginal = Path.Combine(tempDir, "a接点.gcadpart");
+            string pathCopy = Path.Combine(tempDir, "a接点 - コピー.gcadpart");
+            File.WriteAllText(pathOriginal, $$"""{"id":"{{BasicPartTemplates.ContactNOId}}","name":"a接点"}""");
+            File.WriteAllText(pathCopy, $$"""{"id":"{{BasicPartTemplates.ContactNOId}}","name":"a接点のコピー"}""");
+            SetCreationOrder(pathOriginal, pathCopy);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var entryOriginal = result.Entries.Single(e => e.FilePath == pathOriginal);
+            var entryCopy = result.Entries.Single(e => e.FilePath == pathCopy);
+            Assert.Equal(BasicPartTemplates.ContactNOId, entryOriginal.Definition.Id);
+            Assert.NotEqual(BasicPartTemplates.ContactNOId, entryCopy.Definition.Id);
+            Assert.True(entryOriginal.Definition.IsOrEligible);
+            Assert.True(entryCopy.Definition.IsOrEligible);
+
+            var reloadedCopy = PartLibrarySerializer.LoadOne(pathCopy);
+            Assert.True(reloadedCopy.IsOrEligible);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Enumerate_ReadOnlyFile_ReassignsInMemoryWithoutThrowing()
     {
         string tempDir = CreateTempDir();

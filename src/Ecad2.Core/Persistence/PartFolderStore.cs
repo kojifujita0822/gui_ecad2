@@ -74,6 +74,20 @@ public sealed class PartFolderStore
             try { def = PartLibrarySerializer.LoadOne(file); }
             catch { continue; }   // 壊れたファイルはスキップ（起動を止めない）
 
+            // T-037往復3周目: IsOrEligible導入(往復2周目)より前に生成された旧版JSONは当該
+            // キーを持たず、デシリアライズ時にデフォルトfalseとなる。固定Id(a接点/b接点)の
+            // ときだけtrueへ補正する(隠密レビュー指摘: Role単独ではセレクトSW(Role=ContactNO)
+            // も区別できず再混入するため、対象は固定Idの2件に限定)。Id重複チェックより前に
+            // 補正することで、本ファイルがコピーで複製され後続処理で新Idへ再採番されても、
+            // 書き戻される内容には補正後のtrueが引き継がれる(コピー耐性)。書き戻し失敗は
+            // ベストエフォート(次回起動時のOneDrive同期完了後等に再補正され得る)とし、
+            // 例外を伝播させず起動を止めない(T-039の教訓)。
+            if (!def.IsOrEligible && (def.Id == BasicPartTemplates.ContactNOId || def.Id == BasicPartTemplates.ContactNCId))
+            {
+                def.IsOrEligible = true;
+                try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
+            }
+
             // 隠密レビュー指摘: Idがnull/空文字列(壊れた/旧形式ファイル)の場合、HashSet.Addは
             // 最初の1件を「非重複」として通してしまい無効なIdのまま放置される
             // (後続のDictionary登録でArgumentNullException等の恐れ)。無条件で再採番扱いにする。
