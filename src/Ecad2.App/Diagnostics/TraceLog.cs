@@ -82,11 +82,12 @@ internal static class TraceLog
     }
 
     /// <summary>T-035: PartFolderStore.Enumerate()でPartDefinition.Idの重複検出・再採番が
-    /// 発生した際のフック(件数のみ、個別パーツ名までは追わない)。</summary>
-    public static void LogPartIdReassigned(int count)
+    /// 発生した際のフック。savedはファイルへの書き戻し(SaveOne)が成功したか
+    /// (隠密レビュー指摘: 件数のみでは「永続化できたか/メモリ内のみか」を事後調査で区別できない)。</summary>
+    public static void LogPartIdReassigned(string filePath, string oldId, string newId, bool saved)
     {
         if (!IsEnabled) return;
-        Write($"event=PartIdReassigned count={count}");
+        Write($"event=PartIdReassigned file={Quote(filePath)} oldId={Quote(oldId)} newId={Quote(newId)} saved={Quote(saved)}");
     }
 
     /// <summary>App側のGotKeyboardFocus/LostKeyboardFocusクラスハンドラからのフック(案B (b))。</summary>

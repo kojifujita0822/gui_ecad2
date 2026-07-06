@@ -34,9 +34,10 @@ public sealed class PartPaletteViewModel : ViewModelBase
         store.SeedBasics();
         var enumeration = store.Enumerate();
         Entries = enumeration.Entries;
-        // T-035: ファイルコピー等によるPartDefinition.Id重複が検出・再採番された件数をトレースする。
-        if (enumeration.ReassignedCount > 0)
-            TraceLog.LogPartIdReassigned(enumeration.ReassignedCount);
+        // T-035: ファイルコピー等によるPartDefinition.Id重複検出・再採番の詳細(対象ファイル・
+        // 旧Id・新Id・書き戻し成否)をトレースする(隠密レビュー指摘: 件数のみでは事後調査不能)。
+        foreach (var r in enumeration.Reassignments)
+            TraceLog.LogPartIdReassigned(r.FilePath, r.OldId, r.NewId, r.Saved);
 
         Library = new PartLibrary();
         foreach (var entry in Entries) Library.ById[entry.Definition.Id] = entry.Definition;
