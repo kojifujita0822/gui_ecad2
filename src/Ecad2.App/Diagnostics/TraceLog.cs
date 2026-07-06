@@ -39,11 +39,27 @@ internal static class TraceLog
         _initialized = true;
 
         bool viaArg = args.Any(a => string.Equals(a, ArgName, StringComparison.OrdinalIgnoreCase));
-        bool viaEnv = Environment.GetEnvironmentVariable(EnvVarName) is { Length: > 0 } env
-            && !DisableEnvValues.Contains(env.Trim());
+        // 隠密再レビュー指摘: Trim前の生値で長さ判定していたため、空白のみの値がTrim後に
+        // 空文字列となり無効化リストと不一致→誤って有効化される穴があった。Trim・全角正規化
+        // してから長さ判定・無効化リスト照合の順に改める。
+        string envNormalized = NormalizeFullWidthDigits((Environment.GetEnvironmentVariable(EnvVarName) ?? "").Trim());
+        bool viaEnv = envNormalized.Length > 0 && !DisableEnvValues.Contains(envNormalized);
         IsEnabled = viaArg || viaEnv;
 
         if (IsEnabled) Write($"==== session start {DateTime.Now:O} ====");
+    }
+
+    // 全角数字(U+FF10-FF19)を半角へ正規化する(隠密再レビュー指摘: 全角「０」が"0"と一致せず
+    // 誤って有効化される事故を防ぐ、CLAUDE.mdの環境依存文字混入注意にも合致)。
+    private static string NormalizeFullWidthDigits(string value)
+    {
+        Span<char> chars = value.Length <= 64 ? stackalloc char[value.Length] : new char[value.Length];
+        for (int i = 0; i < value.Length; i++)
+        {
+            char c = value[i];
+            chars[i] = c is >= '０' and <= '９' ? (char)(c - '０' + '0') : c;
+        }
+        return new string(chars);
     }
 
     /// <summary>ViewModelBase.OnPropertyChangedからの一括フック(案B (a))。oldValueはSetProperty経由の

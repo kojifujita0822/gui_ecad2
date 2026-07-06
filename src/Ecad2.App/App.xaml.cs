@@ -87,8 +87,17 @@ public partial class App : Application
     // ユーザー向けのエラー表示とログの分離(design-brief 3節#8)は本格実装時に対応する。
     private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)
     {
-        string logPath = Path.Combine(Path.GetTempPath(), "ecad2-crash.log");
-        File.AppendAllText(logPath, $"{DateTime.Now:O}: {e.Exception}\n\n");
+        // 隠密再レビュー指摘: crashログ書込自体がfinding1と同根の穴(最後の安全網)になっていた。
+        // ログ書込失敗でMessageBox表示(ユーザーへの通知)まで道連れにしないようtry/catchで隔離。
+        try
+        {
+            string logPath = Path.Combine(Path.GetTempPath(), "ecad2-crash.log");
+            File.AppendAllText(logPath, $"{DateTime.Now:O}: {e.Exception}\n\n");
+        }
+        catch
+        {
+            // ベストエフォート。
+        }
         MessageBox.Show(e.Exception.ToString(), "予期しないエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         e.Handled = true;
     }

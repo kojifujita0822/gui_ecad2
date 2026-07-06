@@ -1,3 +1,4 @@
+using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Simulation;
 
@@ -25,7 +26,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _tool;
         set
         {
-            var oldValue = _tool;
+            // 隠密再レビュー指摘: IsEnabledガード無しだと無効時も_tool(値型)のボクシングが
+            // 無条件発生する(finding7と同根)。短絡評価でfalse時は_toolへ触れないようにする。
+            object? oldValue = TraceLog.IsEnabled ? _tool : null;
             _tool = value;
             OnPropertyChanged(nameof(Tool), oldValue);
             OnPropertyChanged(nameof(IsPartSelectionVisible));
@@ -364,8 +367,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         Persistence.GcadSerializer.Save(Document, path);
         if (CurrentFilePath != path)
         {
+            // 隠密再レビュー指摘: 1引数版のままだと旧値null化が再発するため、他の直接代入経路と
+            // 同様に旧値を明示的に渡す。
+            string? oldFilePath = CurrentFilePath;
             CurrentFilePath = path;
-            OnPropertyChanged(nameof(CurrentFilePath));
+            OnPropertyChanged(nameof(CurrentFilePath), oldFilePath);
         }
         IsDirty = false;
     }
@@ -400,8 +406,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var oldDocument = Document;
         var oldFilePath = CurrentFilePath;
-        var oldSheetIndex = _currentSheetIndex;
-        var oldSelectedCell = _selectedCell;
+        // 隠密再レビュー指摘: _currentSheetIndex(int)/_selectedCell(GridPos?)は値型のため
+        // IsEnabledガード無しだと無効時も無条件ボクシングが発生する(finding7と同根)。
+        object? oldSheetIndex = TraceLog.IsEnabled ? _currentSheetIndex : null;
+        object? oldSelectedCell = TraceLog.IsEnabled ? _selectedCell : null;
 
         Document = newDocument;
         CurrentFilePath = filePath;
