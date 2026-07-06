@@ -628,10 +628,17 @@ public partial class MainWindow : Window
     }
 
     // T-033増分2(殿注文1): 配置バーを選択セルの直下へ表示する。CellRectDipはLayoutTransform
-    // 適用前のローカルDIP座標のため、TranslatePointでMainWorkAreaGrid(バーと同じGrid.Row="2"の
-    // 座標系、ラッパー導入後も原点は不変)へ変換する。TranslatePointはズーム(LayoutTransform)・
-    // ScrollViewerのスクロールオフセットの両方を実際の描画位置として反映する(PointToScreenと同じ
-    // 変換機構、SymbolAutomationPeer.GetBoundingRectangleCore参照)。
+    // 適用前のローカルDIP座標のため、TranslatePointで変換する。TranslatePointはズーム
+    // (LayoutTransform)・ScrollViewerのスクロールオフセットの両方を実際の描画位置として反映する
+    // (PointToScreenと同じ変換機構、SymbolAutomationPeer.GetBoundingRectangleCore参照)。
+    //
+    // 隠密レビューCONFIRMED(T-033増分2位置バグ、`docs/ecad2-t033-review-onmitsu-3.md`観点a):
+    // ElementPlacementBarはRootLayoutGrid直下(Grid.Row="2"、ラッパーMainContentAreaの外)にあるため、
+    // Marginの基準はRootLayoutGrid座標系でなければならない。旧実装はMainWorkAreaGrid基準の座標を
+    // そのまま流用しており、MainContentAreaのRowSpan導入でルートのAuto行(メニュー/ツールバー等)が
+    // 実質0に潰れる副作用と相まって、両者の原点が食い違っていた(バーが恒常的に上へ表示される原因)。
+    // 変換先をRootLayoutGridへ揃え、クランプ基準もMainWorkAreaGridの原点をRootLayoutGrid座標系へ
+    // 変換した値(workAreaOrigin)から算出することで、原点の食い違いを解消する。
     //
     // バーの実サイズはVisibility=Visible反映後でないと取得できない(WPF仕様: Collapsed中の
     // Measure()はDesiredSizeを強制的に0,0にする)。呼び出し元でIsPlacementBarVisible=trueを
@@ -639,16 +646,17 @@ public partial class MainWindow : Window
     private void PositionPlacementBar(Ecad2.Model.GridPos cell)
     {
         var localRect = LadderCanvasHost.CellRectDip(cell);
-        var topLeft = LadderCanvasHost.TranslatePoint(new Point(localRect.X, localRect.Bottom), MainWorkAreaGrid);
+        var topLeft = LadderCanvasHost.TranslatePoint(new Point(localRect.X, localRect.Bottom), RootLayoutGrid);
+        var workAreaOrigin = MainWorkAreaGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
 
         ElementPlacementBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = ElementPlacementBar.DesiredSize;
 
         // 画面端クランプ(殿注文2): 右端・下端でバーがMainWorkAreaGridの外へはみ出さないようにする。
-        double maxX = Math.Max(0, MainWorkAreaGrid.ActualWidth - barSize.Width);
-        double maxY = Math.Max(0, MainWorkAreaGrid.ActualHeight - barSize.Height);
-        double x = Math.Clamp(topLeft.X, 0, maxX);
-        double y = Math.Clamp(topLeft.Y, 0, maxY);
+        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + MainWorkAreaGrid.ActualWidth - barSize.Width);
+        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + MainWorkAreaGrid.ActualHeight - barSize.Height);
+        double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
+        double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
 
         ElementPlacementBar.Margin = new Thickness(x, y, 0, 0);
     }
