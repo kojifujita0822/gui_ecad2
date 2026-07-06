@@ -157,10 +157,13 @@
                      GX Works3様式へ統一(T-040、殿裁定=基本キーの直後にそのShift版を並べる)。
                      ツールチップ・AutomationProperties.Nameは正式名称(Shift+F5等)を維持し、
                      ボタン上のキー凡例のみ短縮表記(sF5等)にする(忍者のUIA検証互換への配慮)。
-                     OR系(sF5/sF6)は接点記号の左に縦の分岐線(前段からの接続を示す短い枝)を追加、
-                     コイル(F7)は円ではなく左右2つの半円弧による角ばった括弧「( )」型に統一(殿の
-                     GX画像実測に基づく意匠差し替え)。線の太さはPlacementToolBarIconStyleで
-                     StrokeThickness=1.0に細くし、縮小後の密集感を緩和(隠密指摘への手当て)。 -->
+                     OR系(sF5/sF6)は接点記号の左右リード両端からそれぞれ上へ立ち上がる縦線を追加した
+                     「└┤├┘」構図(殿の図示指定、並列回路の両端が上段配線へ繋がる意匠)、コイル(F7)は
+                     真円、端子台(F8)は円を縦線が貫く「-Φ-」構図(いずれも殿の意匠指示、2026-07-06)。
+                     線の太さはPlacementToolBarIconStyleでStrokeThickness=1.0に細くし、縮小後の
+                     密集感を緩和(隠密指摘への手当て)。各グリフの境界ボックス(bounding box)は
+                     Stretch=Uniformでのスケール不揃いを避けるため、対応する非OR/非差し替え版と
+                     揃えている(隠密申し送り、F5/sF5=x2-16,y4-14・F6/sF6/F8=x2-16,y3-15)。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
                         Click="SelectDefaultButton_Click"
@@ -187,7 +190,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M1,4 L1,14 M1,9 L8,9 M14,9 L18,9 M8,4 L8,14 M14,4 L14,14"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF5"/>
                     </StackPanel>
                 </Button>
@@ -207,7 +210,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M1,4 L1,14 M1,9 L8,9 M14,9 L18,9 M8,4 L8,14 M14,4 L14,14 M6,15 L16,3"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF6"/>
                     </StackPanel>
                 </Button>
@@ -217,7 +220,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L5,9 M13,9 L16,9 M7,5 A4,4 0 0 0 7,13 M11,5 A4,4 0 0 1 11,13"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L4,9 M14,9 L16,9 M9,4 A5,5 0 1 1 8.999,4"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F7"/>
                     </StackPanel>
                 </Button>
@@ -227,7 +230,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,9 A1.6,1.6 0 1 1 8.999,9 M6,6 L12,12"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,6 A3,3 0 1 1 8.999,6 M9,3 L9,15"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F8"/>
                     </StackPanel>
                 </Button>
