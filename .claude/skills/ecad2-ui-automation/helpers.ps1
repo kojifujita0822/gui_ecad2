@@ -70,13 +70,14 @@ function Get-Ecad2Process {
 
 # dotnet run はラッパープロセス(dotnet)＋実プロセス(Ecad2.App)の2つが立つ。
 # 検証操作の対象は必ず Ecad2.App 側（MainWindowHandle を持つ方）。
-# -Screen 'Secondary' を指定すると、起動直後にセカンダリモニタへウィンドウを移動する
-# （ユーザーが作業中のプライマリモニタを占有しないようにする用途、2026-07-03追加）。
+# 既定（-Screen 'Auto'）はセカンダリモニタが在ればそちらへ自動移動する【MUST・殿指示2026-07-07】。
+# ユーザーが作業中のプライマリモニタを検証ウィンドウで占有しないため。'None' での打ち消しは
+# 正当な理由（プライマリでしか再現しない事象の検証等）があり殿の了承を得た場合に限る。
 function Start-Ecad2App {
     param(
         [string]$OutLog = "$env:TEMP\ecad2-ui-automation-stdout.log",
         [string]$ErrLog = "$env:TEMP\ecad2-ui-automation-stderr.log",
-        [ValidateSet('Primary', 'Secondary', 'None')][string]$Screen = 'None'
+        [ValidateSet('Auto', 'Primary', 'Secondary', 'None')][string]$Screen = 'Auto'
     )
     if (Get-Ecad2Process) { throw "Ecad2.App is already running. Call Stop-Ecad2App first." }
     Start-Process -FilePath "dotnet" -ArgumentList "run --project src/Ecad2.App" -WorkingDirectory "C:\ECAD2" `
@@ -85,7 +86,13 @@ function Start-Ecad2App {
         Start-Sleep -Milliseconds 500
         $p = Get-Ecad2Process
         if ($p -and $p.MainWindowHandle -ne 0) {
-            if ($Screen -ne 'None') { Move-Ecad2WindowToScreen -Screen $Screen }
+            if ($Screen -eq 'Auto') {
+                Add-Type -AssemblyName System.Windows.Forms
+                $hasSecondary = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+                if ($hasSecondary) { Move-Ecad2WindowToScreen -Screen Secondary }
+            } elseif ($Screen -ne 'None') {
+                Move-Ecad2WindowToScreen -Screen $Screen
+            }
             return $p
         }
     }
