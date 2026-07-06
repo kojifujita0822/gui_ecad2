@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.App", "Ecad2.App\Ecad
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.Core.Tests", "..\tests\Ecad2.Core.Tests\Ecad2.Core.Tests.csproj", "{76C09B6A-B21E-4CBD-991E-AF616BEC116C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Ecad2.App.Tests", "..\tests\Ecad2.App.Tests\Ecad2.App.Tests.csproj", "{B9E09308-F6EB-4A6A-A045-9772ACACF8F5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,5 +44,9 @@ Global
 		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{76C09B6A-B21E-4CBD-991E-AF616BEC116C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B9E09308-F6EB-4A6A-A045-9772ACACF8F5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B9E09308-F6EB-4A6A-A045-9772ACACF8F5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B9E09308-F6EB-4A6A-A045-9772ACACF8F5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B9E09308-F6EB-4A6A-A045-9772ACACF8F5}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
