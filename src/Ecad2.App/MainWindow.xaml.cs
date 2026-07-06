@@ -663,37 +663,7 @@ public partial class MainWindow : Window
         double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
         double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
 
-        // T-038診断ログ(家老采配、T-033増分2位置バグの実機診断用。原因確定後に本節ごと削除する一時実装)。
-        LogPlacementBarDiagnostics(cell, inputPoint, topLeft, workAreaOrigin, barSize, maxX, maxY, x, y);
-
         ElementPlacementBar.Margin = new Thickness(x, y, 0, 0);
-    }
-
-    // T-038診断ログ(家老采配、一時実装。原因確定後に本メソッドごと削除する)。
-    // %TEMP%\ecad2-diag.log へ1呼び出し1行、key=value形式で追記する。
-    private void LogPlacementBarDiagnostics(
-        Ecad2.Model.GridPos cell, Point translateIn, Point translateOut, Point workAreaOrigin,
-        Size barDesiredSize, double maxX, double maxY, double postClampX, double postClampY)
-    {
-        string line = string.Format(
-            System.Globalization.CultureInfo.InvariantCulture,
-            "{0:o} event=PositionPlacementBar cell=({1},{2}) zoom={3} " +
-            "translateIn=({4:F2},{5:F2}) translateOut=({6:F2},{7:F2}) " +
-            "workAreaOrigin=({8:F2},{9:F2}) workAreaSize=({10:F2},{11:F2}) " +
-            "barDesiredSize=({12:F2},{13:F2}) barActualSize=({14:F2},{15:F2}) " +
-            "scrollOffset=({16:F2},{17:F2}) preClamp=({18:F2},{19:F2}) " +
-            "clampMax=({20:F2},{21:F2}) postClamp=({22:F2},{23:F2}) " +
-            "canvasHostIsArrangeValid={24} canvasHostIsMeasureValid={25} barIsMeasureValid={26}",
-            DateTime.Now, cell.Row, cell.Column, _viewModel.CanvasScale,
-            translateIn.X, translateIn.Y, translateOut.X, translateOut.Y,
-            workAreaOrigin.X, workAreaOrigin.Y, MainWorkAreaGrid.ActualWidth, MainWorkAreaGrid.ActualHeight,
-            barDesiredSize.Width, barDesiredSize.Height, ElementPlacementBar.ActualWidth, ElementPlacementBar.ActualHeight,
-            CanvasArea.HorizontalOffset, CanvasArea.VerticalOffset, translateOut.X, translateOut.Y,
-            maxX, maxY, postClampX, postClampY,
-            LadderCanvasHost.IsArrangeValid, LadderCanvasHost.IsMeasureValid, ElementPlacementBar.IsMeasureValid);
-        System.IO.File.AppendAllText(
-            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log"),
-            line + Environment.NewLine);
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
