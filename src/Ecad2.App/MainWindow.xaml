@@ -14,6 +14,7 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+        <converters:InverseBooleanConverter x:Key="InverseBool"/>
         <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
@@ -70,7 +71,11 @@
         </Grid.RowDefinitions>
 
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
-        <Menu x:Name="MenuBarArea" Grid.Row="0">
+        <!-- T-033増分1(隠密レビュー指摘): 配置バー表示中はIsEnabledで無効化する(新規/開く等が
+             バー表示中に無防備で実行できてしまう穴を恒久的に塞ぐ、殿裁定=メインコンテンツ全体を
+             グレーアウト。以下ToolBarArea/メイン作業域Grid/OutputPanelAreaも同様)。 -->
+        <Menu x:Name="MenuBarArea" Grid.Row="0"
+              IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N" Click="NewButton_Click"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
@@ -101,7 +106,8 @@
         </Menu>
 
         <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド) -->
-        <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
+        <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True"
+                     IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
             <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
                         AutomationProperties.Name="新規作成 (Ctrl+N)" Click="NewButton_Click">
@@ -249,7 +255,7 @@
         </ToolBarTray>
 
         <!-- メイン作業域: 左パレット / 中央キャンバス / 右パネル -->
-        <Grid Grid.Row="2">
+        <Grid Grid.Row="2" IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition x:Name="LeftPaletteColumn" Width="220"/>
                 <ColumnDefinition Width="Auto"/>
@@ -384,7 +390,8 @@
              殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
              行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
              (OutputPanelViewModel.SelectedDiagnostic参照)。 -->
-        <DockPanel x:Name="OutputPanelArea" Grid.Row="3" Height="160">
+        <DockPanel x:Name="OutputPanelArea" Grid.Row="3" Height="160"
+                   IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
             <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
                 <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"/>
             </Border>
@@ -443,11 +450,14 @@
              隠密所見によりPopup不採用。docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md参照)。
              現行ElementPlacementDialog(モーダルWindow)の縦積みレイアウトをそのまま移植し、
              非モーダル化の構造変更のみを増分1の対象とする(位置・レイアウト変更は増分2)。
-             メイン作業域(Row=2)の中央に固定表示。PoC所見どおりバー表示中はWindow_PreviewKeyDown
-             冒頭で全グローバルショートカットを無効化する(殿裁定=現行モーダル同等の使用感)。 -->
+             メイン作業域(Row=2)の中央に固定表示。表示状態はIsPlacementBarVisible(ViewModel単一の
+             真実源、隠密レビュー指摘)へバインドし、上記Menu/ToolBarTray/メイン作業域Grid/
+             OutputPanelAreaのIsEnabledと連動させることで、キーボード(Window_PreviewKeyDown冒頭の
+             早期リターン)・マウスの両経路を同時に無効化する(殿裁定=現行モーダル同等の使用感)。 -->
         <Border x:Name="ElementPlacementBar" Grid.Row="2" Background="White" BorderBrush="Gray"
                 BorderThickness="1" Padding="12" HorizontalAlignment="Center" VerticalAlignment="Center"
-                Visibility="Collapsed" Panel.ZIndex="100">
+                Visibility="{Binding IsPlacementBarVisible, Converter={StaticResource BoolToVisibility}}"
+                Panel.ZIndex="100">
             <StackPanel>
                 <TextBlock Text="種別:" Margin="0,0,0,4"/>
                 <ComboBox x:Name="PlacementPartComboBox" DisplayMemberPath="Definition.Name" Width="200" Margin="0,0,0,12"/>

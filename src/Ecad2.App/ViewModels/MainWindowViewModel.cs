@@ -43,6 +43,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public bool IsPartSelectionVisible => Tool.Mode == ToolMode.PlaceElement;
 
+    private bool _isPlacementBarVisible;
+
+    /// <summary>T-033増分1: 配置後入力の非モーダルバー表示状態(単一の真実源、隠密レビュー指摘)。
+    /// バー表示中はメインコンテンツ(メニュー・ツールバー・メイン作業域・出力パネル)全体を
+    /// IsEnabledバインドで無効化し、キャンバスクリック等マウス経由6系統の素通しを恒久的に塞ぐ
+    /// (殿裁定=グレーアウト。個別ハンドラへの後追いガードはT-021の轍のため不採用)。</summary>
+    public bool IsPlacementBarVisible
+    {
+        get => _isPlacementBarVisible;
+        set => SetProperty(ref _isPlacementBarVisible, value);
+    }
+
     private double _canvasScale = 1.0;
 
     /// <summary>キャンバスの表示倍率（Ctrl+マウスホイールで変更）。0.25〜4.0の範囲にクランプする。</summary>

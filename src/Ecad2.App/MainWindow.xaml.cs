@@ -8,6 +8,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace Ecad2.App;
 
@@ -234,13 +235,16 @@ public partial class MainWindow : Window
     // F5=AND(a接点)/F6=NAND(b接点)/Shift+F5=OR(ORa接点)/Shift+F6=NOR(ORb接点)キー体系(殿裁定)。
     private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        // T-033増分1(殿裁定2026-07-07、PoC所見): 非モーダル化により本ハンドラがバー表示中も
-        // 発火してしまう(モーダルWindow時代は別Windowのため到達しなかった)。バー表示中はF5〜F8等の
-        // 配置ショートカット・Escapeの多層キャンセル等、本メソッドのグローバルショートカットを
-        // 一切無効化し、現行モーダル同等の使用感(誤押しによる意図せぬ確定・取消を避ける安全側)を
-        // 保つ。Esc/Enterによるバー自身の確定・取消はIsCancel/IsDefault(PlacementOkButton_Click/
-        // PlacementCancelButton_Click)が別経路で処理するため、本ガードの影響を受けない。
-        if (ElementPlacementBar.Visibility == Visibility.Visible) return;
+        // T-033増分1(殿裁定2026-07-07、PoC所見・隠密レビュー往復1周目指摘): 非モーダル化により
+        // 本ハンドラがバー表示中も発火してしまう(モーダルWindow時代は別Windowのため到達しなかった)。
+        // バー表示中はF5〜F8等の配置ショートカット・Escapeの多層キャンセル等、本メソッドの
+        // グローバルショートカットを一切無効化し、現行モーダル同等の使用感(誤押しによる意図せぬ
+        // 確定・取消を避ける安全側)を保つ。Esc/Enterによるバー自身の確定・取消はIsCancel/IsDefault
+        // (PlacementOkButton_Click/PlacementCancelButton_Click)が別経路で処理するため、本ガードの
+        // 影響を受けない。マウス経路6系統(隠密レビュー指摘)はMainWindow.xamlのMenu/ToolBarTray/
+        // メイン作業域Grid/OutputPanelAreaのIsEnabledバインドで別途一括無効化しており(単一の真実源
+        // =IsPlacementBarVisible)、キーボード・マウス両経路が同じフラグから連動する。
+        if (_viewModel.IsPlacementBarVisible) return;
 
         if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.Shift)
         {
@@ -584,8 +588,9 @@ public partial class MainWindow : Window
 
     // T-033増分1(PoC成立、docs/ecad2-t033-poc-result-samurai.md): 旧`isOr`初期値をバー確定まで
     // 保持するためのフィールド(旧ローカル変数相当。非モーダル化でOK確定処理が別メソッドへ分離した
-    // ため、TryPlaceElement呼び出し時のisOrをここへ一時保持する)。
-    private bool _placementIsOr;
+    // ため、TryPlaceElement呼び出し時のisOrをここへ一時保持する)。バー非表示中に無意味な値を
+    // 持ち続けないよう、ClosePlacementBarでnullへリセットする(隠密レビューSimplification指摘)。
+    private bool? _placementIsOr;
 
     // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
     // 浮動インラインバー(種別+デバイス名、T-033増分1で同一Window内オーバーレイの非モーダル化)を
@@ -613,8 +618,12 @@ public partial class MainWindow : Window
             .FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id)
             ?? _viewModel.PartPalette.Entries.FirstOrDefault();
         PlacementDeviceNameBox.Text = "";
-        ElementPlacementBar.Visibility = Visibility.Visible;
-        PlacementDeviceNameBox.Focus();
+        _viewModel.IsPlacementBarVisible = true;
+        // 隠密レビュー指摘(観点3、Microsoft Learn「Focus Overview - WPF」一次情報): Collapsed→
+        // Visible直後はMeasure/Arrange未完了のため、Focus()の同期呼び出しは失敗しうる(例外も
+        // フィードバックも無く気づかれにくい)。レイアウトパス完了後に確実にフォーカスするため
+        // Dispatcher.BeginInvokeへ委譲する。
+        Dispatcher.BeginInvoke(new Action(() => PlacementDeviceNameBox.Focus()), DispatcherPriority.Loaded);
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
@@ -629,7 +638,7 @@ public partial class MainWindow : Window
             // (a接点/b接点)であればOR保持の意図は自然に成立するためisOrを維持し、OR対象外
             // (セレクトSW・端子台等)へ切り替えられた場合はOR接続自体が無意味かつ誤動作になる
             // ためisOrを無効化する(PartDefinition.IsOrEligible=電気的Role非依存の専用フラグで判定)。
-            bool effectiveIsOr = _placementIsOr && entry.Definition.IsOrEligible;
+            bool effectiveIsOr = _placementIsOr == true && entry.Definition.IsOrEligible;
             _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, PlacementDeviceNameBox.Text.Trim(), effectiveIsOr);
             _viewModel.StatusMessage = "";
             RedrawCanvas();
@@ -650,7 +659,8 @@ public partial class MainWindow : Window
     // の罠(T-016)を避けるため素のKeyboard.Focusではなく2段方式のFocusCanvasに統一(隠密レビュー観点3)。
     private void ClosePlacementBar()
     {
-        ElementPlacementBar.Visibility = Visibility.Collapsed;
+        _viewModel.IsPlacementBarVisible = false;
+        _placementIsOr = null;
         FocusCanvas();
     }
 
