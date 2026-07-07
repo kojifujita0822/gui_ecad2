@@ -116,8 +116,7 @@ public sealed class LadderCanvas : FrameworkElement
     /// </summary>
     internal VerticalConnector? HitTestConnector(Point localPositionDip, Sheet sheet)
     {
-        double xMm = localPositionDip.X / MmToDip;
-        double yMm = localPositionDip.Y / MmToDip;
+        (double xMm, double yMm) = ToMm(localPositionDip);
         var geo = _renderer.Geometry;
 
         foreach (var c in sheet.Connectors)
@@ -150,11 +149,15 @@ public sealed class LadderCanvas : FrameworkElement
     /// </summary>
     public GridPos ToGridPos(Point localPositionDip)
     {
-        double xMm = localPositionDip.X / MmToDip;
-        double yMm = localPositionDip.Y / MmToDip;
+        (double xMm, double yMm) = ToMm(localPositionDip);
         var geo = _renderer.Geometry;
         return new GridPos(geo.RowAt(yMm), geo.ColAt(xMm));
     }
+
+    /// <summary>ローカルDIP座標をmm座標へ変換する(T-041増分1隠密レビュー指摘=Reuse、ToGridPos/
+    /// HitTestConnectorで重複していたDIP→mm変換を集約)。</summary>
+    private static (double XMm, double YMm) ToMm(Point localPositionDip)
+        => (localPositionDip.X / MmToDip, localPositionDip.Y / MmToDip);
 
     /// <summary>グリッドセル1つ分のローカル矩形(DIP単位)。選択ハイライト描画とSymbolAutomationPeer
     /// のGetBoundingRectangleCore(T-023)の両方で使う共通座標計算。</summary>

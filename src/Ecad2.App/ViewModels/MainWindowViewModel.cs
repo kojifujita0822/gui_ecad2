@@ -106,9 +106,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             OnPropertyChanged(nameof(CurrentSheet));
             // シート切替時、前シートのSelectedCell(ハイライト・プロパティパネル)を持ち越さない
             // (T-018忍者実機検証で発見: 空シートへ切替えてもハイライト・プロパティ内容が残存するバグ)。
+            // SelectedConnectorも同じsetterが自動クリアする(T-041増分1隠密レビュー指摘、上記
+            // SelectedCellのsetter参照)。
             SelectedCell = null;
-            // 同様にSelectedConnectorも他シートのインスタンス参照を持ち越さない(T-041増分1)。
-            SelectedConnector = null;
             // SheetNavigation.SelectedSheetはCurrentSheetIndexを読むだけの導出プロパティのため、
             // DRC出力パネルのジャンプ(T-018)等、シートナビ経由以外でCurrentSheetIndexが変わった際は
             // 左パレットの選択ハイライトが追従しない(T-018忍者実機検証で発見)。ここで明示的に通知する。
@@ -155,6 +155,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _selectedCell;
         set
         {
+            // T-041増分1隠密レビュー指摘(観点2 CONFIRMED4件): SelectedCellとSelectedConnectorは
+            // 排他のはずが、呼び出し元(矢印キー移動・選択解除ボタン等)がSelectedConnectorのクリアを
+            // 個別に書き忘れると崩れる(実際に4箇所で発生)。呼び出し元の記憶に頼る方式をやめ、この
+            // setter自身を「選択状態をクリアする唯一の入口」にする。値が変化しない場合も含め常時
+            // クリアする(下のSetPropertyの早期returnより前に置くのはそのため、CurrentSheetIndex
+            // 経由の同一シートジャンプで早期returnにより後続処理が丸ごと飛ばされた実例への対処)。
+            // 縦コネクタをクリック選択する経路は、この副作用を踏まえてSelectedCell=null→
+            // SelectedConnector=connectorの順で呼ぶ(MainWindow.xaml.cs)。
+            SelectedConnector = null;
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -173,8 +182,11 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>
     /// 現在選択中の縦コネクタ(T-041増分1: 配線プリミティブの選択、GridPos単位のSelectedCellとは
-    /// 別枠で保持する)。SelectedCellとは排他(クリック時にどちらか一方のみが立つ、呼び出し元の
-    /// MainWindow.xaml.csが両者を明示的に切り替える)。単一選択のみ(殿裁定2026-07-07)。
+    /// 別枠で保持する)。SelectedCellとは排他——SelectedCellのsetterが値変化の有無に関わらず常時
+    /// このプロパティをクリアするため(隠密レビュー指摘、上記SelectedCell参照)、縦コネクタを
+    /// クリック選択する経路はSelectedCell=null→SelectedConnector=connectorの順で呼ぶ必要がある
+    /// (逆順だとSelectedCellのクリアが直後にこのプロパティを打ち消してしまう)。単一選択のみ
+    /// (殿裁定2026-07-07)。
     /// </summary>
     public VerticalConnector? SelectedConnector
     {
@@ -185,12 +197,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// SelectedConnectorを削除する(T-041増分1、案A=既存の部品削除(Deleteキー)と同型)。
     /// Undo機能は不採用のため直接List操作＋MarkDirty()の流儀に揃える(DeleteSelectedElementと同様)。
+    /// 隠密レビュー指摘: Remove()の戻り値(実際に削除できたか)を見て、できなければMarkDirty()も
+    /// falseもtrueにせず、削除できていない状態を偽って報告しない(DeleteSelectedElementとの一貫性)。
     /// 戻り値は実際に削除したか。
     /// </summary>
     public bool DeleteSelectedConnector()
     {
         if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector connector) return false;
-        sheet.Connectors.Remove(connector);
+        if (!sheet.Connectors.Remove(connector)) return false;
         MarkDirty();
         SelectedConnector = null;
         return true;
@@ -478,6 +492,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         CurrentFilePath = filePath;
         _currentSheetIndex = 0;
         _selectedCell = null;
+        // T-041増分1隠密レビュー指摘(観点2 CONFIRMED#4): 上の_selectedCellはsetterをバイパスする
+        // 直接代入のため、SelectedCellのsetterに集約した自動クリア(上記参照)が効かない。旧文書の
+        // VerticalConnector参照を持ち越さないよう、ここでも明示的にクリアする。SelectedConnectorは
+        // 参照型でTraceLogのボクシング懸念が無いため、setter経由(自己通知)でよい。
+        SelectedConnector = null;
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);

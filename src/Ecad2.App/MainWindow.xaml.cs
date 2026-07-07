@@ -217,16 +217,18 @@ public partial class MainWindow : Window
         // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
         // (配置モード中のクリックは常に要素配置目的のため対象外とする)。ヒットすればSelectedCellは
         // 使わず(セル単位の概念に載らないため)排他的に切り替える。
+        // 隠密レビュー指摘: SelectedCellのsetterが常にSelectedConnectorをクリアする(上記
+        // MainWindowViewModel.SelectedCell参照)ため、必ずSelectedCell=null→SelectedConnector=
+        // connectorの順で呼ぶ(逆順だとSelectedCellのクリアが直後に打ち消してしまう)。
         if (_viewModel.Tool.Mode == ViewModels.ToolMode.Select
             && _viewModel.CurrentSheet is Ecad2.Model.Sheet sheet
             && LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
         {
-            _viewModel.SelectedConnector = connector;
             _viewModel.SelectedCell = null;
+            _viewModel.SelectedConnector = connector;
             return;
         }
 
-        _viewModel.SelectedConnector = null;
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
         TryPlaceActiveTool();
     }
@@ -305,8 +307,9 @@ public partial class MainWindow : Window
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null)
                 {
                     // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1) → 選択解除のみ。
+                    // SelectedCellのsetterが値変化の有無に関わらずSelectedConnectorも常にクリア
+                    // するため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、1行で足りる。
                     _viewModel.SelectedCell = null;
-                    _viewModel.SelectedConnector = null;
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
                 // Escapeはボタンのマウス/キーボード二重発火問題を持たないグローバルショートカットの
