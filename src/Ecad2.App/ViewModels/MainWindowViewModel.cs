@@ -376,8 +376,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         // このケースを自然にカバーするため、省略しても電気的分断は起きない(列0はこの条件の自明な
         // 特殊ケースとして包含される)。いずれかの行に既存要素があれば縦分岐を維持し、その要素を
         // 誤ってバイパスする配線を防ぐ。右(合流側)縦分岐は従来どおり常時生成する。
+        //
+        // 隠密レビューCONFIRMED(重大、docs/ecad2-t044-review-onmitsu.md所見1): 既存要素(sheet.Elements)
+        // だけでなく既存の縦コネクタ(sheet.Connectors)も見る必要がある。同一列で3階層以上のOR配置を
+        // 重ねる連鎖ケースでは、基準行(br)が「要素としては空」でも、より上位のOR配置で生成済みの
+        // 縦コネクタにより既に母線から分岐された状態(=直結ではない)になっている。この既存コネクタを
+        // 見落とすと、末端行が誤って母線へ直結され電気的トポロジーが壊れる(B・Cが同一ネットであるべき
+        // ところ、Cだけ母線ネットになってしまう)。判定対象の行がTopRow/BottomRowとして紐づく既存
+        // コネクタのうちColumn<=leftColumnのものが無いかも確認する。
         bool NothingBetweenRailAndColumn(int row, int column)
-            => !sheet.Elements.Any(el => el.Pos.Row == row && el.Pos.Column < column);
+            => !sheet.Elements.Any(el => el.Pos.Row == row && el.Pos.Column < column)
+            && !sheet.Connectors.Any(c => (c.TopRow == row || c.BottomRow == row) && c.Column <= column);
 
         if (!NothingBetweenRailAndColumn(pos.Row, leftColumn) || !NothingBetweenRailAndColumn(br, leftColumn))
             sheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
