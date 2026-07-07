@@ -102,6 +102,67 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         Assert.Equal("シート2", addedSheet.Name);
     }
 
+    /// <summary>
+    /// T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大)の回帰テスト。2シート中の先頭(表示中)を
+    /// 削除すると、後続シートが繰り上がりCurrentSheetIndexの数値は0のまま変化しない
+    /// (Math.Min(0, Sheets.Count-1)=0)。この「数値が偶然一致したまま実体が差し替わる」経路で
+    /// 記入中状態(_connectorDraft)が残留し、削除後の(実体としては別の)シートへ誤って確定される
+    /// 実害が無いことを検証する。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhileDraftingConnector_WhenIndexNumberStaysSame_CancelsDraftAndPreventsCrossSheetLeak()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        // CurrentSheetIndexは既定の0のまま(先頭シートを表示中)。
+        vm.SelectedCell = new GridPos(0, 0);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);
+
+        // 表示中の先頭シートを削除する。後続シートがindex0へ繰り上がり、
+        // CurrentSheetIndex = Math.Min(0, Sheets.Count-1=0) = 0 (数値上は変化なし)。
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.Null(vm.ConnectorDraftPreview);
+        Assert.Empty(vm.CurrentSheet!.Connectors);
+    }
+
+    /// <summary>同上、自由線(FreeLine)版。</summary>
+    [Fact]
+    public void DeleteCommand_WhileDraftingFreeLine_WhenIndexNumberStaysSame_CancelsDraftAndPreventsCrossSheetLeak()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2(主回路)",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+            MainCircuit = true,
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.SelectedCell = new GridPos(2, 3);
+        vm.BeginFreeLineDraft(horizontal: true, startXMm: 47.0, startYMm: 38.5, stepMm: 9.0);
+        vm.MoveFreeLineDraftEnd(2);
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.Null(vm.FreeLineDraftPreview);
+        bool confirmed = vm.ConfirmFreeLineDraft();
+        Assert.False(confirmed);
+        Assert.Empty(vm.CurrentSheet!.FreeLines);
+    }
+
     [Fact]
     public void RenameCommand_MarksDirty()
     {

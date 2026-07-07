@@ -102,11 +102,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _currentSheetIndex;
         set
         {
-            if (!SetProperty(ref _currentSheetIndex, value)) return;
+            // T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大、増分1由来の構造的な穴): シート削除
+            // (SheetNavigationViewModel.DeleteCommand)で「非末尾シートを削除、かつそれが現在表示中」
+            // の場合、削除後のindex数値がたまたま削除前と一致するケースがある(Sheets[index]の実体は
+            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。従来はここで
+            // SetPropertyの早期returnにより後続処理(CurrentSheet変更通知・SelectedCellクリア→
+            // 全選択状態/記入中状態の連鎖クリア・RedrawCanvas)が丸ごとスキップされ、削除された旧
+            // シートの描画・選択・記入中状態(縦コネクタ/自由線等)が残留したまま新シートへ誤って
+            // 確定されうるバグがあった。SelectedCellのsetter集約と同じ設計(値変化の有無に関わらず
+            // 常時実行)へ改め、SetPropertyの戻り値では後続処理をガードしない。
+            SetProperty(ref _currentSheetIndex, value);
             OnPropertyChanged(nameof(CurrentSheet));
             // シート切替時、前シートのSelectedCell(ハイライト・プロパティパネル)を持ち越さない
             // (T-018忍者実機検証で発見: 空シートへ切替えてもハイライト・プロパティ内容が残存するバグ)。
-            // SelectedConnectorも同じsetterが自動クリアする(T-041増分1隠密レビュー指摘、上記
+            // SelectedConnector等も同じsetterが自動クリアする(T-041増分1隠密レビュー指摘、上記
             // SelectedCellのsetter参照)。
             SelectedCell = null;
             // SheetNavigation.SelectedSheetはCurrentSheetIndexを読むだけの導出プロパティのため、
