@@ -16,6 +16,13 @@ public static class BasicPartTemplates
     public const string ContactNOId = "basic-contact-no";
     /// <summary>b接点の固定Id。用途は<see cref="ContactNOId"/>と同じ。</summary>
     public const string ContactNCId = "basic-contact-nc";
+    /// <summary>コイルの固定Id。T-033増分4: 配置バー種別選択のシンボル表示で、既知5種を
+    /// Idで判別するために公開する(ContactNOId/ContactNCIdと同じ用途)。</summary>
+    public const string CoilId = "basic-coil";
+    /// <summary>端子台の固定Id。用途は<see cref="CoilId"/>と同じ。</summary>
+    public const string TerminalId = "basic-terminal";
+    /// <summary>セレクトSWの固定Id。用途は<see cref="CoilId"/>と同じ。</summary>
+    public const string SelectSwitchId = "basic-select-switch";
 
     /// <summary>2端子（左=NetA / 右=NetB）の標準ポート。1セル幅の図形で共通。</summary>
     private static List<PortDef> TwoPorts() => new()
@@ -78,7 +85,7 @@ public static class BasicPartTemplates
     // コイル: 円＋左右リード
     private static PartDefinition Coil() => new()
     {
-        Id = "basic-coil",
+        Id = CoilId,
         Name = "コイル",
         WidthCells = 1,
         HeightCells = 1,
@@ -95,7 +102,7 @@ public static class BasicPartTemplates
     // 端子台: 小円＋斜線＋左右リード
     private static PartDefinition Terminal() => new()
     {
-        Id = "basic-terminal",
+        Id = TerminalId,
         Name = "端子台",
         WidthCells = 1,
         HeightCells = 1,
@@ -113,7 +120,7 @@ public static class BasicPartTemplates
     // セレクトSW: 2端子円＋切替バー（接点として扱う・セレクトSW-NEW.gcadpart 由来）
     private static PartDefinition SelectSwitch() => new()
     {
-        Id = "basic-select-switch",
+        Id = SelectSwitchId,
         Name = "セレクトSW",
         WidthCells = 1,
         HeightCells = 1,
