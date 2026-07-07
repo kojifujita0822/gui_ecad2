@@ -21,7 +21,7 @@
 | 14 | プロパティパネルのDeviceNameBox編集中にF5等で新規配置をトリガーすると、IsPlacementBarVisible=trueの作業域無効化で編集中Boxが強制フォーカス喪失し、LostKeyboardFocusがTryPlaceElement実行中に再入発火する（無害な再描画1回程度、隠密PLAUSIBLE） | T-033 増分1修正 | 既存要素のプロパティパネル編集中に、別セルへF5等で新規配置をトリガーした場合のみ。 | 2026-07-07 |
 | 15 | 配置バーのMargin計算がRootLayoutGrid絶対座標とバー親セル相対座標を区別せず、現状「ルートRow0+Row1=実質0」に依存して成立している（隠密CONFIRMED・現時点で実害なし）。将来ルートGridのRow0/Row1に単独専有の子要素が追加されると座標ズレが再発しうる技術的負債 | T-033 増分2修正(bfa8994) | ルートGridのRow0/Row1へ単独専有の子要素を追加する構造変更をした場合のみ。P-025（App層リファクタ）検討時の候補。 | 2026-07-07 |
 | 16 | 配置バーがMarginを「位置決め」と「測定リセット値」の二重役割で使う設計は、将来リサイズ追従等の新経路が追加されると同種のMargin汚染バグが再発するリスクを残す（隠密PLAUSIBLE・現状バグではない）。Canvas.Left/Top方式への置換が検討候補 | T-033 増分2修正(5c73b66) | 配置バーのMargin/Measure周りに新経路（リサイズ追従等）を追加する改修をした場合のみ。P-025等でMargin/Measureに再度手を入れる機会に検討。 | 2026-07-07 |
-| 17 | GX様式グリフのPath DataがPartEntryToGlyphGeometryConverter（増分4）とMainWindow.xamlツールバー（T-040）の双方に二重ハードコードされており、片方だけ直すと見た目が食い違う（隠密PLAUSIBLE。T-040グリフが1日に3回作り直された実績・T-043の見た目不一致前例あり、リスクは実績ベース） | T-033 増分4(025e8d6) | ツールバーグリフ（F5〜F8等）のPath Dataをどちらか片方だけ変更した場合。次にグリフへ手を入れる機会に共通リソース化（StaticResource等）を検討。 | 2026-07-07 |
+| 17 | GX様式グリフのPath DataがPartEntryToGlyphGeometryConverter（増分4）・MainWindow.xamlツールバー（T-040）・PartThumbnailRenderer（T-043、参照方向の制約で共有不可）の**3箇所**にハードコードされており、一部だけ直すと見た目が食い違う（隠密PLAUSIBLE。T-040グリフが1日に3回作り直された実績あり、リスクは実績ベース） | T-033 増分4(025e8d6)・T-043(c56b13c) | グリフ（F5〜F8・sF5/sF6等）のPath Dataを一部の箇所だけ変更した場合。次にグリフへ手を入れる機会に共通リソース化を検討（App→Rendering.Wpf参照方向の制約に留意）。 | 2026-07-07 |
 | 18 | 配置バー初期選択の第2段階フォールバック（Id一致のみ）は理論上OR意図が静かに失われる余地がある。現状はBasicPartTemplatesハードコード＋Enumerate()自己修復＋SaveCustomカテゴリ分離の三重保証で到達不能だが、保護テストが無い（隠密PLAUSIBLE） | T-033 増分5(d089f88) | 将来、新規OR対象パーツ追加時にIsOrEligible設定を忘れる等で顕在化しうる。OR対象パーツを増やす改修時に保護テスト追加を検討。 | 2026-07-07 |
 
 ## 参照
