@@ -492,16 +492,20 @@
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M2,3 L12,3 L12,9 L7,9 L4,13 L4,9 L2,9 Z"/>
                 </Button>
-                <!-- 種別選択(T-033増分4、殿注文=省スペース化): 文字表記からシンボルのみ表示へ変更。
-                     ツールバー2段目(T-040)と同じGX様式グリフをPartEntryToGlyphGeometryConverterで
-                     Definition.Idから引く(閉状態・ドロップダウン項目とも同一ItemTemplateのため
-                     自動的に揃う)。ToolTip・AutomationProperties.Nameは正式名称を維持し(忍者のUIA
-                     検証互換)、コントロール自体は選択中の部品名を動的反映、ドロップダウン各項目は
-                     ItemContainerStyleでその部品自身の名称を持つ。 -->
+                <!-- 種別選択(T-033増分4/5、殿注文=省スペース化+表示どおりの動作): 文字表記から
+                     シンボルのみ表示へ変更。項目は部品選択リストと同じ7種(ORa/ORb含む、
+                     PartPaletteViewModel.SelectionEntries、並び順もリストと同一)。ツールバー2段目
+                     (T-040)と同じGX様式グリフをPartEntryToGlyphGeometryConverterでDefinition.Id+
+                     IsOrから引く(閉状態・ドロップダウン項目とも同一ItemTemplateのため自動的に
+                     揃う)。ToolTip・AutomationProperties.Nameは正式名称(DisplayName、IsOr時は
+                     「ORa接点」等)を維持し(忍者のUIA検証互換)、コントロール自体は選択中の部品名を
+                     動的反映、ドロップダウン各項目はItemContainerStyleでその部品自身の名称を持つ。
+                     ドロップダウンで選んだ項目そのものがOR属性も決める(PlacementOkButton_Click参照、
+                     T-037の暗黙保持ルールはT-033増分5で廃止)。 -->
                 <ComboBox x:Name="PlacementPartComboBox" Width="40"
                           VerticalAlignment="Center" Margin="0,0,8,0"
-                          ToolTip="{Binding SelectedItem.Definition.Name, RelativeSource={RelativeSource Self}, FallbackValue=種別選択}"
-                          AutomationProperties.Name="{Binding SelectedItem.Definition.Name, RelativeSource={RelativeSource Self}, FallbackValue=種別選択}">
+                          ToolTip="{Binding SelectedItem.DisplayName, RelativeSource={RelativeSource Self}, FallbackValue=種別選択}"
+                          AutomationProperties.Name="{Binding SelectedItem.DisplayName, RelativeSource={RelativeSource Self}, FallbackValue=種別選択}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
                             <Path Style="{StaticResource PlacementToolBarIconStyle}"
@@ -510,8 +514,8 @@
                     </ComboBox.ItemTemplate>
                     <ComboBox.ItemContainerStyle>
                         <Style TargetType="ComboBoxItem">
-                            <Setter Property="ToolTip" Value="{Binding Definition.Name}"/>
-                            <Setter Property="AutomationProperties.Name" Value="{Binding Definition.Name}"/>
+                            <Setter Property="ToolTip" Value="{Binding DisplayName}"/>
+                            <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
                         </Style>
                     </ComboBox.ItemContainerStyle>
                 </ComboBox>

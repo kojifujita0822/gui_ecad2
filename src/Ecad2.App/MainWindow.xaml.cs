@@ -586,12 +586,6 @@ public partial class MainWindow : Window
             _viewModel.OutputPanel.JumpToDiagnostic(diagnostic);
     }
 
-    // T-033増分1(PoC成立、docs/ecad2-t033-poc-result-samurai.md): 旧`isOr`初期値をバー確定まで
-    // 保持するためのフィールド(旧ローカル変数相当。非モーダル化でOK確定処理が別メソッドへ分離した
-    // ため、TryPlaceElement呼び出し時のisOrをここへ一時保持する)。バー非表示中に無意味な値を
-    // 持ち続けないよう、ClosePlacementBarでnullへリセットする(隠密レビューSimplification指摘)。
-    private bool? _placementIsOr;
-
     // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
     // 浮動インラインバー(種別+デバイス名、T-033増分1で同一Window内オーバーレイの非モーダル化)を
     // 選択セル付近に表示→OKで確定配置。isOr=trueの場合、実際のOR接続処理(基準行判定・縦コネクタ
@@ -612,11 +606,16 @@ public partial class MainWindow : Window
         // T-033増分1: 非モーダル化により`ShowDialog()`の同期戻り値待ちが失われるため、OK/キャンセル
         // 確定処理はPlacementOkButton_Click/PlacementCancelButton_Clickへ移設した(旧
         // `if (dialog.ShowDialog() == true ...)`の同期構造からの構造変更、プラン3.3節参照)。
-        _placementIsOr = isOr;
-        PlacementPartComboBox.ItemsSource = _viewModel.PartPalette.Entries;
-        PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.Entries
-            .FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id)
-            ?? _viewModel.PartPalette.Entries.FirstOrDefault();
+        //
+        // T-033増分5(殿裁定=表示どおりの動作): ドロップダウンは部品選択リストと同じ7種
+        // (ORa/ORb含む、PartPaletteViewModel.SelectionEntries)を表示する。入口がsF5/sF6(OR系
+        // ツールバーボタン)ならisOr=trueで呼ばれるため、初期選択もOR版(ORa接点/ORb接点)を選ぶ
+        // (Id一致かつIsOr一致を優先し、無ければId一致のみへフォールバック)。
+        PlacementPartComboBox.ItemsSource = _viewModel.PartPalette.SelectionEntries;
+        PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.SelectionEntries
+            .FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id && e.IsOr == isOr)
+            ?? _viewModel.PartPalette.SelectionEntries.FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id)
+            ?? _viewModel.PartPalette.SelectionEntries.FirstOrDefault();
         PlacementDeviceNameBox.Text = "";
         _viewModel.IsPlacementBarVisible = true;
         PositionPlacementBar(cell);
@@ -671,14 +670,13 @@ public partial class MainWindow : Window
     // ため、未命名の孤立要素は構造上残らない(現行の「OK後に配置」構造がそのまま原子的取消を満たす)。
     private void PlacementOkButton_Click(object sender, RoutedEventArgs e)
     {
-        if (PlacementPartComboBox.SelectedItem is Ecad2.Persistence.PartFolderEntry entry)
+        if (PlacementPartComboBox.SelectedItem is ViewModels.PartSelectionEntryViewModel entry)
         {
-            // 隠密レビュー指摘(T-037往復1周目): バー内でパーツ種別を切り替えられるため、
-            // isOr(初期値)が確定時の最終選択(entry)と食い違いうる。最終確定パーツがOR対象
-            // (a接点/b接点)であればOR保持の意図は自然に成立するためisOrを維持し、OR対象外
-            // (セレクトSW・端子台等)へ切り替えられた場合はOR接続自体が無意味かつ誤動作になる
-            // ためisOrを無効化する(PartDefinition.IsOrEligible=電気的Role非依存の専用フラグで判定)。
-            bool effectiveIsOr = _placementIsOr == true && entry.Definition.IsOrEligible;
+            // T-033増分5(殿裁定=表示どおりの動作): ドロップダウンで選んだ項目そのものがOR属性を
+            // 決める(見たまま=実態)。T-037で導入した「接点系同士の切替でisOrを暗黙保持する」ルール
+            // (旧: `_placementIsOr == true && entry.Definition.IsOrEligible`)は本裁定で廃止する。
+            // ORa接点で開いてもb接点へ切り替えればORを失う(明示的にORb接点を選べばOR並列b接点になる)。
+            bool effectiveIsOr = entry.IsOr;
             _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, PlacementDeviceNameBox.Text.Trim(), effectiveIsOr);
             _viewModel.StatusMessage = "";
             RedrawCanvas();
@@ -700,7 +698,6 @@ public partial class MainWindow : Window
     private void ClosePlacementBar()
     {
         _viewModel.IsPlacementBarVisible = false;
-        _placementIsOr = null;
         FocusCanvas();
     }
 
