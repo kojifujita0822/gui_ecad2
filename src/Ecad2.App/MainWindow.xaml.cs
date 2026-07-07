@@ -98,6 +98,16 @@ public partial class MainWindow : Window
             _viewModel.SheetNavigation.RenameCommand.Execute(dialog.NewName);
     }
 
+    // T-041(殿裁定「案1」): シート追加ボタン。RenameSheetButton_Clickと同型、ダイアログ表示は
+    // View側の責務でAddCommandへ(名前, 主回路か)を渡す。
+    private void AddSheetButton_Click(object sender, RoutedEventArgs e)
+    {
+        int pageNumber = _viewModel.Document.Sheets.Count + 1;
+        var dialog = new Views.AddSheetDialog($"シート{pageNumber}") { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.SheetNavigation.AddCommand.Execute((dialog.SheetName, dialog.IsMainCircuit));
+    }
+
     private const string GcadFileFilter = "GCADファイル (*.gcad)|*.gcad";
 
     // 上書き保存(T-019)。ファイルダイアログ表示はView側の責務、実際の保存(GcadSerializer呼び出し)

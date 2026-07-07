@@ -68,10 +68,38 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        try { vm.SheetNavigation.AddCommand.Execute(null); }
+        // T-041(殿裁定「案1」): AddCommandは(名前, 主回路か)のタプルを受け取る呼び出し規約に変更。
+        try { vm.SheetNavigation.AddCommand.Execute(("シート2", false)); }
         catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
 
         Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void AddCommand_WithMainCircuitTrue_CreatesMainCircuitSheet()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        try { vm.SheetNavigation.AddCommand.Execute(("主回路シート", true)); }
+        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+
+        var addedSheet = vm.Document.Sheets[^1];
+        Assert.Equal("主回路シート", addedSheet.Name);
+        Assert.True(addedSheet.MainCircuit);
+    }
+
+    [Fact]
+    public void AddCommand_WithBlankName_FallsBackToAutoNumberedName()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        try { vm.SheetNavigation.AddCommand.Execute(("  ", false)); }
+        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+
+        var addedSheet = vm.Document.Sheets[^1];
+        Assert.Equal("シート2", addedSheet.Name);
     }
 
     [Fact]

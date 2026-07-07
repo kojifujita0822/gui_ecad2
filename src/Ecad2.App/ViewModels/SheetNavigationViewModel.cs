@@ -59,15 +59,24 @@ public sealed class SheetNavigationViewModel : ViewModelBase
         _owner = owner;
         Sheets = new ObservableCollection<Sheet>(_owner.Document.Sheets);
 
-        AddCommand = new RelayCommand(() =>
+        // T-041(殿裁定「案1」): シート追加時に名前・種別(制御回路/主回路)をダイアログで選ばせる
+        // (忍者範囲外検出=UIから主回路シートを作る手段が無かった問題への対処)。ダイアログ表示自体は
+        // View側の責務(AddSheetDialog、RenameCommandと同じくパラメータ渡しの流儀)。名前が空なら
+        // 従来どおりの自動採番名にフォールバックする(「＋」ボタンが失敗せず必ず追加される既存挙動を保つ)。
+        AddCommand = new RelayCommand(param =>
         {
+            if (param is not ValueTuple<string, bool> args) return;
+            var (rawName, isMainCircuit) = args;
             bool wasEmpty = _owner.Document.Sheets.Count == 0;
             int pageNumber = _owner.Document.Sheets.Count + 1;
+            string name = rawName.Trim();
+            if (name.Length == 0) name = $"シート{pageNumber}";
             var sheet = new Sheet
             {
                 PageNumber = pageNumber,
-                Name = $"シート{pageNumber}",
+                Name = name,
                 Grid = new GridSpec { Rows = 10, Columns = 20 },
+                MainCircuit = isMainCircuit,
             };
             _owner.Document.Sheets.Add(sheet);
             Sheets.Add(sheet);
