@@ -35,7 +35,8 @@ public partial class MainWindow : Window
     {
         if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnector))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnector)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ConnectorDraftPreview))
             RedrawCanvas();
     }
 
@@ -45,7 +46,8 @@ public partial class MainWindow : Window
     private void RedrawCanvas()
     {
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
-            LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector);
+            LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
+                _viewModel.ConnectorDraftPreview);
         else
             LadderCanvasHost.Clear();
     }
@@ -304,6 +306,11 @@ public partial class MainWindow : Window
                     // 同じセルへ配置し直せるようにする。
                     _viewModel.Tool = ViewModels.ToolState.SelectDefault;
                 }
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector)
+                {
+                    // 層2'(T-041増分2): 縦コネクタ記入中 → 取消して選択モードへ戻す。何も生成しない。
+                    _viewModel.CancelConnectorDraft();
+                }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null)
                 {
                     // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1) → 選択解除のみ。
@@ -341,12 +348,28 @@ public partial class MainWindow : Window
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
+            case Key.F9 when shift:
+                // T-041増分2: sF9で縦コネクタ手動記入モードを開始する(制御回路シート限定、
+                // `ecad2-t041-key-flow-proposal-samurai.md`3節・殿裁定「案A」)。
+                TryBeginConnectorDraft();
+                e.Handled = true;
+                break;
             case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
                 // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
                 // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
                 // キャンバスフォーカス時はScrollViewer(CanvasArea)の既定スクロールを上書きし、
-                // SelectedCellをセル単位で移動する(T-017)。
-                MoveSelectedCell(e.Key);
+                // SelectedCellをセル単位で移動する(T-017)。T-041増分2: 縦コネクタ記入中は矢印キーを
+                // SelectedCell移動ではなく記入中プレビューの範囲/列位置の調整に転用する。
+                if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector)
+                    AdjustConnectorDraft(e.Key, cellCenterStep: false);
+                else
+                    MoveSelectedCell(e.Key);
+                e.Handled = true;
+                break;
+            case Key.Left or Key.Right when shift && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector:
+                // T-041増分2: Shift+Left/Rightはセル中央(X.5)刻みでの列位置調整(原案3節)。
+                AdjustConnectorDraft(e.Key, cellCenterStep: true);
                 e.Handled = true;
                 break;
             case Key.Delete when noModifier && IsCanvasFocused():
@@ -368,6 +391,16 @@ public partial class MainWindow : Window
                 // 前提。配置本体はクリック配置と共通のTryPlaceActiveToolへ委譲する。Enterがこの4条件で
                 // 成立しないときは配置以外(将来用途)へ委ねるためHandledにしない。
                 TryPlaceActiveTool();
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector:
+                // T-041増分2: 記入中の縦コネクタを確定する。範囲が0(まだ上下キーで広げていない)場合は
+                // 確定せず案内のみ出す(原案3節)。
+                if (_viewModel.ConfirmConnectorDraft())
+                    RedrawCanvas();
+                else
+                    _viewModel.StatusMessage = "上下キーで範囲を広げてから確定してください";
                 e.Handled = true;
                 break;
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
@@ -573,6 +606,43 @@ public partial class MainWindow : Window
         }
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Name == partName);
         if (entry is not null) TryPlaceElement(entry, isOr);
+    }
+
+    // T-041増分2: sF9押下時の縦コネクタ記入モード開始。TryPlaceBuiltinと同型の前提チェック
+    // (HasProject→SelectedCell)に加え、制御回路シート限定(主回路のFreeLineは増分5)を確認する。
+    private void TryBeginConnectorDraft()
+    {
+        if (!_viewModel.HasProject)
+        {
+            _viewModel.StatusMessage = "シートがありません。新規作成（Ctrl+N）から始めてください";
+            return;
+        }
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet || sheet.MainCircuit)
+        {
+            _viewModel.StatusMessage = "縦分岐線の記入は制御回路シートでのみ使用できます";
+            return;
+        }
+        if (_viewModel.SelectedCell is null)
+        {
+            _viewModel.StatusMessage = "配置するセルを先に選択してください";
+            return;
+        }
+        _viewModel.BeginConnectorDraft();
+        _viewModel.StatusMessage = "上下キーで範囲、左右キー(Shiftでセル中央)で列位置を調整しEnterで確定、Escで取消";
+    }
+
+    // T-041増分2: 縦コネクタ記入中(Tool.Mode==PlaceConnector)の矢印キーで範囲・列位置を調整する。
+    // Up/Downで終点行を伸縮、Left/Rightで列境界を移動(cellCenterStep=falseは整数境界1.0刻み、
+    // true(Shift併用)はセル中央0.5刻み、原案3節)。
+    private void AdjustConnectorDraft(Key key, bool cellCenterStep)
+    {
+        switch (key)
+        {
+            case Key.Up: _viewModel.MoveConnectorDraftRow(-1); break;
+            case Key.Down: _viewModel.MoveConnectorDraftRow(1); break;
+            case Key.Left: _viewModel.MoveConnectorDraftColumn(cellCenterStep ? -0.5 : -1.0); break;
+            case Key.Right: _viewModel.MoveConnectorDraftColumn(cellCenterStep ? 0.5 : 1.0); break;
+        }
     }
 
     // 自作パーツボタン(T-026段階4-7、案B)。Tool.Mode=PlaceElementにすることで右パネル下段を

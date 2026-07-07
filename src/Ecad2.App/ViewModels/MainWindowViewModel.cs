@@ -210,6 +210,83 @@ public sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    // T-041増分2: 縦コネクタ手動記入(sF9)の作業中データ。AnchorRowは記入開始行(固定)、CurrentRowは
+    // 矢印キーで動く終点行。TopRow/BottomRowはこの2つのMin/Maxとして都度導出する(`ecad2-t041-key-flow
+    // -proposal-samurai.md`3節の設計)。
+    private (int AnchorRow, int CurrentRow, double Column)? _connectorDraft;
+
+    /// <summary>記入中の縦コネクタのプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
+    public VerticalConnector? ConnectorDraftPreview
+    {
+        get
+        {
+            if (_connectorDraft is not { } draft) return null;
+            return new VerticalConnector
+            {
+                Column = draft.Column,
+                TopRow = Math.Min(draft.AnchorRow, draft.CurrentRow),
+                BottomRow = Math.Max(draft.AnchorRow, draft.CurrentRow),
+            };
+        }
+    }
+
+    /// <summary>
+    /// sF9押下時、SelectedCellを起点に縦コネクタ記入を開始する(T-041増分2)。呼び出し元
+    /// (MainWindow.xaml.cs)でHasProject/制御回路シート判定は済ませてある前提。始点列境界は
+    /// SelectedCellのセル左端(整数境界)とする(原案3節)。
+    /// </summary>
+    public void BeginConnectorDraft()
+    {
+        if (SelectedCell is not { } pos) return;
+        _connectorDraft = (pos.Row, pos.Row, pos.Column);
+        Tool = new ToolState(ToolMode.PlaceConnector);
+        OnPropertyChanged(nameof(ConnectorDraftPreview));
+    }
+
+    /// <summary>記入中の縦コネクタの終点行を矢印キー1回分(delta=±1)動かす。グリッド行範囲内にクランプする。</summary>
+    public void MoveConnectorDraftRow(int delta)
+    {
+        if (_connectorDraft is not { } draft || CurrentSheet is not Sheet sheet) return;
+        int newRow = Math.Clamp(draft.CurrentRow + delta, 0, sheet.Grid.Rows - 1);
+        _connectorDraft = draft with { CurrentRow = newRow };
+        OnPropertyChanged(nameof(ConnectorDraftPreview));
+    }
+
+    /// <summary>記入中の縦コネクタの列境界を矢印キー1回分動かす(step=±1.0は整数境界、±0.5は
+    /// Shift+Left/Rightによるセル中央境界、原案3節)。グリッド列範囲内にクランプする。</summary>
+    public void MoveConnectorDraftColumn(double step)
+    {
+        if (_connectorDraft is not { } draft || CurrentSheet is not Sheet sheet) return;
+        double newColumn = Math.Clamp(draft.Column + step, 0, sheet.Grid.Columns);
+        _connectorDraft = draft with { Column = newColumn };
+        OnPropertyChanged(nameof(ConnectorDraftPreview));
+    }
+
+    /// <summary>
+    /// 記入中の縦コネクタを確定する(Enter、T-041増分2)。TopRow==BottomRow(まだ伸縮していない)場合は
+    /// 縦コネクタとして無意味なため確定せず記入モードに留める(戻り値false)。確定後は既存OR自動配線
+    /// (PlaceElementAtSelectedCell)と同じ直接List操作＋MarkDirty()の流儀に揃える。
+    /// </summary>
+    public bool ConfirmConnectorDraft()
+    {
+        if (_connectorDraft is not { } draft || CurrentSheet is not Sheet sheet) return false;
+        int topRow = Math.Min(draft.AnchorRow, draft.CurrentRow);
+        int bottomRow = Math.Max(draft.AnchorRow, draft.CurrentRow);
+        if (topRow == bottomRow) return false;
+        sheet.Connectors.Add(new VerticalConnector { Column = draft.Column, TopRow = topRow, BottomRow = bottomRow });
+        MarkDirty();
+        CancelConnectorDraft();
+        return true;
+    }
+
+    /// <summary>記入中の縦コネクタ記入を取消す(Esc、T-041増分2)。何も生成せず選択モードへ戻す。</summary>
+    public void CancelConnectorDraft()
+    {
+        _connectorDraft = null;
+        Tool = ToolState.SelectDefault;
+        OnPropertyChanged(nameof(ConnectorDraftPreview));
+    }
+
     /// <summary>SelectedCellの位置にある既存要素(T-017)。null=要素なし、または未選択。</summary>
     public ElementInstance? SelectedElement
         => SelectedCell is { } pos && CurrentSheet is Sheet sheet ? sheet.Elements.FirstOrDefault(el => el.Pos == pos) : null;

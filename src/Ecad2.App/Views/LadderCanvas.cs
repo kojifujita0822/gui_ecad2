@@ -49,6 +49,17 @@ public sealed class LadderCanvas : FrameworkElement
     // 「配線が選択されている」ことを線そのものの強調で示す(セルの矩形ハイライトとは表現を変える)。
     private static readonly Pen SelectedConnectorPen = new(Brushes.OrangeRed, 3.5);
 
+    // 記入中(未確定)の縦コネクタのプレビュー線(T-041増分2)。確定済みの選択ハイライトと区別する
+    // ため破線にする(DashStyle未共有=独立インスタンスにしないとFreeze例外になるため個別生成)。
+    private static readonly Pen ConnectorDraftPen = CreateConnectorDraftPen();
+
+    private static Pen CreateConnectorDraftPen()
+    {
+        var pen = new Pen(Brushes.DodgerBlue, 2.5) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
+        pen.Freeze();
+        return pen;
+    }
+
     // 縦コネクタのヒットテスト許容誤差(mm)。要調整・実機確認で見直す可能性あり(T-041増分1、隠密レビュー対象)。
     private const double ConnectorHitToleranceMm = 2.0;
 
@@ -65,7 +76,7 @@ public sealed class LadderCanvas : FrameworkElement
     protected override AutomationPeer OnCreateAutomationPeer() => new LadderCanvasAutomationPeer(this);
 
     public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null,
-        VerticalConnector? selectedConnector = null)
+        VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -99,6 +110,19 @@ public sealed class LadderCanvas : FrameworkElement
                 double yTop = geo.YRow(connector.TopRow) * MmToDip;
                 double yBot = geo.YRow(connector.BottomRow) * MmToDip;
                 dc.DrawLine(SelectedConnectorPen, new Point(x, yTop), new Point(x, yBot));
+            }
+
+            // 記入中(未確定)の縦コネクタのプレビュー(T-041増分2)。TopRow==BottomRow(まだ範囲を
+            // 広げていない)間は線として見えないため、始点位置に短い縦線を出して視認できるようにする。
+            if (connectorDraft is { } draft)
+            {
+                var geo = _renderer.Geometry;
+                double x = geo.X(draft.Column) * MmToDip;
+                double yTop = geo.YRow(draft.TopRow) * MmToDip;
+                double yBot = draft.TopRow == draft.BottomRow
+                    ? yTop + geo.CellMm * 0.3 * MmToDip
+                    : geo.YRow(draft.BottomRow) * MmToDip;
+                dc.DrawLine(ConnectorDraftPen, new Point(x, yTop), new Point(x, yBot));
             }
         }
         _children.Add(visual);
