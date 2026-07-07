@@ -521,11 +521,13 @@
                 <Button Content="キャンセル" Width="76" VerticalAlignment="Center" IsCancel="True" Click="PlacementCancelButton_Click" Margin="0,0,8,0"/>
                 <!-- 拡張表示ボタン(T-033増分3): 構想図末尾の[拡張表示]の配置のみ。詳細画面はT-028で
                      別途実装予定のため、本増分ではClickハンドラ未配線・押下無反応(左端の小アイコン類と
-                     同様の暫定状態)。ただしTabオーダーからは除外しない(小アイコン類との相違点、侍技術
-                     裁量): 小アイコン類は恒久的に非機能なプレースホルダだが、本ボタンはT-028で実機能を
-                     持つ予定の本物のボタンであり、今の内からTabオーダーに含めておけば実装後に配線を
-                     変える必要がない。押しても反応が無い暫定状態はT-028までの一時的な粗さに留まる。 -->
-                <Button Content="拡張表示" VerticalAlignment="Center" AutomationProperties.Name="拡張表示"/>
+                     同様の暫定状態)。
+                     Tab順(殿裁定、隠密実機検証後の修正): 当初は侍技術裁量でTabオーダーに含めていたが、
+                     隠密実機検証で「本ボタンにフォーカス中にEnterを押してもOK確定が発火しない」実害が
+                     確認されたため、安全側としてKeyboardNavigation.IsTabStop="False"で除外する。T-028で
+                     詳細画面機能を実装する際にTabオーダーへ復帰させること。 -->
+                <Button Content="拡張表示" VerticalAlignment="Center" AutomationProperties.Name="拡張表示"
+                        KeyboardNavigation.IsTabStop="False"/>
             </StackPanel>
         </Border>
     </Grid>
