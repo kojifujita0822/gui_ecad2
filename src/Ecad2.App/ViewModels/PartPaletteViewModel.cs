@@ -48,7 +48,7 @@ public sealed class PartPaletteViewModel : ViewModelBase
         foreach (var entry in Entries) Library.ById[entry.Definition.Id] = entry.Definition;
 
         var selectionEntries = Entries
-            .Select(entry => new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library)))
+            .Select(entry => new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition, Library)))
             .ToList();
 
         // T-037(殿裁定=案A): ツールバーのOR a接点/OR b接点(Shift+F5/F6)と同じ選択肢を部品選択
@@ -58,7 +58,7 @@ public sealed class PartPaletteViewModel : ViewModelBase
         // 巻き込まれ「ORセレクトSW」が出現した。殿裁定=ORa/ORbのみに絞るため、電気的Role非依存の
         // 専用フラグへ置換。Id・Nameに依存しないためコピー・再採番・リネームでも判定が揺らがない)。
         foreach (var entry in Entries.Where(e => e.Category == "" && e.Definition.IsOrEligible))
-            selectionEntries.Add(new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition.Id, Library, isOr: true), isOr: true));
+            selectionEntries.Add(new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition, Library, isOr: true), isOr: true));
 
         SelectionEntries = selectionEntries;
     }

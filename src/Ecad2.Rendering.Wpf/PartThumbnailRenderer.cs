@@ -2,7 +2,6 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Ecad2.Model;
-using Ecad2.Persistence;
 using Ecad2.Rendering;
 
 namespace Ecad2.Rendering.Wpf;
@@ -30,18 +29,23 @@ public static class PartThumbnailRenderer
         OrContactNcGlyph.Freeze();
     }
 
-    /// <summary>partId(PartLibrary内のPartDefinition.Idと一致)の図形を1セル分の正方形サムネイル
-    /// として描画する。MarginMm=0・Pos=(0,0)の専用DiagramRendererで原点合わせして描く。
-    /// ORa/ORb(isOr=true かつ a接点/b接点)はツールバーsF5/sF6と同じGX様式グリフで描画する(T-043)。
+    /// <summary>definitionの図形を1セル分の正方形サムネイルとして描画する。MarginMm=0・Pos=(0,0)の
+    /// 専用DiagramRendererで原点合わせして描く。ORa/ORb(isOr=true かつ IsOrEligible)はツールバー
+    /// sF5/sF6と同じGX様式グリフで描画する(T-043)。判定はdefinition.IsOrEligible/Roleベースであり
+    /// Idには依存しない(隠密レビューCONFIRMED: 旧Id完全一致判定はExplorerコピー由来の再採番パーツ
+    /// (T-035、IsOrEligibleは維持されたままIdのみ変わる)でOR視覚表現が欠落する退行を持ち込んでいた)。
     /// それ以外(ORa/ORb以外の5種、および将来isOr=trueになりうるその他の部品)は従来どおり
     /// PartDefinitionの形状をそのまま描画する。</summary>
-    public static ImageSource Render(string partId, PartLibrary library, bool isOr = false, double cellMm = 9.0)
+    public static ImageSource Render(PartDefinition definition, PartLibrary library, bool isOr = false, double cellMm = 9.0)
     {
-        if (isOr && partId == BasicPartTemplates.ContactNOId) return RenderGlyph(OrContactNoGlyph, cellMm);
-        if (isOr && partId == BasicPartTemplates.ContactNCId) return RenderGlyph(OrContactNcGlyph, cellMm);
+        if (isOr && definition.IsOrEligible)
+        {
+            if (definition.Role == PartRole.ContactNO) return RenderGlyph(OrContactNoGlyph, cellMm);
+            if (definition.Role == PartRole.ContactNC) return RenderGlyph(OrContactNcGlyph, cellMm);
+        }
 
         var renderer = new DiagramRenderer(options: new RenderOptions { CellMm = cellMm, MarginMm = 0 });
-        var element = new ElementInstance { PartId = partId, Pos = new GridPos(0, 0) };
+        var element = new ElementInstance { PartId = definition.Id, Pos = new GridPos(0, 0) };
 
         int sizeDip = (int)Math.Round(cellMm * K);
 
