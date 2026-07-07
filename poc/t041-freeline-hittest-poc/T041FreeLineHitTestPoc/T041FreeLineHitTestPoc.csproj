@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T-041増分4 PoC: FreeLine(点と線分の距離)・ConnectionDot(点と点の距離)のヒットテスト計算が
+    実用的な精度で機能するか、しきい値・近接プリミティブ選択の妥当性を検証する。
+    poc/隔離ルールに従い本体src/とは独立、自己完結構成。UIは持たず計算結果のみをコンソール出力する
+    (ズーム安全性はMainWindow.xaml.csのLayoutTransform適用前ローカル座標を返すWPF既定挙動により
+    構造的に保証されるため、UI付きPoCは不要と判断した経緯はREADME.md参照)。
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>

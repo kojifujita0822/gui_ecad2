@@ -1,0 +1,24 @@
+T-041増分4 PoC結果: FreeLine/ConnectionDot ヒットテスト計算の検証
+許容誤差(ToleranceMm) = 2mm (HitTestConnector/HitTestWireBreakと同値の出発点)
+
+[PASS] FreeLine_ClickAtMidpoint — distance=0.000mm, expectHit=True, actualHit=True
+[PASS] FreeLine_1_5mmPerpendicular_WithinTolerance — distance=1.500mm, expectHit=True, actualHit=True
+[PASS] FreeLine_3_0mmPerpendicular_BeyondTolerance — distance=3.000mm, expectHit=False, actualHit=False
+[PASS] FreeLine_BeyondEndpoint_ClampsToEndpoint — distance=5.099mm, expectHit=False, actualHit=False
+[PASS] FreeLine_BeyondEndpoint_DistanceMatchesEndpointCalc — 端点距離と一致
+[PASS] FreeLine_NearestWins_TwoCloseSegments — selected=segment0(expected=segment0), distA=1.200, distB=1.800
+[PASS] ConnectionDot_ClickAtPoint — distance=0.000mm, expectHit=True, actualHit=True
+[PASS] ConnectionDot_1_5mmAway_WithinTolerance — distance=1.487mm, expectHit=True, actualHit=True
+[PASS] ConnectionDot_3_0mmAway_BeyondTolerance — distance=3.000mm, expectHit=False, actualHit=False
+
+合計: 9/9 PASS
+
+--- ズーム安全性についての所見(実行検証ではなく構造分析) ---
+MainWindow.xaml: <views:LadderCanvas.LayoutTransform><ScaleTransform .../></views:LadderCanvas.LayoutTransform>
+クリックハンドラは e.GetPosition(LadderCanvasHost) を使用しており、WPFの仕様上
+GetPosition(対象自身) は対象要素自身のLayoutTransform適用前のローカル座標を返す
+(既存コードのToGridPos/HitTestConnectorのコメントでも明記済み)。
+したがってCanvasScale(ズーム倍率)が変化しても、position引数は既にLayoutTransform
+適用前のDIP座標であり、本PoCで検証した距離計算・しきい値判定への影響は無い。
+実機でのズーム時挙動確認は、既存のHitTestConnector(増分1)と同型のためリスクは
+低いと判断し、本PoCでは計算ロジックの正しさ検証を主眼とした。
