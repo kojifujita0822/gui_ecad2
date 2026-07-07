@@ -1,8 +1,8 @@
-using System.Globalization;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Ecad2.Model;
+using Ecad2.Persistence;
 using Ecad2.Rendering;
 
 namespace Ecad2.Rendering.Wpf;
@@ -15,12 +15,31 @@ public static class PartThumbnailRenderer
 {
     private const double K = 96.0 / 25.4;   // mm → WPF DIP(1/96インチ)
 
+    // T-043(殿裁定): ORa/ORbはツールバーsF5/sF6(T-040)と同じGX様式グリフ(└┤├┘構図)で統一する。
+    // Path Dataは Ecad2.App.Converters.PartEntryToGlyphGeometryConverter のORa/ORbグリフと同一
+    // (App→Rendering.Wpfの参照方向のため値を複製している。ツールバー意匠を変える場合は両方を
+    // 合わせて直すこと)。座標系は18x18キャンバス基準(x2-16,y3-15相当、T-040の慣例)。
+    private static readonly Geometry OrContactNoGlyph =
+        Geometry.Parse("M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9");
+    private static readonly Geometry OrContactNcGlyph =
+        Geometry.Parse("M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9 M4,15 L14,3");
+
+    static PartThumbnailRenderer()
+    {
+        OrContactNoGlyph.Freeze();
+        OrContactNcGlyph.Freeze();
+    }
+
     /// <summary>partId(PartLibrary内のPartDefinition.Idと一致)の図形を1セル分の正方形サムネイル
-    /// として描画する。MarginMm=0・Pos=(0,0)の専用DiagramRendererで原点合わせして描く。isOr=true
-    /// の場合、右下に小さな"OR"バッジを合成描画する(T-037、殿裁定=案A)。PartDefinitionの形状のみ
-    /// ではOR/非ORの区別がつかない問題(隠密調査所見)への対応。</summary>
+    /// として描画する。MarginMm=0・Pos=(0,0)の専用DiagramRendererで原点合わせして描く。
+    /// ORa/ORb(isOr=true かつ a接点/b接点)はツールバーsF5/sF6と同じGX様式グリフで描画する(T-043)。
+    /// それ以外(ORa/ORb以外の5種、および将来isOr=trueになりうるその他の部品)は従来どおり
+    /// PartDefinitionの形状をそのまま描画する。</summary>
     public static ImageSource Render(string partId, PartLibrary library, bool isOr = false, double cellMm = 9.0)
     {
+        if (isOr && partId == BasicPartTemplates.ContactNOId) return RenderGlyph(OrContactNoGlyph, cellMm);
+        if (isOr && partId == BasicPartTemplates.ContactNCId) return RenderGlyph(OrContactNcGlyph, cellMm);
+
         var renderer = new DiagramRenderer(options: new RenderOptions { CellMm = cellMm, MarginMm = 0 });
         var element = new ElementInstance { PartId = partId, Pos = new GridPos(0, 0) };
 
@@ -31,7 +50,6 @@ public static class PartThumbnailRenderer
         {
             var wpfRenderer = new WpfRenderer(dc);
             renderer.DrawPreview(wpfRenderer, element, DrawingTheme.Black, library);
-            if (isOr) DrawOrBadge(dc, sizeDip);
         }
 
         var bitmap = new RenderTargetBitmap(sizeDip, sizeDip, 96, 96, PixelFormats.Pbgra32);
@@ -40,16 +58,23 @@ public static class PartThumbnailRenderer
         return bitmap;
     }
 
-    // サムネイル右下に白背景+黒枠+"OR"の小バッジを重ね描きする。
-    private static void DrawOrBadge(DrawingContext dc, int sizeDip)
+    // GX様式グリフ(18x18キャンバス基準のGeometry)をsizeDip四方の正方形へ均等スケールして描画する。
+    private static ImageSource RenderGlyph(Geometry glyph, double cellMm)
     {
-        double badgeSize = sizeDip * 0.42;
-        double x = sizeDip - badgeSize;
-        double y = sizeDip - badgeSize;
-        dc.DrawRectangle(Brushes.White, new Pen(Brushes.Black, 1.0), new Rect(x, y, badgeSize, badgeSize));
+        int sizeDip = (int)Math.Round(cellMm * K);
+        double scale = sizeDip / 18.0;
 
-        var text = new FormattedText("OR", CultureInfo.InvariantCulture, FlowDirection.LeftToRight,
-            new Typeface("Segoe UI"), badgeSize * 0.5, Brushes.Black, 96.0 / 96.0);
-        dc.DrawText(text, new Point(x + (badgeSize - text.Width) / 2, y + (badgeSize - text.Height) / 2));
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            dc.PushTransform(new ScaleTransform(scale, scale));
+            dc.DrawGeometry(null, new Pen(Brushes.Black, 1.0), glyph);
+            dc.Pop();
+        }
+
+        var bitmap = new RenderTargetBitmap(sizeDip, sizeDip, 96, 96, PixelFormats.Pbgra32);
+        bitmap.Render(visual);
+        bitmap.Freeze();
+        return bitmap;
     }
 }
