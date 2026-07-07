@@ -366,9 +366,15 @@ public partial class MainWindow : Window
                 TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
-            case Key.F10 when noModifier:
+            case Key.System when noModifier && e.SystemKey == Key.F10:
                 // T-041増分3: F10で配線分断(WireBreak)を即時記入する(点系は確認フェーズ無し、
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」)。
+                // 忍者実機発見(F10無反応・メインメニューへフォーカス移動)への対処: F10はAlt併用
+                // 有無に関わらずWin32のWM_SYSKEYDOWN(システムキー、メニューアクセラレータ由来)
+                // として扱われるWPF既知の仕様があり、この場合e.Keyには`Key.System`が入り実キーは
+                // `e.SystemKey`側に入る(F5〜F9は通常キーのためe.Keyでそのまま拾えるが、F10のみ
+                // この特別扱いを受ける)。case Key.F10単体では到達せず、WPF既定のメニューフォーカス
+                // 処理へ素通しされていたのが無反応の原因。
                 TryPlaceWireBreak();
                 e.Handled = true;
                 break;
