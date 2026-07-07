@@ -166,6 +166,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedConnector = null;
             // T-041増分3: 配線分断(WireBreak)も同じ排他対象として扱う(SelectedWireBreak参照)。
             SelectedWireBreak = null;
+            // T-041増分2隠密レビュー指摘(観点3 CONFIRMED、所見E=増分1所見Aの反復): 記入中
+            // (_connectorDraft)はSelectedCellとは別枠の状態だったため、CurrentSheetIndexの
+            // シート切替経由でSelectedCellがクリアされてもTool/_connectorDraftが残留し、
+            // 制御回路限定・グリッド範囲という不変条件を確定時に迂回しうるバグを生んだ。
+            // BeginConnectorDraftはSelectedCellを読むだけでこのsetterを経由しないため記入開始
+            // 自体は妨げない。PlaceElementのTool保持(T-021分岐A)には影響しないよう、記入中の
+            // 場合のみ限定してクリアする。
+            ClearConnectorDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -308,22 +316,35 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 記入中の縦コネクタを確定する(Enter、T-041増分2)。TopRow==BottomRow(まだ伸縮していない)場合は
     /// 縦コネクタとして無意味なため確定せず記入モードに留める(戻り値false)。確定後は既存OR自動配線
     /// (PlaceElementAtSelectedCell)と同じ直接List操作＋MarkDirty()の流儀に揃える。
+    /// 隠密レビュー指摘(観点3 CONFIRMED): 記入中にシートが切り替わってもSelectedCellのsetter経由の
+    /// クリア(上記参照)で通常は起こり得なくなったが、防御的二重チェックとして制御回路シート限定・
+    /// グリッド範囲のクランプをここでも再検証する(将来別経路が生まれても二重に守られる)。
     /// </summary>
     public bool ConfirmConnectorDraft()
     {
-        if (_connectorDraft is not { } draft || CurrentSheet is not Sheet sheet) return false;
-        int topRow = Math.Min(draft.AnchorRow, draft.CurrentRow);
-        int bottomRow = Math.Max(draft.AnchorRow, draft.CurrentRow);
+        if (_connectorDraft is not { } draft || CurrentSheet is not Sheet sheet || sheet.MainCircuit) return false;
+        int topRow = Math.Clamp(Math.Min(draft.AnchorRow, draft.CurrentRow), 0, sheet.Grid.Rows - 1);
+        int bottomRow = Math.Clamp(Math.Max(draft.AnchorRow, draft.CurrentRow), 0, sheet.Grid.Rows - 1);
+        double column = Math.Clamp(draft.Column, 0, sheet.Grid.Columns);
         if (topRow == bottomRow) return false;
-        sheet.Connectors.Add(new VerticalConnector { Column = draft.Column, TopRow = topRow, BottomRow = bottomRow });
+        sheet.Connectors.Add(new VerticalConnector { Column = column, TopRow = topRow, BottomRow = bottomRow });
         MarkDirty();
         CancelConnectorDraft();
         return true;
     }
 
     /// <summary>記入中の縦コネクタ記入を取消す(Esc、T-041増分2)。何も生成せず選択モードへ戻す。</summary>
-    public void CancelConnectorDraft()
+    public void CancelConnectorDraft() => ClearConnectorDraftIfAny();
+
+    /// <summary>
+    /// 記入中(_connectorDraft)であれば取消してSelect状態へ戻す(T-041増分2隠密レビュー指摘、
+    /// 観点3 CONFIRMED・所見E対応)。記入中でなければ何もしない(PlaceElementのTool保持、T-021
+    /// 分岐Aの継続配置フローに影響を与えないため)。SelectedCellのsetter・CancelConnectorDraft・
+    /// ReplaceDocumentの共通クリア入口として一本化する。
+    /// </summary>
+    private void ClearConnectorDraftIfAny()
     {
+        if (_connectorDraft is null) return;
         _connectorDraft = null;
         Tool = ToolState.SelectDefault;
         OnPropertyChanged(nameof(ConnectorDraftPreview));
@@ -618,6 +639,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedConnector = null;
         // T-041増分3: 配線分断(WireBreak)も同様に旧文書の参照を持ち越さない。
         SelectedWireBreak = null;
+        // T-041増分2隠密レビュー指摘(観点3 CONFIRMED): 記入中(_connectorDraft)も同様に、直接代入
+        // (_selectedCell)経由ではSelectedCellのsetterの自動クリアが効かないため、ここでも明示する。
+        ClearConnectorDraftIfAny();
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);

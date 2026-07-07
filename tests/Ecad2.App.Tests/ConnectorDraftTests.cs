@@ -151,4 +151,73 @@ public class ConnectorDraftTests : ViewModelTestBase
         Assert.Null(vm.ConnectorDraftPreview);
         Assert.Empty(vm.CurrentSheet!.Connectors);
     }
+
+    /// <summary>
+    /// T-041増分2隠密レビュー指摘(観点3 CONFIRMED)の回帰テスト。記入開始後にシートを切替えると、
+    /// 切替先シート(主回路シート、グリッドも異なる)へ誤ってVerticalConnectorが確定・混入して
+    /// いた実害を再現し、修正後は記入状態が正しくキャンセルされることを検証する。
+    /// </summary>
+    [Fact]
+    public void SwitchingCurrentSheetIndex_WhileDrafting_CancelsDraftAndPreventsCrossSheetLeak()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2(主回路)",
+            Grid = new GridSpec { Rows = 5, Columns = 10 },
+            MainCircuit = true,
+        });
+        vm.SelectedCell = new GridPos(3, 5);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);   // 範囲を広げ、確定可能な状態にしておく
+
+        vm.CurrentSheetIndex = 1;   // 記入完了前にシート切替(隠密レビューの再現手順)
+
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.Null(vm.ConnectorDraftPreview);
+        bool confirmed = vm.ConfirmConnectorDraft();
+        Assert.False(confirmed);
+        Assert.Empty(vm.CurrentSheet!.Connectors);   // 新シート(主回路)へのVerticalConnector混入なし
+    }
+
+    /// <summary>
+    /// T-041増分2隠密レビュー指摘(観点4)の回帰テスト。記入中にマウスクリック相当(SelectedCellへの
+    /// 新規代入)が発生した場合、記入状態が残留せず取消されることを検証する(クリックハンドラの
+    /// フォールスルー経路=MainWindow.xaml.cs LadderCanvasHost_PreviewMouseLeftButtonUpを模す)。
+    /// </summary>
+    [Fact]
+    public void SettingSelectedCell_WhileDrafting_CancelsDraft()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(3, 5);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);
+
+        vm.SelectedCell = new GridPos(7, 2);   // クリックによるSelectedCell代入を模す
+
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.Null(vm.ConnectorDraftPreview);
+        Assert.Empty(vm.CurrentSheet!.Connectors);
+    }
+
+    /// <summary>ConfirmConnectorDraftの防御的再チェック(隠密レビュー推奨)の直接検証:
+    /// 主回路シートでは(通常は起こり得ない経路でも)確定しない。</summary>
+    [Fact]
+    public void ConfirmConnectorDraft_ReturnsFalse_WhenCurrentSheetIsMainCircuit()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        vm.SelectedCell = new GridPos(3, 5);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);
+
+        bool confirmed = vm.ConfirmConnectorDraft();
+
+        Assert.False(confirmed);
+        Assert.Empty(vm.CurrentSheet!.Connectors);
+    }
 }

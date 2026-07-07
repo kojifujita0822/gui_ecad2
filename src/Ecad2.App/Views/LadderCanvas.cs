@@ -116,24 +116,18 @@ public sealed class LadderCanvas : FrameworkElement
             // 同じ線分(列境界・TopRow〜BottomRow)を太線で上書き描画する。
             if (selectedConnector is { } connector)
             {
-                var geo = _renderer.Geometry;
-                double x = geo.X(connector.Column) * MmToDip;
-                double yTop = geo.YRow(connector.TopRow) * MmToDip;
-                double yBot = geo.YRow(connector.BottomRow) * MmToDip;
-                dc.DrawLine(SelectedConnectorPen, new Point(x, yTop), new Point(x, yBot));
+                var (p1, p2) = ConnectorEndpointsDip(connector.Column, connector.TopRow, connector.BottomRow);
+                dc.DrawLine(SelectedConnectorPen, p1, p2);
             }
 
             // 記入中(未確定)の縦コネクタのプレビュー(T-041増分2)。TopRow==BottomRow(まだ範囲を
             // 広げていない)間は線として見えないため、始点位置に短い縦線を出して視認できるようにする。
             if (connectorDraft is { } draft)
             {
-                var geo = _renderer.Geometry;
-                double x = geo.X(draft.Column) * MmToDip;
-                double yTop = geo.YRow(draft.TopRow) * MmToDip;
-                double yBot = draft.TopRow == draft.BottomRow
-                    ? yTop + geo.CellMm * 0.3 * MmToDip
-                    : geo.YRow(draft.BottomRow) * MmToDip;
-                dc.DrawLine(ConnectorDraftPen, new Point(x, yTop), new Point(x, yBot));
+                var (p1, p2) = draft.TopRow == draft.BottomRow
+                    ? ConnectorEndpointsDip(draft.Column, draft.TopRow, draft.TopRow, extendBottomMm: _renderer.Geometry.CellMm * 0.3)
+                    : ConnectorEndpointsDip(draft.Column, draft.TopRow, draft.BottomRow);
+                dc.DrawLine(ConnectorDraftPen, p1, p2);
             }
 
             // 選択中の配線分断のハイライトマーク(T-041増分3)。通常時は無表示(マーク無し・提出品質)
@@ -205,6 +199,21 @@ public sealed class LadderCanvas : FrameworkElement
         Width = 0;
         Height = 0;
         InvalidateMeasure();
+    }
+
+    /// <summary>
+    /// 縦コネクタ(列境界・TopRow〜BottomRow)の2端点をローカルDIP座標へ変換する(T-041増分2隠密
+    /// レビュー所見D、選択ハイライト・記入中プレビューで重複していた組み立てロジックを集約)。
+    /// <paramref name="extendBottomMm"/>を指定すると下端をmm単位で延長する(記入直後のTopRow==
+    /// BottomRow=ゼロ長時に短い縦線として視認できるようにするための特例)。
+    /// </summary>
+    private (Point Top, Point Bottom) ConnectorEndpointsDip(double column, int topRow, int bottomRow, double extendBottomMm = 0)
+    {
+        var geo = _renderer.Geometry;
+        double x = geo.X(column) * MmToDip;
+        double yTop = geo.YRow(topRow) * MmToDip;
+        double yBot = geo.YRow(bottomRow) * MmToDip + extendBottomMm * MmToDip;
+        return (new Point(x, yTop), new Point(x, yBot));
     }
 
     /// <summary>
