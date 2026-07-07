@@ -34,7 +34,8 @@ public partial class MainWindow : Window
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnector))
             RedrawCanvas();
     }
 
@@ -44,7 +45,7 @@ public partial class MainWindow : Window
     private void RedrawCanvas()
     {
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
-            LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell);
+            LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector);
         else
             LadderCanvasHost.Clear();
     }
@@ -212,6 +213,20 @@ public partial class MainWindow : Window
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         var position = e.GetPosition(LadderCanvasHost);
+
+        // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
+        // (配置モード中のクリックは常に要素配置目的のため対象外とする)。ヒットすればSelectedCellは
+        // 使わず(セル単位の概念に載らないため)排他的に切り替える。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.Select
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet sheet
+            && LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
+        {
+            _viewModel.SelectedConnector = connector;
+            _viewModel.SelectedCell = null;
+            return;
+        }
+
+        _viewModel.SelectedConnector = null;
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
         TryPlaceActiveTool();
     }
@@ -287,10 +302,11 @@ public partial class MainWindow : Window
                     // 同じセルへ配置し直せるようにする。
                     _viewModel.Tool = ViewModels.ToolState.SelectDefault;
                 }
-                else if (_viewModel.SelectedCell is not null)
+                else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null)
                 {
-                    // 層3: 要素選択中 → 選択解除のみ。
+                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1) → 選択解除のみ。
                     _viewModel.SelectedCell = null;
+                    _viewModel.SelectedConnector = null;
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
                 // Escapeはボタンのマウス/キーボード二重発火問題を持たないグローバルショートカットの
@@ -333,7 +349,10 @@ public partial class MainWindow : Window
             case Key.Delete when noModifier && IsCanvasFocused():
                 // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
-                if (_viewModel.DeleteSelectedElement())
+                // T-041増分1(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ)が選択中であれば
+                // それを削除する(既存の部品削除と同じDeleteキーへ統合)。クリック時点で両者は排他的に
+                // しか選択されない設計だが、優先順位を明記しておく。
+                if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector())
                     RedrawCanvas();
                 e.Handled = true;
                 break;

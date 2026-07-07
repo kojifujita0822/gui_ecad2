@@ -107,6 +107,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             // シート切替時、前シートのSelectedCell(ハイライト・プロパティパネル)を持ち越さない
             // (T-018忍者実機検証で発見: 空シートへ切替えてもハイライト・プロパティ内容が残存するバグ)。
             SelectedCell = null;
+            // 同様にSelectedConnectorも他シートのインスタンス参照を持ち越さない(T-041増分1)。
+            SelectedConnector = null;
             // SheetNavigation.SelectedSheetはCurrentSheetIndexを読むだけの導出プロパティのため、
             // DRC出力パネルのジャンプ(T-018)等、シートナビ経由以外でCurrentSheetIndexが変わった際は
             // 左パレットの選択ハイライトが追従しない(T-018忍者実機検証で発見)。ここで明示的に通知する。
@@ -166,6 +168,33 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>SelectedCellのステータスバー表示用文字列。</summary>
     public string SelectedCellDisplay => SelectedCell is { } pos ? $"行{pos.Row + 1}/列{pos.Column}" : "未選択";
+
+    private VerticalConnector? _selectedConnector;
+
+    /// <summary>
+    /// 現在選択中の縦コネクタ(T-041増分1: 配線プリミティブの選択、GridPos単位のSelectedCellとは
+    /// 別枠で保持する)。SelectedCellとは排他(クリック時にどちらか一方のみが立つ、呼び出し元の
+    /// MainWindow.xaml.csが両者を明示的に切り替える)。単一選択のみ(殿裁定2026-07-07)。
+    /// </summary>
+    public VerticalConnector? SelectedConnector
+    {
+        get => _selectedConnector;
+        set => SetProperty(ref _selectedConnector, value);
+    }
+
+    /// <summary>
+    /// SelectedConnectorを削除する(T-041増分1、案A=既存の部品削除(Deleteキー)と同型)。
+    /// Undo機能は不採用のため直接List操作＋MarkDirty()の流儀に揃える(DeleteSelectedElementと同様)。
+    /// 戻り値は実際に削除したか。
+    /// </summary>
+    public bool DeleteSelectedConnector()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector connector) return false;
+        sheet.Connectors.Remove(connector);
+        MarkDirty();
+        SelectedConnector = null;
+        return true;
+    }
 
     /// <summary>SelectedCellの位置にある既存要素(T-017)。null=要素なし、または未選択。</summary>
     public ElementInstance? SelectedElement
