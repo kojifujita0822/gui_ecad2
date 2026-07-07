@@ -368,7 +368,19 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
         int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
-        sheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
+
+        // T-044(殿直接要望、隠密事前調査docs/ecad2-t044-presurvey-onmitsu.md): OR自動配線の左縦分岐は、
+        // 配置行・基準行の両方で「OR左接続点(leftColumn)と左母線(列0)の間に既存要素が無い」場合のみ
+        // 省略する(殿最終裁定=トポロジー等価保証ケース限定)。母線への直結横線
+        // (DiagramRenderer.LeftTerminator/NetlistBuilder.LeftRailReachedの既存c.Column>0除外条件)が
+        // このケースを自然にカバーするため、省略しても電気的分断は起きない(列0はこの条件の自明な
+        // 特殊ケースとして包含される)。いずれかの行に既存要素があれば縦分岐を維持し、その要素を
+        // 誤ってバイパスする配線を防ぐ。右(合流側)縦分岐は従来どおり常時生成する。
+        bool NothingBetweenRailAndColumn(int row, int column)
+            => !sheet.Elements.Any(el => el.Pos.Row == row && el.Pos.Column < column);
+
+        if (!NothingBetweenRailAndColumn(pos.Row, leftColumn) || !NothingBetweenRailAndColumn(br, leftColumn))
+            sheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
         sheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
     }
 
