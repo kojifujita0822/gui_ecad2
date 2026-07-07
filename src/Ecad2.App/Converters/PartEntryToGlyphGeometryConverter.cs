@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Windows.Data;
 using System.Windows.Media;
 using Ecad2.App.ViewModels;
-using Ecad2.Persistence;
+using Ecad2.Model;
 
 namespace Ecad2.App.Converters;
 
@@ -13,6 +13,14 @@ namespace Ecad2.App.Converters;
 /// グリフの無いセレクトSWは同系統で新規作成(侍起草、忍者スクショ・殿目視の型で確定させる想定)。
 /// 既知5種以外(自作パーツ等)は「自作パーツ」ツールバーボタンと同じ汎用フォルダアイコンへ
 /// フォールバックする。
+///
+/// T-043往復2周目(隠密レビューCONFIRMED、docs/ecad2-t043-review-onmitsu-2.md所見1): 判定は
+/// Definition.Idの固定文字列完全一致ではなくCategory/Role/IsOrEligibleベース。Explorerコピー由来で
+/// Id再採番された基本図形(T-035、Category/Role/IsOrEligibleは維持されIdのみ変わる)でも正しく
+/// 個別グリフを表示できる。Category==""(基本図形フォルダ直下)をゲートにするのは、Role/IsOrEligible
+/// の組だけで判定すると、たまたま同じ組み合わせを持つ自作パーツ(Category="自作")まで誤って既知5種の
+/// グリフに巻き込みかねないため(PartPaletteViewModel.cs:60のOR論理エントリ生成が同じ
+/// Category==""ゲートを使っている前例踏襲)。
 /// </summary>
 public sealed class PartEntryToGlyphGeometryConverter : IValueConverter
 {
@@ -40,16 +48,17 @@ public sealed class PartEntryToGlyphGeometryConverter : IValueConverter
 
     public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
     {
-        if (value is not PartSelectionEntryViewModel entry) return Custom;
-        return (entry.Definition.Id, entry.IsOr) switch
+        if (value is not PartSelectionEntryViewModel entry || entry.Category != "") return Custom;
+        var def = entry.Definition;
+        return (def.Role, def.IsOrEligible, entry.IsOr) switch
         {
-            (BasicPartTemplates.ContactNOId, false) => ContactNo,
-            (BasicPartTemplates.ContactNOId, true) => OrContactNo,
-            (BasicPartTemplates.ContactNCId, false) => ContactNc,
-            (BasicPartTemplates.ContactNCId, true) => OrContactNc,
-            (BasicPartTemplates.CoilId, _) => Coil,
-            (BasicPartTemplates.TerminalId, _) => Terminal,
-            (BasicPartTemplates.SelectSwitchId, _) => SelectSwitch,
+            (PartRole.ContactNO, true, false) => ContactNo,
+            (PartRole.ContactNO, true, true) => OrContactNo,
+            (PartRole.ContactNC, true, false) => ContactNc,
+            (PartRole.ContactNC, true, true) => OrContactNc,
+            (PartRole.ContactNO, false, _) => SelectSwitch,
+            (PartRole.Coil, _, _) => Coil,
+            (PartRole.Terminal, _, _) => Terminal,
             _ => Custom,
         };
     }
