@@ -63,6 +63,16 @@ public sealed class LadderCanvas : FrameworkElement
     // 縦コネクタのヒットテスト許容誤差(mm)。要調整・実機確認で見直す可能性あり(T-041増分1、隠密レビュー対象)。
     private const double ConnectorHitToleranceMm = 2.0;
 
+    // 配線分断(WireBreak)のヒットテスト許容誤差(mm、T-041増分3)。ConnectorHitToleranceMmと同値の
+    // 出発点(実機確認で見直す可能性あり)。
+    private const double WireBreakHitToleranceMm = 2.0;
+
+    // 選択中の配線分断のハイライトマーク(T-041増分3)。WireBreakは通常時「マーク無し・提出品質」
+    // (DiagramRenderer.DrawRungSegment参照、分断は線の空白として表現されるだけ)のため、選択中である
+    // ことを示す視覚要素が元々存在しない。選択操作(クリック選択→Delete)専用の一時マークとして
+    // 小さな塗り円を描く(印刷・PDF出力には影響しない画面表示専用)。
+    private static readonly Brush SelectedWireBreakBrush = Brushes.OrangeRed;
+
     // 直近のDraw()呼び出し内容(T-023)。LadderCanvasAutomationPeer/SymbolAutomationPeerが
     // Draw()の呼び出しタイミングと無関係にいつでも参照できるよう、キャンバス自身の状態として保持する
     // (Drawはビュー外部(MainWindow)から都度呼ばれる素通しメソッドのため、他に保持場所が無い)。
@@ -76,7 +86,8 @@ public sealed class LadderCanvas : FrameworkElement
     protected override AutomationPeer OnCreateAutomationPeer() => new LadderCanvasAutomationPeer(this);
 
     public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null,
-        VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null)
+        VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null,
+        WireBreak? selectedWireBreak = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -124,6 +135,16 @@ public sealed class LadderCanvas : FrameworkElement
                     : geo.YRow(draft.BottomRow) * MmToDip;
                 dc.DrawLine(ConnectorDraftPen, new Point(x, yTop), new Point(x, yBot));
             }
+
+            // 選択中の配線分断のハイライトマーク(T-041増分3)。通常時は無表示(マーク無し・提出品質)
+            // のため、選択中である旨を示す小さな塗り円を独自に描く(印刷・PDF出力には出ない画面専用)。
+            if (selectedWireBreak is { } wireBreak)
+            {
+                var geo = _renderer.Geometry;
+                double x = geo.X(wireBreak.Boundary) * MmToDip;
+                double y = geo.YRow(wireBreak.Row) * MmToDip;
+                dc.DrawEllipse(SelectedWireBreakBrush, null, new Point(x, y), geo.CellMm * 0.15 * MmToDip, geo.CellMm * 0.15 * MmToDip);
+            }
         }
         _children.Add(visual);
 
@@ -150,6 +171,25 @@ public sealed class LadderCanvas : FrameworkElement
             double yBot = geo.YRow(c.BottomRow);
             if (yMm < yTop - ConnectorHitToleranceMm || yMm > yBot + ConnectorHitToleranceMm) continue;
             return c;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// クリック位置(ローカルDIP座標)に十分近い配線分断を探す(T-041増分3)。列境界(Boundary)・行
+    /// (Row)ともmm距離が許容誤差以内であることを確認する(HitTestConnectorが線分への距離を見るのに
+    /// 対し、こちらは単純な1点への距離)。
+    /// </summary>
+    internal WireBreak? HitTestWireBreak(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        var geo = _renderer.Geometry;
+
+        foreach (var b in sheet.WireBreaks)
+        {
+            if (Math.Abs(xMm - geo.X(b.Boundary)) > WireBreakHitToleranceMm) continue;
+            if (Math.Abs(yMm - geo.YRow(b.Row)) > WireBreakHitToleranceMm) continue;
+            return b;
         }
         return null;
     }

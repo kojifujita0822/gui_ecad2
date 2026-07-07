@@ -164,6 +164,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 縦コネクタをクリック選択する経路は、この副作用を踏まえてSelectedCell=null→
             // SelectedConnector=connectorの順で呼ぶ(MainWindow.xaml.cs)。
             SelectedConnector = null;
+            // T-041増分3: 配線分断(WireBreak)も同じ排他対象として扱う(SelectedWireBreak参照)。
+            SelectedWireBreak = null;
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -207,6 +209,46 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (!sheet.Connectors.Remove(connector)) return false;
         MarkDirty();
         SelectedConnector = null;
+        return true;
+    }
+
+    private WireBreak? _selectedWireBreak;
+
+    /// <summary>
+    /// 現在選択中の配線分断(T-041増分3: 制御回路シートの点系プリミティブ、SelectedConnectorと同型の
+    /// 排他制御——SelectedCellのsetterが常時クリアする)。単一選択のみ。
+    /// </summary>
+    public WireBreak? SelectedWireBreak
+    {
+        get => _selectedWireBreak;
+        set => SetProperty(ref _selectedWireBreak, value);
+    }
+
+    /// <summary>
+    /// SelectedWireBreakを削除する(T-041増分3、案A=DeleteSelectedConnectorと同型)。
+    /// 戻り値は実際に削除したか。
+    /// </summary>
+    public bool DeleteSelectedWireBreak()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedWireBreak is not WireBreak wireBreak) return false;
+        if (!sheet.WireBreaks.Remove(wireBreak)) return false;
+        MarkDirty();
+        SelectedWireBreak = null;
+        return true;
+    }
+
+    /// <summary>
+    /// F10押下時、SelectedCellの位置へ配線分断を即時記入する(T-041増分3、点系は確認フェーズ無し
+    /// で即時記入する原案3節の設計)。呼び出し元(MainWindow.xaml.cs)でHasProject/制御回路シート判定は
+    /// 済ませてある前提。同一位置に既存の配線分断があれば重複記入を避けて何もしない(戻り値false)。
+    /// </summary>
+    public bool PlaceWireBreakAtSelectedCell()
+    {
+        if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return false;
+        double boundary = pos.Column + 0.5;
+        if (sheet.WireBreaks.Any(b => b.Row == pos.Row && b.Boundary == boundary)) return false;
+        sheet.WireBreaks.Add(new WireBreak { Boundary = boundary, Row = pos.Row });
+        MarkDirty();
         return true;
     }
 
@@ -574,6 +616,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         // VerticalConnector参照を持ち越さないよう、ここでも明示的にクリアする。SelectedConnectorは
         // 参照型でTraceLogのボクシング懸念が無いため、setter経由(自己通知)でよい。
         SelectedConnector = null;
+        // T-041増分3: 配線分断(WireBreak)も同様に旧文書の参照を持ち越さない。
+        SelectedWireBreak = null;
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);

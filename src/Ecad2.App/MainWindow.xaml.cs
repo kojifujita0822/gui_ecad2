@@ -36,7 +36,8 @@ public partial class MainWindow : Window
         if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.CurrentSheet)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnector)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ConnectorDraftPreview))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ConnectorDraftPreview)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedWireBreak))
             RedrawCanvas();
     }
 
@@ -47,7 +48,7 @@ public partial class MainWindow : Window
     {
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
             LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
-                _viewModel.ConnectorDraftPreview);
+                _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak);
         else
             LadderCanvasHost.Clear();
     }
@@ -222,13 +223,22 @@ public partial class MainWindow : Window
         // 隠密レビュー指摘: SelectedCellのsetterが常にSelectedConnectorをクリアする(上記
         // MainWindowViewModel.SelectedCell参照)ため、必ずSelectedCell=null→SelectedConnector=
         // connectorの順で呼ぶ(逆順だとSelectedCellのクリアが直後に打ち消してしまう)。
-        if (_viewModel.Tool.Mode == ViewModels.ToolMode.Select
-            && _viewModel.CurrentSheet is Ecad2.Model.Sheet sheet
-            && LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.Select && _viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
         {
-            _viewModel.SelectedCell = null;
-            _viewModel.SelectedConnector = connector;
-            return;
+            if (LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedConnector = connector;
+                return;
+            }
+            // T-041増分3: 配線分断(WireBreak)の選択。SelectedConnectorと同じ排他クリア順序
+            // (SelectedCell=null→SelectedWireBreak=wireBreak)に倣う。
+            if (LadderCanvasHost.HitTestWireBreak(position, sheet) is Ecad2.Model.WireBreak wireBreak)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedWireBreak = wireBreak;
+                return;
+            }
         }
 
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
@@ -311,11 +321,13 @@ public partial class MainWindow : Window
                     // 層2'(T-041増分2): 縦コネクタ記入中 → 取消して選択モードへ戻す。何も生成しない。
                     _viewModel.CancelConnectorDraft();
                 }
-                else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null)
+                else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
+                    || _viewModel.SelectedWireBreak is not null)
                 {
-                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1) → 選択解除のみ。
-                    // SelectedCellのsetterが値変化の有無に関わらずSelectedConnectorも常にクリア
-                    // するため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、1行で足りる。
+                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3) → 選択解除のみ。
+                    // SelectedCellのsetterが値変化の有無に関わらずSelectedConnector/SelectedWireBreak
+                    // も常にクリアするため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、
+                    // 1行で足りる。
                     _viewModel.SelectedCell = null;
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
@@ -354,6 +366,12 @@ public partial class MainWindow : Window
                 TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
+            case Key.F10 when noModifier:
+                // T-041増分3: F10で配線分断(WireBreak)を即時記入する(点系は確認フェーズ無し、
+                // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」)。
+                TryPlaceWireBreak();
+                e.Handled = true;
+                break;
             case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
                 // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
                 // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
@@ -375,10 +393,11 @@ public partial class MainWindow : Window
             case Key.Delete when noModifier && IsCanvasFocused():
                 // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
-                // T-041増分1(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ)が選択中であれば
-                // それを削除する(既存の部品削除と同じDeleteキーへ統合)。クリック時点で両者は排他的に
-                // しか選択されない設計だが、優先順位を明記しておく。
-                if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector())
+                // T-041増分1/3(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ・配線分断)が
+                // 選択中であればそれを削除する(既存の部品削除と同じDeleteキーへ統合)。クリック時点で
+                // いずれも排他的にしか選択されない設計だが、優先順位を明記しておく。
+                if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
+                    || _viewModel.DeleteSelectedWireBreak())
                     RedrawCanvas();
                 e.Handled = true;
                 break;
@@ -643,6 +662,30 @@ public partial class MainWindow : Window
             case Key.Left: _viewModel.MoveConnectorDraftColumn(cellCenterStep ? -0.5 : -1.0); break;
             case Key.Right: _viewModel.MoveConnectorDraftColumn(cellCenterStep ? 0.5 : 1.0); break;
         }
+    }
+
+    // T-041増分3: F10押下時の配線分断(WireBreak)即時記入。点系は確認フェーズ無し(原案4節)。
+    private void TryPlaceWireBreak()
+    {
+        if (!_viewModel.HasProject)
+        {
+            _viewModel.StatusMessage = "シートがありません。新規作成（Ctrl+N）から始めてください";
+            return;
+        }
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet || sheet.MainCircuit)
+        {
+            _viewModel.StatusMessage = "配線分断の記入は制御回路シートでのみ使用できます";
+            return;
+        }
+        if (_viewModel.SelectedCell is null)
+        {
+            _viewModel.StatusMessage = "配置するセルを先に選択してください";
+            return;
+        }
+        if (_viewModel.PlaceWireBreakAtSelectedCell())
+            RedrawCanvas();
+        else
+            _viewModel.StatusMessage = "この位置には既に配線分断があります";
     }
 
     // 自作パーツボタン(T-026段階4-7、案B)。Tool.Mode=PlaceElementにすることで右パネル下段を
