@@ -37,7 +37,10 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedCell)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnector)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ConnectorDraftPreview)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedWireBreak))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedWireBreak)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedFreeLine)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.FreeLineDraftPreview)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot))
             RedrawCanvas();
     }
 
@@ -48,7 +51,8 @@ public partial class MainWindow : Window
     {
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
             LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
-                _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak);
+                _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
+                _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot);
         else
             LadderCanvasHost.Clear();
     }
@@ -249,6 +253,19 @@ public partial class MainWindow : Window
                 _viewModel.SelectedWireBreak = wireBreak;
                 return;
             }
+            // T-041増分5: 自由線・接続点(主回路シート)の選択。同じ排他クリア順序に倣う。
+            if (LadderCanvasHost.HitTestFreeLine(position, sheet) is Ecad2.Model.FreeLine freeLine)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedFreeLine = freeLine;
+                return;
+            }
+            if (LadderCanvasHost.HitTestConnectionDot(position, sheet) is Ecad2.Model.ConnectionDot dot)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedConnectionDot = dot;
+                return;
+            }
         }
 
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
@@ -331,12 +348,18 @@ public partial class MainWindow : Window
                     // 層2'(T-041増分2): 縦コネクタ記入中 → 取消して選択モードへ戻す。何も生成しない。
                     _viewModel.CancelConnectorDraft();
                 }
-                else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
-                    || _viewModel.SelectedWireBreak is not null)
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine)
                 {
-                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3) → 選択解除のみ。
-                    // SelectedCellのsetterが値変化の有無に関わらずSelectedConnector/SelectedWireBreak
-                    // も常にクリアするため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、
+                    // 層2''(T-041増分5): 自由線記入中 → 取消して選択モードへ戻す。何も生成しない。
+                    _viewModel.CancelFreeLineDraft();
+                }
+                else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
+                    || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
+                    || _viewModel.SelectedConnectionDot is not null)
+                {
+                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3/5) → 選択解除のみ。
+                    // SelectedCellのsetterが値変化の有無に関わらず全ての配線プリミティブ選択も常に
+                    // クリアするため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、
                     // 1行で足りる。
                     _viewModel.SelectedCell = null;
                 }
@@ -370,32 +393,47 @@ public partial class MainWindow : Window
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
+            case Key.F9 when noModifier:
+                // T-041増分5: F9で自由線(横線)手動記入モードを開始する(主回路シート限定、
+                // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A」)。制御回路シートでは
+                // 当面未使用(原案どおり、自動横配線があるため対応する手動記入は無い)。
+                TryBeginFreeLineDraft(horizontal: true);
+                e.Handled = true;
+                break;
             case Key.F9 when shift:
-                // T-041増分2: sF9で縦コネクタ手動記入モードを開始する(制御回路シート限定、
-                // `ecad2-t041-key-flow-proposal-samurai.md`3節・殿裁定「案A」)。
-                TryBeginConnectorDraft();
+                // T-041増分2/5: sF9はシート種別で対象が切替わる(殿裁定「シート種別で自動切替」)。
+                // 制御回路シート→縦コネクタ手動記入、主回路シート→自由線(縦線)手動記入。
+                if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sf9Sheet && sf9Sheet.MainCircuit)
+                    TryBeginFreeLineDraft(horizontal: false);
+                else
+                    TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
             case Key.System when noModifier && e.SystemKey == Key.F10:
-                // T-041増分3: F10で配線分断(WireBreak)を即時記入する(点系は確認フェーズ無し、
-                // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」)。
+                // T-041増分3/5: F10もシート種別で対象が切替わる(制御回路→配線分断、主回路→接続点)。
+                // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」。
                 // 忍者実機発見(F10無反応・メインメニューへフォーカス移動)への対処: F10はAlt併用
                 // 有無に関わらずWin32のWM_SYSKEYDOWN(システムキー、メニューアクセラレータ由来)
                 // として扱われるWPF既知の仕様があり、この場合e.Keyには`Key.System`が入り実キーは
                 // `e.SystemKey`側に入る(F5〜F9は通常キーのためe.Keyでそのまま拾えるが、F10のみ
                 // この特別扱いを受ける)。case Key.F10単体では到達せず、WPF既定のメニューフォーカス
                 // 処理へ素通しされていたのが無反応の原因。
-                TryPlaceWireBreak();
+                if (_viewModel.CurrentSheet is Ecad2.Model.Sheet f10Sheet && f10Sheet.MainCircuit)
+                    TryPlaceConnectionDot();
+                else
+                    TryPlaceWireBreak();
                 e.Handled = true;
                 break;
             case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
                 // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
                 // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
                 // キャンバスフォーカス時はScrollViewer(CanvasArea)の既定スクロールを上書きし、
-                // SelectedCellをセル単位で移動する(T-017)。T-041増分2: 縦コネクタ記入中は矢印キーを
-                // SelectedCell移動ではなく記入中プレビューの範囲/列位置の調整に転用する。
+                // SelectedCellをセル単位で移動する(T-017)。T-041増分2/5: 縦コネクタ/自由線記入中は
+                // 矢印キーをSelectedCell移動ではなく記入中プレビューの範囲/位置の調整に転用する。
                 if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector)
                     AdjustConnectorDraft(e.Key, cellCenterStep: false);
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine)
+                    AdjustFreeLineDraft(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -409,11 +447,12 @@ public partial class MainWindow : Window
             case Key.Delete when noModifier && IsCanvasFocused():
                 // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
-                // T-041増分1/3(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ・配線分断)が
-                // 選択中であればそれを削除する(既存の部品削除と同じDeleteキーへ統合)。クリック時点で
-                // いずれも排他的にしか選択されない設計だが、優先順位を明記しておく。
+                // T-041増分1/3/5(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ・配線分断・
+                // 自由線・接続点)が選択中であればそれを削除する(既存の部品削除と同じDeleteキーへ
+                // 統合)。クリック時点でいずれも排他的にしか選択されない設計だが、優先順位を明記しておく。
                 if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
-                    || _viewModel.DeleteSelectedWireBreak())
+                    || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
+                    || _viewModel.DeleteSelectedConnectionDot())
                     RedrawCanvas();
                 e.Handled = true;
                 break;
@@ -436,6 +475,16 @@ public partial class MainWindow : Window
                     RedrawCanvas();
                 else
                     _viewModel.StatusMessage = "上下キーで範囲を広げてから確定してください";
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine:
+                // T-041増分5: 記入中の自由線を確定する。長さが0(まだ矢印キーで伸ばしていない)場合は
+                // 確定せず案内のみ出す(縦コネクタと同型)。
+                if (_viewModel.ConfirmFreeLineDraft())
+                    RedrawCanvas();
+                else
+                    _viewModel.StatusMessage = "矢印キーで長さを広げてから確定してください";
                 e.Handled = true;
                 break;
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
@@ -702,6 +751,74 @@ public partial class MainWindow : Window
             RedrawCanvas();
         else
             _viewModel.StatusMessage = "この位置には既に配線分断があります";
+    }
+
+    // T-041増分5: F9(横線)/sF9(縦線)押下時の自由線記入モード開始。TryBeginConnectorDraftと同型の
+    // 前提チェック(HasProject→SelectedCell)に加え、主回路シート限定(制御回路のVerticalConnectorは
+    // 増分2)を確認する。mm座標への変換(SelectedCell→mm)・矢印キー1回分の移動量(CellMm)はここで
+    // LadderCanvasHostから取得しViewModelへ渡す(ViewModelは幾何を知らない設計、増分5節参照)。
+    private void TryBeginFreeLineDraft(bool horizontal)
+    {
+        if (!_viewModel.HasProject)
+        {
+            _viewModel.StatusMessage = "シートがありません。新規作成（Ctrl+N）から始めてください";
+            return;
+        }
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet || !sheet.MainCircuit)
+        {
+            _viewModel.StatusMessage = "自由線の記入は主回路シートでのみ使用できます";
+            return;
+        }
+        if (_viewModel.SelectedCell is not { } pos)
+        {
+            _viewModel.StatusMessage = "配置するセルを先に選択してください";
+            return;
+        }
+        var (xMm, yMm) = LadderCanvasHost.CellToMm(pos);
+        _viewModel.BeginFreeLineDraft(horizontal, xMm, yMm, LadderCanvasHost.CellMm);
+        _viewModel.StatusMessage = (horizontal ? "左右キー" : "上下キー") + "で長さを調整しEnterで確定、Escで取消";
+    }
+
+    // T-041増分5: 自由線記入中(Tool.Mode==PlaceLine)の矢印キーで長さを調整する。水平線はLeft/Right
+    // のみ、垂直線はUp/Downのみが有効(直交方向のキーは無視、原案4節「水平・垂直のみ」の制約)。
+    private void AdjustFreeLineDraft(Key key)
+    {
+        bool horizontal = _viewModel.IsFreeLineDraftHorizontal;
+        int delta = (horizontal, key) switch
+        {
+            (true, Key.Left) => -1,
+            (true, Key.Right) => 1,
+            (false, Key.Up) => -1,
+            (false, Key.Down) => 1,
+            _ => 0,
+        };
+        if (delta != 0) _viewModel.MoveFreeLineDraftEnd(delta);
+    }
+
+    // T-041増分5: F10押下時(主回路シート)の接続点即時記入。TryPlaceWireBreakと同型、点系は確認
+    // フェーズ無し(原案4節)。mm座標への変換はTryBeginFreeLineDraftと同様ここで行う。
+    private void TryPlaceConnectionDot()
+    {
+        if (!_viewModel.HasProject)
+        {
+            _viewModel.StatusMessage = "シートがありません。新規作成（Ctrl+N）から始めてください";
+            return;
+        }
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet || !sheet.MainCircuit)
+        {
+            _viewModel.StatusMessage = "接続点の記入は主回路シートでのみ使用できます";
+            return;
+        }
+        if (_viewModel.SelectedCell is not { } pos)
+        {
+            _viewModel.StatusMessage = "配置するセルを先に選択してください";
+            return;
+        }
+        var (xMm, yMm) = LadderCanvasHost.CellToMm(pos);
+        if (_viewModel.PlaceConnectionDot(xMm, yMm))
+            RedrawCanvas();
+        else
+            _viewModel.StatusMessage = "この位置には既に接続点があります";
     }
 
     // 自作パーツボタン(T-026段階4-7、案B)。Tool.Mode=PlaceElementにすることで右パネル下段を

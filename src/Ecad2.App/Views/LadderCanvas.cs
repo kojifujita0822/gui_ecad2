@@ -49,11 +49,12 @@ public sealed class LadderCanvas : FrameworkElement
     // 「配線が選択されている」ことを線そのものの強調で示す(セルの矩形ハイライトとは表現を変える)。
     private static readonly Pen SelectedConnectorPen = new(Brushes.OrangeRed, 3.5);
 
-    // 記入中(未確定)の縦コネクタのプレビュー線(T-041増分2)。確定済みの選択ハイライトと区別する
-    // ため破線にする(DashStyle未共有=独立インスタンスにしないとFreeze例外になるため個別生成)。
-    private static readonly Pen ConnectorDraftPen = CreateConnectorDraftPen();
+    // 記入中(未確定)の縦コネクタ/自由線のプレビュー線(T-041増分2/5)。確定済みの選択ハイライトと
+    // 区別するため破線にする(DashStyle未共有=独立インスタンスにしないとFreeze例外になるため個別生成、
+    // 縦コネクタ用・自由線用で別インスタンスを持つ)。
+    private static readonly Pen ConnectorDraftPen = CreateDraftPen();
 
-    private static Pen CreateConnectorDraftPen()
+    private static Pen CreateDraftPen()
     {
         var pen = new Pen(Brushes.DodgerBlue, 2.5) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
         pen.Freeze();
@@ -73,6 +74,20 @@ public sealed class LadderCanvas : FrameworkElement
     // 小さな塗り円を描く(印刷・PDF出力には影響しない画面表示専用)。
     private static readonly Brush SelectedWireBreakBrush = Brushes.OrangeRed;
 
+    // 自由線(FreeLine)・接続点(ConnectionDot)のヒットテスト許容誤差(mm、T-041増分5)。
+    // PoC(poc/t041-freeline-hittest-poc)で検証済みの値。
+    private const double FreeLineHitToleranceMm = 2.0;
+    private const double ConnectionDotHitToleranceMm = 2.0;
+
+    // 選択中の自由線のハイライト線(T-041増分5、SelectedConnectorPenと同型)。
+    private static readonly Pen SelectedFreeLinePen = new(Brushes.OrangeRed, 3.5);
+
+    // 記入中(未確定)の自由線のプレビュー(T-041増分5、ConnectorDraftPenと同型)。
+    private static readonly Pen FreeLineDraftPen = CreateDraftPen();
+
+    // 選択中の接続点のハイライトマーク(T-041増分5、SelectedWireBreakBrushと同型)。
+    private static readonly Brush SelectedConnectionDotBrush = Brushes.OrangeRed;
+
     // 直近のDraw()呼び出し内容(T-023)。LadderCanvasAutomationPeer/SymbolAutomationPeerが
     // Draw()の呼び出しタイミングと無関係にいつでも参照できるよう、キャンバス自身の状態として保持する
     // (Drawはビュー外部(MainWindow)から都度呼ばれる素通しメソッドのため、他に保持場所が無い)。
@@ -87,7 +102,8 @@ public sealed class LadderCanvas : FrameworkElement
 
     public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null,
         VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null,
-        WireBreak? selectedWireBreak = null)
+        WireBreak? selectedWireBreak = null, FreeLine? selectedFreeLine = null,
+        FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -139,6 +155,29 @@ public sealed class LadderCanvas : FrameworkElement
                 double y = geo.YRow(wireBreak.Row) * MmToDip;
                 dc.DrawEllipse(SelectedWireBreakBrush, null, new Point(x, y), geo.CellMm * 0.15 * MmToDip, geo.CellMm * 0.15 * MmToDip);
             }
+
+            // 選択中の自由線のハイライト(T-041増分5)。mm実座標をそのままDIPへ変換して上書き描画する。
+            if (selectedFreeLine is { } freeLine)
+                dc.DrawLine(SelectedFreeLinePen, FreeLineEndpointDip(freeLine, start: true), FreeLineEndpointDip(freeLine, start: false));
+
+            // 記入中(未確定)の自由線のプレビュー(T-041増分5)。ConnectorDraftPenと同様、まだ伸縮
+            // していない(ゼロ長)間も短い線として視認できるよう最低限の長さを描く。
+            if (freeLineDraft is { } lineDraft)
+            {
+                var p1 = FreeLineEndpointDip(lineDraft, start: true);
+                var p2 = FreeLineEndpointDip(lineDraft, start: false);
+                if (p1 == p2) p2 = new Point(p1.X, p1.Y + _renderer.Geometry.CellMm * 0.3 * MmToDip);
+                dc.DrawLine(FreeLineDraftPen, p1, p2);
+            }
+
+            // 選択中の接続点のハイライトマーク(T-041増分5、SelectedWireBreakと同型)。
+            if (selectedConnectionDot is { } dot)
+            {
+                double x = dot.XMm * MmToDip;
+                double y = dot.YMm * MmToDip;
+                double r = _renderer.Geometry.CellMm * 0.15 * MmToDip;
+                dc.DrawEllipse(SelectedConnectionDotBrush, null, new Point(x, y), r, r);
+            }
         }
         _children.Add(visual);
 
@@ -187,6 +226,82 @@ public sealed class LadderCanvas : FrameworkElement
         }
         return null;
     }
+
+    /// <summary>
+    /// クリック位置(ローカルDIP座標)に十分近い自由線を探す(T-041増分5)。点と線分の距離計算
+    /// (PoC=poc/t041-freeline-hittest-poc/Program.cs)を移植。<see cref="HitTestConnector"/>の
+    /// 「先頭一致」とは異なり、全候補の中から最短距離(nearest-wins)のものを選ぶ(PoC所見、複数の
+    /// 自由線が近接する場合に意図しない方を選ばないための設計)。
+    /// </summary>
+    internal FreeLine? HitTestFreeLine(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+
+        FreeLine? best = null;
+        double bestDistance = double.MaxValue;
+        foreach (var line in sheet.FreeLines)
+        {
+            double distance = DistancePointToSegment(xMm, yMm, line.X1Mm, line.Y1Mm, line.X2Mm, line.Y2Mm);
+            if (distance <= FreeLineHitToleranceMm && distance < bestDistance)
+            {
+                best = line;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>
+    /// クリック位置(ローカルDIP座標)に十分近い接続点を探す(T-041増分5)。<see cref="HitTestFreeLine"/>
+    /// と同様nearest-wins方式。
+    /// </summary>
+    internal ConnectionDot? HitTestConnectionDot(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+
+        ConnectionDot? best = null;
+        double bestDistance = double.MaxValue;
+        foreach (var dot in sheet.ConnectionDots)
+        {
+            double dx = xMm - dot.XMm, dy = yMm - dot.YMm;
+            double distance = Math.Sqrt(dx * dx + dy * dy);
+            if (distance <= ConnectionDotHitToleranceMm && distance < bestDistance)
+            {
+                best = dot;
+                bestDistance = distance;
+            }
+        }
+        return best;
+    }
+
+    /// <summary>点(px,py)と線分((x1,y1)-(x2,y2))の距離(mm)。PoC(poc/t041-freeline-hittest-poc)で
+    /// 検証済みのロジックをそのまま移植。</summary>
+    private static double DistancePointToSegment(double px, double py, double x1, double y1, double x2, double y2)
+    {
+        double dx = x2 - x1, dy = y2 - y1;
+        double lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-9) return Math.Sqrt((px - x1) * (px - x1) + (py - y1) * (py - y1));
+        double t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+        t = Math.Clamp(t, 0.0, 1.0);
+        double cx = x1 + t * dx, cy = y1 + t * dy;
+        return Math.Sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy));
+    }
+
+    /// <summary>グリッドセル位置をmm実座標(グリッドに依存しないFreeLine/ConnectionDot用)へ変換する
+    /// (T-041増分5)。SelectedCellをFreeLine始点・ConnectionDot位置のmm座標へ変換する際に使う
+    /// (MainWindow.xaml.csのTryBeginFreeLineDraft/TryPlaceConnectionDotから呼ぶ)。</summary>
+    internal (double XMm, double YMm) CellToMm(GridPos cell)
+    {
+        var geo = _renderer.Geometry;
+        return (geo.X(cell.Column), geo.YRow(cell.Row));
+    }
+
+    /// <summary>グリッド1セル分のmm寸法(T-041増分5、自由線記入の矢印キー1回分の移動量に使う)。</summary>
+    internal double CellMm => _renderer.Geometry.CellMm;
+
+    /// <summary>FreeLineの始点/終点をローカルDIP座標へ変換する(T-041増分5)。</summary>
+    private static Point FreeLineEndpointDip(FreeLine line, bool start)
+        => start ? new Point(line.X1Mm * MmToDip, line.Y1Mm * MmToDip) : new Point(line.X2Mm * MmToDip, line.Y2Mm * MmToDip);
 
     /// <summary>描画内容を消去する(T-019: Document.Sheets.Count==0の空状態で使う。
     /// 前回シートの残像を残さない)。</summary>

@@ -166,6 +166,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedConnector = null;
             // T-041増分3: 配線分断(WireBreak)も同じ排他対象として扱う(SelectedWireBreak参照)。
             SelectedWireBreak = null;
+            // T-041増分5: 自由線・接続点(主回路シート)も同様に扱う。
+            SelectedFreeLine = null;
+            SelectedConnectionDot = null;
             // T-041増分2隠密レビュー指摘(観点3 CONFIRMED、所見E=増分1所見Aの反復): 記入中
             // (_connectorDraft)はSelectedCellとは別枠の状態だったため、CurrentSheetIndexの
             // シート切替経由でSelectedCellがクリアされてもTool/_connectorDraftが残留し、
@@ -174,6 +177,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 自体は妨げない。PlaceElementのTool保持(T-021分岐A)には影響しないよう、記入中の
             // 場合のみ限定してクリアする。
             ClearConnectorDraftIfAny();
+            // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同型でクリアする。
+            ClearFreeLineDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -256,6 +261,68 @@ public sealed class MainWindowViewModel : ViewModelBase
         double boundary = pos.Column + 0.5;
         if (sheet.WireBreaks.Any(b => b.Row == pos.Row && b.Boundary == boundary)) return false;
         sheet.WireBreaks.Add(new WireBreak { Boundary = boundary, Row = pos.Row });
+        MarkDirty();
+        return true;
+    }
+
+    private FreeLine? _selectedFreeLine;
+
+    /// <summary>
+    /// 現在選択中の自由線(T-041増分5: 主回路シートの線系プリミティブ、SelectedConnectorと同型の
+    /// 排他制御——SelectedCellのsetterが常時クリアする)。単一選択のみ。
+    /// </summary>
+    public FreeLine? SelectedFreeLine
+    {
+        get => _selectedFreeLine;
+        set => SetProperty(ref _selectedFreeLine, value);
+    }
+
+    /// <summary>SelectedFreeLineを削除する(T-041増分5、案A=DeleteSelectedConnectorと同型)。
+    /// 戻り値は実際に削除したか。</summary>
+    public bool DeleteSelectedFreeLine()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedFreeLine is not FreeLine freeLine) return false;
+        if (!sheet.FreeLines.Remove(freeLine)) return false;
+        MarkDirty();
+        SelectedFreeLine = null;
+        return true;
+    }
+
+    private ConnectionDot? _selectedConnectionDot;
+
+    /// <summary>
+    /// 現在選択中の接続点(T-041増分5: 主回路シートの点系プリミティブ、SelectedWireBreakと同型の
+    /// 排他制御——SelectedCellのsetterが常時クリアする)。単一選択のみ。
+    /// </summary>
+    public ConnectionDot? SelectedConnectionDot
+    {
+        get => _selectedConnectionDot;
+        set => SetProperty(ref _selectedConnectionDot, value);
+    }
+
+    /// <summary>SelectedConnectionDotを削除する(T-041増分5、案A=DeleteSelectedWireBreakと同型)。
+    /// 戻り値は実際に削除したか。</summary>
+    public bool DeleteSelectedConnectionDot()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedConnectionDot is not ConnectionDot dot) return false;
+        if (!sheet.ConnectionDots.Remove(dot)) return false;
+        MarkDirty();
+        SelectedConnectionDot = null;
+        return true;
+    }
+
+    /// <summary>
+    /// F10押下時、指定のmm座標へ接続点を即時記入する(T-041増分5、主回路シート限定・点系は確認
+    /// フェーズ無しでWireBreakと同型)。mm座標への変換(SelectedCell→mm)はView側の責務
+    /// (LadderCanvas.CellToMm)、ViewModelはmm座標を受け取るのみ(FreeLineの座標系がグリッドに
+    /// 依存しないmm実座標のため、他の記入メソッドと異なりViewModelは幾何変換を行わない)。
+    /// 同一位置に既存の接続点があれば重複記入を避けて何もしない(戻り値false)。
+    /// </summary>
+    public bool PlaceConnectionDot(double xMm, double yMm)
+    {
+        if (CurrentSheet is not Sheet sheet) return false;
+        if (sheet.ConnectionDots.Any(d => d.XMm == xMm && d.YMm == yMm)) return false;
+        sheet.ConnectionDots.Add(new ConnectionDot { XMm = xMm, YMm = yMm });
         MarkDirty();
         return true;
     }
@@ -348,6 +415,90 @@ public sealed class MainWindowViewModel : ViewModelBase
         _connectorDraft = null;
         Tool = ToolState.SelectDefault;
         OnPropertyChanged(nameof(ConnectorDraftPreview));
+    }
+
+    // T-041増分5: 自由線手動記入(F9/sF9、主回路シート)の作業中データ。AnchorXMm/AnchorYMmは記入
+    // 開始点(固定、mm実座標)。StepMmは矢印キー1回分の移動量(View側でCellMmを渡す)。StepCountは
+    // 矢印キーで動く符号付きステップ数(IsHorizontal=trueならX方向、falseならY方向にのみ動く)。
+    // mm座標への変換はView側の責務(LadderCanvas.CellToMm)で完結させ、ViewModelは幾何を知らない
+    // (VerticalConnectorがグリッド単位で完結するのと対称的に、FreeLineはmm単位で完結させる設計)。
+    private (double AnchorXMm, double AnchorYMm, double StepMm, int StepCount, bool IsHorizontal)? _freeLineDraft;
+
+    /// <summary>記入中の自由線が水平方向かを返す(View側のキー判定用)。記入中でなければfalse。</summary>
+    public bool IsFreeLineDraftHorizontal => _freeLineDraft?.IsHorizontal ?? false;
+
+    /// <summary>記入中の自由線のプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
+    public FreeLine? FreeLineDraftPreview
+    {
+        get
+        {
+            if (_freeLineDraft is not { } d) return null;
+            double currentX = d.IsHorizontal ? d.AnchorXMm + d.StepCount * d.StepMm : d.AnchorXMm;
+            double currentY = d.IsHorizontal ? d.AnchorYMm : d.AnchorYMm + d.StepCount * d.StepMm;
+            return new FreeLine
+            {
+                X1Mm = Math.Min(d.AnchorXMm, currentX),
+                Y1Mm = Math.Min(d.AnchorYMm, currentY),
+                X2Mm = Math.Max(d.AnchorXMm, currentX),
+                Y2Mm = Math.Max(d.AnchorYMm, currentY),
+            };
+        }
+    }
+
+    /// <summary>
+    /// F9(横線)/sF9(縦線)押下時、指定のmm座標を起点に自由線記入を開始する(T-041増分5)。呼び出し元
+    /// (MainWindow.xaml.cs)でHasProject/主回路シート判定・SelectedCell存在は済ませてある前提。
+    /// mm座標への変換(SelectedCell→mm)・矢印キー1回分の移動量(stepMm=CellMm)はView側が渡す。
+    /// </summary>
+    public void BeginFreeLineDraft(bool horizontal, double startXMm, double startYMm, double stepMm)
+    {
+        _freeLineDraft = (startXMm, startYMm, stepMm, 0, horizontal);
+        Tool = new ToolState(ToolMode.PlaceLine);
+        OnPropertyChanged(nameof(FreeLineDraftPreview));
+    }
+
+    /// <summary>記入中の自由線の終点を矢印キー1回分(delta=±1)動かす。方向(水平/垂直)に沿わない
+    /// キーは呼び出し元(View)が弾く前提で、ここでは単純にStepCountを加算しグリッド範囲相当
+    /// (Columns/Rows)内にクランプする。</summary>
+    public void MoveFreeLineDraftEnd(int delta)
+    {
+        if (_freeLineDraft is not { } d || CurrentSheet is not Sheet sheet) return;
+        int maxSteps = d.IsHorizontal ? sheet.Grid.Columns : sheet.Grid.Rows;
+        int newStepCount = Math.Clamp(d.StepCount + delta, -maxSteps, maxSteps);
+        _freeLineDraft = d with { StepCount = newStepCount };
+        OnPropertyChanged(nameof(FreeLineDraftPreview));
+    }
+
+    /// <summary>
+    /// 記入中の自由線を確定する(Enter、T-041増分5)。StepCount==0(まだ伸縮していない)場合は
+    /// 自由線として無意味なため確定せず記入モードに留める(戻り値false)。ConfirmConnectorDraftと
+    /// 同様、主回路シート限定を防御的に再検証する(二重の安全網)。
+    /// </summary>
+    public bool ConfirmFreeLineDraft()
+    {
+        if (_freeLineDraft is not { } d || CurrentSheet is not Sheet sheet || !sheet.MainCircuit) return false;
+        if (d.StepCount == 0) return false;
+        var preview = FreeLineDraftPreview!;
+        sheet.FreeLines.Add(new FreeLine
+        {
+            X1Mm = preview.X1Mm, Y1Mm = preview.Y1Mm, X2Mm = preview.X2Mm, Y2Mm = preview.Y2Mm,
+        });
+        MarkDirty();
+        CancelFreeLineDraft();
+        return true;
+    }
+
+    /// <summary>記入中の自由線記入を取消す(Esc、T-041増分5)。何も生成せず選択モードへ戻す。</summary>
+    public void CancelFreeLineDraft() => ClearFreeLineDraftIfAny();
+
+    /// <summary>記入中(_freeLineDraft)であれば取消してSelect状態へ戻す(SelectedCellのsetter・
+    /// CancelFreeLineDraft・ReplaceDocumentの共通クリア入口、ClearConnectorDraftIfAnyと同型)。</summary>
+    private void ClearFreeLineDraftIfAny()
+    {
+        if (_freeLineDraft is null) return;
+        _freeLineDraft = null;
+        Tool = ToolState.SelectDefault;
+        OnPropertyChanged(nameof(FreeLineDraftPreview));
     }
 
     /// <summary>SelectedCellの位置にある既存要素(T-017)。null=要素なし、または未選択。</summary>
@@ -639,9 +790,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedConnector = null;
         // T-041増分3: 配線分断(WireBreak)も同様に旧文書の参照を持ち越さない。
         SelectedWireBreak = null;
+        // T-041増分5: 自由線・接続点も同様に旧文書の参照を持ち越さない。
+        SelectedFreeLine = null;
+        SelectedConnectionDot = null;
         // T-041増分2隠密レビュー指摘(観点3 CONFIRMED): 記入中(_connectorDraft)も同様に、直接代入
         // (_selectedCell)経由ではSelectedCellのsetterの自動クリアが効かないため、ここでも明示する。
         ClearConnectorDraftIfAny();
+        // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同様。
+        ClearFreeLineDraftIfAny();
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);
