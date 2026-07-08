@@ -27,7 +27,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedCell = null;
         vm.SelectedFreeLine = line;
 
-        bool moved = vm.MoveSelectedFreeLine(5, 2);
+        bool moved = vm.MoveSelectedFreeLine(5, 2, maxXMm: 1000, maxYMm: 1000);
 
         Assert.True(moved);
         Assert.Equal(15, line.X1Mm);
@@ -43,8 +43,28 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        Assert.False(vm.MoveSelectedFreeLine(5, 0));
+        Assert.False(vm.MoveSelectedFreeLine(5, 0, maxXMm: 1000, maxYMm: 1000));
         Assert.False(vm.IsDirty);
+    }
+
+    // T-041増分7隠密レビュー所見AA対応: グリッド・ページ境界へのクランプ回帰テスト
+    [Fact]
+    public void MoveSelectedFreeLine_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();   // X1=10,Y1=30 - X2=40,Y2=30
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        // ページ境界50mmに対し+100mm移動を試みても、終点(X2=40)が境界に達するところで止まる
+        bool moved = vm.MoveSelectedFreeLine(100, 0, maxXMm: 50, maxYMm: 1000);
+
+        Assert.True(moved);
+        Assert.Equal(20, line.X1Mm);
+        Assert.Equal(50, line.X2Mm);
+        Assert.True(vm.IsDirty);
     }
 
     // ---- ResizeSelectedFreeLineEndpoint(Tab+Shift矢印、端点伸縮) ----
@@ -133,7 +153,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
 
-        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30);
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.False(vm.IsDirty);
 
         vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 32);   // +5,+2
@@ -160,7 +180,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
 
-        vm.BeginDragFreeLine(line, isEndpoint: true, isStart: true, startXMm: 10, startYMm: 30);
+        vm.BeginDragFreeLine(line, isEndpoint: true, isStart: true, startXMm: 10, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragFreeLine(currentXMm: 15, currentYMm: 35);   // Y方向にもズレて掴んだ想定
 
         Assert.Equal(15, line.X1Mm);
@@ -177,7 +197,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
 
-        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30);
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30);
         Assert.Equal(15, line.X1Mm);
 
@@ -187,6 +207,24 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         Assert.Equal(40, line.X2Mm);
         Assert.False(vm.IsDirty);
         Assert.False(vm.IsDraggingFreeLine);
+    }
+
+    // T-041増分7隠密レビュー所見AA対応: グリッド・ページ境界へのクランプ回帰テスト
+    [Fact]
+    public void DragFreeLine_Move_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();   // X1=10,Y1=30 - X2=40,Y2=30
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 50, maxYMm: 1000);
+        vm.UpdateDragFreeLine(currentXMm: 125, currentYMm: 30);   // +100を試みても境界50で止まる
+
+        Assert.Equal(20, line.X1Mm);
+        Assert.Equal(50, line.X2Mm);
     }
 
     // ---- 所見A横展開: ドラッグ中の外部要因(Delete/文書差し替え)による強制クリア ----
@@ -200,7 +238,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         var line = MakeHorizontal();
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
-        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30);
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.True(vm.IsDraggingFreeLine);
 
         bool deleted = vm.DeleteSelectedFreeLine();
@@ -221,7 +259,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         var line = MakeHorizontal();
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
-        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30);
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
         vm.NewDocument();
 

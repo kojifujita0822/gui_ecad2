@@ -331,10 +331,14 @@ public partial class MainWindow : Window
 
         // T-041増分7横展開: 選択中の自由線(mm実座標系の線分)を押下したらドラッグを開始する。
         if (_viewModel.SelectedFreeLine is Ecad2.Model.FreeLine freeLine
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet flSheet
             && LadderCanvasHost.HitTestFreeLineDragMode(position, freeLine) is (bool flIsEndpoint, bool flIsStart))
         {
             var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
-            _viewModel.BeginDragFreeLine(freeLine, flIsEndpoint, flIsStart, xMm, yMm);
+            // T-041増分7隠密レビュー所見AA対応: ページ境界(mm)をViewModelは幾何を知らない設計のため
+            // ここで計算して渡す(TryBeginFreeLineDraftのCellMm渡しと同じ設計原則)。
+            _viewModel.BeginDragFreeLine(freeLine, flIsEndpoint, flIsStart, xMm, yMm,
+                flSheet.Grid.Columns * LadderCanvasHost.CellMm, flSheet.Grid.Rows * LadderCanvasHost.CellMm);
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragFreeLine(); return; }
             _freeLineDragPressPositionDip = position;
             _freeLineDragStarted = false;
@@ -434,32 +438,37 @@ public partial class MainWindow : Window
         // 値が変化していなければMarkDirty()しないため、実質クリックとして無害。
         if (_viewModel.IsDraggingConnector)
         {
-            LadderCanvasHost.ReleaseMouseCapture();
+            // T-041増分7隠密レビュー所見X対応: ReleaseMouseCapture()はキャプチャ保持中の要素に対し
+            // LostMouseCaptureを同一コールスタック内で同期発火する。ConfirmDrag*より先に呼ぶと
+            // IsDraggingConnector=trueのままLostMouseCaptureハンドラのCancelDragConnector()が
+            // 割り込み実行され、直後のConfirmDragConnector()が空振りしてドラッグ結果が巻き戻る。
+            // 必ずConfirmDrag*でIsDragging*=falseにしてからReleaseMouseCapture()を呼ぶ。
             _viewModel.ConfirmDragConnector();
+            LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragStarted = false;
             RedrawCanvas();
             return;
         }
         if (_viewModel.IsDraggingWireBreak)
         {
-            LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragWireBreak();
+            LadderCanvasHost.ReleaseMouseCapture();
             _wireBreakDragStarted = false;
             RedrawCanvas();
             return;
         }
         if (_viewModel.IsDraggingFreeLine)
         {
-            LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragFreeLine();
+            LadderCanvasHost.ReleaseMouseCapture();
             _freeLineDragStarted = false;
             RedrawCanvas();
             return;
         }
         if (_viewModel.IsDraggingConnectionDot)
         {
-            LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragConnectionDot();
+            LadderCanvasHost.ReleaseMouseCapture();
             _connectionDotDragStarted = false;
             RedrawCanvas();
             return;
@@ -954,13 +963,17 @@ public partial class MainWindow : Window
     // 1ステップ=CellMm=記入時(BeginFreeLineDraft)・WireBreak横展開と同じ単位に揃える)。
     private void MoveSelectedFreeLineByKey(Key key)
     {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         double step = LadderCanvasHost.CellMm;
+        // T-041増分7隠密レビュー所見AA対応: ページ境界(mm)を渡す(BeginDragFreeLineと同じ設計)。
+        double maxXMm = sheet.Grid.Columns * step;
+        double maxYMm = sheet.Grid.Rows * step;
         bool moved = key switch
         {
-            Key.Up => _viewModel.MoveSelectedFreeLine(0, -step),
-            Key.Down => _viewModel.MoveSelectedFreeLine(0, step),
-            Key.Left => _viewModel.MoveSelectedFreeLine(-step, 0),
-            Key.Right => _viewModel.MoveSelectedFreeLine(step, 0),
+            Key.Up => _viewModel.MoveSelectedFreeLine(0, -step, maxXMm, maxYMm),
+            Key.Down => _viewModel.MoveSelectedFreeLine(0, step, maxXMm, maxYMm),
+            Key.Left => _viewModel.MoveSelectedFreeLine(-step, 0, maxXMm, maxYMm),
+            Key.Right => _viewModel.MoveSelectedFreeLine(step, 0, maxXMm, maxYMm),
             _ => false,
         };
         if (moved) RedrawCanvas();
