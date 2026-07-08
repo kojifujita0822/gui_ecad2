@@ -1169,8 +1169,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// SelectedElementのデバイス名(T-017、プロパティパネルで編集可能)。ElementInstance.DeviceName
     /// を書き換えるだけでなく、Document.Devices(機器表)にも反映する。同名デバイスを参照する他要素
     /// も含めた一括リネームはSimulation.DeviceRenamerに委譲する(既存デバイスの改名時)。新規デバイス
-    /// 名(Document.Devicesに未登録)の場合はDeviceClass.Otherで新規登録する(忍者実機検証で発覚:
-    /// 単純代入だけでは機器表に反映されないバグの修正)。
+    /// 名(Document.Devicesに未登録)の場合は要素種別から解決したDeviceClass(T-045 P-020対応、
+    /// ResolveDeviceClass参照)で新規登録する(忍者実機検証で発覚: 単純代入だけでは機器表に反映
+    /// されないバグの修正)。
     /// </summary>
     public string SelectedElementDeviceName
     {
@@ -1192,7 +1193,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 if (newName.Length > 0)
                 {
                     if (!Document.Devices.ByName.ContainsKey(newName))
-                        Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
+                        Document.Devices.ByName[newName] = new Device { Name = newName, Class = ResolveDeviceClass(el) };
                 }
                 else if (oldName.Length > 0)
                 {
@@ -1284,6 +1285,49 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool IsSelectedCellOccupied()
         => SelectedCell is { } pos && CurrentSheet is Sheet sheet && sheet.Elements.Any(el => el.Pos == pos);
 
+    /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
+    /// 統合)。行0〜Rows-1・列0〜Columns-1の範囲外、または既に要素があればfalse。
+    /// 選択(SelectedCell)自体の仕様範囲(行-1・列-2まで選択可、殿教示2026-07-07・
+    /// docs/proposed.md P-022/P-024)には触れず、配置経路のみをガードする
+    /// (殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
+    public bool ValidatePlacement(GridPos pos, Sheet sheet)
+        => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
+        && pos.Column >= 0 && pos.Column < sheet.Grid.Columns
+        && !sheet.Elements.Any(el => el.Pos == pos);
+
+    /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
+    /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
+    /// Lamp→Lamp、PushButtonNO/NC・EmergencyStop→PushButton、SelectSwitch→SelectSwitch、
+    /// Terminal→Terminal、Timer系(限時・瞬時とも)→Timer、Counter→Counter、
+    /// ThermalOverload/ThermalOverload3P・Motor・Breaker3P→Other(該当クラス無し)。</summary>
+    private static DeviceClass MapToDeviceClass(ElementKind kind) => kind switch
+    {
+        ElementKind.ContactNO or ElementKind.ContactNC or ElementKind.Coil or ElementKind.ContactorMain3P
+            => DeviceClass.Relay,
+        ElementKind.Lamp => DeviceClass.Lamp,
+        ElementKind.PushButtonNO or ElementKind.PushButtonNC or ElementKind.EmergencyStop
+            => DeviceClass.PushButton,
+        ElementKind.SelectSwitch => DeviceClass.SelectSwitch,
+        ElementKind.Terminal => DeviceClass.Terminal,
+        ElementKind.Timer or ElementKind.TimerContactNO or ElementKind.TimerContactNC
+            or ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC => DeviceClass.Timer,
+        ElementKind.Counter => DeviceClass.Counter,
+        _ => DeviceClass.Other,
+    };
+
+    /// <summary>要素からDeviceClassを解決する(T-045 P-020対応)。PartResolver.ComponentKindは
+    /// CreatesComponent=false(自作パーツRole=NonSimulated等)の場合に例外を投げるため、事前に
+    /// ガードしOtherへフォールバックする。セレクトSW(BasicPartTemplates)はRole=ContactNO
+    /// (電気的にはa接点と同一、T-037往復2周目の既知制約)のためComponentKind経由では区別できず、
+    /// 固定Idで個別判定する(T-037のIsOrEligible導入と同型の対処)。</summary>
+    private DeviceClass ResolveDeviceClass(ElementInstance element)
+    {
+        if (element.PartId == Persistence.BasicPartTemplates.SelectSwitchId) return DeviceClass.SelectSwitch;
+        return PartResolver.CreatesComponent(element, PartLibrary)
+            ? MapToDeviceClass(PartResolver.ComponentKind(element, PartLibrary))
+            : DeviceClass.Other;
+    }
+
     /// <summary>
     /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、基準行
     /// (SelectedCellより上にある直近の既存要素行、殿裁定で上方向限定)との間に縦コネクタを
@@ -1292,6 +1336,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
+        if (!ValidatePlacement(pos, sheet)) return;
 
         const int cellWidth = 1; // 基本図形(BasicPartTemplates)は全て1セル幅
         var newElement = new ElementInstance
@@ -1304,10 +1349,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         MarkDirty();
 
         // 機器表(Document.Devices)への登録(T-036、殿承認2026-07-05)。SelectedElementDeviceNameの
-        // setterと同じ流儀: 新規デバイス名(未登録)のみDeviceClass.Otherで追加し、既存デバイス名なら
-        // 既存エントリを維持(上書きしない)。デバイス名空欄の場合は機器表を一切操作しない。
+        // setterと同じ流儀: 新規デバイス名(未登録)のみ要素種別から解決したDeviceClass(T-045
+        // P-020対応)で追加し、既存デバイス名なら既存エントリを維持(上書きしない)。デバイス名
+        // 空欄の場合は機器表を一切操作しない。
         if (deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName))
-            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = DeviceClass.Other };
+            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = ResolveDeviceClass(newElement) };
         DeviceTable.Refresh();
 
         if (!isOr) return;
