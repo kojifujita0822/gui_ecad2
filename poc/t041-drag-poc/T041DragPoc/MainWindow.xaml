@@ -1,0 +1,16 @@
+<Window x:Class="T041DragPoc.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:T041DragPoc"
+        Title="T-041増分6 ドラッグUI基盤PoC" Height="600" Width="900">
+    <DockPanel>
+        <TextBlock x:Name="StatusText" DockPanel.Dock="Top" Margin="8" FontFamily="Consolas" FontSize="13"
+                   Text="起動直後: ベンチマーク実行中…" TextWrapping="Wrap" />
+        <TextBlock DockPanel.Dock="Top" Margin="8,0,8,8" FontFamily="Consolas" FontSize="11" Foreground="Gray"
+                   Text="操作: 線分中央付近をドラッグ=本体移動 / 端点付近をドラッグ=端点リサイズ / ドラッグ中Esc=キャンセル" />
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      FocusManager.IsFocusScope="True">
+            <local:DragCanvas x:Name="Canvas" />
+        </ScrollViewer>
+    </DockPanel>
+</Window>

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T-041増分6 PoC: マウスドラッグUI基盤(移動・端点リサイズ・Escキャンセル・再描画コスト)が
+    実用的に成立するか検証する。ecad2に前例の無いCaptureMouse/MouseMove系インタラクションの
+    ため、poc/隔離ルールに従い本体src/とは独立させつつ、実際のDiagramRenderer/WpfRenderer
+    (src/Ecad2.Core・src/Ecad2.Rendering.Wpf)をProjectReferenceで参照して実物の描画コストを
+    計測する(増分4のPoCと異なりUI付き対話検証が必須、詳細はREADME.md参照)。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ecad2.Core\Ecad2.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ecad2.Rendering.Wpf\Ecad2.Rendering.Wpf.csproj" />
+  </ItemGroup>
+
+</Project>
