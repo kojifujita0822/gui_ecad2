@@ -205,6 +205,45 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>SelectedCellのステータスバー表示用文字列。</summary>
     public string SelectedCellDisplay => SelectedCell is { } pos ? $"行{pos.Row + 1}/列{pos.Column}" : "未選択";
 
+    private bool _selectedEndpointIsStart = true;
+
+    /// <summary>選択中の線分プリミティブ(VerticalConnector/FreeLine)に対し、Tab+Shift+矢印キーで
+    /// 操作する対象端点(T-041増分7、殿裁定P-033=案2)。true=始点(VerticalConnectorの
+    /// TopRow/FreeLineの(X1Mm,Y1Mm))、false=終点(BottomRow/(X2Mm,Y2Mm))。新しい線分プリミティブが
+    /// 選択されるたび(SelectedConnector/SelectedFreeLineのsetter)に既定値(始点)へリセットされる。
+    /// 点系(WireBreak/ConnectionDot)には端点概念が無いため関与しない。</summary>
+    public bool SelectedEndpointIsStart
+    {
+        get => _selectedEndpointIsStart;
+        set
+        {
+            // T-041増分7実機確認で発覚(往復1周目): SetPropertyは自身(SelectedEndpointIsStart)の
+            // 変更通知のみ発火し、派生表示プロパティ(SelectedEndpointDisplay)へは伝播しない
+            // (WPFのCallerMemberName既定の仕組み上当然だが、ここでは明示発火が必要だった)。
+            // 忘れるとToggleSelectedEndpoint()は内部的に正しく動作するのにステータスバー表示だけ
+            // 更新されない、という気づきにくい表示バグになる(実機で「Tabが効かない」ように見えた)。
+            if (SetProperty(ref _selectedEndpointIsStart, value))
+                OnPropertyChanged(nameof(SelectedEndpointDisplay));
+        }
+    }
+
+    /// <summary>ステータスバー表示用(T-041増分7)。線分プリミティブ選択中のみ意味を持つ。</summary>
+    public string SelectedEndpointDisplay => SelectedEndpointIsStart ? "始点" : "終点";
+
+    /// <summary>ステータスバーの操作対象端点表示の可視性判定用(T-041増分7)。線分プリミティブ
+    /// (VerticalConnector/FreeLine)選択中のみtrue。SelectedConnector/SelectedFreeLineの
+    /// setterが変更を明示通知する。</summary>
+    public bool HasSelectedLinePrimitive => SelectedConnector is not null || SelectedFreeLine is not null;
+
+    /// <summary>Tabキーで操作対象端点をトグルする(T-041増分7、殿裁定P-033=案2)。選択中の線分
+    /// プリミティブが無ければ何もしない(呼び出し元がTool.Mode/選択有無を判定済みの前提でも、
+    /// 二重防御としてここでも確認する)。</summary>
+    public void ToggleSelectedEndpoint()
+    {
+        if (SelectedConnector is null && SelectedFreeLine is null) return;
+        SelectedEndpointIsStart = !SelectedEndpointIsStart;
+    }
+
     private VerticalConnector? _selectedConnector;
 
     /// <summary>
@@ -212,13 +251,145 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 別枠で保持する)。SelectedCellとは排他——SelectedCellのsetterが値変化の有無に関わらず常時
     /// このプロパティをクリアするため(隠密レビュー指摘、上記SelectedCell参照)、縦コネクタを
     /// クリック選択する経路はSelectedCell=null→SelectedConnector=connectorの順で呼ぶ必要がある
-    /// (逆順だとSelectedCellのクリアが直後にこのプロパティを打ち消してしまう)。単一選択のみ
+    /// (逆順だとSelectedCellのクリアが直後に打ち消してしまう)。単一選択のみ
     /// (殿裁定2026-07-07)。
     /// </summary>
     public VerticalConnector? SelectedConnector
     {
         get => _selectedConnector;
-        set => SetProperty(ref _selectedConnector, value);
+        set
+        {
+            // T-041増分7: 新規選択のたびに操作対象端点を既定(始点)へリセットする(値変化の有無に
+            // 関わらず無条件、SelectedCellのsetterと同じ設計原則)。
+            SelectedEndpointIsStart = true;
+            SetProperty(ref _selectedConnector, value);
+            OnPropertyChanged(nameof(HasSelectedLinePrimitive));
+        }
+    }
+
+    // T-041増分7: 縦コネクタのドラッグ(本体移動/端点リサイズ)の一時状態。記入中ドラフト
+    // (_connectorDraft)と同様、確定前はモデル(sheet.Connectors内の実体)を直接書き換えつつ
+    // 開始時スナップショットを保持し、Escでスナップショットへ復元できるようにする。
+    // ドラッグ確定(ConfirmDragConnector)・キーボード平行移動(MoveSelectedConnector)の両経路とも
+    // 「モデルへ実際に反映し、値が変化した場合のみMarkDirty()する」という同じ結果に収束する。
+    private VerticalConnector? _draggingConnector;
+    private bool _draggingConnectorIsEndpoint;
+    private bool _draggingConnectorIsTop;
+    private int _dragConnectorOrigTopRow;
+    private int _dragConnectorOrigBottomRow;
+    private int _dragConnectorStartRow;
+
+    /// <summary>縦コネクタをドラッグ中か(View側がMouseMove/Escの処理要否を判定するのに使う)。</summary>
+    public bool IsDraggingConnector => _draggingConnector is not null;
+
+    /// <summary>縦コネクタのドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、
+    /// trueならisTopで指定した端点のみのリサイズ。startRowはドラッグ開始時のマウス位置(行)。</summary>
+    public void BeginDragConnector(VerticalConnector connector, bool isEndpoint, bool isTop, int startRow)
+    {
+        _draggingConnector = connector;
+        _draggingConnectorIsEndpoint = isEndpoint;
+        _draggingConnectorIsTop = isTop;
+        _dragConnectorOrigTopRow = connector.TopRow;
+        _dragConnectorOrigBottomRow = connector.BottomRow;
+        _dragConnectorStartRow = startRow;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(現在行)に応じて縦コネクタの位置を更新する(T-041増分7)。
+    /// 本体移動はTop/BottomRowの間隔(span)を保ったままGrid範囲内にクランプする(独立にクランプすると
+    /// 片方が先に端へ達した際に間隔が歪むため、delta自体を範囲内に丸めてから両方へ同時適用する)。
+    /// 端点リサイズはTop&lt;Bottom(ゼロ長禁止、ConfirmConnectorDraftの記入時不変条件と同じ)を保つ。</summary>
+    public void UpdateDragConnector(int currentRow)
+    {
+        if (_draggingConnector is not VerticalConnector c || CurrentSheet is not Sheet sheet) return;
+        int deltaRow = currentRow - _dragConnectorStartRow;
+        if (_draggingConnectorIsEndpoint)
+        {
+            if (_draggingConnectorIsTop)
+                c.TopRow = Math.Clamp(_dragConnectorOrigTopRow + deltaRow, 0, c.BottomRow - 1);
+            else
+                c.BottomRow = Math.Clamp(_dragConnectorOrigBottomRow + deltaRow, c.TopRow + 1, sheet.Grid.Rows - 1);
+        }
+        else
+        {
+            int minDelta = -_dragConnectorOrigTopRow;
+            int maxDelta = sheet.Grid.Rows - 1 - _dragConnectorOrigBottomRow;
+            int clamped = Math.Clamp(deltaRow, minDelta, maxDelta);
+            c.TopRow = _dragConnectorOrigTopRow + clamped;
+            c.BottomRow = _dragConnectorOrigBottomRow + clamped;
+        }
+    }
+
+    /// <summary>縦コネクタのドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
+    /// MarkDirty()する(ドラッグ中は毎フレーム呼ばず、確定時の1回に集約)。</summary>
+    public void ConfirmDragConnector()
+    {
+        if (_draggingConnector is VerticalConnector c &&
+            (c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow))
+            MarkDirty();
+        _draggingConnector = null;
+    }
+
+    /// <summary>縦コネクタのドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
+    public void CancelDragConnector()
+    {
+        if (_draggingConnector is VerticalConnector c)
+        {
+            c.TopRow = _dragConnectorOrigTopRow;
+            c.BottomRow = _dragConnectorOrigBottomRow;
+        }
+        _draggingConnector = null;
+    }
+
+    /// <summary>選択中の縦コネクタを行方向に矢印キー1回分(delta=±1)平行移動する(T-041増分7、
+    /// キーボード等価操作)。UpdateDragConnectorの本体移動と同じ「間隔を保ったままクランプ」方式。
+    /// 実際に動けた場合のみMarkDirty()し、ドラッグ確定と同じ結果に収束する。</summary>
+    public bool MoveSelectedConnector(int deltaRow)
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector c) return false;
+        int minDelta = -c.TopRow;
+        int maxDelta = sheet.Grid.Rows - 1 - c.BottomRow;
+        int clamped = Math.Clamp(deltaRow, minDelta, maxDelta);
+        if (clamped == 0) return false;
+        c.TopRow += clamped;
+        c.BottomRow += clamped;
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>選択中の縦コネクタを列方向に矢印キー1回分(delta=±1)平行移動する(T-041増分7、
+    /// キーボード等価操作、Key.Left/Right)。MoveSelectedConnectorと対の列方向版。</summary>
+    public bool MoveSelectedConnectorColumn(double delta)
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector c) return false;
+        double newColumn = Math.Clamp(c.Column + delta, 0, sheet.Grid.Columns);
+        if (newColumn == c.Column) return false;
+        c.Column = newColumn;
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>選択中の縦コネクタの操作対象端点(SelectedEndpointIsStart、Tab+Shift+矢印、
+    /// T-041増分7殿裁定P-033=案2)を矢印キー1回分(delta=±1)伸縮する。始点=TopRow、終点=BottomRow
+    /// とみなす(VerticalConnectorは常に縦線のためShift+Up/Downのみ呼ばれる想定、Left/Rightは
+    /// 呼び出し元(MainWindow.xaml.cs)で無視される)。Top&lt;Bottom(ゼロ長禁止、ConfirmConnectorDraftの
+    /// 記入時不変条件と同じ)・Grid範囲でクランプする。</summary>
+    public bool ResizeSelectedConnectorEndpoint(int delta)
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector c) return false;
+        if (SelectedEndpointIsStart)
+        {
+            int newTop = Math.Clamp(c.TopRow + delta, 0, c.BottomRow - 1);
+            if (newTop == c.TopRow) return false;
+            c.TopRow = newTop;
+        }
+        else
+        {
+            int newBottom = Math.Clamp(c.BottomRow + delta, c.TopRow + 1, sheet.Grid.Rows - 1);
+            if (newBottom == c.BottomRow) return false;
+            c.BottomRow = newBottom;
+        }
+        MarkDirty();
+        return true;
     }
 
     /// <summary>
@@ -286,7 +457,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     public FreeLine? SelectedFreeLine
     {
         get => _selectedFreeLine;
-        set => SetProperty(ref _selectedFreeLine, value);
+        set
+        {
+            // T-041増分7: SelectedConnectorのsetterと同じ理由で操作対象端点を既定(始点)へリセットする。
+            SelectedEndpointIsStart = true;
+            SetProperty(ref _selectedFreeLine, value);
+            OnPropertyChanged(nameof(HasSelectedLinePrimitive));
+        }
     }
 
     /// <summary>SelectedFreeLineを削除する(T-041増分5、案A=DeleteSelectedConnectorと同型)。

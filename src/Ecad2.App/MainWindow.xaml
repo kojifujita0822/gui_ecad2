@@ -326,7 +326,10 @@
                         </Style.Triggers>
                     </Style>
                 </ScrollViewer.Style>
-                <views:LadderCanvas x:Name="LadderCanvasHost" PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp">
+                <views:LadderCanvas x:Name="LadderCanvasHost"
+                                    PreviewMouseLeftButtonDown="LadderCanvasHost_PreviewMouseLeftButtonDown"
+                                    PreviewMouseMove="LadderCanvasHost_PreviewMouseMove"
+                                    PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp">
                     <views:LadderCanvas.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
                     </views:LadderCanvas.LayoutTransform>
@@ -452,6 +455,12 @@
                 <TextBlock Text="{Binding SelectedCellDisplay, StringFormat='選択セル: {0}'}"/>
             </StatusBarItem>
             <Separator/>
+            <!-- T-041増分7(殿裁定P-033=案2): 線分プリミティブ(VerticalConnector/FreeLine)選択中のみ
+                 Tabで切替える操作対象端点(始点/終点)を表示する。 -->
+            <StatusBarItem Visibility="{Binding HasSelectedLinePrimitive, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding SelectedEndpointDisplay, StringFormat='操作対象: {0}'}"/>
+            </StatusBarItem>
+            <Separator Visibility="{Binding HasSelectedLinePrimitive, Converter={StaticResource BoolToVisibility}}"/>
             <StatusBarItem>
                 <TextBlock Text="{Binding CanvasScale, StringFormat='ズーム: {0:P0}'}"/>
             </StatusBarItem>

@@ -209,6 +209,34 @@ public sealed class LadderCanvas : FrameworkElement
     }
 
     /// <summary>
+    /// クリック位置(ローカルDIP座標)が選択中の縦コネクタ(<paramref name="connector"/>、選択済み前提)の
+    /// 本体/端点いずれに近いか判定する(T-041増分7、ドラッグ操作用)。HitTestConnectorが「複数候補
+    /// から選ぶ」のに対し、こちらは選択済みの1本に対して「本体/端点どちらを掴んだか」を判定する
+    /// (PoC=poc/t041-drag-poc/T041DragPoc/DragCanvas.csのHitTestを移植)。null=対象外(許容誤差外)。
+    /// </summary>
+    internal (bool IsEndpoint, bool IsTop)? HitTestConnectorDragMode(Point localPositionDip, VerticalConnector connector)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        var geo = _renderer.Geometry;
+        if (Math.Abs(xMm - geo.X(connector.Column)) > ConnectorHitToleranceMm) return null;
+
+        double yTop = geo.YRow(connector.TopRow), yBot = geo.YRow(connector.BottomRow);
+        if (yMm < yTop - ConnectorHitToleranceMm || yMm > yBot + ConnectorHitToleranceMm) return null;
+
+        if (Math.Abs(yMm - yTop) <= ConnectorHitToleranceMm) return (true, true);
+        if (Math.Abs(yMm - yBot) <= ConnectorHitToleranceMm) return (true, false);
+        return (false, false);
+    }
+
+    /// <summary>ローカルDIP座標(Y)が属するグリッド行を返す(T-041増分7、ドラッグ中のマウス追従用)。
+    /// ToGridPosと同じ変換だが行のみを返す薄いラッパー(呼び出し側でColumnまで必要としないため)。</summary>
+    internal int RowAtDip(double yDip)
+    {
+        var geo = _renderer.Geometry;
+        return geo.RowAt(yDip / MmToDip);
+    }
+
+    /// <summary>
     /// クリック位置(ローカルDIP座標)に十分近い配線分断を探す(T-041増分3)。列境界(Boundary)・行
     /// (Row)ともmm距離が許容誤差以内であることを確認する(HitTestConnectorが線分への距離を見るのに
     /// 対し、こちらは単純な1点への距離)。

@@ -19,6 +19,22 @@ public partial class MainWindow : Window
 {
     private readonly ViewModels.MainWindowViewModel _viewModel;
 
+    // T-041増分7: 配線プリミティブのドラッグ(本体移動/端点リサイズ)のしきい値判定用状態。
+    // ドラッグの状態機械自体(対象・モード・スナップショット)はViewModel側(BeginDrag*/UpdateDrag*/
+    // ConfirmDrag*/CancelDrag*)が持つが、「クリックとドラッグを区別するしきい値判定」はマウス
+    // イベントの連続性に依存するView固有の関心事のためここで保持する(poc/t041-drag-poc/PoCと同じ設計)。
+    private Point _connectorDragPressPositionDip;
+    private bool _connectorDragStarted;
+    private const double DragStartThresholdDip = 4.0;
+
+    // T-041増分7実機確認で発覚(往復1周目): Escでドラッグをキャンセルした時点ではユーザーの指は
+    // まだマウスボタンを押したままのため、ReleaseMouseCapture()するとその後実際に指を離した際の
+    // MouseUpがキャプチャ外の「新規クリック」として処理され、意図せぬセル/プリミティブ選択が
+    // 発生していた(離した位置がたまたま別要素の上にあると誤選択される)。キャンセル時はキャプチャを
+    // 維持したまま「このマウスダウン〜アップはドラッグ関連だった」ことだけを記録し、実際のMouseUpで
+    // 通常のクリック処理をスキップしてキャプチャを解放する。
+    private bool _connectorDragConsumedByEscape;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -227,8 +243,67 @@ public partial class MainWindow : Window
     // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の
     // 場合はクリック位置がそのまま配置位置になるため、その場でTryPlaceElementを呼ぶ。
     // キーボードショートカット(F5等)は、SelectedCellが既にある前提でTryPlaceBuiltinから直接呼ぶ。
+    // T-041増分7: 選択中の縦コネクタの本体/端点付近を押下したら、しきい値付きドラッグを開始する。
+    // 選択中でない、またはヒットしない場合は何もしない(その後のMouseLeftButtonUpが通常のクリック
+    // 処理=セル選択/縦コネクタ選択切替へ素通しされる)。
+    private void LadderCanvasHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
+        if (_viewModel.SelectedConnector is not Ecad2.Model.VerticalConnector connector) return;
+
+        var position = e.GetPosition(LadderCanvasHost);
+        if (LadderCanvasHost.HitTestConnectorDragMode(position, connector) is not (bool isEndpoint, bool isTop))
+            return;
+
+        int startRow = LadderCanvasHost.RowAtDip(position.Y);
+        _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow);
+        _connectorDragPressPositionDip = position;
+        _connectorDragStarted = false;
+        LadderCanvasHost.CaptureMouse();
+    }
+
+    // T-041増分7: ドラッグ中(キャプチャ中)のみ処理する。しきい値未満の移動はクリックとの区別のため
+    // 無視する(poc/t041-drag-poc/DragCanvas.csと同じ設計)。
+    private void LadderCanvasHost_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_viewModel.IsDraggingConnector || !LadderCanvasHost.IsMouseCaptured) return;
+        var position = e.GetPosition(LadderCanvasHost);
+
+        if (!_connectorDragStarted)
+        {
+            if ((position - _connectorDragPressPositionDip).Length < DragStartThresholdDip) return;
+            _connectorDragStarted = true;
+        }
+
+        _viewModel.UpdateDragConnector(LadderCanvasHost.RowAtDip(position.Y));
+        RedrawCanvas();
+    }
+
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDraggingConnector=falseだが
+        // _connectorDragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
+        // キャプチャを解放するのみで、通常のクリック処理(セル選択/縦コネクタ選択切替)は行わない
+        // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
+        if (_connectorDragConsumedByEscape)
+        {
+            LadderCanvasHost.ReleaseMouseCapture();
+            _connectorDragConsumedByEscape = false;
+            return;
+        }
+
+        // T-041増分7: ドラッグ中だった場合はここで確定し、以降の通常クリック処理(セル選択/縦コネクタ
+        // 選択切替)は行わない。ドラッグしきい値未満(_connectorDragStarted=false)のまま離した場合も
+        // ConfirmDragConnectorは値が変化していなければMarkDirty()しないため、実質クリックとして無害。
+        if (_viewModel.IsDraggingConnector)
+        {
+            LadderCanvasHost.ReleaseMouseCapture();
+            _viewModel.ConfirmDragConnector();
+            _connectorDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+
         var position = e.GetPosition(LadderCanvasHost);
 
         // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
@@ -314,6 +389,21 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
+                // T-041増分7: ドラッグ中(マウスキャプチャ中)のEscは掴んだ位置への復元のみを行う
+                // 独立した最優先の層とする(記入中モードと同じ「1回のEscは1層だけ」の原則、下記の
+                // 層2/3/4処理へは落とさない)。poc/t041-drag-poc/DragCanvas.csと同じ設計。
+                if (_viewModel.IsDraggingConnector)
+                {
+                    // キャプチャは解放しない(ユーザーの指はまだボタンを押したままの想定)。
+                    // _connectorDragConsumedByEscapeで印を付け、実際のMouseUpで無害化してから解放する。
+                    _viewModel.CancelDragConnector();
+                    _connectorDragStarted = false;
+                    _connectorDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // T-036追加修正(殿裁定=Esc入力破棄、隠密レビュー指摘=Esc層消費): デバイス名編集中の
                 // Escは表示復元(UpdateTarget())+フォーカス復帰のみの独立した1層として消費し、
                 // 下記の層2/3/4処理(選択解除等)へは落とさない(T-021「1回のEscは1層だけ」の原則に
@@ -434,6 +524,9 @@ public partial class MainWindow : Window
                     AdjustConnectorDraft(e.Key, cellCenterStep: false);
                 else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine)
                     AdjustFreeLineDraft(e.Key);
+                else if (_viewModel.SelectedConnector is not null)
+                    // T-041増分7: 選択中の縦コネクタを平行移動する(キーボード等価操作、案X)。
+                    MoveSelectedConnectorByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -442,6 +535,19 @@ public partial class MainWindow : Window
                     && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceConnector:
                 // T-041増分2: Shift+Left/Rightはセル中央(X.5)刻みでの列位置調整(原案3節)。
                 AdjustConnectorDraft(e.Key, cellCenterStep: true);
+                e.Handled = true;
+                break;
+            case Key.Up or Key.Down when shift && IsCanvasFocused() && _viewModel.SelectedConnector is not null:
+                // T-041増分7(殿裁定P-033=案2): Tabで選んだ操作対象端点(始点/終点)をUp=-1/Down=+1で
+                // 伸縮する。VerticalConnectorは常に縦線のためLeft/Rightの端点伸縮は意味を持たず未対応。
+                if (_viewModel.ResizeSelectedConnectorEndpoint(e.Key == Key.Up ? -1 : 1))
+                    RedrawCanvas();
+                e.Handled = true;
+                break;
+            case Key.Tab when noModifier && IsCanvasFocused() && _viewModel.HasSelectedLinePrimitive:
+                // T-041増分7(殿裁定P-033=案2): 操作対象端点(始点/終点)をトグルする。表示は
+                // ステータスバーのSelectedEndpointDisplayバインディングで自動反映される。
+                _viewModel.ToggleSelectedEndpoint();
                 e.Handled = true;
                 break;
             case Key.Delete when noModifier && IsCanvasFocused():
@@ -564,6 +670,24 @@ public partial class MainWindow : Window
             }
             LadderCanvasHost.BringIntoView(new Rect(viewLeft, viewRect.Y, viewWidth, viewRect.Height));
         }
+    }
+
+    // T-041増分7: 選択中の縦コネクタを矢印キー1回分(Shift無し)平行移動する(キーボード等価操作、
+    // 案X)。Up/Down=行方向、Left/Right=列方向。ViewModelのMoveSelectedConnector/
+    // MoveSelectedConnectorColumnはモデル(TopRow/BottomRow/Column)を直接更新するのみで
+    // SelectedConnector自体の参照は変わらないためPropertyChangedが発火せず、RedrawCanvas()を
+    // ここで明示的に呼ぶ(ドラッグ確定・Escキャンセルと同じ理由)。
+    private void MoveSelectedConnectorByKey(Key key)
+    {
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedConnector(-1),
+            Key.Down => _viewModel.MoveSelectedConnector(1),
+            Key.Left => _viewModel.MoveSelectedConnectorColumn(-1),
+            Key.Right => _viewModel.MoveSelectedConnectorColumn(1),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
     }
 
     // 選択ツールボタン(ツールバーのEsc相当ボタン)の即時処理。選択セル・ツール・案内メッセージを
