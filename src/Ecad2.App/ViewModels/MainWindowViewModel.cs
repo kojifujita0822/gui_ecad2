@@ -1286,15 +1286,23 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool IsSelectedCellOccupied()
         => SelectedCell is { } pos && CurrentSheet is Sheet sheet && sheet.Elements.Any(el => el.Pos == pos);
 
-    /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
-    /// 統合)。行0〜Rows-1・列0〜Columns-1の範囲外、または既に要素があればfalse。
-    /// 選択(SelectedCell)自体の仕様範囲(行-1・列-2まで選択可、殿教示2026-07-07・
-    /// docs/proposed.md P-022/P-024)には触れず、配置経路のみをガードする
-    /// (殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
-    private bool ValidatePlacement(GridPos pos, Sheet sheet)
+    /// <summary>SelectedCellが現在のグリッド範囲内(行0〜Rows-1・列0〜Columns-1)か判定する
+    /// (T-045増分C、View層のTryPlaceElementが配置バー表示前に境界外を弾くために使う。所見B=
+    /// 境界チェック未追随でのサイレント失敗の解消)。選択(SelectedCell)自体の仕様範囲(行-1・
+    /// 列-2まで選択可、殿教示2026-07-07・docs/proposed.md P-022/P-024)には触れず、配置前の
+    /// フィードバック用の判定に留める(殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
+    public bool IsSelectedCellWithinGrid()
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, sheet);
+
+    private static bool IsWithinGridBounds(GridPos pos, Sheet sheet)
         => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
-        && pos.Column >= 0 && pos.Column < sheet.Grid.Columns
-        && !sheet.Elements.Any(el => el.Pos == pos);
+        && pos.Column >= 0 && pos.Column < sheet.Grid.Columns;
+
+    /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
+    /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
+    /// 共有する(IsWithinGridBounds)。</summary>
+    private bool ValidatePlacement(GridPos pos, Sheet sheet)
+        => IsWithinGridBounds(pos, sheet) && !sheet.Elements.Any(el => el.Pos == pos);
 
     /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
     /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、

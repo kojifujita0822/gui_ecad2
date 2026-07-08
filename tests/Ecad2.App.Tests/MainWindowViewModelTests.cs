@@ -160,6 +160,40 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Equal(expectPlaced, vm.CurrentSheet!.Elements.Any(el => el.Pos == new GridPos(row, column)));
     }
 
+    /// <summary>
+    /// T-045増分C(所見B=TryPlaceElementの境界チェック未追随の解消)の回帰テスト。IsSelectedCellWithinGrid
+    /// はValidatePlacementと境界判定ロジックを共有する(IsWithinGridBounds)。境界は
+    /// PlaceElementAtSelectedCell_BoundaryRowAndColumnと同じ8ケース。
+    /// </summary>
+    [Theory]
+    [InlineData(-1, 5, false)]
+    [InlineData(0, 5, true)]
+    [InlineData(9, 5, true)]
+    [InlineData(10, 5, false)]
+    [InlineData(0, -2, false)]
+    [InlineData(0, 0, true)]
+    [InlineData(0, 19, true)]
+    [InlineData(0, 20, false)]
+    public void IsSelectedCellWithinGrid_BoundaryRowAndColumn_ReturnsExpected(int row, int column, bool expected)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(row, column);
+
+        Assert.Equal(expected, vm.IsSelectedCellWithinGrid());
+    }
+
+    /// <summary>SelectedCell未選択(null)の場合はfalseを返す(TryPlaceElementは占有チェック同様、
+    /// null選択を別ガードで先に弾くため到達しない想定だが、単体としての境界値を確認する)。</summary>
+    [Fact]
+    public void IsSelectedCellWithinGrid_WhenNoCellSelected_ReturnsFalse()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        Assert.False(vm.IsSelectedCellWithinGrid());
+    }
+
     /// <summary>T-045増分B(P-021占有再チェック欠如の解消)の回帰テスト。既に要素があるセルへの
     /// 再配置は無視され、先着の要素・機器名がそのまま残ることを検証する。</summary>
     [Fact]

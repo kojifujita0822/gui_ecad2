@@ -232,14 +232,6 @@ public sealed class LadderCanvas : FrameworkElement
         return (false, false);
     }
 
-    /// <summary>ローカルDIP座標(Y)が属するグリッド行を返す(T-041増分7、ドラッグ中のマウス追従用)。
-    /// ToGridPosと同じ変換だが行のみを返す薄いラッパー(呼び出し側でColumnまで必要としないため)。</summary>
-    internal int RowAtDip(double yDip)
-    {
-        var geo = _renderer.Geometry;
-        return geo.RowAt(yDip / MmToDip);
-    }
-
     /// <summary>ローカルDIP座標を(行, 列境界0.5刻み)へ変換する(T-041増分7、WireBreakドラッグ用)。
     /// GridGeometry.BoundaryAtHalfで縦コネクタ/配線分断の記入時と同じ0.5刻みにスナップする。</summary>
     internal (int Row, double Boundary) ToRowBoundary(Point localPositionDip)
