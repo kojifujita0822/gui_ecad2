@@ -9,6 +9,8 @@ namespace Ecad2.App.ViewModels;
 /// 左パレット（シートナビゲーション）用の ViewModel。GuiEcadのナビツリー調査（T-026）に基づき、
 /// 実質フラットリスト（1シート=1ノード、階層なし）を踏襲する。MainWindowViewModel の子プロパティ
 /// として持たせる（design-brief 3節#1: God Class化の再発防止）。
+/// T-045(P-016対応): AddCommand/RenameCommand内のBeginInvoke呼び出し(2箇所)は、いずれも
+/// IDispatcherService経由にし、WPF Applicationへの直接依存を除去したもの。
 /// </summary>
 public sealed class SheetNavigationViewModel : ViewModelBase
 {
@@ -96,7 +98,6 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // 終えていないため、この場で同期的にSelectedSheetを設定すると視覚上の選択ハイライトが
             // 追従しない(IsSelectedはSelectionItemPattern上は正しく更新されるが表示は前の項目の
             // ままになる。T-026実機確認で発見)。UI要素生成後の次フレームへ遅延させる。
-            // T-045(P-016対応): IDispatcherService経由にし、WPF Applicationへの直接依存を除去。
             _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
                 () => SelectedSheet = sheet);
@@ -147,7 +148,6 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // RefreshSelectedSheet()の変更通知だけで再同期できる(SelectedSheetのgetterは
             // CurrentSheetIndex経由でSheets[index]を返すため、indexが不変ならgetterの戻り値は
             // 改名後のsheet参照を正しく指す)。
-            // T-045(P-016対応): IDispatcherService経由にし、WPF Applicationへの直接依存を除去。
             _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
                 RefreshSelectedSheet);

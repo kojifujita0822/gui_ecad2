@@ -1,3 +1,4 @@
+using System.Windows.Threading;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
 
@@ -9,7 +10,9 @@ namespace Ecad2.App.Tests;
 /// 解消した。CreateViewModel()(ViewModelTestBase)がImmediateDispatcherService(即時同期実行)を
 /// 注入するため、従来try/catchで握りつぶしていたNullReferenceExceptionが発生しなくなり、
 /// BeginInvoke経由の選択ハイライト同期(SelectedSheet設定・RefreshSelectedSheet)まで
-/// 直接検証できるようになった。
+/// 直接検証できるようになった。ただし本番<see cref="WpfDispatcherService"/>は実際のWPF
+/// Dispatcherへ非同期でキューイングするのに対し、<see cref="ImmediateDispatcherService"/>は
+/// actionを即時同期実行するため、タイミング特性が異なる(増分A補遺、隠密軽微指摘)。
 /// </summary>
 public class SheetNavigationViewModelTests : ViewModelTestBase
 {
@@ -70,9 +73,43 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.AddCommand.Execute(("シート2", false));
 
         Assert.True(vm.IsDirty);
-        // T-045(P-016対応): BeginInvoke経由のSelectedSheet設定が即時同期実行され、追加した
-        // シートが選択状態になることを検証する(従来はtry/catchで握りつぶし未検証だった経路)。
+        // 追加したシートが選択状態になることを検証する(BeginInvoke経由の同期、クラスコメント参照)。
         Assert.Equal(vm.Document.Sheets[^1], vm.SheetNavigation.SelectedSheet);
+    }
+
+    /// <summary>
+    /// 増分A補遺(隠密所見1、CONFIRMED)の回帰テスト。ImmediateDispatcherServiceはpriority引数を
+    /// 無視して即時実行するため、AddCommand_MarksDirtyだけでは意図的に選ばれた
+    /// DispatcherPriority.ContextIdle(T-026実機確認由来)が別の値に変わっても検出できなかった。
+    /// </summary>
+    [Fact]
+    public void AddCommand_DispatchesSelectionSyncWithContextIdlePriority()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+
+        Assert.Equal(DispatcherPriority.ContextIdle, Dispatcher.LastPriority);
+    }
+
+    /// <summary>
+    /// 増分A補遺(隠密所見2、CONFIRMED)の回帰テスト。ImmediateDispatcherServiceが即時同期実行
+    /// するため、AddCommand_MarksDirtyは最終状態(IsDirty)しか見ておらず、MarkDirty()が
+    /// BeginInvoke呼び出し前(同期部分)からlambda内(非同期部分)へ移動しても検出できなかった。
+    /// BeginInvoke呼び出し直前(action実行前)の時点で既にIsDirtyがtrueであることを検証する。
+    /// </summary>
+    [Fact]
+    public void AddCommand_MarksDirtyBeforeDispatchingSelectionSync()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        bool isDirtyWhenDispatched = false;
+        Dispatcher.BeforeInvoke = () => isDirtyWhenDispatched = vm.IsDirty;
+
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+
+        Assert.True(isDirtyWhenDispatched);
     }
 
     [Fact]
@@ -211,9 +248,34 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.RenameCommand.Execute("新シート名");
 
         Assert.True(vm.IsDirty);
-        // T-045(P-016対応): BeginInvoke経由のRefreshSelectedSheet()が即時同期実行され、
-        // SelectedSheetのPropertyChangedが発火することを検証する(従来はtry/catchで握りつぶし
-        // 未検証だった経路)。
+        // RefreshSelectedSheet()経由でSelectedSheetのPropertyChangedが発火することを検証する
+        // (BeginInvoke経由の同期、クラスコメント参照)。
         Assert.True(selectedSheetChanged);
+    }
+
+    /// <summary>増分A補遺(隠密所見1、CONFIRMED)の回帰テスト。RenameCommand版。</summary>
+    [Fact]
+    public void RenameCommand_DispatchesRefreshWithContextIdlePriority()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.SheetNavigation.RenameCommand.Execute("新シート名");
+
+        Assert.Equal(DispatcherPriority.ContextIdle, Dispatcher.LastPriority);
+    }
+
+    /// <summary>増分A補遺(隠密所見2、CONFIRMED)の回帰テスト。RenameCommand版。</summary>
+    [Fact]
+    public void RenameCommand_MarksDirtyBeforeDispatchingRefresh()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        bool isDirtyWhenDispatched = false;
+        Dispatcher.BeforeInvoke = () => isDirtyWhenDispatched = vm.IsDirty;
+
+        vm.SheetNavigation.RenameCommand.Execute("新シート名");
+
+        Assert.True(isDirtyWhenDispatched);
     }
 }
