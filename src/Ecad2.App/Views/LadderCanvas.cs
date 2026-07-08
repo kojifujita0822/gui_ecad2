@@ -236,6 +236,15 @@ public sealed class LadderCanvas : FrameworkElement
         return geo.RowAt(yDip / MmToDip);
     }
 
+    /// <summary>ローカルDIP座標を(行, 列境界0.5刻み)へ変換する(T-041増分7、WireBreakドラッグ用)。
+    /// GridGeometry.BoundaryAtHalfで縦コネクタ/配線分断の記入時と同じ0.5刻みにスナップする。</summary>
+    internal (int Row, double Boundary) ToRowBoundary(Point localPositionDip)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        var geo = _renderer.Geometry;
+        return (geo.RowAt(yMm), geo.BoundaryAtHalf(xMm));
+    }
+
     /// <summary>
     /// クリック位置(ローカルDIP座標)に十分近い配線分断を探す(T-041増分3)。列境界(Boundary)・行
     /// (Row)ともmm距離が許容誤差以内であることを確認する(HitTestConnectorが線分への距離を見るのに

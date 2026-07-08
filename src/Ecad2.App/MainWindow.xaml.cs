@@ -35,6 +35,12 @@ public partial class MainWindow : Window
     // 通常のクリック処理をスキップしてキャプチャを解放する。
     private bool _connectorDragConsumedByEscape;
 
+    // T-041増分7横展開: 配線分断(WireBreak)ドラッグの同種の状態(VerticalConnectorと同じ理由で
+    // View側に保持)。
+    private Point _wireBreakDragPressPositionDip;
+    private bool _wireBreakDragStarted;
+    private bool _wireBreakDragConsumedByEscape;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -249,57 +255,97 @@ public partial class MainWindow : Window
     private void LadderCanvasHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
-        if (_viewModel.SelectedConnector is not Ecad2.Model.VerticalConnector connector) return;
-
         var position = e.GetPosition(LadderCanvasHost);
-        if (LadderCanvasHost.HitTestConnectorDragMode(position, connector) is not (bool isEndpoint, bool isTop))
-            return;
 
-        int startRow = LadderCanvasHost.RowAtDip(position.Y);
-        _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow);
-        _connectorDragPressPositionDip = position;
-        _connectorDragStarted = false;
-        LadderCanvasHost.CaptureMouse();
+        if (_viewModel.SelectedConnector is Ecad2.Model.VerticalConnector connector
+            && LadderCanvasHost.HitTestConnectorDragMode(position, connector) is (bool isEndpoint, bool isTop))
+        {
+            int startRow = LadderCanvasHost.RowAtDip(position.Y);
+            _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow);
+            _connectorDragPressPositionDip = position;
+            _connectorDragStarted = false;
+            LadderCanvasHost.CaptureMouse();
+            return;
+        }
+
+        // T-041増分7横展開: 選択中の配線分断(点系)を押下したらドラッグを開始する。HitTestWireBreak
+        // (複数候補から探す通常のヒットテスト)の結果が選択中の1点と一致する場合のみ対象とする
+        // (VerticalConnectorのHitTestConnectorDragModeと異なり、点は本体/端点の区別が無いため
+        // 専用のドラッグ用HitTestは不要)。
+        if (_viewModel.SelectedWireBreak is Ecad2.Model.WireBreak wireBreak
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet sheet
+            && LadderCanvasHost.HitTestWireBreak(position, sheet) == wireBreak)
+        {
+            var (row, boundary) = LadderCanvasHost.ToRowBoundary(position);
+            _viewModel.BeginDragWireBreak(wireBreak, row, boundary);
+            _wireBreakDragPressPositionDip = position;
+            _wireBreakDragStarted = false;
+            LadderCanvasHost.CaptureMouse();
+        }
     }
 
     // T-041増分7: ドラッグ中(キャプチャ中)のみ処理する。しきい値未満の移動はクリックとの区別のため
     // 無視する(poc/t041-drag-poc/DragCanvas.csと同じ設計)。
     private void LadderCanvasHost_PreviewMouseMove(object sender, MouseEventArgs e)
     {
-        if (!_viewModel.IsDraggingConnector || !LadderCanvasHost.IsMouseCaptured) return;
+        if (!LadderCanvasHost.IsMouseCaptured) return;
         var position = e.GetPosition(LadderCanvasHost);
 
-        if (!_connectorDragStarted)
+        if (_viewModel.IsDraggingConnector)
         {
-            if ((position - _connectorDragPressPositionDip).Length < DragStartThresholdDip) return;
-            _connectorDragStarted = true;
+            if (!_connectorDragStarted)
+            {
+                if ((position - _connectorDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _connectorDragStarted = true;
+            }
+            _viewModel.UpdateDragConnector(LadderCanvasHost.RowAtDip(position.Y));
+            RedrawCanvas();
+            return;
         }
 
-        _viewModel.UpdateDragConnector(LadderCanvasHost.RowAtDip(position.Y));
-        RedrawCanvas();
+        if (_viewModel.IsDraggingWireBreak)
+        {
+            if (!_wireBreakDragStarted)
+            {
+                if ((position - _wireBreakDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _wireBreakDragStarted = true;
+            }
+            var (row, boundary) = LadderCanvasHost.ToRowBoundary(position);
+            _viewModel.UpdateDragWireBreak(row, boundary);
+            RedrawCanvas();
+        }
     }
 
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDraggingConnector=falseだが
-        // _connectorDragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
-        // キャプチャを解放するのみで、通常のクリック処理(セル選択/縦コネクタ選択切替)は行わない
+        // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDragging*=falseだが
+        // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
+        // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
-        if (_connectorDragConsumedByEscape)
+        if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
+            _wireBreakDragConsumedByEscape = false;
             return;
         }
 
-        // T-041増分7: ドラッグ中だった場合はここで確定し、以降の通常クリック処理(セル選択/縦コネクタ
-        // 選択切替)は行わない。ドラッグしきい値未満(_connectorDragStarted=false)のまま離した場合も
-        // ConfirmDragConnectorは値が変化していなければMarkDirty()しないため、実質クリックとして無害。
+        // T-041増分7: ドラッグ中だった場合はここで確定し、以降の通常クリック処理(セル選択/配線
+        // プリミティブ選択切替)は行わない。ドラッグしきい値未満のまま離した場合もConfirmDrag*は
+        // 値が変化していなければMarkDirty()しないため、実質クリックとして無害。
         if (_viewModel.IsDraggingConnector)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragConnector();
             _connectorDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingWireBreak)
+        {
+            LadderCanvasHost.ReleaseMouseCapture();
+            _viewModel.ConfirmDragWireBreak();
+            _wireBreakDragStarted = false;
             RedrawCanvas();
             return;
         }
@@ -399,6 +445,16 @@ public partial class MainWindow : Window
                     _viewModel.CancelDragConnector();
                     _connectorDragStarted = false;
                     _connectorDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsDraggingWireBreak)
+                {
+                    _viewModel.CancelDragWireBreak();
+                    _wireBreakDragStarted = false;
+                    _wireBreakDragConsumedByEscape = true;
                     RedrawCanvas();
                     FocusCanvas();
                     e.Handled = true;
@@ -527,6 +583,9 @@ public partial class MainWindow : Window
                 else if (_viewModel.SelectedConnector is not null)
                     // T-041増分7: 選択中の縦コネクタを平行移動する(キーボード等価操作、案X)。
                     MoveSelectedConnectorByKey(e.Key);
+                else if (_viewModel.SelectedWireBreak is not null)
+                    // T-041増分7横展開: 選択中の配線分断を平行移動する(点系、本体移動のみ)。
+                    MoveSelectedWireBreakByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -685,6 +744,21 @@ public partial class MainWindow : Window
             Key.Down => _viewModel.MoveSelectedConnector(1),
             Key.Left => _viewModel.MoveSelectedConnectorColumn(-1),
             Key.Right => _viewModel.MoveSelectedConnectorColumn(1),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
+    }
+
+    // T-041増分7横展開: 選択中の配線分断を矢印キー1回分(Shift無し)平行移動する(点系、本体移動のみ)。
+    // MoveSelectedConnectorByKeyと同じ理由でRedrawCanvas()をここで明示的に呼ぶ。
+    private void MoveSelectedWireBreakByKey(Key key)
+    {
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedWireBreak(-1, 0),
+            Key.Down => _viewModel.MoveSelectedWireBreak(1, 0),
+            Key.Left => _viewModel.MoveSelectedWireBreak(0, -1),
+            Key.Right => _viewModel.MoveSelectedWireBreak(0, 1),
             _ => false,
         };
         if (moved) RedrawCanvas();

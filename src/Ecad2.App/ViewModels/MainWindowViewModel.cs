@@ -433,6 +433,76 @@ public sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    // T-041増分7横展開: 配線分断(WireBreak)のドラッグ移動の一時状態。点系は本体移動のみ(端点概念が
+    // 無いためVerticalConnectorのisEndpoint/isTopに相当する分岐は不要)。行・列(Boundary)とも
+    // ドラッグ開始位置からの相対差分で動かす(点をつまんだ位置がいきなり点の中心へワープしないよう、
+    // VerticalConnectorの本体移動と同じ相対差分方式に揃える)。
+    private WireBreak? _draggingWireBreak;
+    private int _dragWireBreakOrigRow;
+    private double _dragWireBreakOrigBoundary;
+    private int _dragWireBreakStartRow;
+    private double _dragWireBreakStartBoundary;
+
+    /// <summary>配線分断をドラッグ中か。</summary>
+    public bool IsDraggingWireBreak => _draggingWireBreak is not null;
+
+    /// <summary>配線分断のドラッグを開始する(T-041増分7)。startRow/startBoundaryはドラッグ開始時の
+    /// マウス位置(行・列境界0.5刻み)。</summary>
+    public void BeginDragWireBreak(WireBreak wireBreak, int startRow, double startBoundary)
+    {
+        _draggingWireBreak = wireBreak;
+        _dragWireBreakOrigRow = wireBreak.Row;
+        _dragWireBreakOrigBoundary = wireBreak.Boundary;
+        _dragWireBreakStartRow = startRow;
+        _dragWireBreakStartBoundary = startBoundary;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(現在行・列境界)に応じて配線分断の位置を更新する(T-041増分7)。
+    /// Grid範囲内にクランプする。</summary>
+    public void UpdateDragWireBreak(int currentRow, double currentBoundary)
+    {
+        if (_draggingWireBreak is not WireBreak b || CurrentSheet is not Sheet sheet) return;
+        int deltaRow = currentRow - _dragWireBreakStartRow;
+        double deltaBoundary = currentBoundary - _dragWireBreakStartBoundary;
+        b.Row = Math.Clamp(_dragWireBreakOrigRow + deltaRow, 0, sheet.Grid.Rows - 1);
+        b.Boundary = Math.Clamp(_dragWireBreakOrigBoundary + deltaBoundary, 0, sheet.Grid.Columns);
+    }
+
+    /// <summary>配線分断のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
+    /// MarkDirty()する。</summary>
+    public void ConfirmDragWireBreak()
+    {
+        if (_draggingWireBreak is WireBreak b &&
+            (b.Row != _dragWireBreakOrigRow || b.Boundary != _dragWireBreakOrigBoundary))
+            MarkDirty();
+        _draggingWireBreak = null;
+    }
+
+    /// <summary>配線分断のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
+    public void CancelDragWireBreak()
+    {
+        if (_draggingWireBreak is WireBreak b)
+        {
+            b.Row = _dragWireBreakOrigRow;
+            b.Boundary = _dragWireBreakOrigBoundary;
+        }
+        _draggingWireBreak = null;
+    }
+
+    /// <summary>選択中の配線分断を矢印キー1回分(deltaRow/deltaBoundary、いずれか一方は0)平行移動する
+    /// (T-041増分7、キーボード等価操作)。点系は本体移動のみ。実際に動けた場合のみMarkDirty()する。</summary>
+    public bool MoveSelectedWireBreak(int deltaRow, double deltaBoundary)
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedWireBreak is not WireBreak b) return false;
+        int newRow = Math.Clamp(b.Row + deltaRow, 0, sheet.Grid.Rows - 1);
+        double newBoundary = Math.Clamp(b.Boundary + deltaBoundary, 0, sheet.Grid.Columns);
+        if (newRow == b.Row && newBoundary == b.Boundary) return false;
+        b.Row = newRow;
+        b.Boundary = newBoundary;
+        MarkDirty();
+        return true;
+    }
+
     /// <summary>
     /// F10押下時、SelectedCellの位置へ配線分断を即時記入する(T-041増分3、点系は確認フェーズ無し
     /// で即時記入する原案3節の設計)。呼び出し元(MainWindow.xaml.cs)でHasProject/制御回路シート判定は
