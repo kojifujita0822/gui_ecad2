@@ -105,23 +105,26 @@ public sealed class MainWindowViewModel : ViewModelBase
             // T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大、増分1由来の構造的な穴): シート削除
             // (SheetNavigationViewModel.DeleteCommand)で「非末尾シートを削除、かつそれが現在表示中」
             // の場合、削除後のindex数値がたまたま削除前と一致するケースがある(Sheets[index]の実体は
-            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。クロスカット的クリア
+            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。CurrentSheetIndex
+            // は「値そのもの」ではなく「Document.Sheetsへの添字(キー)」に過ぎず、キーの数値が同じ
+            // でも参照先の実体(Sheets[index])が入れ替わりうる非対称性を持つ。よってプロパティ
+            // 自身の変更通知(OnPropertyChanged(nameof(CurrentSheet)))・クロスカット的クリア
             // (前シートのSelectedCell・全選択状態/記入中状態の連鎖クリア、左パレット選択ハイライト
-            // 同期)は値変化の有無に関わらず常時実行し、削除された旧シートの描画・選択・記入中状態
-            // (縦コネクタ/自由線等)が残留したまま新シートへ誤って確定されるのを防ぐ。
+            // 同期)は共に値変化の有無に関わらず常時実行する(SetPropertyの戻り値でガードしない)。
             //
-            // T-041増分5隠密再レビュー指摘(所見L CONFIRMED重大・所見M根本原因): 上記を「setter全体を
-            // 無条件化」で実現すると、シート改名(SheetNavigationViewModel.RenameCommand、参照だけが
-            // 入れ替わりindex数値は不変)のような既存の正常系にも波及し、改名するだけで記入中の
-            // 縦コネクタ・自由線ドラフトが警告なく破棄される副作用を生んだ。SelectedCellのsetter
-            // (下記参照)と同じ粒度(クロスカット的クリアはSetPropertyより前に無条件配置、プロパティ
-            // 自身の変更通知はSetPropertyが真を返した場合のみ発火)へ揃える。
+            // T-041増分5隠密再レビュー往復2周目で、この無条件クロスカットクリアがシート改名
+            // (SheetNavigationViewModel.RenameCommand、参照だけが入れ替わりindex数値は不変)にも
+            // 波及し記入中ドラフトを警告なく破棄する副作用(所見L)を発見、一度はSelectedCellの
+            // setterと同じ粒度(変更通知のみ値変化時限定)へ統一したが、往復3周目でそれが本節
+            // 冒頭の症状1(削除時の再描画漏れ)を「削除直前にSelectedCellが既にnull」という別条件
+            // 下で再発させることが判明した。真因は改名の遅延再選択がCurrentSheetIndexへの代入
+            // 自体を経由すること側にあったため、対処はSheetNavigationViewModel.RenameCommand側
+            // (RefreshSelectedSheet()のみ呼ぶ形)で行い、本setterは往復1周目の「常時無条件」の
+            // ままとする(二重のモグラ叩きを避ける)。
+            SetProperty(ref _currentSheetIndex, value);
+            OnPropertyChanged(nameof(CurrentSheet));
             SelectedCell = null;
             SheetNavigation.RefreshSelectedSheet();
-            if (SetProperty(ref _currentSheetIndex, value))
-            {
-                OnPropertyChanged(nameof(CurrentSheet));
-            }
         }
     }
 

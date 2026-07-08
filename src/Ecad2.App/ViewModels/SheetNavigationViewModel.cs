@@ -136,9 +136,17 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             _owner.MarkDirty();
             Sheets.RemoveAt(index);
             Sheets.Insert(index, sheet);
+            // T-041増分5隠密レビュー指摘(往復3周目、所見L真因対処): 改名は同一シートに留まる
+            // 操作(indexは不変)のため、SelectedSheetのsetter経由でCurrentSheetIndexへ再代入する
+            // 必要は無い。CurrentSheetIndexへの代入はSelectedCellクリア等のクロスカット処理を
+            // 伴うため、改名だけで記入中の縦コネクタ・自由線ドラフトが警告なく破棄される副作用
+            // (所見L)を生んでいた。RemoveAt+Insertでズレたコンテナの選択ハイライトは
+            // RefreshSelectedSheet()の変更通知だけで再同期できる(SelectedSheetのgetterは
+            // CurrentSheetIndex経由でSheets[index]を返すため、indexが不変ならgetterの戻り値は
+            // 改名後のsheet参照を正しく指す)。
             System.Windows.Application.Current.Dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
-                new Action(() => SelectedSheet = sheet));
+                new Action(RefreshSelectedSheet));
         });
     }
 }

@@ -163,6 +163,42 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         Assert.Empty(vm.CurrentSheet!.FreeLines);
     }
 
+    /// <summary>
+    /// T-041増分5隠密レビュー指摘(往復3周目、テストカバレッジの隙間対応)。往復1周目の回帰テスト2件は
+    /// いずれも削除前にSelectedCellを明示セットしていたため、SelectedCell自身のPropertyChanged
+    /// (null→値、削除でnullに戻る際に発火)がCurrentSheetの変更通知漏れを覆い隠してしまい、症状1
+    /// (削除でindex数値が変化しない場合にCurrentSheetのPropertyChangedが発火せず再描画が飛ぶ)を
+    /// 検出できていなかった。削除前にSelectedCellが既にnull(セル未選択のまま削除する、最も基本的な
+    /// 操作)というケースで、CurrentSheetのPropertyChangedが確実に発火することを直接検証する。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenIndexNumberStaysSameAndSelectedCellAlreadyNull_RaisesCurrentSheetChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        // CurrentSheetIndexは既定の0のまま(先頭シートを表示中)。SelectedCellは未選択(null)のまま。
+        Assert.Null(vm.SelectedCell);
+
+        bool currentSheetChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.CurrentSheet)) currentSheetChanged = true;
+        };
+
+        // 表示中の先頭シートを削除する。後続シートがindex0へ繰り上がり、
+        // CurrentSheetIndex = Math.Min(0, Sheets.Count-1=0) = 0 (数値上は変化なし)。
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.True(currentSheetChanged);
+    }
+
     [Fact]
     public void RenameCommand_MarksDirty()
     {
