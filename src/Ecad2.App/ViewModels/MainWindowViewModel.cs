@@ -105,23 +105,23 @@ public sealed class MainWindowViewModel : ViewModelBase
             // T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大、増分1由来の構造的な穴): シート削除
             // (SheetNavigationViewModel.DeleteCommand)で「非末尾シートを削除、かつそれが現在表示中」
             // の場合、削除後のindex数値がたまたま削除前と一致するケースがある(Sheets[index]の実体は
-            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。従来はここで
-            // SetPropertyの早期returnにより後続処理(CurrentSheet変更通知・SelectedCellクリア→
-            // 全選択状態/記入中状態の連鎖クリア・RedrawCanvas)が丸ごとスキップされ、削除された旧
-            // シートの描画・選択・記入中状態(縦コネクタ/自由線等)が残留したまま新シートへ誤って
-            // 確定されうるバグがあった。SelectedCellのsetter集約と同じ設計(値変化の有無に関わらず
-            // 常時実行)へ改め、SetPropertyの戻り値では後続処理をガードしない。
-            SetProperty(ref _currentSheetIndex, value);
-            OnPropertyChanged(nameof(CurrentSheet));
-            // シート切替時、前シートのSelectedCell(ハイライト・プロパティパネル)を持ち越さない
-            // (T-018忍者実機検証で発見: 空シートへ切替えてもハイライト・プロパティ内容が残存するバグ)。
-            // SelectedConnector等も同じsetterが自動クリアする(T-041増分1隠密レビュー指摘、上記
-            // SelectedCellのsetter参照)。
+            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。クロスカット的クリア
+            // (前シートのSelectedCell・全選択状態/記入中状態の連鎖クリア、左パレット選択ハイライト
+            // 同期)は値変化の有無に関わらず常時実行し、削除された旧シートの描画・選択・記入中状態
+            // (縦コネクタ/自由線等)が残留したまま新シートへ誤って確定されるのを防ぐ。
+            //
+            // T-041増分5隠密再レビュー指摘(所見L CONFIRMED重大・所見M根本原因): 上記を「setter全体を
+            // 無条件化」で実現すると、シート改名(SheetNavigationViewModel.RenameCommand、参照だけが
+            // 入れ替わりindex数値は不変)のような既存の正常系にも波及し、改名するだけで記入中の
+            // 縦コネクタ・自由線ドラフトが警告なく破棄される副作用を生んだ。SelectedCellのsetter
+            // (下記参照)と同じ粒度(クロスカット的クリアはSetPropertyより前に無条件配置、プロパティ
+            // 自身の変更通知はSetPropertyが真を返した場合のみ発火)へ揃える。
             SelectedCell = null;
-            // SheetNavigation.SelectedSheetはCurrentSheetIndexを読むだけの導出プロパティのため、
-            // DRC出力パネルのジャンプ(T-018)等、シートナビ経由以外でCurrentSheetIndexが変わった際は
-            // 左パレットの選択ハイライトが追従しない(T-018忍者実機検証で発見)。ここで明示的に通知する。
             SheetNavigation.RefreshSelectedSheet();
+            if (SetProperty(ref _currentSheetIndex, value))
+            {
+                OnPropertyChanged(nameof(CurrentSheet));
+            }
         }
     }
 

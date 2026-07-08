@@ -49,8 +49,9 @@ public class SelectedConnectorExclusivityTests : ViewModelTestBase
         vm.SelectedConnector = MakeConnector();
 
         // OutputPanelViewModel.JumpToのDRC同一シートジャンプを模す: CurrentSheetIndexを同値へ
-        // 代入(SetPropertyの早期returnでシート内部のクリア処理はスキップされる)した後、
-        // JumpTo自身がSelectedCellへ新しいセルを明示代入する。
+        // 代入した後、JumpTo自身がSelectedCellへ新しいセルを明示代入する。CurrentSheetIndexの
+        // setterはクロスカット的クリア(SelectedCell=null等)を値変化の有無に関わらず無条件実行
+        // する(T-041増分5隠密再レビュー所見M、SelectedCellのsetterと同じ粒度)。
         vm.CurrentSheetIndex = vm.CurrentSheetIndex;
         vm.SelectedCell = new GridPos(1, 1);
 
