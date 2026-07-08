@@ -47,6 +47,12 @@ public partial class MainWindow : Window
     private bool _freeLineDragStarted;
     private bool _freeLineDragConsumedByEscape;
 
+    // T-041増分7横展開: 接続点(ConnectionDot)ドラッグの同種の状態(VerticalConnectorと同じ理由で
+    // View側に保持)。
+    private Point _connectionDotDragPressPositionDip;
+    private bool _connectionDotDragStarted;
+    private bool _connectionDotDragConsumedByEscape;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -93,6 +99,12 @@ public partial class MainWindow : Window
             if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
             _freeLineDragStarted = false;
             _freeLineDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingConnectionDot) && !_viewModel.IsDraggingConnectionDot)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _connectionDotDragStarted = false;
+            _connectionDotDragConsumedByEscape = false;
         }
     }
 
@@ -326,6 +338,19 @@ public partial class MainWindow : Window
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragFreeLine(); return; }
             _freeLineDragPressPositionDip = position;
             _freeLineDragStarted = false;
+            return;
+        }
+
+        // T-041増分7横展開: 選択中の接続点(mm実座標系の点)を押下したらドラッグを開始する。
+        if (_viewModel.SelectedConnectionDot is Ecad2.Model.ConnectionDot dot
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet cdSheet
+            && LadderCanvasHost.HitTestConnectionDot(position, cdSheet) == dot)
+        {
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.BeginDragConnectionDot(dot, xMm, yMm);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragConnectionDot(); return; }
+            _connectionDotDragPressPositionDip = position;
+            _connectionDotDragStarted = false;
         }
     }
 
@@ -371,6 +396,19 @@ public partial class MainWindow : Window
             var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
             _viewModel.UpdateDragFreeLine(xMm, yMm);
             RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsDraggingConnectionDot)
+        {
+            if (!_connectionDotDragStarted)
+            {
+                if ((position - _connectionDotDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _connectionDotDragStarted = true;
+            }
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.UpdateDragConnectionDot(xMm, yMm);
+            RedrawCanvas();
         }
     }
 
@@ -380,12 +418,14 @@ public partial class MainWindow : Window
         // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
-        if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape)
+        if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
+            || _connectionDotDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
             _wireBreakDragConsumedByEscape = false;
             _freeLineDragConsumedByEscape = false;
+            _connectionDotDragConsumedByEscape = false;
             return;
         }
 
@@ -413,6 +453,14 @@ public partial class MainWindow : Window
             LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragFreeLine();
             _freeLineDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingConnectionDot)
+        {
+            LadderCanvasHost.ReleaseMouseCapture();
+            _viewModel.ConfirmDragConnectionDot();
+            _connectionDotDragStarted = false;
             RedrawCanvas();
             return;
         }
@@ -485,9 +533,16 @@ public partial class MainWindow : Window
             _freeLineDragStarted = false;
             RedrawCanvas();
         }
+        if (_viewModel.IsDraggingConnectionDot)
+        {
+            _viewModel.CancelDragConnectionDot();
+            _connectionDotDragStarted = false;
+            RedrawCanvas();
+        }
         _connectorDragConsumedByEscape = false;
         _wireBreakDragConsumedByEscape = false;
         _freeLineDragConsumedByEscape = false;
+        _connectionDotDragConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -562,6 +617,16 @@ public partial class MainWindow : Window
                     _viewModel.CancelDragFreeLine();
                     _freeLineDragStarted = false;
                     _freeLineDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsDraggingConnectionDot)
+                {
+                    _viewModel.CancelDragConnectionDot();
+                    _connectionDotDragStarted = false;
+                    _connectionDotDragConsumedByEscape = true;
                     RedrawCanvas();
                     FocusCanvas();
                     e.Handled = true;
@@ -696,6 +761,9 @@ public partial class MainWindow : Window
                 else if (_viewModel.SelectedFreeLine is not null)
                     // T-041増分7横展開: 選択中の自由線を平行移動する(mm実座標系)。
                     MoveSelectedFreeLineByKey(e.Key);
+                else if (_viewModel.SelectedConnectionDot is not null)
+                    // T-041増分7横展開: 選択中の接続点を平行移動する(点系・mm実座標系、本体移動のみ)。
+                    MoveSelectedConnectionDotByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -913,6 +981,22 @@ public partial class MainWindow : Window
             _ => false,
         };
         if (resized) RedrawCanvas();
+    }
+
+    // T-041増分7横展開: 選択中の接続点を矢印キー1回分(Shift無し)平行移動する(点系・mm実座標系、
+    // 1ステップ=CellMm、本体移動のみ)。
+    private void MoveSelectedConnectionDotByKey(Key key)
+    {
+        double step = LadderCanvasHost.CellMm;
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedConnectionDot(0, -step),
+            Key.Down => _viewModel.MoveSelectedConnectionDot(0, step),
+            Key.Left => _viewModel.MoveSelectedConnectionDot(-step, 0),
+            Key.Right => _viewModel.MoveSelectedConnectionDot(step, 0),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
     }
 
     // 選択ツールボタン(ツールバーのEsc相当ボタン)の即時処理。選択セル・ツール・案内メッセージを

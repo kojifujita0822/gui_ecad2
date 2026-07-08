@@ -775,7 +775,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ConnectionDot? SelectedConnectionDot
     {
         get => _selectedConnectionDot;
-        set => SetProperty(ref _selectedConnectionDot, value);
+        set
+        {
+            // T-041増分7横展開(所見A対応、SelectedWireBreakと同型): Delete・シート切替・
+            // 文書差し替えいずれも最終的にこのsetterを経由してSelectedConnectionDot=nullを
+            // 代入するため、ドラッグ中の一時状態(_draggingConnectionDot)もここで強制クリアする。
+            ForceCancelDragConnectionDotIfAny();
+            SetProperty(ref _selectedConnectionDot, value);
+        }
     }
 
     /// <summary>SelectedConnectionDotを削除する(T-041増分5、案A=DeleteSelectedWireBreakと同型)。
@@ -786,6 +793,76 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (!sheet.ConnectionDots.Remove(dot)) return false;
         MarkDirty();
         SelectedConnectionDot = null;
+        return true;
+    }
+
+    // T-041増分7横展開: 接続点(ConnectionDot)のドラッグ移動の一時状態。WireBreakと同型(点系・
+    // 本体移動のみ・相対差分方式)だが、mm実座標系のためFreeLineと同様double精度で扱う。
+    private ConnectionDot? _draggingConnectionDot;
+    private double _dragConnectionDotOrigXMm, _dragConnectionDotOrigYMm;
+    private double _dragConnectionDotStartXMm, _dragConnectionDotStartYMm;
+
+    /// <summary>接続点をドラッグ中か。</summary>
+    public bool IsDraggingConnectionDot => _draggingConnectionDot is not null;
+
+    /// <summary>ドラッグ中の接続点を外部要因により強制的にクリアする(T-041増分7所見A対応、
+    /// ForceCancelDragConnectorIfAnyと同型)。</summary>
+    private void ForceCancelDragConnectionDotIfAny()
+    {
+        if (_draggingConnectionDot is null) return;
+        _draggingConnectionDot = null;
+        OnPropertyChanged(nameof(IsDraggingConnectionDot));
+    }
+
+    /// <summary>接続点のドラッグを開始する(T-041増分7)。startXMm/startYMmはドラッグ開始時の
+    /// マウス位置(mm実座標)。</summary>
+    public void BeginDragConnectionDot(ConnectionDot dot, double startXMm, double startYMm)
+    {
+        _draggingConnectionDot = dot;
+        _dragConnectionDotOrigXMm = dot.XMm;
+        _dragConnectionDotOrigYMm = dot.YMm;
+        _dragConnectionDotStartXMm = startXMm;
+        _dragConnectionDotStartYMm = startYMm;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて接続点の位置を更新する(T-041増分7)。</summary>
+    public void UpdateDragConnectionDot(double currentXMm, double currentYMm)
+    {
+        if (_draggingConnectionDot is not ConnectionDot dot) return;
+        dot.XMm = _dragConnectionDotOrigXMm + (currentXMm - _dragConnectionDotStartXMm);
+        dot.YMm = _dragConnectionDotOrigYMm + (currentYMm - _dragConnectionDotStartYMm);
+    }
+
+    /// <summary>接続点のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
+    /// MarkDirty()する。</summary>
+    public void ConfirmDragConnectionDot()
+    {
+        if (_draggingConnectionDot is ConnectionDot dot &&
+            (dot.XMm != _dragConnectionDotOrigXMm || dot.YMm != _dragConnectionDotOrigYMm))
+            MarkDirty();
+        _draggingConnectionDot = null;
+    }
+
+    /// <summary>接続点のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
+    public void CancelDragConnectionDot()
+    {
+        if (_draggingConnectionDot is ConnectionDot dot)
+        {
+            dot.XMm = _dragConnectionDotOrigXMm;
+            dot.YMm = _dragConnectionDotOrigYMm;
+        }
+        _draggingConnectionDot = null;
+    }
+
+    /// <summary>選択中の接続点を矢印キー1回分(Shift無し)平行移動する(T-041増分7、キーボード
+    /// 等価操作、1ステップ=CellMm)。実際に動けた場合のみMarkDirty()する。</summary>
+    public bool MoveSelectedConnectionDot(double deltaXMm, double deltaYMm)
+    {
+        if (SelectedConnectionDot is not ConnectionDot dot) return false;
+        if (deltaXMm == 0 && deltaYMm == 0) return false;
+        dot.XMm += deltaXMm;
+        dot.YMm += deltaYMm;
+        MarkDirty();
         return true;
     }
 
