@@ -364,10 +364,19 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.True(vm.IsDraggingFreeLine);
 
+        // T-045補遺2(Stryker棚卸し、ForceCancelIfAnyのnotify()生存ミュータント対応): 最終値
+        // だけでなくPropertyChangedイベント自体が発火することを検証する。
+        bool isDraggingFreeLineChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingFreeLine)) isDraggingFreeLineChanged = true;
+        };
+
         bool deleted = vm.DeleteSelectedFreeLine();
 
         Assert.True(deleted);
         Assert.False(vm.IsDraggingFreeLine);
+        Assert.True(isDraggingFreeLineChanged);
         var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30));
         Assert.Null(ex);
         Assert.Equal(10, line.X1Mm);   // 書き換わっていない
@@ -384,9 +393,16 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;
         vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
+        bool isDraggingFreeLineChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingFreeLine)) isDraggingFreeLineChanged = true;
+        };
+
         vm.NewDocument();
 
         Assert.False(vm.IsDraggingFreeLine);
+        Assert.True(isDraggingFreeLineChanged);
         Assert.False(vm.IsDirty);
         var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30));
         Assert.Null(ex);
@@ -404,6 +420,12 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;
         vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
+        bool isDraggingFreeLineChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingFreeLine)) isDraggingFreeLineChanged = true;
+        };
+
         vm.Document.Sheets.Add(new Sheet
         {
             PageNumber = 2,
@@ -415,6 +437,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheetIndex = 1;
 
         Assert.False(vm.IsDraggingFreeLine);
+        Assert.True(isDraggingFreeLineChanged);
         var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30));
         Assert.Null(ex);
     }

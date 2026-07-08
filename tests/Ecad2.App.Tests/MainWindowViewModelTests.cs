@@ -1,5 +1,6 @@
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
 using Ecad2.Persistence;
@@ -305,6 +306,45 @@ public class MainWindowViewModelTests : ViewModelTestBase
         {
             Directory.Delete(tempDir, recursive: true);
         }
+    }
+
+    /// <summary>
+    /// T-045補遺2(Stryker棚卸し、docs/ecad2-t046-stryker-t045-close-survey-onmitsu.md=MapToDeviceClass
+    /// 生存ミュータント4件対応)。裁可済み案A対応表(handover-next-session.md §2)の全20 ElementKindを
+    /// 直接検証する。PlaceElementAtSelectedCell経由(PartResolver.ComponentKind→Role起点)では
+    /// ContactNO/ContactNC/Coil/Lamp/Terminal/PushButtonNO/PushButtonNCの7値にしか実際には到達
+    /// できない(Timer/Counter/EmergencyStop/SelectSwitch等13値に対応するPartRoleが存在しないため)。
+    /// MapToDeviceClassは将来のKind直接設定に備え全20値を網羅する設計のため、経路上到達できない
+    /// 残りをリフレクション経由で直接検証する。
+    /// </summary>
+    [Theory]
+    [InlineData(ElementKind.ContactNO, DeviceClass.Relay)]
+    [InlineData(ElementKind.ContactNC, DeviceClass.Relay)]
+    [InlineData(ElementKind.Coil, DeviceClass.Relay)]
+    [InlineData(ElementKind.ContactorMain3P, DeviceClass.Relay)]
+    [InlineData(ElementKind.Lamp, DeviceClass.Lamp)]
+    [InlineData(ElementKind.PushButtonNO, DeviceClass.PushButton)]
+    [InlineData(ElementKind.PushButtonNC, DeviceClass.PushButton)]
+    [InlineData(ElementKind.EmergencyStop, DeviceClass.PushButton)]
+    [InlineData(ElementKind.SelectSwitch, DeviceClass.SelectSwitch)]
+    [InlineData(ElementKind.Terminal, DeviceClass.Terminal)]
+    [InlineData(ElementKind.Timer, DeviceClass.Timer)]
+    [InlineData(ElementKind.TimerContactNO, DeviceClass.Timer)]
+    [InlineData(ElementKind.TimerContactNC, DeviceClass.Timer)]
+    [InlineData(ElementKind.TimerInstantContactNO, DeviceClass.Timer)]
+    [InlineData(ElementKind.TimerInstantContactNC, DeviceClass.Timer)]
+    [InlineData(ElementKind.Counter, DeviceClass.Counter)]
+    [InlineData(ElementKind.ThermalOverload, DeviceClass.Other)]
+    [InlineData(ElementKind.ThermalOverload3P, DeviceClass.Other)]
+    [InlineData(ElementKind.Motor, DeviceClass.Other)]
+    [InlineData(ElementKind.Breaker3P, DeviceClass.Other)]
+    public void MapToDeviceClass_AllApprovedMappingTableAElementKinds_MatchesExpected(ElementKind kind, DeviceClass expected)
+    {
+        var method = typeof(MainWindowViewModel).GetMethod(
+            "MapToDeviceClass", BindingFlags.NonPublic | BindingFlags.Static);
+        var actual = (DeviceClass)method!.Invoke(null, new object[] { kind })!;
+
+        Assert.Equal(expected, actual);
     }
 
     /// <summary>自作パーツRole=NonSimulated(主回路記号等)はComponentKindが呼べない
