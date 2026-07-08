@@ -13,6 +13,7 @@ namespace Ecad2.App.ViewModels;
 public sealed class SheetNavigationViewModel : ViewModelBase
 {
     private readonly MainWindowViewModel _owner;
+    private readonly IDispatcherService _dispatcher;
 
     /// <summary>
     /// Document.Sheets のミラー。ListBox.ItemsSource は素の List&lt;Sheet&gt; を直接バインドすると
@@ -54,9 +55,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
     public ICommand DeleteCommand { get; }
     public ICommand RenameCommand { get; }
 
-    public SheetNavigationViewModel(MainWindowViewModel owner)
+    public SheetNavigationViewModel(MainWindowViewModel owner, IDispatcherService dispatcher)
     {
         _owner = owner;
+        _dispatcher = dispatcher;
         Sheets = new ObservableCollection<Sheet>(_owner.Document.Sheets);
 
         // T-041(殿裁定「案1」): シート追加時に名前・種別(制御回路/主回路)をダイアログで選ばせる
@@ -94,9 +96,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // 終えていないため、この場で同期的にSelectedSheetを設定すると視覚上の選択ハイライトが
             // 追従しない(IsSelectedはSelectionItemPattern上は正しく更新されるが表示は前の項目の
             // ままになる。T-026実機確認で発見)。UI要素生成後の次フレームへ遅延させる。
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(
+            // T-045(P-016対応): IDispatcherService経由にし、WPF Applicationへの直接依存を除去。
+            _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
-                new Action(() => SelectedSheet = sheet));
+                () => SelectedSheet = sheet);
         });
 
         // 最後の1枚は削除不可（ドキュメントにシートが0枚の状態を作らない）。
@@ -144,9 +147,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // RefreshSelectedSheet()の変更通知だけで再同期できる(SelectedSheetのgetterは
             // CurrentSheetIndex経由でSheets[index]を返すため、indexが不変ならgetterの戻り値は
             // 改名後のsheet参照を正しく指す)。
-            System.Windows.Application.Current.Dispatcher.BeginInvoke(
+            // T-045(P-016対応): IDispatcherService経由にし、WPF Applicationへの直接依存を除去。
+            _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
-                new Action(RefreshSelectedSheet));
+                RefreshSelectedSheet);
         });
     }
 }

@@ -1453,10 +1453,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel() : this(PartFolderStore.CreateDefault()) { }
 
     /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
-    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。</summary>
-    public MainWindowViewModel(PartFolderStore partFolderStore)
+    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。IDispatcherServiceは
+    /// 本番既定(WpfDispatcherService)を使う。</summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore) : this(partFolderStore, new WpfDispatcherService()) { }
+
+    /// <summary>T-045(P-016対応): テスト等からIDispatcherServiceも注入できるようにするための
+    /// コンストラクタ(SheetNavigationViewModelのDispatcher直接依存分離)。PartFolderStoreの
+    /// 2本立てパターン(T-042)と同型。</summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore, IDispatcherService dispatcherService)
     {
-        SheetNavigation = new SheetNavigationViewModel(this);
+        SheetNavigation = new SheetNavigationViewModel(this, dispatcherService);
         PartPalette = new PartPaletteViewModel(partFolderStore);
         // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
         // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。

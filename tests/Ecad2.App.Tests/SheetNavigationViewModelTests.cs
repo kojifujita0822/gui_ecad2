@@ -4,14 +4,12 @@ using Ecad2.Model;
 namespace Ecad2.App.Tests;
 
 /// <summary>
-/// T-034: SheetNavigationViewModelのMarkDirty呼び忘れ検出。AddCommand/RenameCommandは
-/// System.Windows.Application.Current.Dispatcherへ直接依存しており(選択ハイライト遅延反映)、
-/// WPF Applicationが起動していないテストプロセスで実行するとNullReferenceExceptionになることを
-/// 確認済み(ViewModelのテスト容易性=Window依存の分離、家老委任事項。詳細は家老への報告参照)。
-/// AddCommand/RenameCommandのMarkDirty呼び出しはNREの原因となるDispatcher.BeginInvoke呼び出し
-/// より前に同期実行されるため、NREをtry/catchで握りつぶした上でMarkDirty検証のみ行う
-/// (隠密レビューT-034往復1周目で実機実証済みの手法。P-016=Dispatcher依存の根本解消が
-/// 完了するまでの暫定策)。
+/// T-034: SheetNavigationViewModelのMarkDirty呼び忘れ検出。T-045(P-016対応)で
+/// IDispatcherService抽象化を導入し、AddCommand/RenameCommandのWPF Application直接依存を
+/// 解消した。CreateViewModel()(ViewModelTestBase)がImmediateDispatcherService(即時同期実行)を
+/// 注入するため、従来try/catchで握りつぶしていたNullReferenceExceptionが発生しなくなり、
+/// BeginInvoke経由の選択ハイライト同期(SelectedSheet設定・RefreshSelectedSheet)まで
+/// 直接検証できるようになった。
 /// </summary>
 public class SheetNavigationViewModelTests : ViewModelTestBase
 {
@@ -69,10 +67,12 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.NewDocument();
 
         // T-041(殿裁定「案1」): AddCommandは(名前, 主回路か)のタプルを受け取る呼び出し規約に変更。
-        try { vm.SheetNavigation.AddCommand.Execute(("シート2", false)); }
-        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
 
         Assert.True(vm.IsDirty);
+        // T-045(P-016対応): BeginInvoke経由のSelectedSheet設定が即時同期実行され、追加した
+        // シートが選択状態になることを検証する(従来はtry/catchで握りつぶし未検証だった経路)。
+        Assert.Equal(vm.Document.Sheets[^1], vm.SheetNavigation.SelectedSheet);
     }
 
     [Fact]
@@ -81,8 +81,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        try { vm.SheetNavigation.AddCommand.Execute(("主回路シート", true)); }
-        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+        vm.SheetNavigation.AddCommand.Execute(("主回路シート", true));
 
         var addedSheet = vm.Document.Sheets[^1];
         Assert.Equal("主回路シート", addedSheet.Name);
@@ -95,8 +94,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        try { vm.SheetNavigation.AddCommand.Execute(("  ", false)); }
-        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+        vm.SheetNavigation.AddCommand.Execute(("  ", false));
 
         var addedSheet = vm.Document.Sheets[^1];
         Assert.Equal("シート2", addedSheet.Name);
@@ -204,10 +202,18 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         vm.NewDocument();
+        bool selectedSheetChanged = false;
+        vm.SheetNavigation.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.SheetNavigation.SelectedSheet)) selectedSheetChanged = true;
+        };
 
-        try { vm.SheetNavigation.RenameCommand.Execute("新シート名"); }
-        catch (NullReferenceException) { /* Application.Current.Dispatcher依存、P-016まで既知の制約 */ }
+        vm.SheetNavigation.RenameCommand.Execute("新シート名");
 
         Assert.True(vm.IsDirty);
+        // T-045(P-016対応): BeginInvoke経由のRefreshSelectedSheet()が即時同期実行され、
+        // SelectedSheetのPropertyChangedが発火することを検証する(従来はtry/catchで握りつぶし
+        // 未検証だった経路)。
+        Assert.True(selectedSheetChanged);
     }
 }
