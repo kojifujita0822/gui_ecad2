@@ -25,7 +25,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.SelectedCell = null;
         vm.SelectedConnectionDot = dot;
 
-        bool moved = vm.MoveSelectedConnectionDot(5, -3);
+        bool moved = vm.MoveSelectedConnectionDot(5, -3, maxXMm: 1000, maxYMm: 1000);
 
         Assert.True(moved);
         Assert.Equal(25, dot.XMm);
@@ -39,8 +39,27 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        Assert.False(vm.MoveSelectedConnectionDot(5, 0));
+        Assert.False(vm.MoveSelectedConnectionDot(5, 0, maxXMm: 1000, maxYMm: 1000));
         Assert.False(vm.IsDirty);
+    }
+
+    // T-041増分7隠密レビュー所見AD対応(忍者と3者独立発見): FreeLineと同じmm実座標系・Undo無し
+    // のため境界クランプを拡大適用した回帰テスト。
+    [Fact]
+    public void MoveSelectedConnectionDot_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();   // XMm=20, YMm=30
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+
+        bool moved = vm.MoveSelectedConnectionDot(100, 0, maxXMm: 50, maxYMm: 1000);
+
+        Assert.True(moved);
+        Assert.Equal(50, dot.XMm);
+        Assert.True(vm.IsDirty);
     }
 
     // ---- ドラッグ(BeginDragConnectionDot/UpdateDragConnectionDot/ConfirmDragConnectionDot/CancelDragConnectionDot) ----
@@ -55,7 +74,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
 
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.False(vm.IsDirty);
 
         vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);
@@ -70,6 +89,23 @@ public class ConnectionDotDragTests : ViewModelTestBase
         Assert.False(vm.IsDraggingConnectionDot);
     }
 
+    // T-041増分7隠密レビュー所見AD対応: ドラッグ版にも境界クランプが効くことの回帰テスト。
+    [Fact]
+    public void DragConnectionDot_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();   // XMm=20, YMm=30
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 50, maxYMm: 1000);
+        vm.UpdateDragConnectionDot(currentXMm: 120, currentYMm: 30);   // +100を試みても境界50で止まる
+
+        Assert.Equal(50, dot.XMm);
+    }
+
     [Fact]
     public void DragConnectionDot_Cancel_RestoresOriginalPositionWithoutMarkingDirty()
     {
@@ -80,7 +116,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
 
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);
         Assert.Equal(25, dot.XMm);
 
@@ -102,7 +138,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
 
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragConnectionDot(currentXMm: 20, currentYMm: 30);
         vm.ConfirmDragConnectionDot();
 
@@ -120,7 +156,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.True(vm.IsDraggingConnectionDot);
 
         bool deleted = vm.DeleteSelectedConnectionDot();
@@ -141,7 +177,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
         vm.NewDocument();
 
@@ -161,7 +197,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
         vm.Document.Sheets.Add(new Sheet
         {
@@ -190,7 +226,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();   // XMm=20, YMm=30
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
         Assert.Equal(25, dot.XMm);
 
@@ -209,7 +245,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
         Assert.Equal(25, dot.XMm);
 
@@ -237,7 +273,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var dot = MakeDot();
         vm.CurrentSheet!.ConnectionDots.Add(dot);
         vm.SelectedConnectionDot = dot;
-        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
 
         vm.NewDocument();

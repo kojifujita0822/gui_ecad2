@@ -657,7 +657,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて自由線の位置を更新する(T-041増分7)。
     /// 端点リサイズは水平・垂直の向きを保ちゼロ長を禁止する(クラス冒頭コメント参照)。T-041増分7
     /// 隠密レビュー所見AA対応: グリッド・ページ境界(0〜_dragFreeLineMax*Mm)へクランプする
-    /// (Undo機能が無いため、境界外へ飛んで見失うことを防ぐ)。</summary>
+    /// (Undo機能が無いため、境界外へ飛んで見失うことを防ぐ)。T-041増分7隠密レビュー所見AB対応:
+    /// 線の長さがページ境界を超える場合(min>max)はMath.Clampが例外を投げるため、
+    /// VerticalConnectorのUpdateDragConnectorと同様に先にガードしその方向は動かさない。</summary>
     public void UpdateDragFreeLine(double currentXMm, double currentYMm)
     {
         if (_draggingFreeLine is not FreeLine line) return;
@@ -668,10 +670,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             double minDeltaX = -Math.Min(_dragFreeLineOrigX1, _dragFreeLineOrigX2);
             double maxDeltaX = _dragFreeLineMaxXMm - Math.Max(_dragFreeLineOrigX1, _dragFreeLineOrigX2);
-            double clampedDeltaX = Math.Clamp(deltaX, minDeltaX, maxDeltaX);
+            double clampedDeltaX = minDeltaX > maxDeltaX ? 0 : Math.Clamp(deltaX, minDeltaX, maxDeltaX);
             double minDeltaY = -Math.Min(_dragFreeLineOrigY1, _dragFreeLineOrigY2);
             double maxDeltaY = _dragFreeLineMaxYMm - Math.Max(_dragFreeLineOrigY1, _dragFreeLineOrigY2);
-            double clampedDeltaY = Math.Clamp(deltaY, minDeltaY, maxDeltaY);
+            double clampedDeltaY = minDeltaY > maxDeltaY ? 0 : Math.Clamp(deltaY, minDeltaY, maxDeltaY);
             line.X1Mm = _dragFreeLineOrigX1 + clampedDeltaX;
             line.Y1Mm = _dragFreeLineOrigY1 + clampedDeltaY;
             line.X2Mm = _dragFreeLineOrigX2 + clampedDeltaX;
@@ -732,17 +734,18 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>選択中の自由線を矢印キー1回分(deltaXMm/deltaYMm、いずれか一方は0)平行移動する
     /// (T-041増分7、キーボード等価操作)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AA
-    /// 対応、呼び出し元がsheet.Grid.Columns/Rows×CellMmを計算して渡す)。実際に動けた場合のみ
-    /// MarkDirty()する。</summary>
+    /// 対応、呼び出し元がsheet.Grid.Columns/Rows×CellMmを計算して渡す)。T-041増分7隠密レビュー
+    /// 所見AB対応: 線の長さがページ境界を超える場合(min>max)はその方向を動かさない
+    /// (UpdateDragFreeLineと同じガード)。実際に動けた場合のみMarkDirty()する。</summary>
     public bool MoveSelectedFreeLine(double deltaXMm, double deltaYMm, double maxXMm, double maxYMm)
     {
         if (SelectedFreeLine is not FreeLine line) return false;
         double minDeltaX = -Math.Min(line.X1Mm, line.X2Mm);
         double maxDeltaX = maxXMm - Math.Max(line.X1Mm, line.X2Mm);
-        double clampedDeltaX = Math.Clamp(deltaXMm, minDeltaX, maxDeltaX);
+        double clampedDeltaX = minDeltaX > maxDeltaX ? 0 : Math.Clamp(deltaXMm, minDeltaX, maxDeltaX);
         double minDeltaY = -Math.Min(line.Y1Mm, line.Y2Mm);
         double maxDeltaY = maxYMm - Math.Max(line.Y1Mm, line.Y2Mm);
-        double clampedDeltaY = Math.Clamp(deltaYMm, minDeltaY, maxDeltaY);
+        double clampedDeltaY = minDeltaY > maxDeltaY ? 0 : Math.Clamp(deltaYMm, minDeltaY, maxDeltaY);
         if (clampedDeltaX == 0 && clampedDeltaY == 0) return false;
         line.X1Mm += clampedDeltaX; line.Y1Mm += clampedDeltaY;
         line.X2Mm += clampedDeltaX; line.Y2Mm += clampedDeltaY;
@@ -753,11 +756,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>選択中の自由線の操作対象端点(SelectedEndpointIsStart、Tab+Shift+矢印、
     /// T-041増分7殿裁定P-033=案2)を矢印キー1回分伸縮する。水平線はdeltaXMmのみ、垂直線は
     /// deltaYMmのみ意味を持つ(呼び出し元(MainWindow.xaml.cs)が線の向きに応じたキーのみ渡す)。
-    /// ゼロ長になる場合は変更しない。T-041増分7隠密レビュー所見Z対応: 呼び出し元は線の向きを
-    /// 問わずKey.Up/Down/Left/Rightすべてを無条件で渡すため、線の向きと逆軸のキー(常にdelta=0)
-    /// では実際には座標が変化しない。この場合はゼロ長ガードを素通りして偽陽性のMarkDirty()に
-    /// 至る前に「変化なし」を検出してfalseを返す(MoveSelectedWireBreakと同じ趣旨)。</summary>
-    public bool ResizeSelectedFreeLineEndpoint(double deltaXMm, double deltaYMm)
+    /// maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AC対応、ドラッグ版UpdateDragFreeLine
+    /// と対称にMath.Clamp(…, 0, maxMm)でクランプする。0が下限のためmin>maxにはならず所見ABの
+    /// ガードは不要)。ゼロ長になる場合は変更しない。T-041増分7隠密レビュー所見Z対応: 呼び出し元は
+    /// 線の向きを問わずKey.Up/Down/Left/Rightすべてを無条件で渡すため、線の向きと逆軸のキー
+    /// (常にdelta=0)や境界に達し変化しないキーでは実際には座標が変化しない。この場合はゼロ長
+    /// ガードを素通りして偽陽性のMarkDirty()に至る前に「変化なし」を検出してfalseを返す
+    /// (MoveSelectedWireBreakと同じ趣旨)。</summary>
+    public bool ResizeSelectedFreeLineEndpoint(double deltaXMm, double deltaYMm, double maxXMm, double maxYMm)
     {
         if (SelectedFreeLine is not FreeLine line) return false;
         bool isHorizontal = Math.Abs(line.Y1Mm - line.Y2Mm) < 0.001;
@@ -765,14 +771,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (isHorizontal)
             {
-                double newX1 = line.X1Mm + deltaXMm;
+                double newX1 = Math.Clamp(line.X1Mm + deltaXMm, 0, maxXMm);
                 if (newX1 == line.X1Mm) return false;
                 if (Math.Abs(line.X2Mm - newX1) < FreeLineMinLengthMm) return false;
                 line.X1Mm = newX1;
             }
             else
             {
-                double newY1 = line.Y1Mm + deltaYMm;
+                double newY1 = Math.Clamp(line.Y1Mm + deltaYMm, 0, maxYMm);
                 if (newY1 == line.Y1Mm) return false;
                 if (Math.Abs(line.Y2Mm - newY1) < FreeLineMinLengthMm) return false;
                 line.Y1Mm = newY1;
@@ -782,14 +788,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (isHorizontal)
             {
-                double newX2 = line.X2Mm + deltaXMm;
+                double newX2 = Math.Clamp(line.X2Mm + deltaXMm, 0, maxXMm);
                 if (newX2 == line.X2Mm) return false;
                 if (Math.Abs(newX2 - line.X1Mm) < FreeLineMinLengthMm) return false;
                 line.X2Mm = newX2;
             }
             else
             {
-                double newY2 = line.Y2Mm + deltaYMm;
+                double newY2 = Math.Clamp(line.Y2Mm + deltaYMm, 0, maxYMm);
                 if (newY2 == line.Y2Mm) return false;
                 if (Math.Abs(newY2 - line.Y1Mm) < FreeLineMinLengthMm) return false;
                 line.Y2Mm = newY2;
@@ -834,6 +840,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private ConnectionDot? _draggingConnectionDot;
     private double _dragConnectionDotOrigXMm, _dragConnectionDotOrigYMm;
     private double _dragConnectionDotStartXMm, _dragConnectionDotStartYMm;
+    // T-041増分7隠密レビュー所見AD対応: ページ境界(mm)。FreeLineと同じmm実座標系・Undo機能無しの
+    // 条件を共有するため境界クランプを拡大適用する(呼び出し元がsheet.Grid.Columns/Rows×CellMmを
+    // 計算して渡す)。単一点のためFreeLineの本体移動と異なりmin>maxは起こりえない(0<=maxは常に真)。
+    private double _dragConnectionDotMaxXMm, _dragConnectionDotMaxYMm;
 
     /// <summary>接続点をドラッグ中か。</summary>
     public bool IsDraggingConnectionDot => _draggingConnectionDot is not null;
@@ -849,22 +859,27 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>接続点のドラッグを開始する(T-041増分7)。startXMm/startYMmはドラッグ開始時の
-    /// マウス位置(mm実座標)。</summary>
-    public void BeginDragConnectionDot(ConnectionDot dot, double startXMm, double startYMm)
+    /// マウス位置(mm実座標)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AD対応、
+    /// 呼び出し元がsheet.Grid.Columns/Rows×CellMmを計算して渡す)。</summary>
+    public void BeginDragConnectionDot(ConnectionDot dot, double startXMm, double startYMm, double maxXMm, double maxYMm)
     {
         _draggingConnectionDot = dot;
         _dragConnectionDotOrigXMm = dot.XMm;
         _dragConnectionDotOrigYMm = dot.YMm;
         _dragConnectionDotStartXMm = startXMm;
         _dragConnectionDotStartYMm = startYMm;
+        _dragConnectionDotMaxXMm = maxXMm;
+        _dragConnectionDotMaxYMm = maxYMm;
     }
 
-    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて接続点の位置を更新する(T-041増分7)。</summary>
+    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて接続点の位置を更新する(T-041増分7)。
+    /// T-041増分7隠密レビュー所見AD対応: グリッド・ページ境界(0〜_dragConnectionDotMax*Mm)へ
+    /// クランプする(Undo機能が無いため、境界外へ飛んで見失うことを防ぐ)。</summary>
     public void UpdateDragConnectionDot(double currentXMm, double currentYMm)
     {
         if (_draggingConnectionDot is not ConnectionDot dot) return;
-        dot.XMm = _dragConnectionDotOrigXMm + (currentXMm - _dragConnectionDotStartXMm);
-        dot.YMm = _dragConnectionDotOrigYMm + (currentYMm - _dragConnectionDotStartYMm);
+        dot.XMm = Math.Clamp(_dragConnectionDotOrigXMm + (currentXMm - _dragConnectionDotStartXMm), 0, _dragConnectionDotMaxXMm);
+        dot.YMm = Math.Clamp(_dragConnectionDotOrigYMm + (currentYMm - _dragConnectionDotStartYMm), 0, _dragConnectionDotMaxYMm);
     }
 
     /// <summary>接続点のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
@@ -889,13 +904,17 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>選択中の接続点を矢印キー1回分(Shift無し)平行移動する(T-041増分7、キーボード
-    /// 等価操作、1ステップ=CellMm)。実際に動けた場合のみMarkDirty()する。</summary>
-    public bool MoveSelectedConnectionDot(double deltaXMm, double deltaYMm)
+    /// 等価操作、1ステップ=CellMm)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AD対応、
+    /// 呼び出し元がsheet.Grid.Columns/Rows×CellMmを計算して渡す)。実際に動けた場合のみ
+    /// MarkDirty()する。</summary>
+    public bool MoveSelectedConnectionDot(double deltaXMm, double deltaYMm, double maxXMm, double maxYMm)
     {
         if (SelectedConnectionDot is not ConnectionDot dot) return false;
-        if (deltaXMm == 0 && deltaYMm == 0) return false;
-        dot.XMm += deltaXMm;
-        dot.YMm += deltaYMm;
+        double newX = Math.Clamp(dot.XMm + deltaXMm, 0, maxXMm);
+        double newY = Math.Clamp(dot.YMm + deltaYMm, 0, maxYMm);
+        if (newX == dot.XMm && newY == dot.YMm) return false;
+        dot.XMm = newX;
+        dot.YMm = newY;
         MarkDirty();
         return true;
     }

@@ -351,7 +351,9 @@ public partial class MainWindow : Window
             && LadderCanvasHost.HitTestConnectionDot(position, cdSheet) == dot)
         {
             var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
-            _viewModel.BeginDragConnectionDot(dot, xMm, yMm);
+            // T-041増分7隠密レビュー所見AD対応: ページ境界(mm)を渡す(BeginDragFreeLineと同じ設計)。
+            _viewModel.BeginDragConnectionDot(dot, xMm, yMm,
+                cdSheet.Grid.Columns * LadderCanvasHost.CellMm, cdSheet.Grid.Rows * LadderCanvasHost.CellMm);
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragConnectionDot(); return; }
             _connectionDotDragPressPositionDip = position;
             _connectionDotDragStarted = false;
@@ -984,13 +986,17 @@ public partial class MainWindow : Window
     // AdjustFreeLineDraftと同じ制約)。
     private void ResizeSelectedFreeLineByKey(Key key)
     {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         double step = LadderCanvasHost.CellMm;
+        // T-041増分7隠密レビュー所見AC対応: ページ境界(mm)を渡す(BeginDragFreeLineと同じ設計)。
+        double maxXMm = sheet.Grid.Columns * step;
+        double maxYMm = sheet.Grid.Rows * step;
         bool resized = key switch
         {
-            Key.Up => _viewModel.ResizeSelectedFreeLineEndpoint(0, -step),
-            Key.Down => _viewModel.ResizeSelectedFreeLineEndpoint(0, step),
-            Key.Left => _viewModel.ResizeSelectedFreeLineEndpoint(-step, 0),
-            Key.Right => _viewModel.ResizeSelectedFreeLineEndpoint(step, 0),
+            Key.Up => _viewModel.ResizeSelectedFreeLineEndpoint(0, -step, maxXMm, maxYMm),
+            Key.Down => _viewModel.ResizeSelectedFreeLineEndpoint(0, step, maxXMm, maxYMm),
+            Key.Left => _viewModel.ResizeSelectedFreeLineEndpoint(-step, 0, maxXMm, maxYMm),
+            Key.Right => _viewModel.ResizeSelectedFreeLineEndpoint(step, 0, maxXMm, maxYMm),
             _ => false,
         };
         if (resized) RedrawCanvas();
@@ -1000,13 +1006,17 @@ public partial class MainWindow : Window
     // 1ステップ=CellMm、本体移動のみ)。
     private void MoveSelectedConnectionDotByKey(Key key)
     {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         double step = LadderCanvasHost.CellMm;
+        // T-041増分7隠密レビュー所見AD対応: ページ境界(mm)を渡す(MoveSelectedFreeLineと同じ設計)。
+        double maxXMm = sheet.Grid.Columns * step;
+        double maxYMm = sheet.Grid.Rows * step;
         bool moved = key switch
         {
-            Key.Up => _viewModel.MoveSelectedConnectionDot(0, -step),
-            Key.Down => _viewModel.MoveSelectedConnectionDot(0, step),
-            Key.Left => _viewModel.MoveSelectedConnectionDot(-step, 0),
-            Key.Right => _viewModel.MoveSelectedConnectionDot(step, 0),
+            Key.Up => _viewModel.MoveSelectedConnectionDot(0, -step, maxXMm, maxYMm),
+            Key.Down => _viewModel.MoveSelectedConnectionDot(0, step, maxXMm, maxYMm),
+            Key.Left => _viewModel.MoveSelectedConnectionDot(-step, 0, maxXMm, maxYMm),
+            Key.Right => _viewModel.MoveSelectedConnectionDot(step, 0, maxXMm, maxYMm),
             _ => false,
         };
         if (moved) RedrawCanvas();

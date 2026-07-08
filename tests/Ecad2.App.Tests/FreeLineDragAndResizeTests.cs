@@ -67,6 +67,27 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         Assert.True(vm.IsDirty);
     }
 
+    // T-041増分7隠密レビュー所見AB対応(実測クラッシュ再現、忍者テストレビュー指摘):
+    // 線の長さがページ境界を超える場合、min>maxとなりMath.Clampが
+    // System.ArgumentException: '-0' cannot be greater than -450.'を投げていた実例外の再現。
+    [Fact]
+    public void MoveSelectedFreeLine_WhenLineWiderThanPageBoundary_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = new FreeLine { X1Mm = 0, Y1Mm = 30, X2Mm = 500, Y2Mm = 30 };   // 線幅500mm
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        // ページ境界450mm(線幅500mmを下回る、min>maxとなるケース)
+        var ex = Record.Exception(() => vm.MoveSelectedFreeLine(10, 0, maxXMm: 450, maxYMm: 1000));
+
+        Assert.Null(ex);
+        Assert.Equal(0, line.X1Mm);     // 動かせない(はみ出したまま)方向は変化しない
+        Assert.Equal(500, line.X2Mm);
+    }
+
     // ---- ResizeSelectedFreeLineEndpoint(Tab+Shift矢印、端点伸縮) ----
 
     [Fact]
@@ -79,7 +100,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;   // 既定=始点
 
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(-5, 0);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(-5, 0, maxXMm: 1000, maxYMm: 1000);
 
         Assert.True(resized);
         Assert.Equal(5, line.X1Mm);
@@ -99,7 +120,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;
         vm.ToggleSelectedEndpoint();   // 始点→終点
 
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(5, 0);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(5, 0, maxXMm: 1000, maxYMm: 1000);
 
         Assert.True(resized);
         Assert.Equal(10, line.X1Mm);   // 始点は不変
@@ -117,7 +138,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.FreeLines.Add(line);
         vm.SelectedFreeLine = line;
 
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 5, deltaYMm: -3);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 5, deltaYMm: -3, maxXMm: 1000, maxYMm: 1000);
 
         Assert.True(resized);
         Assert.Equal(20, line.X1Mm);   // 垂直線なのでX方向のdeltaは無視
@@ -135,7 +156,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;   // 始点選択中
 
         // 始点(X1=10)を終点(X2=10.5)へ0.6mm近づけると長さが1.0mm未満になる
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(0.6, 0);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(0.6, 0, maxXMm: 1000, maxYMm: 1000);
 
         Assert.False(resized);
         Assert.Equal(10, line.X1Mm);
@@ -155,7 +176,7 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;
 
         // 水平線にUp/Downキー相当(deltaXMm=0, deltaYMm!=0)を渡すケース
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 0, deltaYMm: -3);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 0, deltaYMm: -3, maxXMm: 1000, maxYMm: 1000);
 
         Assert.False(resized);
         Assert.Equal(10, line.X1Mm);
@@ -174,12 +195,33 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         vm.SelectedFreeLine = line;
 
         // 垂直線にLeft/Rightキー相当(deltaYMm=0, deltaXMm!=0)を渡すケース
-        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 5, deltaYMm: 0);
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 5, deltaYMm: 0, maxXMm: 1000, maxYMm: 1000);
 
         Assert.False(resized);
         Assert.Equal(20, line.X1Mm);
         Assert.Equal(10, line.Y1Mm);
         Assert.False(vm.IsDirty);
+    }
+
+    // T-041増分7隠密レビュー所見AC対応: ドラッグ版(UpdateDragFreeLine)と対称にキーボード端点
+    // リサイズにもページ境界クランプが効くことの回帰テスト。
+    [Fact]
+    public void ResizeSelectedFreeLineEndpoint_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();   // X1=10,Y1=30 - X2=40,Y2=30
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+        vm.ToggleSelectedEndpoint();   // 終点(X2=40)を選択
+
+        // ページ境界50mmに対し+100mm伸ばそうとしても境界50で止まる
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 100, deltaYMm: 0, maxXMm: 50, maxYMm: 1000);
+
+        Assert.True(resized);
+        Assert.Equal(50, line.X2Mm);
+        Assert.True(vm.IsDirty);
     }
 
     // ---- ドラッグ(BeginDragFreeLine/UpdateDragFreeLine/ConfirmDragFreeLine/CancelDragFreeLine) ----
@@ -284,6 +326,28 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
 
         Assert.Equal(20, line.X1Mm);
         Assert.Equal(50, line.X2Mm);
+    }
+
+    // T-041増分7隠密レビュー所見AB対応(実測クラッシュ再現、忍者テストレビュー指摘):
+    // 線の長さがページ境界を超える場合、min>maxとなりMath.Clampが
+    // System.ArgumentException: '-0' cannot be greater than -450.'を投げていた実例外の再現。
+    [Fact]
+    public void DragFreeLine_Move_WhenLineWiderThanPageBoundary_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = new FreeLine { X1Mm = 0, Y1Mm = 30, X2Mm = 500, Y2Mm = 30 };   // 線幅500mm
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        // ページ境界450mm(線幅500mmを下回る、min>maxとなるケース)
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 100, startYMm: 30, maxXMm: 450, maxYMm: 1000);
+        var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 110, currentYMm: 30));
+
+        Assert.Null(ex);
+        Assert.Equal(0, line.X1Mm);     // 動かせない(はみ出したまま)方向は変化しない
+        Assert.Equal(500, line.X2Mm);
     }
 
     // ---- 所見A横展開: ドラッグ中の外部要因(Delete/文書差し替え)による強制クリア ----
