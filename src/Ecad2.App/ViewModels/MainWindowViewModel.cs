@@ -383,25 +383,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>縦コネクタのドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する(ドラッグ中は毎フレーム呼ばず、確定時の1回に集約)。</summary>
     public void ConfirmDragConnector()
-    {
-        if (_draggingConnector is VerticalConnector c &&
-            (c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow
-             || c.Column != _dragConnectorOrigColumn))
-            MarkDirty();
-        _draggingConnector = null;
-    }
+        => ConfirmDrag(ref _draggingConnector,
+            c => c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow
+                || c.Column != _dragConnectorOrigColumn);
 
     /// <summary>縦コネクタのドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragConnector()
-    {
-        if (_draggingConnector is VerticalConnector c)
+        => CancelDrag(ref _draggingConnector, c =>
         {
             c.TopRow = _dragConnectorOrigTopRow;
             c.BottomRow = _dragConnectorOrigBottomRow;
             c.Column = _dragConnectorOrigColumn;
-        }
-        _draggingConnector = null;
-    }
+        });
 
     /// <summary>選択中の縦コネクタを行方向に矢印キー1回分(delta=±1)平行移動する(T-041増分7、
     /// キーボード等価操作)。UpdateDragConnectorの本体移動と同じ「間隔を保ったままクランプ」方式。
@@ -555,23 +548,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>配線分断のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する。</summary>
     public void ConfirmDragWireBreak()
-    {
-        if (_draggingWireBreak is WireBreak b &&
-            (b.Row != _dragWireBreakOrigRow || b.Boundary != _dragWireBreakOrigBoundary))
-            MarkDirty();
-        _draggingWireBreak = null;
-    }
+        => ConfirmDrag(ref _draggingWireBreak,
+            b => b.Row != _dragWireBreakOrigRow || b.Boundary != _dragWireBreakOrigBoundary);
 
     /// <summary>配線分断のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragWireBreak()
-    {
-        if (_draggingWireBreak is WireBreak b)
+        => CancelDrag(ref _draggingWireBreak, b =>
         {
             b.Row = _dragWireBreakOrigRow;
             b.Boundary = _dragWireBreakOrigBoundary;
-        }
-        _draggingWireBreak = null;
-    }
+        });
 
     /// <summary>選択中の配線分断を矢印キー1回分(deltaRow/deltaBoundary、いずれか一方は0)平行移動する
     /// (T-041増分7、キーボード等価操作)。点系は本体移動のみ。実際に動けた場合のみMarkDirty()する。</summary>
@@ -737,24 +723,17 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>自由線のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する。</summary>
     public void ConfirmDragFreeLine()
-    {
-        if (_draggingFreeLine is FreeLine line &&
-            (line.X1Mm != _dragFreeLineOrigX1 || line.Y1Mm != _dragFreeLineOrigY1 ||
-             line.X2Mm != _dragFreeLineOrigX2 || line.Y2Mm != _dragFreeLineOrigY2))
-            MarkDirty();
-        _draggingFreeLine = null;
-    }
+        => ConfirmDrag(ref _draggingFreeLine,
+            line => line.X1Mm != _dragFreeLineOrigX1 || line.Y1Mm != _dragFreeLineOrigY1 ||
+                    line.X2Mm != _dragFreeLineOrigX2 || line.Y2Mm != _dragFreeLineOrigY2);
 
     /// <summary>自由線のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragFreeLine()
-    {
-        if (_draggingFreeLine is FreeLine line)
+        => CancelDrag(ref _draggingFreeLine, line =>
         {
             line.X1Mm = _dragFreeLineOrigX1; line.Y1Mm = _dragFreeLineOrigY1;
             line.X2Mm = _dragFreeLineOrigX2; line.Y2Mm = _dragFreeLineOrigY2;
-        }
-        _draggingFreeLine = null;
-    }
+        });
 
     /// <summary>選択中の自由線を矢印キー1回分(deltaXMm/deltaYMm、いずれか一方は0)平行移動する
     /// (T-041増分7、キーボード等価操作)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AA
@@ -905,19 +884,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         dot.YMm = Math.Clamp(_dragConnectionDotOrigYMm + (currentYMm - _dragConnectionDotStartYMm), 0, _dragConnectionDotMaxYMm);
     }
 
-    /// <summary>ドラッグ確定の骨格(T-045増分D PoC、対象=ConnectionDotのみ)。draggingが非nullかつ
-    /// hasChangedがtrueならMarkDirty()し、draggingをnullへ戻す。Confirm/Cancelとも「型固有の判定・
-    /// 復元ロジックのみdelegateとして渡し、if文の構造とnull化はここへ集約する」設計(隠密所見3.4節2.
-    /// 「スナップショット構造体」に相当、他3種(Connector/WireBreak/FreeLine)への展開可否は本PoCの
-    /// 結果を見て別途判断=展開は本コミットの対象外)。</summary>
+    /// <summary>ドラッグ確定の骨格(T-045増分D、当初ConnectionDotのみのPoCだったが、隠密レビュー
+    /// (ecad2-t045-increment-d-review-onmitsu.md DoD(6))でConfirmDragConnector/ConfirmDragFreeLine
+    /// にも分岐が無く同型と判明したためConnector/WireBreak/FreeLineへも展開し4種全てに適用)。
+    /// draggingが非nullかつhasChangedがtrueならMarkDirty()し、draggingをnullへ戻す。Confirm/Cancel
+    /// とも「型固有の判定・復元ロジックのみdelegateとして渡し、if文の構造とnull化はここへ集約する」
+    /// 設計(隠密所見3.4節2.「スナップショット構造体」に相当)。</summary>
     private void ConfirmDrag<T>(ref T? dragging, Func<T, bool> hasChanged) where T : class
     {
         if (dragging is not null && hasChanged(dragging)) MarkDirty();
         dragging = null;
     }
 
-    /// <summary>ドラッグキャンセルの骨格(T-045増分D PoC、対象=ConnectionDotのみ)。draggingが
-    /// 非nullならrestoreで開始時位置へ復元してからnullへ戻す。</summary>
+    /// <summary>ドラッグキャンセルの骨格(T-045増分D、4種(Connector/WireBreak/FreeLine/
+    /// ConnectionDot)全てに適用)。draggingが非nullならrestoreで開始時位置へ復元してからnullへ
+    /// 戻す。</summary>
     private void CancelDrag<T>(ref T? dragging, Action<T> restore) where T : class
     {
         if (dragging is not null) restore(dragging);
