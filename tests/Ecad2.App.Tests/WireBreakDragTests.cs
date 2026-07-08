@@ -65,6 +65,23 @@ public class WireBreakDragTests : ViewModelTestBase
         Assert.Equal(0, b.Boundary);
     }
 
+    // 忍者テストレビュー指摘: 下限側のみで上限側(Rows-1/Columns)のクランプが未検証だった。
+    [Fact]
+    public void MoveSelectedWireBreak_ClampsAtGridUpperBounds()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();   // GridSpec既定Rows=10(行0〜9)/Columns=20
+        var b = new WireBreak { Boundary = 20, Row = 9 };   // いずれも上限
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+
+        bool moved = vm.MoveSelectedWireBreak(1, 1);
+
+        Assert.False(moved);
+        Assert.Equal(9, b.Row);
+        Assert.Equal(20, b.Boundary);
+    }
+
     [Fact]
     public void MoveSelectedWireBreak_WithoutSelection_DoesNothing()
     {
@@ -114,6 +131,22 @@ public class WireBreakDragTests : ViewModelTestBase
         vm.UpdateDragWireBreak(currentRow: 20, currentBoundary: 4.5);   // Grid.Rows=10を大きく超える
 
         Assert.Equal(9, b.Row);   // Rows-1でクランプ
+    }
+
+    // 忍者テストレビュー指摘: Row側のみでBoundary側(Grid.Columns)のクランプが未検証だった。
+    [Fact]
+    public void DragWireBreak_ClampsAtGridBounds_Boundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();   // GridSpec既定Columns=20
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+        vm.UpdateDragWireBreak(currentRow: 3, currentBoundary: 50);   // Grid.Columns=20を大きく超える
+
+        Assert.Equal(20, b.Boundary);   // Columnsでクランプ
     }
 
     [Fact]
@@ -191,5 +224,95 @@ public class WireBreakDragTests : ViewModelTestBase
         Assert.False(vm.IsDirty);
         var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5));
         Assert.Null(ex);
+    }
+
+    // 忍者テストレビュー指摘: ConnectorDragAndResizeTests.csにはあるがWireBreakには無かったカバレッジ。
+    [Fact]
+    public void SheetSwitch_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.False(vm.IsDraggingWireBreak);
+        var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 8, currentBoundary: 8.5));
+        Assert.Null(ex);
+    }
+
+    // ---- 所見Y: 強制クリア時にUpdateDrag*済みの半端な位置が復元されるか(旧実装=null化のみでは
+    // 検出できない、忍者テストレビュー指摘) ----
+
+    [Fact]
+    public void SelectedWireBreakAssignment_WithPositionChanged_RestoresOriginalPosition()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();   // Row=3, Boundary=4.5
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+        vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5);   // 位置をずらす
+        Assert.Equal(6, b.Row);
+
+        vm.DeleteSelectedWireBreak();
+
+        Assert.Equal(3, b.Row);
+        Assert.Equal(4.5, b.Boundary);
+    }
+
+    [Fact]
+    public void SheetSwitch_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+        vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5);   // 位置をずらす
+        Assert.Equal(6, b.Row);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.Equal(3, b.Row);
+        Assert.Equal(4.5, b.Boundary);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ReplaceDocument_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+        vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5);   // 位置をずらす
+
+        vm.NewDocument();
+
+        Assert.Equal(3, b.Row);
+        Assert.Equal(4.5, b.Boundary);
+        Assert.False(vm.IsDirty);
     }
 }

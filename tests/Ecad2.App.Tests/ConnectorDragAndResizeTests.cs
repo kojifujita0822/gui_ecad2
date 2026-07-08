@@ -306,6 +306,74 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         Assert.Null(ex);
     }
 
+    // ---- 所見Y: 強制クリア時にUpdateDrag*済みの半端な位置が復元されるか(旧実装=null化のみでは
+    // 検出できない、忍者テストレビュー指摘) ----
+
+    [Fact]
+    public void SelectedConnectorAssignment_WithPositionChanged_RestoresOriginalPosition()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();   // TopRow=3, BottomRow=6
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+        Assert.Equal(6, c.TopRow);
+
+        vm.DeleteSelectedConnector();
+
+        // 旧実装(nullにするだけ)ではTopRow=6のまま残る。新実装は開始時位置へ復元する。
+        Assert.Equal(3, c.TopRow);
+        Assert.Equal(6, c.BottomRow);
+    }
+
+    [Fact]
+    public void SheetSwitch_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+        Assert.Equal(6, c.TopRow);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        // 所見Y: 復元せずnull化のみだと、生きたシート上のコネクタが半端な位置(TopRow=6)のまま
+        // MarkDirty()もされず黙って確定してしまう。開始時位置(3)へ復元されIsDirtyもfalseのまま。
+        Assert.Equal(3, c.TopRow);
+        Assert.Equal(6, c.BottomRow);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ReplaceDocument_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+
+        vm.NewDocument();   // ReplaceDocument経由
+
+        Assert.Equal(3, c.TopRow);   // 破棄済みオブジェクトだが位置復元されていること(旧実装との区別)
+        Assert.Equal(6, c.BottomRow);
+        Assert.False(vm.IsDirty);
+    }
+
     // ---- 所見B: 外部データ由来でTopRow>=BottomRowが既に崩れているケースへの防御 ----
 
     [Fact]

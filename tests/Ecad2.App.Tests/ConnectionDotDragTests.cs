@@ -150,4 +150,100 @@ public class ConnectionDotDragTests : ViewModelTestBase
         var ex = Record.Exception(() => vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32));
         Assert.Null(ex);
     }
+
+    // 忍者テストレビュー指摘: ConnectorDragAndResizeTests.csにはあるがConnectionDotには無かったカバレッジ。
+    [Fact]
+    public void SheetSwitch_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            MainCircuit = true,
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.False(vm.IsDraggingConnectionDot);
+        var ex = Record.Exception(() => vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32));
+        Assert.Null(ex);
+    }
+
+    // ---- 所見Y: 強制クリア時にUpdateDrag*済みの半端な位置が復元されるか(旧実装=null化のみでは
+    // 検出できない、忍者テストレビュー指摘) ----
+
+    [Fact]
+    public void SelectedConnectionDotAssignment_WithPositionChanged_RestoresOriginalPosition()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();   // XMm=20, YMm=30
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
+        Assert.Equal(25, dot.XMm);
+
+        vm.DeleteSelectedConnectionDot();
+
+        Assert.Equal(20, dot.XMm);
+        Assert.Equal(30, dot.YMm);
+    }
+
+    [Fact]
+    public void SheetSwitch_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
+        Assert.Equal(25, dot.XMm);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            MainCircuit = true,
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.Equal(20, dot.XMm);
+        Assert.Equal(30, dot.YMm);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ReplaceDocument_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var dot = MakeDot();
+        vm.CurrentSheet!.ConnectionDots.Add(dot);
+        vm.SelectedConnectionDot = dot;
+        vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30);
+        vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32);   // 位置をずらす
+
+        vm.NewDocument();
+
+        Assert.Equal(20, dot.XMm);
+        Assert.Equal(30, dot.YMm);
+        Assert.False(vm.IsDirty);
+    }
 }

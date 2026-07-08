@@ -141,6 +141,47 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         Assert.Equal(10, line.X1Mm);
     }
 
+    // T-041増分7隠密レビュー所見Z再発防止(忍者テストレビュー指摘): 実際の呼び出し元
+    // (ResizeSelectedFreeLineByKey)は線の向きと逆軸のキーもdelta=0で無条件に渡してくる。
+    // 既存のIgnoresXDeltaテストは両軸とも非ゼロで呼んでおりこの発火条件を突いていなかった。
+    [Fact]
+    public void ResizeSelectedFreeLineEndpoint_Horizontal_PerpendicularKey_DoesNotMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();   // 水平線
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        // 水平線にUp/Downキー相当(deltaXMm=0, deltaYMm!=0)を渡すケース
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 0, deltaYMm: -3);
+
+        Assert.False(resized);
+        Assert.Equal(10, line.X1Mm);
+        Assert.Equal(30, line.Y1Mm);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ResizeSelectedFreeLineEndpoint_Vertical_PerpendicularKey_DoesNotMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeVertical();   // 垂直線
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        // 垂直線にLeft/Rightキー相当(deltaYMm=0, deltaXMm!=0)を渡すケース
+        bool resized = vm.ResizeSelectedFreeLineEndpoint(deltaXMm: 5, deltaYMm: 0);
+
+        Assert.False(resized);
+        Assert.Equal(20, line.X1Mm);
+        Assert.Equal(10, line.Y1Mm);
+        Assert.False(vm.IsDirty);
+    }
+
     // ---- ドラッグ(BeginDragFreeLine/UpdateDragFreeLine/ConfirmDragFreeLine/CancelDragFreeLine) ----
 
     [Fact]
@@ -209,6 +250,24 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         Assert.False(vm.IsDraggingFreeLine);
     }
 
+    // 忍者テストレビュー指摘: Connector/WireBreak/ConnectionDotにはあるがFreeLineには無かったカバレッジ。
+    [Fact]
+    public void ConfirmDragFreeLine_WhenPositionUnchanged_DoesNotMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateDragFreeLine(currentXMm: 25, currentYMm: 30);   // 移動量ゼロ
+        vm.ConfirmDragFreeLine();
+
+        Assert.False(vm.IsDirty);
+    }
+
     // T-041増分7隠密レビュー所見AA対応: グリッド・ページ境界へのクランプ回帰テスト
     [Fact]
     public void DragFreeLine_Move_ClampsToPageBoundary()
@@ -267,5 +326,107 @@ public class FreeLineDragAndResizeTests : ViewModelTestBase
         Assert.False(vm.IsDirty);
         var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30));
         Assert.Null(ex);
+    }
+
+    // 忍者テストレビュー指摘: ConnectorDragAndResizeTests.csにはあるがFreeLineには無かったカバレッジ。
+    [Fact]
+    public void SheetSwitch_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            MainCircuit = true,
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.False(vm.IsDraggingFreeLine);
+        var ex = Record.Exception(() => vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 30));
+        Assert.Null(ex);
+    }
+
+    // ---- 所見Y: 強制クリア時にUpdateDrag*済みの半端な位置が復元されるか(旧実装=null化のみでは
+    // 検出できない、忍者テストレビュー指摘) ----
+
+    [Fact]
+    public void SelectedFreeLineAssignment_WithPositionChanged_RestoresOriginalPosition()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();   // X1=10,Y1=30 - X2=40,Y2=30
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 32);   // 位置をずらす
+        Assert.Equal(15, line.X1Mm);
+
+        vm.DeleteSelectedFreeLine();
+
+        Assert.Equal(10, line.X1Mm);
+        Assert.Equal(30, line.Y1Mm);
+        Assert.Equal(40, line.X2Mm);
+        Assert.Equal(30, line.Y2Mm);
+    }
+
+    [Fact]
+    public void SheetSwitch_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 32);   // 位置をずらす
+        Assert.Equal(15, line.X1Mm);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            MainCircuit = true,
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.Equal(10, line.X1Mm);
+        Assert.Equal(30, line.Y1Mm);
+        Assert.Equal(40, line.X2Mm);
+        Assert.Equal(30, line.Y2Mm);
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ReplaceDocument_WithPositionChanged_RestoresOriginalPositionWithoutMarkingDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        var line = MakeHorizontal();
+        vm.CurrentSheet!.FreeLines.Add(line);
+        vm.SelectedFreeLine = line;
+        vm.BeginDragFreeLine(line, isEndpoint: false, isStart: false, startXMm: 25, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateDragFreeLine(currentXMm: 30, currentYMm: 32);   // 位置をずらす
+
+        vm.NewDocument();
+
+        Assert.Equal(10, line.X1Mm);
+        Assert.Equal(30, line.Y1Mm);
+        Assert.Equal(40, line.X2Mm);
+        Assert.Equal(30, line.Y2Mm);
+        Assert.False(vm.IsDirty);
     }
 }
