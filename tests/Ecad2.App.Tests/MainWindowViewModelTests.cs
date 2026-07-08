@@ -178,20 +178,6 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.False(vm.Document.Devices.ByName.ContainsKey("X002"));
     }
 
-    /// <summary>T-045増分B(P-020種別マッピング未実装の解消、殿裁可済み案A)の回帰テスト。
-    /// 接点・コイル系(Role=ContactNO/Coil)はRelayへ分類される。</summary>
-    [Fact]
-    public void PlaceElementAtSelectedCell_WithContactPart_SetsDeviceClassRelay()
-    {
-        var vm = CreateViewModel();
-        vm.NewDocument();
-        vm.SelectedCell = new GridPos(0, 0);
-
-        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
-
-        Assert.Equal(DeviceClass.Relay, vm.Document.Devices.ByName["X001"].Class);
-    }
-
     /// <summary>端子台(Role=Terminal)はTerminalへ分類される。</summary>
     [Fact]
     public void PlaceElementAtSelectedCell_WithTerminalPart_SetsDeviceClassTerminal()
@@ -205,18 +191,86 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Equal(DeviceClass.Terminal, vm.Document.Devices.ByName["TB1"].Class);
     }
 
-    /// <summary>セレクトSWはRole=ContactNO(電気的にはa接点と同一、T-037往復2周目の既知制約)だが、
-    /// 機器表分類上はSelectSwitchへ区別される(固定Id判定、殿裁可済み案A)。</summary>
-    [Fact]
-    public void PlaceElementAtSelectedCell_WithSelectSwitchPart_SetsDeviceClassSelectSwitch()
+    /// <summary>
+    /// T-045増分B修正(隠密レビューCONFIRMED、ecad2-t045-increment-b-review-onmitsu.md=セレクトSW
+    /// 誤分類バグ)の回帰テスト。テスト設計書(ecad2-t045-increment-b-fix-test-design-onmitsu.md)の
+    /// 同値分割4分類(A/B/C/D)。既存の`PlaceElementAtSelectedCell_With{Contact,SelectSwitch}Part_
+    /// SetsDeviceClass{Relay,SelectSwitch}`をケースA/Cとして統合した(設計書6節、侍判断で統合可)。
+    /// A/Bは「Idの違いのみ」(固定Id判定の脆さを直接突く対)、C/Dは「IsOrEligibleの違いのみ」
+    /// (IsOrEligible単独判定の弁別力を試す対)、B/Dは「Role=ContactNO・IsOrEligible=falseで一致
+    /// するが期待結果が異なる」最も厳しい対。
+    /// </summary>
+    public static IEnumerable<object[]> SelectSwitchClassificationCases()
     {
-        var vm = CreateViewModel();
-        vm.NewDocument();
-        vm.SelectedCell = new GridPos(0, 0);
+        // A: セレクトSW・元Id(既存テスト相当)。
+        yield return new object[] { BasicPartTemplates.SelectSwitchId, null!, false, DeviceClass.SelectSwitch };
 
-        vm.PlaceElementAtSelectedCell(BasicPartTemplates.SelectSwitchId, "SW1", isOr: false);
+        // B: セレクトSW・再採番Id相当(T-035Explorerコピー後、基本図形フォルダ直下、RED対象)。
+        // Role/IsOrEligible/PortsはSelectSwitchと同一、Idのみ異なる。
+        yield return new object[]
+        {
+            "reassigned-select-switch-guid",
+            new PartDefinition
+            {
+                Id = "reassigned-select-switch-guid", Name = "セレクトSW", Role = PartRole.ContactNO,
+                IsOrEligible = false, Ports = new() { new PortDef("L", 0, 0), new PortDef("R", 0, 1) },
+            },
+            false, // 基本図形フォルダ直下(Category=="")
+            DeviceClass.SelectSwitch,
+        };
 
-        Assert.Equal(DeviceClass.SelectSwitch, vm.Document.Devices.ByName["SW1"].Class);
+        // C: 純正ContactNO(a接点、既存テスト相当、退行防止)。
+        yield return new object[] { BasicPartTemplates.ContactNOId, null!, false, DeviceClass.Relay };
+
+        // D: 自作パーツ(自作フォルダ、Role=ContactNO・IsOrEligible=false、対応案の弁別力を試す。
+        // Category="自作"のためCategory==""ゲートで弾かれ、IsOrEligible単独判定だと誤ってSelectSwitch
+        // へ分類されるところをこのケースが検出する)。
+        yield return new object[]
+        {
+            "custom-contact-no-guid",
+            new PartDefinition
+            {
+                Id = "custom-contact-no-guid", Name = "自作接点", Role = PartRole.ContactNO,
+                IsOrEligible = false, Ports = new() { new PortDef("L", 0, 0), new PortDef("R", 0, 1) },
+            },
+            true, // 自作フォルダ(Category=="自作")
+            DeviceClass.Relay,
+        };
+    }
+
+    /// <summary>customDefinitionが指定されたケース(B/D)は、PartFolderStoreの一時フォルダへ実際に
+    /// .gcadpartファイルを書き出し、store.Enumerate()経由でPartPalette.Entriesへ反映させる
+    /// (vm.PartLibrary.ById直接追加ではEntriesに載らずCategory判定を再現できないため、設計書
+    /// ecad2-t045-increment-b-fix-test-design-onmitsu.md 5節注記に従い実装方式に追随)。</summary>
+    [Theory]
+    [MemberData(nameof(SelectSwitchClassificationCases))]
+    public void PlaceElementAtSelectedCell_ClassifiesSelectSwitchByDataFieldsNotFixedId(
+        string partId, PartDefinition? customDefinition, bool isCustomFolder, DeviceClass expected)
+    {
+        string tempDir = Path.Combine(Path.GetTempPath(), $"ecad2-apptest-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempDir);
+        try
+        {
+            var store = new PartFolderStore(tempDir);
+            if (customDefinition is not null)
+            {
+                store.EnsureFolders();
+                string dir = isCustomFolder ? store.CustomDir : store.RootDir;
+                PartLibrarySerializer.SaveOne(customDefinition, Path.Combine(dir, $"{partId}.gcadpart"));
+            }
+
+            var vm = new MainWindowViewModel(store, new ImmediateDispatcherService());
+            vm.NewDocument();
+            vm.SelectedCell = new GridPos(0, 0);
+
+            vm.PlaceElementAtSelectedCell(partId, "X001", isOr: false);
+
+            Assert.Equal(expected, vm.Document.Devices.ByName["X001"].Class);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
     }
 
     /// <summary>自作パーツRole=NonSimulated(主回路記号等)はComponentKindが呼べない

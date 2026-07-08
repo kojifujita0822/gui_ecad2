@@ -1,3 +1,4 @@
+using System.Linq;
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
@@ -1290,7 +1291,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 選択(SelectedCell)自体の仕様範囲(行-1・列-2まで選択可、殿教示2026-07-07・
     /// docs/proposed.md P-022/P-024)には触れず、配置経路のみをガードする
     /// (殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
-    public bool ValidatePlacement(GridPos pos, Sheet sheet)
+    private bool ValidatePlacement(GridPos pos, Sheet sheet)
         => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
         && pos.Column >= 0 && pos.Column < sheet.Grid.Columns
         && !sheet.Elements.Any(el => el.Pos == pos);
@@ -1317,12 +1318,21 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>要素からDeviceClassを解決する(T-045 P-020対応)。PartResolver.ComponentKindは
     /// CreatesComponent=false(自作パーツRole=NonSimulated等)の場合に例外を投げるため、事前に
-    /// ガードしOtherへフォールバックする。セレクトSW(BasicPartTemplates)はRole=ContactNO
-    /// (電気的にはa接点と同一、T-037往復2周目の既知制約)のためComponentKind経由では区別できず、
-    /// 固定Idで個別判定する(T-037のIsOrEligible導入と同型の対処)。</summary>
+    /// ガードしOtherへフォールバックする。セレクトSWはRole=ContactNO(電気的にはa接点と同一、
+    /// T-037往復2周目の既知制約)のためComponentKind経由では区別できない。T-045増分B修正
+    /// (隠密レビューCONFIRMED、ecad2-t045-increment-b-review-onmitsu.md): 固定Id完全一致判定は
+    /// Explorerコピー由来のId再採番(PartFolderStore.cs:94-110、T-035)に耐性が無く誤分類する
+    /// ため廃止し、PartEntryToGlyphGeometryConverter.cs:53-63と同型のCategory/Role/IsOrEligible
+    /// 判定へ置換する(element.PartIdでPartPalette.Entriesを動的検索、Idの新旧に依存しない)。
+    /// Category==""(基本図形フォルダ直下)をゲートにするのは、自作パーツ(Category="自作")が
+    /// Role=ContactNO・IsOrEligible=falseを偶然持つ場合の誤判定を防ぐため
+    /// (ecad2-t045-increment-b-fix-test-design-onmitsu.md 分類D)。</summary>
     private DeviceClass ResolveDeviceClass(ElementInstance element)
     {
-        if (element.PartId == Persistence.BasicPartTemplates.SelectSwitchId) return DeviceClass.SelectSwitch;
+        var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == element.PartId);
+        if (entry is { Category: "", Definition.Role: PartRole.ContactNO, Definition.IsOrEligible: false })
+            return DeviceClass.SelectSwitch;
+
         return PartResolver.CreatesComponent(element, PartLibrary)
             ? MapToDeviceClass(PartResolver.ComponentKind(element, PartLibrary))
             : DeviceClass.Other;
