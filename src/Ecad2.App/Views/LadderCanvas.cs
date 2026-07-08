@@ -213,6 +213,10 @@ public sealed class LadderCanvas : FrameworkElement
     /// 本体/端点いずれに近いか判定する(T-041増分7、ドラッグ操作用)。HitTestConnectorが「複数候補
     /// から選ぶ」のに対し、こちらは選択済みの1本に対して「本体/端点どちらを掴んだか」を判定する
     /// (PoC=poc/t041-drag-poc/T041DragPoc/DragCanvas.csのHitTestを移植)。null=対象外(許容誤差外)。
+    /// P-039(殿裁定、列ドラッグ対応)で確認: この列ズレ制限(ConnectorHitToleranceMm)は「ドラッグを
+    /// 開始するための掴む精度」であり、開始後にUpdateDragConnectorが列位置を動かせることとは独立
+    /// (本体をつまむにはコネクタの線の近くをクリックする必要がある、という制約はそのまま妥当)。
+    /// よって変更不要と判断する。
     /// </summary>
     internal (bool IsEndpoint, bool IsTop)? HitTestConnectorDragMode(Point localPositionDip, VerticalConnector connector)
     {

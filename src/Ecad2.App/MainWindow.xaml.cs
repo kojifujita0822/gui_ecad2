@@ -305,8 +305,9 @@ public partial class MainWindow : Window
         if (_viewModel.SelectedConnector is Ecad2.Model.VerticalConnector connector
             && LadderCanvasHost.HitTestConnectorDragMode(position, connector) is (bool isEndpoint, bool isTop))
         {
-            int startRow = LadderCanvasHost.RowAtDip(position.Y);
-            _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow);
+            // P-039(殿裁定): 本体移動時に列位置も動かせるよう、開始時の列境界(0.5刻み)も取得する。
+            var (startRow, startColumn) = LadderCanvasHost.ToRowBoundary(position);
+            _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow, startColumn);
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragConnector(); return; }
             _connectorDragPressPositionDip = position;
             _connectorDragStarted = false;
@@ -374,7 +375,9 @@ public partial class MainWindow : Window
                 if ((position - _connectorDragPressPositionDip).Length < DragStartThresholdDip) return;
                 _connectorDragStarted = true;
             }
-            _viewModel.UpdateDragConnector(LadderCanvasHost.RowAtDip(position.Y));
+            // P-039(殿裁定): 本体移動時に列位置も動かせるよう、現在の列境界(0.5刻み)も渡す。
+            var (currentRow, currentColumn) = LadderCanvasHost.ToRowBoundary(position);
+            _viewModel.UpdateDragConnector(currentRow, currentColumn);
             RedrawCanvas();
             return;
         }

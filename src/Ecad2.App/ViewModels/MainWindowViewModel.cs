@@ -286,6 +286,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int _dragConnectorOrigTopRow;
     private int _dragConnectorOrigBottomRow;
     private int _dragConnectorStartRow;
+    // P-039(殿裁定): 本体移動時に列位置(Column)も動かせるようにする。WireBreakのBoundaryと同型
+    // (0.5刻み境界、単一値のためmin>maxガードは不要)。端点リサイズ時は列を変更しない(殿裁定
+    // 「VerticalConnectorは常に縦線のためLeft/Rightの端点伸縮は意味を持たず未対応」と同じ理由)。
+    private double _dragConnectorOrigColumn;
+    private double _dragConnectorStartColumn;
 
     /// <summary>縦コネクタをドラッグ中か(View側がMouseMove/Escの処理要否を判定するのに使う)。</summary>
     public bool IsDraggingConnector => _draggingConnector is not null;
@@ -306,8 +311,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>縦コネクタのドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、
-    /// trueならisTopで指定した端点のみのリサイズ。startRowはドラッグ開始時のマウス位置(行)。</summary>
-    public void BeginDragConnector(VerticalConnector connector, bool isEndpoint, bool isTop, int startRow)
+    /// trueならisTopで指定した端点のみのリサイズ。startRowはドラッグ開始時のマウス位置(行)。
+    /// startColumnはドラッグ開始時のマウス位置(列境界0.5刻み、P-039対応)。</summary>
+    public void BeginDragConnector(VerticalConnector connector, bool isEndpoint, bool isTop, int startRow, double startColumn)
     {
         _draggingConnector = connector;
         _draggingConnectorIsEndpoint = isEndpoint;
@@ -315,13 +321,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         _dragConnectorOrigTopRow = connector.TopRow;
         _dragConnectorOrigBottomRow = connector.BottomRow;
         _dragConnectorStartRow = startRow;
+        _dragConnectorOrigColumn = connector.Column;
+        _dragConnectorStartColumn = startColumn;
     }
 
-    /// <summary>ドラッグ中のマウス位置(現在行)に応じて縦コネクタの位置を更新する(T-041増分7)。
-    /// 本体移動はTop/BottomRowの間隔(span)を保ったままGrid範囲内にクランプする(独立にクランプすると
-    /// 片方が先に端へ達した際に間隔が歪むため、delta自体を範囲内に丸めてから両方へ同時適用する)。
-    /// 端点リサイズはTop&lt;Bottom(ゼロ長禁止、ConfirmConnectorDraftの記入時不変条件と同じ)を保つ。</summary>
-    public void UpdateDragConnector(int currentRow)
+    /// <summary>ドラッグ中のマウス位置(現在行・列境界0.5刻み)に応じて縦コネクタの位置を更新する
+    /// (T-041増分7、列位置はP-039対応)。本体移動はTop/BottomRowの間隔(span)を保ったままGrid範囲内に
+    /// クランプする(独立にクランプすると片方が先に端へ達した際に間隔が歪むため、delta自体を範囲内に
+    /// 丸めてから両方へ同時適用する)。列位置はWireBreak.Boundaryと同型の単一値のため独立クランプで
+    /// よい(min>maxは起こりえない)。端点リサイズはTop&lt;Bottom(ゼロ長禁止、ConfirmConnectorDraftの
+    /// 記入時不変条件と同じ)を保ち、列位置は変更しない(端点は上下伸縮のみ)。</summary>
+    public void UpdateDragConnector(int currentRow, double currentColumn)
     {
         if (_draggingConnector is not VerticalConnector c || CurrentSheet is not Sheet sheet) return;
         int deltaRow = currentRow - _dragConnectorStartRow;
@@ -353,6 +363,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             int clamped = Math.Clamp(deltaRow, minDelta, maxDelta);
             c.TopRow = _dragConnectorOrigTopRow + clamped;
             c.BottomRow = _dragConnectorOrigBottomRow + clamped;
+
+            // P-039(殿裁定): 本体移動時は列位置(Column)もマウス追従させる。WireBreak.Boundaryと
+            // 同型の単一値のためmin>maxガードは不要(0<=sheet.Grid.Columnsは常に真)。
+            double deltaColumn = currentColumn - _dragConnectorStartColumn;
+            c.Column = Math.Clamp(_dragConnectorOrigColumn + deltaColumn, 0, sheet.Grid.Columns);
         }
     }
 
@@ -361,7 +376,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void ConfirmDragConnector()
     {
         if (_draggingConnector is VerticalConnector c &&
-            (c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow))
+            (c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow
+             || c.Column != _dragConnectorOrigColumn))
             MarkDirty();
         _draggingConnector = null;
     }
@@ -373,6 +389,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             c.TopRow = _dragConnectorOrigTopRow;
             c.BottomRow = _dragConnectorOrigBottomRow;
+            c.Column = _dragConnectorOrigColumn;
         }
         _draggingConnector = null;
     }

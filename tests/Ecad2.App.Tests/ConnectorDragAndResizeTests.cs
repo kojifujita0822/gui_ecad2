@@ -172,10 +172,10 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
         Assert.False(vm.IsDirty);   // ドラッグ中はまだMarkDirty()しない
 
-        vm.UpdateDragConnector(currentRow: 5);   // +2行
+        vm.UpdateDragConnector(currentRow: 5, currentColumn: 4);   // +2行
 
         Assert.Equal(5, c.TopRow);
         Assert.Equal(8, c.BottomRow);
@@ -196,8 +196,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: true, isTop: true, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 10);   // Bottom(6)を超えて下げようとする
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: true, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 10, currentColumn: 4);   // Bottom(6)を超えて下げようとする
 
         Assert.Equal(5, c.TopRow);   // Bottom-1でクランプ(ゼロ長禁止)
         Assert.Equal(6, c.BottomRow);
@@ -212,8 +212,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 6);   // +3行、途中まで動かす
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 6, currentColumn: 4);   // +3行、途中まで動かす
         Assert.Equal(6, c.TopRow);
 
         vm.CancelDragConnector();
@@ -233,8 +233,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 3);   // 移動量ゼロ(クリックのみ相当)
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 4);   // 移動量ゼロ(クリックのみ相当)
         vm.ConfirmDragConnector();
 
         Assert.False(vm.IsDirty);
@@ -250,7 +250,7 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
         Assert.True(vm.IsDraggingConnector);
 
         // Delete相当: DeleteSelectedConnectorがSelectedConnector=nullを代入する経路。
@@ -259,7 +259,7 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         Assert.True(deleted);
         Assert.False(vm.IsDraggingConnector);
         // 強制クリア後、UpdateDragConnectorを呼んでも削除済みの実体を書き換えない(例外も起きない)。
-        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
         Assert.Equal(3, c.TopRow);   // 書き換わっていない
     }
@@ -272,7 +272,7 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
 
         vm.Document.Sheets.Add(new Sheet
         {
@@ -284,7 +284,7 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheetIndex = 1;   // SelectedCell=null経由でSelectedConnectorのsetterへ波及する
 
         Assert.False(vm.IsDraggingConnector);
-        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
     }
 
@@ -296,13 +296,13 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
 
         vm.NewDocument();   // ReplaceDocument経由
 
         Assert.False(vm.IsDraggingConnector);
         Assert.False(vm.IsDirty);   // 新規文書がドラッグの残骸で理由なく未保存化しない
-        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
     }
 
@@ -317,8 +317,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();   // TopRow=3, BottomRow=6
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 6, currentColumn: 4);   // +3行、位置をずらす
         Assert.Equal(6, c.TopRow);
 
         vm.DeleteSelectedConnector();
@@ -336,8 +336,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 6, currentColumn: 4);   // +3行、位置をずらす
         Assert.Equal(6, c.TopRow);
 
         vm.Document.Sheets.Add(new Sheet
@@ -364,8 +364,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         var c = MakeConnector();
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
-        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
-        vm.UpdateDragConnector(currentRow: 6);   // +3行、位置をずらす
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 6, currentColumn: 4);   // +3行、位置をずらす
 
         vm.NewDocument();   // ReplaceDocument経由
 
@@ -386,8 +386,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: true, isTop: true, startRow: 5);
-        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 2));
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: true, startRow: 5, startColumn: 4);
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 2, currentColumn: 4));
 
         Assert.Null(ex);
         Assert.Equal(5, c.TopRow);   // 直せない状態のため変更されない
@@ -402,8 +402,8 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheet!.Connectors.Add(c);
         vm.SelectedConnector = c;
 
-        vm.BeginDragConnector(c, isEndpoint: true, isTop: false, startRow: 5);
-        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 7));
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: false, startRow: 5, startColumn: 4);
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 7, currentColumn: 4));
 
         Assert.Null(ex);
         Assert.Equal(5, c.BottomRow);
@@ -422,5 +422,195 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
 
         Assert.Null(ex);
         Assert.Equal(5, c.TopRow);
+    }
+
+    // ---- P-039(殿裁定): VerticalConnectorの列(Column)ドラッグ対応。
+    // 隠密テスト設計書(docs/ecad2-p039-test-design-onmitsu.md)に基づく、新制度初適用。 ----
+
+    // 4.1 UpdateDragConnector(本体移動)でColumn方向が正しく更新される(設計書2.1表B1〜B8)。
+    [Theory]
+    [InlineData(10.0, 2.0, 20, 12.0)]       // B1: 中間値、正の小さいdelta
+    [InlineData(10.0, -3.0, 20, 7.0)]       // B1: 中間値、負の小さいdelta
+    [InlineData(0.0, -3.0, 20, 0.0)]        // B2: 下限、さらに左→クランプで下限維持
+    [InlineData(0.0, 2.0, 20, 2.0)]         // B3: 下限、右へ離れる→クランプ不要
+    [InlineData(20.0, 3.0, 20, 20.0)]       // B4: 上限、さらに右→クランプで上限維持
+    [InlineData(20.0, -2.0, 20, 18.0)]      // B5: 上限、左へ離れる→クランプ不要
+    [InlineData(10.0, -10.0, 20, 0.0)]      // B6: ちょうど下限に到達
+    [InlineData(10.0, 10.0, 20, 20.0)]      // B7: ちょうど上限に到達
+    [InlineData(10.0, 100.0, 20, 20.0)]     // B8: 境界を大きく超える→クランプ(上限)
+    public void UpdateDragConnector_Move_UpdatesColumnWithClamp(double origColumn, double delta, int gridColumns, double expectedColumn)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Columns = gridColumns;
+        var c = new VerticalConnector { Column = origColumn, TopRow = 3, BottomRow = 6 };
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        // startColumn=0に固定し、currentColumn=deltaとすることでdeltaColumn=deltaに一致させる。
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 0);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: delta);
+
+        Assert.Equal(expectedColumn, c.Column);
+    }
+
+    [Fact]
+    public void UpdateDragConnector_Move_RowAndColumnAreIndependent()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();   // GridSpec既定Rows=10(行0〜9)
+        var c = new VerticalConnector { Column = 10, TopRow = 0, BottomRow = 2 };   // TopRowは既に上限(0)
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 10);
+        // Row方向はさらに上へ(クランプされ動けない)、Column方向は+5(独立して正常に動く)。
+        vm.UpdateDragConnector(currentRow: 0, currentColumn: 15);
+
+        Assert.Equal(0, c.TopRow);
+        Assert.Equal(2, c.BottomRow);
+        Assert.Equal(15, c.Column);
+    }
+
+    // 4.2 端点リサイズ時はColumn不変(殿裁定「VerticalConnectorは常に縦線のため端点伸縮は列に無関係」)。
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void UpdateDragConnector_Resize_NeverChangesColumn(bool isTop)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();   // Column=4, TopRow=3, BottomRow=6
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: isTop, startRow: isTop ? 3 : 6, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: isTop ? 4 : 5, currentColumn: 100);   // 列を大きく変えようとする
+
+        Assert.Equal(4, c.Column);
+    }
+
+    // 4.3 ConfirmDragConnectorがColumn変化も検知する(設計書申し送り: 現状実装ではRED想定)。
+    [Fact]
+    public void ConfirmDragConnector_WhenOnlyColumnChanged_MarksDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();   // Column=4, TopRow=3, BottomRow=6
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 6);   // Row系不変、Columnのみ変化
+        vm.ConfirmDragConnector();
+
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void ConfirmDragConnector_WhenNothingChanged_DoesNotMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 4);   // Row系・Column系とも変化なし
+        vm.ConfirmDragConnector();
+
+        Assert.False(vm.IsDirty);
+    }
+
+    // 4.4 CancelDragConnectorがColumnも復元する(設計書申し送り: 現状実装ではRED想定)。
+    [Fact]
+    public void CancelDragConnector_RestoresColumnToOriginalPosition()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();   // Column=4
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 10);
+        Assert.Equal(10, c.Column);
+
+        vm.CancelDragConnector();
+
+        Assert.Equal(4, c.Column);
+        Assert.False(vm.IsDirty);
+    }
+
+    // 4.5 ForceCancelDragConnectorIfAny(所見Y型)がColumnも復元する(Delete経由・シート切替経由)。
+    [Fact]
+    public void SelectedConnectorAssignment_ForceCancelRestoresColumn_ViaDelete()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();   // Column=4
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 10);
+        Assert.Equal(10, c.Column);
+
+        vm.DeleteSelectedConnector();
+
+        Assert.Equal(4, c.Column);
+    }
+
+    [Fact]
+    public void SelectedConnectorAssignment_ForceCancelRestoresColumn_ViaSheetSwitch()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
+        vm.UpdateDragConnector(currentRow: 3, currentColumn: 10);
+        Assert.Equal(10, c.Column);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;
+
+        Assert.Equal(4, c.Column);
+        Assert.False(vm.IsDirty);
+    }
+
+    // 4.6 キーボード版(MoveSelectedConnectorColumn)と同じ結果に到達する(案Xの核心要件)。
+    [Theory]
+    [InlineData(10.0, 3.0)]     // 中間値
+    [InlineData(0.0, -2.0)]     // 下限、さらに負→クランプされて動かない
+    [InlineData(20.0, 5.0)]     // 上限、さらに正→クランプされて動かない
+    [InlineData(1.0, -5.0)]     // 下限近傍を超えてクランプされる
+    [InlineData(19.0, 5.0)]     // 上限近傍を超えてクランプされる
+    public void DragAndKeyboardColumnMove_ConvergeToSameResult(double origColumn, double delta)
+    {
+        var vmDrag = CreateViewModel();
+        vmDrag.NewDocument();   // GridSpec既定Columns=20
+        var cDrag = new VerticalConnector { Column = origColumn, TopRow = 3, BottomRow = 6 };
+        vmDrag.CurrentSheet!.Connectors.Add(cDrag);
+        vmDrag.SelectedConnector = cDrag;
+        vmDrag.BeginDragConnector(cDrag, isEndpoint: false, isTop: false, startRow: 3, startColumn: 0);
+        vmDrag.UpdateDragConnector(currentRow: 3, currentColumn: delta);
+        vmDrag.ConfirmDragConnector();
+
+        var vmKey = CreateViewModel();
+        vmKey.NewDocument();
+        var cKey = new VerticalConnector { Column = origColumn, TopRow = 3, BottomRow = 6 };
+        vmKey.CurrentSheet!.Connectors.Add(cKey);
+        vmKey.SelectedConnector = cKey;
+        vmKey.MoveSelectedConnectorColumn(delta);
+
+        Assert.Equal(cKey.Column, cDrag.Column);
     }
 }
