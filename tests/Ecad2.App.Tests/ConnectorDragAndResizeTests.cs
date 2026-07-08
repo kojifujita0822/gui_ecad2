@@ -239,4 +239,120 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
 
         Assert.False(vm.IsDirty);
     }
+
+    // ---- 所見A: ドラッグ中の外部要因(Delete/シート切替/文書差し替え)による強制クリア ----
+
+    [Fact]
+    public void SelectedConnectorAssignment_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+        Assert.True(vm.IsDraggingConnector);
+
+        // Delete相当: DeleteSelectedConnectorがSelectedConnector=nullを代入する経路。
+        bool deleted = vm.DeleteSelectedConnector();
+
+        Assert.True(deleted);
+        Assert.False(vm.IsDraggingConnector);
+        // 強制クリア後、UpdateDragConnectorを呼んでも削除済みの実体を書き換えない(例外も起きない)。
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        Assert.Null(ex);
+        Assert.Equal(3, c.TopRow);   // 書き換わっていない
+    }
+
+    [Fact]
+    public void SheetSwitch_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+
+        vm.Document.Sheets.Add(new Sheet
+        {
+            PageNumber = 2,
+            Name = "シート2",
+            Grid = new GridSpec { Rows = 10, Columns = 20 },
+        });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // SelectedCell=null経由でSelectedConnectorのsetterへ波及する
+
+        Assert.False(vm.IsDraggingConnector);
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        Assert.Null(ex);
+    }
+
+    [Fact]
+    public void ReplaceDocument_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = MakeConnector();
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+        vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3);
+
+        vm.NewDocument();   // ReplaceDocument経由
+
+        Assert.False(vm.IsDraggingConnector);
+        Assert.False(vm.IsDirty);   // 新規文書がドラッグの残骸で理由なく未保存化しない
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8));
+        Assert.Null(ex);
+    }
+
+    // ---- 所見B: 外部データ由来でTopRow>=BottomRowが既に崩れているケースへの防御 ----
+
+    [Fact]
+    public void UpdateDragConnector_ResizeTop_WithBottomRowAtZero_DoesNotThrowAndDoesNothing()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        // 手編集ファイル等由来の不正データ(BottomRow=0、Top操作の下限クランプがmin>maxになりうる)。
+        var c = new VerticalConnector { Column = 4, TopRow = 5, BottomRow = 0 };
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: true, startRow: 5);
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 2));
+
+        Assert.Null(ex);
+        Assert.Equal(5, c.TopRow);   // 直せない状態のため変更されない
+    }
+
+    [Fact]
+    public void UpdateDragConnector_ResizeBottom_WithTopRowAtGridMax_DoesNotThrowAndDoesNothing()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();   // GridSpec既定Rows=10(行0〜9)
+        var c = new VerticalConnector { Column = 4, TopRow = 9, BottomRow = 5 };
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;
+
+        vm.BeginDragConnector(c, isEndpoint: true, isTop: false, startRow: 5);
+        var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 7));
+
+        Assert.Null(ex);
+        Assert.Equal(5, c.BottomRow);
+    }
+
+    [Fact]
+    public void ResizeSelectedConnectorEndpoint_WithInvertedTopBottom_DoesNotThrowAndDoesNothing()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var c = new VerticalConnector { Column = 4, TopRow = 5, BottomRow = 0 };
+        vm.CurrentSheet!.Connectors.Add(c);
+        vm.SelectedConnector = c;   // 始点(Top)選択中
+
+        var ex = Record.Exception(() => vm.ResizeSelectedConnectorEndpoint(-1));
+
+        Assert.Null(ex);
+        Assert.Equal(5, c.TopRow);
+    }
 }

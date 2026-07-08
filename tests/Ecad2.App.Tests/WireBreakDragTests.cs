@@ -152,4 +152,44 @@ public class WireBreakDragTests : ViewModelTestBase
 
         Assert.False(vm.IsDirty);
     }
+
+    // ---- 所見A横展開: ドラッグ中の外部要因(Delete/シート切替/文書差し替え)による強制クリア ----
+
+    [Fact]
+    public void SelectedWireBreakAssignment_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+        Assert.True(vm.IsDraggingWireBreak);
+
+        bool deleted = vm.DeleteSelectedWireBreak();
+
+        Assert.True(deleted);
+        Assert.False(vm.IsDraggingWireBreak);
+        var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5));
+        Assert.Null(ex);
+        Assert.Equal(3, b.Row);   // 書き換わっていない
+    }
+
+    [Fact]
+    public void ReplaceDocument_ForceCancelsInProgressDrag()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var b = MakeWireBreak();
+        vm.CurrentSheet!.WireBreaks.Add(b);
+        vm.SelectedWireBreak = b;
+        vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
+
+        vm.NewDocument();
+
+        Assert.False(vm.IsDraggingWireBreak);
+        Assert.False(vm.IsDirty);
+        var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5));
+        Assert.Null(ex);
+    }
 }

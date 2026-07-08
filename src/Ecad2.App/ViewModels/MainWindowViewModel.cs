@@ -262,6 +262,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             // T-041増分7: 新規選択のたびに操作対象端点を既定(始点)へリセットする(値変化の有無に
             // 関わらず無条件、SelectedCellのsetterと同じ設計原則)。
             SelectedEndpointIsStart = true;
+            // T-041増分7隠密レビュー所見A対応: SelectedCellのsetter・CurrentSheetIndexのsetter
+            // (SelectedCell=null経由)・ReplaceDocumentはいずれも最終的にこのsetterを通じて
+            // SelectedConnector=nullを代入する(Delete経由のDeleteSelectedConnectorも同様)。
+            // ドラッグ中の一時状態(_draggingConnector)はこれら3経路の外に置かれていたため、削除
+            // 済み/切替後/破棄済みの実体を後続のMouseMove/MouseUpが無意味に書き換え続ける穴が
+            // あった。このsetter自体を「ドラッグ状態をも強制クリアする唯一の入口」にすることで、
+            // 個別経路への後追い対応(モグラ叩き)を避ける(_connectorDraftのクリア集約と同じ設計)。
+            ForceCancelDragConnectorIfAny();
             SetProperty(ref _selectedConnector, value);
             OnPropertyChanged(nameof(HasSelectedLinePrimitive));
         }
@@ -281,6 +289,18 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>縦コネクタをドラッグ中か(View側がMouseMove/Escの処理要否を判定するのに使う)。</summary>
     public bool IsDraggingConnector => _draggingConnector is not null;
+
+    /// <summary>ドラッグ中の縦コネクタを外部要因(Delete・シート切替・ドキュメント差し替え等、
+    /// SelectedConnectorのsetterを経由する全経路)により強制的にクリアする(T-041増分7隠密レビュー
+    /// 所見A対応)。通常のConfirm/Cancelと異なりMarkDirty()せず、IsDraggingConnectorの変更を
+    /// OnPropertyChangedでView側へ明示通知する(MainWindow.xaml.csのViewModel_PropertyChangedが
+    /// これを受けてキャプチャ解放・Viewローカル一時フラグのリセット等の後始末を行う)。</summary>
+    private void ForceCancelDragConnectorIfAny()
+    {
+        if (_draggingConnector is null) return;
+        _draggingConnector = null;
+        OnPropertyChanged(nameof(IsDraggingConnector));
+    }
 
     /// <summary>縦コネクタのドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、
     /// trueならisTopで指定した端点のみのリサイズ。startRowはドラッグ開始時のマウス位置(行)。</summary>
@@ -304,15 +324,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         int deltaRow = currentRow - _dragConnectorStartRow;
         if (_draggingConnectorIsEndpoint)
         {
+            // T-041増分7隠密レビュー所見B対応: 外部データ(手編集ファイル・旧バージョン由来等)で
+            // TopRow>=BottomRowという不変条件違反のコネクタが読み込まれていた場合、Math.Clampの
+            // 上限・下限が逆転しArgumentExceptionが未処理のまま投げられクラッシュする
+            // (min>maxをここで先に検出し、直せない状態なら何もせず抜ける)。ConfirmConnectorDraftの
+            // topRow==bottomRowならreturn falseと同じ趣旨の二重防御。
             if (_draggingConnectorIsTop)
-                c.TopRow = Math.Clamp(_dragConnectorOrigTopRow + deltaRow, 0, c.BottomRow - 1);
+            {
+                int maxTop = c.BottomRow - 1;
+                if (maxTop < 0) return;
+                c.TopRow = Math.Clamp(_dragConnectorOrigTopRow + deltaRow, 0, maxTop);
+            }
             else
-                c.BottomRow = Math.Clamp(_dragConnectorOrigBottomRow + deltaRow, c.TopRow + 1, sheet.Grid.Rows - 1);
+            {
+                int minBottom = c.TopRow + 1;
+                if (minBottom > sheet.Grid.Rows - 1) return;
+                c.BottomRow = Math.Clamp(_dragConnectorOrigBottomRow + deltaRow, minBottom, sheet.Grid.Rows - 1);
+            }
         }
         else
         {
             int minDelta = -_dragConnectorOrigTopRow;
             int maxDelta = sheet.Grid.Rows - 1 - _dragConnectorOrigBottomRow;
+            if (minDelta > maxDelta) return;
             int clamped = Math.Clamp(deltaRow, minDelta, maxDelta);
             c.TopRow = _dragConnectorOrigTopRow + clamped;
             c.BottomRow = _dragConnectorOrigBottomRow + clamped;
@@ -376,15 +410,20 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool ResizeSelectedConnectorEndpoint(int delta)
     {
         if (CurrentSheet is not Sheet sheet || SelectedConnector is not VerticalConnector c) return false;
+        // T-041増分7隠密レビュー所見B対応: UpdateDragConnectorと同じ理由でmin>maxの事前ガードが要る。
         if (SelectedEndpointIsStart)
         {
-            int newTop = Math.Clamp(c.TopRow + delta, 0, c.BottomRow - 1);
+            int maxTop = c.BottomRow - 1;
+            if (maxTop < 0) return false;
+            int newTop = Math.Clamp(c.TopRow + delta, 0, maxTop);
             if (newTop == c.TopRow) return false;
             c.TopRow = newTop;
         }
         else
         {
-            int newBottom = Math.Clamp(c.BottomRow + delta, c.TopRow + 1, sheet.Grid.Rows - 1);
+            int minBottom = c.TopRow + 1;
+            if (minBottom > sheet.Grid.Rows - 1) return false;
+            int newBottom = Math.Clamp(c.BottomRow + delta, minBottom, sheet.Grid.Rows - 1);
             if (newBottom == c.BottomRow) return false;
             c.BottomRow = newBottom;
         }
@@ -417,7 +456,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     public WireBreak? SelectedWireBreak
     {
         get => _selectedWireBreak;
-        set => SetProperty(ref _selectedWireBreak, value);
+        set
+        {
+            // T-041増分7隠密レビュー所見A対応(SelectedConnectorと同型): Delete・シート切替・
+            // ドキュメント差し替えいずれも最終的にこのsetterを経由してSelectedWireBreak=nullを
+            // 代入するため、ドラッグ中の一時状態(_draggingWireBreak)もここで強制クリアする。
+            ForceCancelDragWireBreakIfAny();
+            SetProperty(ref _selectedWireBreak, value);
+        }
     }
 
     /// <summary>
@@ -445,6 +491,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>配線分断をドラッグ中か。</summary>
     public bool IsDraggingWireBreak => _draggingWireBreak is not null;
+
+    /// <summary>ドラッグ中の配線分断を外部要因により強制的にクリアする(T-041増分7隠密レビュー
+    /// 所見A対応、ForceCancelDragConnectorIfAnyと同型)。</summary>
+    private void ForceCancelDragWireBreakIfAny()
+    {
+        if (_draggingWireBreak is null) return;
+        _draggingWireBreak = null;
+        OnPropertyChanged(nameof(IsDraggingWireBreak));
+    }
 
     /// <summary>配線分断のドラッグを開始する(T-041増分7)。startRow/startBoundaryはドラッグ開始時の
     /// マウス位置(行・列境界0.5刻み)。</summary>
@@ -531,6 +586,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             // T-041増分7: SelectedConnectorのsetterと同じ理由で操作対象端点を既定(始点)へリセットする。
             SelectedEndpointIsStart = true;
+            // T-041増分7隠密レビュー所見A対応(SelectedConnectorと同型): ドラッグ中の一時状態
+            // (_draggingFreeLine)もこのsetter経由で強制クリアする。
+            ForceCancelDragFreeLineIfAny();
             SetProperty(ref _selectedFreeLine, value);
             OnPropertyChanged(nameof(HasSelectedLinePrimitive));
         }
@@ -544,6 +602,167 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (!sheet.FreeLines.Remove(freeLine)) return false;
         MarkDirty();
         SelectedFreeLine = null;
+        return true;
+    }
+
+    // T-041増分7横展開: 自由線(FreeLine)のドラッグ(本体移動/端点リサイズ)の一時状態。mm実座標系の
+    // ためVerticalConnectorと異なりdouble精度で扱う。記入時(AdjustFreeLineDraft、原案4節「水平・
+    // 垂直のみ」)と同じ制約を端点リサイズにも適用する: 水平線の端点はX方向のみ、垂直線の端点は
+    // Y方向のみ動かし、線が斜めに崩れないようにする(本体移動は両端点を同量シフトするため制約不要)。
+    private FreeLine? _draggingFreeLine;
+    private bool _draggingFreeLineIsEndpoint;
+    private bool _draggingFreeLineIsStart;
+    private double _dragFreeLineOrigX1, _dragFreeLineOrigY1, _dragFreeLineOrigX2, _dragFreeLineOrigY2;
+    private double _dragFreeLineStartXMm, _dragFreeLineStartYMm;
+
+    // ConfirmFreeLineDraftのStepCount==0禁止(ゼロ長禁止)と同じ趣旨。記入時と異なり連続値のため
+    // 「0との比較」ではなく最小長さで判定する。
+    private const double FreeLineMinLengthMm = 1.0;
+
+    /// <summary>自由線をドラッグ中か。</summary>
+    public bool IsDraggingFreeLine => _draggingFreeLine is not null;
+
+    /// <summary>ドラッグ中の自由線を外部要因により強制的にクリアする(T-041増分7隠密レビュー
+    /// 所見A対応、ForceCancelDragConnectorIfAnyと同型)。</summary>
+    private void ForceCancelDragFreeLineIfAny()
+    {
+        if (_draggingFreeLine is null) return;
+        _draggingFreeLine = null;
+        OnPropertyChanged(nameof(IsDraggingFreeLine));
+    }
+
+    /// <summary>自由線のドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、trueなら
+    /// isStartで指定した端点(始点/終点)のみのリサイズ。startXMm/startYMmはドラッグ開始時のマウス
+    /// 位置(mm実座標)。</summary>
+    public void BeginDragFreeLine(FreeLine line, bool isEndpoint, bool isStart, double startXMm, double startYMm)
+    {
+        _draggingFreeLine = line;
+        _draggingFreeLineIsEndpoint = isEndpoint;
+        _draggingFreeLineIsStart = isStart;
+        _dragFreeLineOrigX1 = line.X1Mm; _dragFreeLineOrigY1 = line.Y1Mm;
+        _dragFreeLineOrigX2 = line.X2Mm; _dragFreeLineOrigY2 = line.Y2Mm;
+        _dragFreeLineStartXMm = startXMm; _dragFreeLineStartYMm = startYMm;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて自由線の位置を更新する(T-041増分7)。
+    /// 端点リサイズは水平・垂直の向きを保ちゼロ長を禁止する(クラス冒頭コメント参照)。</summary>
+    public void UpdateDragFreeLine(double currentXMm, double currentYMm)
+    {
+        if (_draggingFreeLine is not FreeLine line) return;
+        double deltaX = currentXMm - _dragFreeLineStartXMm;
+        double deltaY = currentYMm - _dragFreeLineStartYMm;
+
+        if (!_draggingFreeLineIsEndpoint)
+        {
+            line.X1Mm = _dragFreeLineOrigX1 + deltaX;
+            line.Y1Mm = _dragFreeLineOrigY1 + deltaY;
+            line.X2Mm = _dragFreeLineOrigX2 + deltaX;
+            line.Y2Mm = _dragFreeLineOrigY2 + deltaY;
+            return;
+        }
+
+        bool isHorizontal = Math.Abs(_dragFreeLineOrigY1 - _dragFreeLineOrigY2) < 0.001;
+        if (_draggingFreeLineIsStart)
+        {
+            if (isHorizontal)
+            {
+                double newX1 = _dragFreeLineOrigX1 + deltaX;
+                if (Math.Abs(line.X2Mm - newX1) >= FreeLineMinLengthMm) line.X1Mm = newX1;
+            }
+            else
+            {
+                double newY1 = _dragFreeLineOrigY1 + deltaY;
+                if (Math.Abs(line.Y2Mm - newY1) >= FreeLineMinLengthMm) line.Y1Mm = newY1;
+            }
+        }
+        else
+        {
+            if (isHorizontal)
+            {
+                double newX2 = _dragFreeLineOrigX2 + deltaX;
+                if (Math.Abs(newX2 - line.X1Mm) >= FreeLineMinLengthMm) line.X2Mm = newX2;
+            }
+            else
+            {
+                double newY2 = _dragFreeLineOrigY2 + deltaY;
+                if (Math.Abs(newY2 - line.Y1Mm) >= FreeLineMinLengthMm) line.Y2Mm = newY2;
+            }
+        }
+    }
+
+    /// <summary>自由線のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
+    /// MarkDirty()する。</summary>
+    public void ConfirmDragFreeLine()
+    {
+        if (_draggingFreeLine is FreeLine line &&
+            (line.X1Mm != _dragFreeLineOrigX1 || line.Y1Mm != _dragFreeLineOrigY1 ||
+             line.X2Mm != _dragFreeLineOrigX2 || line.Y2Mm != _dragFreeLineOrigY2))
+            MarkDirty();
+        _draggingFreeLine = null;
+    }
+
+    /// <summary>自由線のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
+    public void CancelDragFreeLine()
+    {
+        if (_draggingFreeLine is FreeLine line)
+        {
+            line.X1Mm = _dragFreeLineOrigX1; line.Y1Mm = _dragFreeLineOrigY1;
+            line.X2Mm = _dragFreeLineOrigX2; line.Y2Mm = _dragFreeLineOrigY2;
+        }
+        _draggingFreeLine = null;
+    }
+
+    /// <summary>選択中の自由線を矢印キー1回分(deltaXMm/deltaYMm、いずれか一方は0)平行移動する
+    /// (T-041増分7、キーボード等価操作)。実際に動けた場合のみMarkDirty()する。</summary>
+    public bool MoveSelectedFreeLine(double deltaXMm, double deltaYMm)
+    {
+        if (SelectedFreeLine is not FreeLine line) return false;
+        if (deltaXMm == 0 && deltaYMm == 0) return false;
+        line.X1Mm += deltaXMm; line.Y1Mm += deltaYMm;
+        line.X2Mm += deltaXMm; line.Y2Mm += deltaYMm;
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>選択中の自由線の操作対象端点(SelectedEndpointIsStart、Tab+Shift+矢印、
+    /// T-041増分7殿裁定P-033=案2)を矢印キー1回分伸縮する。水平線はdeltaXMmのみ、垂直線は
+    /// deltaYMmのみ意味を持つ(呼び出し元(MainWindow.xaml.cs)が線の向きに応じたキーのみ渡す)。
+    /// ゼロ長になる場合は変更しない。</summary>
+    public bool ResizeSelectedFreeLineEndpoint(double deltaXMm, double deltaYMm)
+    {
+        if (SelectedFreeLine is not FreeLine line) return false;
+        bool isHorizontal = Math.Abs(line.Y1Mm - line.Y2Mm) < 0.001;
+        if (SelectedEndpointIsStart)
+        {
+            if (isHorizontal)
+            {
+                double newX1 = line.X1Mm + deltaXMm;
+                if (Math.Abs(line.X2Mm - newX1) < FreeLineMinLengthMm) return false;
+                line.X1Mm = newX1;
+            }
+            else
+            {
+                double newY1 = line.Y1Mm + deltaYMm;
+                if (Math.Abs(line.Y2Mm - newY1) < FreeLineMinLengthMm) return false;
+                line.Y1Mm = newY1;
+            }
+        }
+        else
+        {
+            if (isHorizontal)
+            {
+                double newX2 = line.X2Mm + deltaXMm;
+                if (Math.Abs(newX2 - line.X1Mm) < FreeLineMinLengthMm) return false;
+                line.X2Mm = newX2;
+            }
+            else
+            {
+                double newY2 = line.Y2Mm + deltaYMm;
+                if (Math.Abs(newY2 - line.Y1Mm) < FreeLineMinLengthMm) return false;
+                line.Y2Mm = newY2;
+            }
+        }
+        MarkDirty();
         return true;
     }
 

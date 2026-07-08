@@ -41,6 +41,12 @@ public partial class MainWindow : Window
     private bool _wireBreakDragStarted;
     private bool _wireBreakDragConsumedByEscape;
 
+    // T-041増分7横展開: 自由線(FreeLine)ドラッグの同種の状態(VerticalConnectorと同じ理由で
+    // View側に保持)。
+    private Point _freeLineDragPressPositionDip;
+    private bool _freeLineDragStarted;
+    private bool _freeLineDragConsumedByEscape;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -64,6 +70,30 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.FreeLineDraftPreview)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot))
             RedrawCanvas();
+
+        // T-041増分7隠密レビュー所見A対応: ドラッグ中に外部要因(Delete・シート切替・ドキュメント
+        // 差し替え、いずれもSelectedConnector等のsetterを経由する)でForceCancelDrag*IfAnyが発火し
+        // IsDragging*がfalseへ変わった場合、View側のキャプチャ・一時フラグも追従してリセットする。
+        // 通常のConfirm/CancelDrag*(MouseUp/Esc)はOnPropertyChangedを発火しないため、ここは
+        // ForceCancel経由の場合のみ反応する(二重処理は起きない)。
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingConnector) && !_viewModel.IsDraggingConnector)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _connectorDragStarted = false;
+            _connectorDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingWireBreak) && !_viewModel.IsDraggingWireBreak)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _wireBreakDragStarted = false;
+            _wireBreakDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingFreeLine) && !_viewModel.IsDraggingFreeLine)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _freeLineDragStarted = false;
+            _freeLineDragConsumedByEscape = false;
+        }
     }
 
     // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullになる。
@@ -257,14 +287,17 @@ public partial class MainWindow : Window
         if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
         var position = e.GetPosition(LadderCanvasHost);
 
+        // T-041増分7隠密レビュー所見C対応: CaptureMouse()の戻り値を確認する。何らかの理由(既に
+        // 別要素がキャプチャ中等)で失敗した場合、ViewModel側で開始してしまったドラッグ状態を
+        // 即座に取り消す(CancelDrag*はMarkDirty()せず単に状態をクリアするだけなので安全)。
         if (_viewModel.SelectedConnector is Ecad2.Model.VerticalConnector connector
             && LadderCanvasHost.HitTestConnectorDragMode(position, connector) is (bool isEndpoint, bool isTop))
         {
             int startRow = LadderCanvasHost.RowAtDip(position.Y);
             _viewModel.BeginDragConnector(connector, isEndpoint, isTop, startRow);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragConnector(); return; }
             _connectorDragPressPositionDip = position;
             _connectorDragStarted = false;
-            LadderCanvasHost.CaptureMouse();
             return;
         }
 
@@ -278,9 +311,21 @@ public partial class MainWindow : Window
         {
             var (row, boundary) = LadderCanvasHost.ToRowBoundary(position);
             _viewModel.BeginDragWireBreak(wireBreak, row, boundary);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragWireBreak(); return; }
             _wireBreakDragPressPositionDip = position;
             _wireBreakDragStarted = false;
-            LadderCanvasHost.CaptureMouse();
+            return;
+        }
+
+        // T-041増分7横展開: 選択中の自由線(mm実座標系の線分)を押下したらドラッグを開始する。
+        if (_viewModel.SelectedFreeLine is Ecad2.Model.FreeLine freeLine
+            && LadderCanvasHost.HitTestFreeLineDragMode(position, freeLine) is (bool flIsEndpoint, bool flIsStart))
+        {
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.BeginDragFreeLine(freeLine, flIsEndpoint, flIsStart, xMm, yMm);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragFreeLine(); return; }
+            _freeLineDragPressPositionDip = position;
+            _freeLineDragStarted = false;
         }
     }
 
@@ -313,6 +358,19 @@ public partial class MainWindow : Window
             var (row, boundary) = LadderCanvasHost.ToRowBoundary(position);
             _viewModel.UpdateDragWireBreak(row, boundary);
             RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsDraggingFreeLine)
+        {
+            if (!_freeLineDragStarted)
+            {
+                if ((position - _freeLineDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _freeLineDragStarted = true;
+            }
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.UpdateDragFreeLine(xMm, yMm);
+            RedrawCanvas();
         }
     }
 
@@ -322,11 +380,12 @@ public partial class MainWindow : Window
         // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
-        if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape)
+        if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
             _wireBreakDragConsumedByEscape = false;
+            _freeLineDragConsumedByEscape = false;
             return;
         }
 
@@ -346,6 +405,14 @@ public partial class MainWindow : Window
             LadderCanvasHost.ReleaseMouseCapture();
             _viewModel.ConfirmDragWireBreak();
             _wireBreakDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingFreeLine)
+        {
+            LadderCanvasHost.ReleaseMouseCapture();
+            _viewModel.ConfirmDragFreeLine();
+            _freeLineDragStarted = false;
             RedrawCanvas();
             return;
         }
@@ -391,6 +458,36 @@ public partial class MainWindow : Window
 
         _viewModel.SelectedCell = LadderCanvasHost.ToGridPos(position);
         TryPlaceActiveTool();
+    }
+
+    // T-041増分7隠密レビュー所見C対応: Alt+Tab等の外的要因でマウスキャプチャが失われた場合、
+    // 進行中のドラッグを安全にキャンセルする(掴んだ位置への復元、MarkDirty()しない)。
+    // ReleaseMouseCapture()を能動的に呼んだ直後の正常フロー(MouseUp/Escの各分岐)でも本イベントは
+    // 発火するが、その時点では既にConfirm/CancelDrag*でIsDragging*=falseになっているため
+    // 各ガードが素通しし二重処理にはならない。
+    private void LadderCanvasHost_LostMouseCapture(object sender, MouseEventArgs e)
+    {
+        if (_viewModel.IsDraggingConnector)
+        {
+            _viewModel.CancelDragConnector();
+            _connectorDragStarted = false;
+            RedrawCanvas();
+        }
+        if (_viewModel.IsDraggingWireBreak)
+        {
+            _viewModel.CancelDragWireBreak();
+            _wireBreakDragStarted = false;
+            RedrawCanvas();
+        }
+        if (_viewModel.IsDraggingFreeLine)
+        {
+            _viewModel.CancelDragFreeLine();
+            _freeLineDragStarted = false;
+            RedrawCanvas();
+        }
+        _connectorDragConsumedByEscape = false;
+        _wireBreakDragConsumedByEscape = false;
+        _freeLineDragConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -455,6 +552,16 @@ public partial class MainWindow : Window
                     _viewModel.CancelDragWireBreak();
                     _wireBreakDragStarted = false;
                     _wireBreakDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsDraggingFreeLine)
+                {
+                    _viewModel.CancelDragFreeLine();
+                    _freeLineDragStarted = false;
+                    _freeLineDragConsumedByEscape = true;
                     RedrawCanvas();
                     FocusCanvas();
                     e.Handled = true;
@@ -586,6 +693,9 @@ public partial class MainWindow : Window
                 else if (_viewModel.SelectedWireBreak is not null)
                     // T-041増分7横展開: 選択中の配線分断を平行移動する(点系、本体移動のみ)。
                     MoveSelectedWireBreakByKey(e.Key);
+                else if (_viewModel.SelectedFreeLine is not null)
+                    // T-041増分7横展開: 選択中の自由線を平行移動する(mm実座標系)。
+                    MoveSelectedFreeLineByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -601,6 +711,14 @@ public partial class MainWindow : Window
                 // 伸縮する。VerticalConnectorは常に縦線のためLeft/Rightの端点伸縮は意味を持たず未対応。
                 if (_viewModel.ResizeSelectedConnectorEndpoint(e.Key == Key.Up ? -1 : 1))
                     RedrawCanvas();
+                e.Handled = true;
+                break;
+            case Key.Up or Key.Down or Key.Left or Key.Right when shift && IsCanvasFocused()
+                    && _viewModel.SelectedFreeLine is not null:
+                // T-041増分7横展開: Tabで選んだ操作対象端点(始点/終点)を伸縮する。自由線は水平線
+                // (Left/Rightのみ意味を持つ)・垂直線(Up/Downのみ)のいずれかのため、線の向きに沿わない
+                // キーは呼び出し元(ResizeSelectedFreeLineByKey)が無視する(AdjustFreeLineDraftと同型)。
+                ResizeSelectedFreeLineByKey(e.Key);
                 e.Handled = true;
                 break;
             case Key.Tab when noModifier && IsCanvasFocused() && _viewModel.HasSelectedLinePrimitive:
@@ -762,6 +880,39 @@ public partial class MainWindow : Window
             _ => false,
         };
         if (moved) RedrawCanvas();
+    }
+
+    // T-041増分7横展開: 選択中の自由線を矢印キー1回分(Shift無し)平行移動する(mm実座標系、
+    // 1ステップ=CellMm=記入時(BeginFreeLineDraft)・WireBreak横展開と同じ単位に揃える)。
+    private void MoveSelectedFreeLineByKey(Key key)
+    {
+        double step = LadderCanvasHost.CellMm;
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedFreeLine(0, -step),
+            Key.Down => _viewModel.MoveSelectedFreeLine(0, step),
+            Key.Left => _viewModel.MoveSelectedFreeLine(-step, 0),
+            Key.Right => _viewModel.MoveSelectedFreeLine(step, 0),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
+    }
+
+    // T-041増分7横展開(殿裁定P-033=案2): Tabで選んだ操作対象端点をShift+矢印で伸縮する。水平線は
+    // Left/Rightのみ、垂直線はUp/Downのみ意味を持つ(線の向きに沿わないキーは無視、
+    // AdjustFreeLineDraftと同じ制約)。
+    private void ResizeSelectedFreeLineByKey(Key key)
+    {
+        double step = LadderCanvasHost.CellMm;
+        bool resized = key switch
+        {
+            Key.Up => _viewModel.ResizeSelectedFreeLineEndpoint(0, -step),
+            Key.Down => _viewModel.ResizeSelectedFreeLineEndpoint(0, step),
+            Key.Left => _viewModel.ResizeSelectedFreeLineEndpoint(-step, 0),
+            Key.Right => _viewModel.ResizeSelectedFreeLineEndpoint(step, 0),
+            _ => false,
+        };
+        if (resized) RedrawCanvas();
     }
 
     // 選択ツールボタン(ツールバーのEsc相当ボタン)の即時処理。選択セル・ツール・案内メッセージを

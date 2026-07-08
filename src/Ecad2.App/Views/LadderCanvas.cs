@@ -265,6 +265,29 @@ public sealed class LadderCanvas : FrameworkElement
     }
 
     /// <summary>
+    /// クリック位置(ローカルDIP座標)が選択中の自由線(<paramref name="line"/>、選択済み前提)の
+    /// 本体/端点いずれに近いか判定する(T-041増分7、ドラッグ操作用)。HitTestConnectorDragModeの
+    /// mm実座標版。null=対象外(許容誤差外)。
+    /// </summary>
+    internal (bool IsEndpoint, bool IsStart)? HitTestFreeLineDragMode(Point localPositionDip, FreeLine line)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+
+        double dStart = Math.Sqrt(Math.Pow(xMm - line.X1Mm, 2) + Math.Pow(yMm - line.Y1Mm, 2));
+        double dEnd = Math.Sqrt(Math.Pow(xMm - line.X2Mm, 2) + Math.Pow(yMm - line.Y2Mm, 2));
+        if (dStart <= FreeLineHitToleranceMm && dStart <= dEnd) return (true, true);
+        if (dEnd <= FreeLineHitToleranceMm) return (true, false);
+
+        double bodyDistance = DistancePointToSegment(xMm, yMm, line.X1Mm, line.Y1Mm, line.X2Mm, line.Y2Mm);
+        if (bodyDistance <= FreeLineHitToleranceMm) return (false, false);
+        return null;
+    }
+
+    /// <summary>ローカルDIP座標をmm実座標へ変換する(T-041増分7、FreeLine/ConnectionDotドラッグ用)。
+    /// 既存のprivate ToMmをView外部(MainWindow.xaml.cs)へ公開する薄いラッパー。</summary>
+    internal (double XMm, double YMm) ToMmPoint(Point localPositionDip) => ToMm(localPositionDip);
+
+    /// <summary>
     /// クリック位置(ローカルDIP座標)に十分近い自由線を探す(T-041増分5)。点と線分の距離計算
     /// (PoC=poc/t041-freeline-hittest-poc/Program.cs)を移植。<see cref="HitTestConnector"/>の
     /// 「先頭一致」とは異なり、全候補の中から最短距離(nearest-wins)のものを選ぶ(PoC所見、複数の

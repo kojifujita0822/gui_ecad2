@@ -329,7 +329,8 @@
                 <views:LadderCanvas x:Name="LadderCanvasHost"
                                     PreviewMouseLeftButtonDown="LadderCanvasHost_PreviewMouseLeftButtonDown"
                                     PreviewMouseMove="LadderCanvasHost_PreviewMouseMove"
-                                    PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp">
+                                    PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp"
+                                    LostMouseCapture="LadderCanvasHost_LostMouseCapture">
                     <views:LadderCanvas.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
                     </views:LadderCanvas.LayoutTransform>
