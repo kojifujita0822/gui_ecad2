@@ -148,3 +148,39 @@
 
 （タスク完了時、todo.mdの詳細をここへ移す）
 
+### T-047 手動配線系（F9/F10系）のツールバーボタン作成 — 完全Done 2026-07-09
+
+**起票=殿指示2026-07-09**。T-041実装の手動配線4種（FreeLine横線=F9・縦線=Shift+F9／
+VerticalConnector=Shift+F9／WireBreak=F10／ConnectionDot=F10）がキーボード専用でツールバーに
+ボタンが無かったものを、既存配置系ボタン（T-026・T-040様式）と整合する形で追加した。
+
+経緯（パイプライン全段）:
+- 隠密先行調査（`docs/ecad2-t047-presurvey-onmitsu.md`）: キー経路はActivateBuiltinToolと別系統・
+  シート種別連動の活性制御プロパティ新設要・GX実画像で「既存配置ボタン群と同一行に区切り線で隣接」の前例確認
+- GX意匠資源調査（`docs/ecad2-t047-gx-icon-survey-onmitsu.md`）: GPPW3配下887画像+DLL135件の全数調査で
+  記号系アイコン画像は不在=ベクター描画と推測、画像抽出の道なし
+- UI/UX殿裁定3点（2026-07-09）: (1)5ボタン固定+非対応シートはグレーアウト (2)意匠=T-040様式で侍起草→殿目視
+  (3)既存7ボタン末尾に区切り線で隣接。キー凡例は既存様式踏襲=家老判断
+- 実装`4ecae77`: 5ボタン新設+IsMainCircuitSheet/IsControlCircuitSheet新設（CurrentSheet変更3経路の通知を
+  NotifyCurrentSheetDependentPropertiesChangedへ一元化=SetProperty早期returnトラップ対策、RED証明実測）・
+  234件全合格（新規5）
+- 隠密2（臨時5人目、起動プロンプト改訂`ba7e7b5`で制度化）静的レビュー（`docs/ecad2-t047-review-onmitsu2.md`）:
+  機能クリーン。要修正候補=所見1（キーボード起点起動でフォーカスがボタン残留→矢印/Enter無反応、
+  線記入系はマウス確定手段が無く手詰まりに見える）。経過観察5件
+- 忍者実機（`docs/ecad2-t047-ninja-verification.md`+証跡5枚）: 所見1再現確定+**新規重大発見**=残留状態の
+  矢印キーがツールバー既定ナビへ流れ隣の接続点記入を誤起動→意図しないデータが黙って確定配置されEsc不能
+- 修正=制度適用（テスト設計と実装の分離、往復1周）: 隠密設計書（`docs/ecad2-t047-fix-test-design-onmitsu.md`、
+  Tool.Modeベース分岐推奨・フォーカス実挙動はヘッドレス検証不能ゆえ忍者実機観点と切り分け）→
+  侍修正`afeb068`（RequiresCanvasFocusContinuation純粋関数化+[Theory]全7値・RED証明=常時false化で2件失敗実測・
+  241件全合格）→隠密再レビュークリーン（`docs/ecad2-t047-fix-review-onmitsu.md`、所見1=派生経路の副次救済と
+  判明し記録のみ・所見2=observations.md #22へ）
+- 殿新注文1=並び替え`cffef19`（選択→F5〜F10連続→区切り→部品ボタン最後尾）、隠密軽量確認クリーン
+  （byte単位突合・便乗変更なし）
+- 殿新注文2=無効時半透明化`12f85b8`（単純図形はグレー化だけで判別困難との殿目視所見→基底ToolBarButtonStyleへ
+  IsEnabled=false→Opacity0.35 Trigger、全ボタン統一）、隠密軽量確認クリーン（Style継承の落とし穴なし）
+- 忍者実機再確認（`docs/ecad2-t047-fix-ninja-verification.md`+証跡8枚）: 全観点GREEN（フォーカス修正・
+  データ混入再発なし・自由線縦線の上下キー[前回未検証]・並び順一致・半透明0.35で判別明瞭）
+- 殿最終目視（2026-07-09）: 現行意匠で当面良し。**sF9・F10のグリフ変更は次回課題=T-048起票**（意匠は別途殿提示）
+- 範囲外の気づき: P-043（記入中Tabがメニューバーへ抜ける、実害なし）。副次事象=T-047初回コミットが
+  レビュー前にpushされた件から**push全面保留の新掟**確立（未レビュー実装コミットがmain上にある間はdocs含め保留）
+
