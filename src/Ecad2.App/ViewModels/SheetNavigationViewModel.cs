@@ -35,9 +35,12 @@ public sealed class SheetNavigationViewModel : ViewModelBase
         set
         {
             if (value is null) return;
+            // T-050(隠密所見P-015): CurrentSheetIndex変更前に旧値を捕捉し、SetProperty非経由の
+            // 直接代入でも旧値null化しないよう明示的に渡す(finding3と同型対応)。
+            var oldValue = SelectedSheet;
             int index = Sheets.IndexOf(value);
             if (index >= 0) _owner.CurrentSheetIndex = index;
-            OnPropertyChanged();
+            OnPropertyChanged(nameof(SelectedSheet), oldValue);
         }
     }
 

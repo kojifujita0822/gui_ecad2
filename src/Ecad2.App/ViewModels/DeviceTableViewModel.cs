@@ -25,8 +25,11 @@ public sealed class DeviceTableViewModel : ViewModelBase
     /// </summary>
     public void Refresh()
     {
+        // T-050(隠密所見P-015): SetPropertyを経由しない直接代入のため、旧値を明示的に
+        // OnPropertyChangedへ渡す(finding3=SelectedElementDeviceName等と同型の旧値null化対応)。
+        var oldDevices = Devices;
         Devices = BuildList();
-        OnPropertyChanged(nameof(Devices));
+        OnPropertyChanged(nameof(Devices), oldDevices);
     }
 
     /// <summary>参照先のDeviceTableを丸ごと差し替える(T-019: 新規/開くでDocumentを差し替えた際に使う)。</summary>
