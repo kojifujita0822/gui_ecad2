@@ -123,7 +123,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             // (RefreshSelectedSheet()のみ呼ぶ形)で行い、本setterは往復1周目の「常時無条件」の
             // ままとする(二重のモグラ叩きを避ける)。
             SetProperty(ref _currentSheetIndex, value);
-            OnPropertyChanged(nameof(CurrentSheet));
+            NotifyCurrentSheetDependentPropertiesChanged();
             SelectedCell = null;
             SheetNavigation.RefreshSelectedSheet();
         }
@@ -133,6 +133,25 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// Document.Sheets.Count==0(起動直後の濃紺スタート、殿裁定2026-07-05)の間はnull。</summary>
     public Sheet? CurrentSheet
         => CurrentSheetIndex >= 0 && CurrentSheetIndex < Document.Sheets.Count ? Document.Sheets[CurrentSheetIndex] : null;
+
+    /// <summary>現在シートが主回路(動力回路)か(T-047、手動配線F9/sF9/F10系ボタンの活性制御に使う)。
+    /// CurrentSheetがnull(HasProject=false)の間は常にfalse(ボタン非活性のデフォルトに倒す)。</summary>
+    public bool IsMainCircuitSheet => CurrentSheet?.MainCircuit == true;
+
+    /// <summary>現在シートが制御回路(ラダー)か(T-047、<see cref="IsMainCircuitSheet"/>の対)。
+    /// CurrentSheetがnullの間は常にfalse。</summary>
+    public bool IsControlCircuitSheet => CurrentSheet is Sheet sheet && !sheet.MainCircuit;
+
+    /// <summary>CurrentSheet・およびそれに連動する活性制御プロパティ(T-047)の変更通知をまとめて
+    /// 発火する。CurrentSheetIndexのsetter・NotifyCurrentSheetChanged・ReplaceDocumentの3箇所が
+    /// CurrentSheetの実体を変えうる経路であり(T-041増分5隠密レビュー指摘、CurrentSheetIndexの
+    /// SetProperty早期return再発トラップ)、いずれも無条件でこのメソッドを呼ぶ。</summary>
+    private void NotifyCurrentSheetDependentPropertiesChanged()
+    {
+        OnPropertyChanged(nameof(CurrentSheet));
+        OnPropertyChanged(nameof(IsMainCircuitSheet));
+        OnPropertyChanged(nameof(IsControlCircuitSheet));
+    }
 
     /// <summary>
     /// プロジェクト(ドキュメント)が実在するか(T-020)。GX Works3踏襲の空状態(濃紺)⇔作業領域(白＋黒
@@ -155,7 +174,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// SelectedSheet=先頭シートを設定してもCurrentSheetIndexが0→0で「変化なし」と判定され
     /// CurrentSheetのPropertyChangedが発火せず、RedrawCanvasが呼ばれず画面が空白のままになる。
     /// CurrentSheetIndexの番兵値化(-1化、影響範囲が広い)は見送り、この経路でのみ明示発火する。</summary>
-    public void NotifyCurrentSheetChanged() => OnPropertyChanged(nameof(CurrentSheet));
+    public void NotifyCurrentSheetChanged() => NotifyCurrentSheetDependentPropertiesChanged();
 
     private GridPos? _selectedCell;
 
@@ -1487,7 +1506,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(Document), oldDocument);
         OnPropertyChanged(nameof(CurrentFilePath), oldFilePath);
         OnPropertyChanged(nameof(CurrentSheetIndex), oldSheetIndex);
-        OnPropertyChanged(nameof(CurrentSheet));
+        NotifyCurrentSheetDependentPropertiesChanged();
         OnPropertyChanged(nameof(HasProject));
         OnPropertyChanged(nameof(SelectedCell), oldSelectedCell);
         OnPropertyChanged(nameof(SelectedCellDisplay));

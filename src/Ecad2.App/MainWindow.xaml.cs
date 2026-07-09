@@ -1294,6 +1294,40 @@ public partial class MainWindow : Window
         ConsumeToolButtonFocusRestore(sender);
     }
 
+    // T-047: 手動配線系(F9/Shift+F9/F10)ボタン。呼び出し先の各Try系メソッドはキーボード
+    // ショートカット(Window_PreviewKeyDown)と共有の既存メソッドで、HasProject/シート種別/
+    // SelectedCellのガードは各メソッド内で完結している(中身は不変)。IsEnabledのシート種別連動
+    // (MainWindow.xaml参照)により非対応シートではボタン自体がグレーアウトし押下できない。
+    private void FreeLineHorizontalButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryBeginFreeLineDraft(horizontal: true);
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
+    private void FreeLineVerticalButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryBeginFreeLineDraft(horizontal: false);
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
+    private void VerticalConnectorButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryBeginConnectorDraft();
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
+    private void ConnectionDotButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryPlaceConnectionDot();
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
+    private void WireBreakButton_Click(object sender, RoutedEventArgs e)
+    {
+        TryPlaceWireBreak();
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
     // 右パネル下段の部品選択リストの項目クリック。PreviewMouseLeftButtonDownを使う理由は
     // ListBoxItem.Selectedが同一アイテム再選択時に発火しない(WPFの仕様、T-016で確認済み)ため。
     // DataContextはPartSelectionList表示専用のサムネイル付きラッパー(T-015)、配置処理へは
