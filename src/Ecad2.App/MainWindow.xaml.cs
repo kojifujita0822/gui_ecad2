@@ -1111,12 +1111,22 @@ public partial class MainWindow : Window
     private void ConsumeToolButtonFocusRestore(object sender)
     {
         bool isKeyboardOrigin = ReferenceEquals(_toolButtonKeyboardClickSource, sender);
-        if (isKeyboardOrigin)
+        if (isKeyboardOrigin && !RequiresCanvasFocusContinuation(_viewModel.Tool.Mode))
             (sender as UIElement)?.Focus();
         else
             FocusCanvas();
         _toolButtonKeyboardClickSource = null;
     }
+
+    // T-047修正(隠密2所見1+忍者実機4-c対応、隠密設計書1-2節推奨案採用): 記入中状態
+    // (PlaceConnector/PlaceLine)へ遷移した場合、次の操作は必ずキャンバス側の矢印キー
+    // 調整・Enter確定であり「ツールバーに留まりたい」という懸念4のシナリオが原理的に
+    // 存在しない。Tool.Modeで判定するため、既存8ボタン(実行後は常にSelect/PlaceElement)
+    // には一切影響せず懸念4の挙動を保つ(隠密設計書1-3節のトレース表で確認済み)。WPF依存の
+    // 無い純粋な条件判定として切り出し、ユニットテスト(reflection経由)を可能にする
+    // (隠密設計書2-2節)。
+    private static bool RequiresCanvasFocusContinuation(ViewModels.ToolMode mode) =>
+        mode is ViewModels.ToolMode.PlaceConnector or ViewModels.ToolMode.PlaceLine;
 
     // マウス押下時の安全側の掃除(増分vi差し戻し2周目、隠密改善案4)。8ボタン個別配線ではなく
     // Windowレベルの単一ハンドラへ集約する(動作は変更なし、配線箇所のみ整理)。新たなマウス押下が
