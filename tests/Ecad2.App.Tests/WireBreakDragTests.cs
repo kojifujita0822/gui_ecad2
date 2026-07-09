@@ -199,10 +199,19 @@ public class WireBreakDragTests : ViewModelTestBase
         vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
         Assert.True(vm.IsDraggingWireBreak);
 
+        // T-045補遺2(Stryker棚卸し、ForceCancelIfAnyのnotify()生存ミュータント対応): 最終値
+        // だけでなくPropertyChangedイベント自体が発火することを検証する。
+        bool isDraggingWireBreakChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingWireBreak)) isDraggingWireBreakChanged = true;
+        };
+
         bool deleted = vm.DeleteSelectedWireBreak();
 
         Assert.True(deleted);
         Assert.False(vm.IsDraggingWireBreak);
+        Assert.True(isDraggingWireBreakChanged);
         var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5));
         Assert.Null(ex);
         Assert.Equal(3, b.Row);   // 書き換わっていない
@@ -218,9 +227,16 @@ public class WireBreakDragTests : ViewModelTestBase
         vm.SelectedWireBreak = b;
         vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
 
+        bool isDraggingWireBreakChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingWireBreak)) isDraggingWireBreakChanged = true;
+        };
+
         vm.NewDocument();
 
         Assert.False(vm.IsDraggingWireBreak);
+        Assert.True(isDraggingWireBreakChanged);
         Assert.False(vm.IsDirty);
         var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 6, currentBoundary: 6.5));
         Assert.Null(ex);
@@ -237,6 +253,12 @@ public class WireBreakDragTests : ViewModelTestBase
         vm.SelectedWireBreak = b;
         vm.BeginDragWireBreak(b, startRow: 3, startBoundary: 4.5);
 
+        bool isDraggingWireBreakChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingWireBreak)) isDraggingWireBreakChanged = true;
+        };
+
         vm.Document.Sheets.Add(new Sheet
         {
             PageNumber = 2,
@@ -247,6 +269,7 @@ public class WireBreakDragTests : ViewModelTestBase
         vm.CurrentSheetIndex = 1;
 
         Assert.False(vm.IsDraggingWireBreak);
+        Assert.True(isDraggingWireBreakChanged);
         var ex = Record.Exception(() => vm.UpdateDragWireBreak(currentRow: 8, currentBoundary: 8.5));
         Assert.Null(ex);
     }

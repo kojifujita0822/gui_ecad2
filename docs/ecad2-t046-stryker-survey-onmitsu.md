@@ -94,6 +94,26 @@ Stryker.NET以外に有力な代替は無いと判断する。
 
 ---
 
+## 実行時の注意点（2026-07-09追記、T-045クローズ前棚卸しで実際に遭遇）
+
+**実行ディレクトリを誤ると失敗する**：`src/Ecad2.App`（対象プロジェクト自体のディレクトリ）
+から`dotnet stryker`を実行すると、StrykerがEcad2.App.csproj自体をテストプロジェクトと誤認識し
+（ログに`Using ...\Ecad2.App.csproj as test project`と出る）、`can't be mutated because no
+test project references it`という警告のあと`Failed to analyze project builds. Stryker cannot
+continue.`で失敗する。
+
+**必ず`tests/Ecad2.App.Tests`ディレクトリ（テストプロジェクト側）から`-p "Ecad2.App.csproj"`
+を指定して実行すること**：
+
+```
+cd tests/Ecad2.App.Tests
+dotnet stryker -p "Ecad2.App.csproj" -c 4 --output <出力先>
+```
+
+（Ecad2.Core側も同様に`tests/Ecad2.Core.Tests`から実行する）
+
+---
+
 ## 出典・参照
 
 - 実測：グローバルツール`dotnet-stryker`（バージョン4.16.0）を実際にインストールし、

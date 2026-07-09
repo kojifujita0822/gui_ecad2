@@ -159,10 +159,19 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
         Assert.True(vm.IsDraggingConnectionDot);
 
+        // T-045補遺2(Stryker棚卸し、ForceCancelIfAnyのnotify()生存ミュータント対応): 最終値
+        // だけでなくPropertyChangedイベント自体が発火することを検証する。
+        bool isDraggingConnectionDotChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnectionDot)) isDraggingConnectionDotChanged = true;
+        };
+
         bool deleted = vm.DeleteSelectedConnectionDot();
 
         Assert.True(deleted);
         Assert.False(vm.IsDraggingConnectionDot);
+        Assert.True(isDraggingConnectionDotChanged);
         var ex = Record.Exception(() => vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32));
         Assert.Null(ex);
         Assert.Equal(20, dot.XMm);   // 書き換わっていない
@@ -179,9 +188,16 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.SelectedConnectionDot = dot;
         vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
+        bool isDraggingConnectionDotChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnectionDot)) isDraggingConnectionDotChanged = true;
+        };
+
         vm.NewDocument();
 
         Assert.False(vm.IsDraggingConnectionDot);
+        Assert.True(isDraggingConnectionDotChanged);
         Assert.False(vm.IsDirty);
         var ex = Record.Exception(() => vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32));
         Assert.Null(ex);
@@ -199,6 +215,12 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.SelectedConnectionDot = dot;
         vm.BeginDragConnectionDot(dot, startXMm: 20, startYMm: 30, maxXMm: 1000, maxYMm: 1000);
 
+        bool isDraggingConnectionDotChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnectionDot)) isDraggingConnectionDotChanged = true;
+        };
+
         vm.Document.Sheets.Add(new Sheet
         {
             PageNumber = 2,
@@ -210,6 +232,7 @@ public class ConnectionDotDragTests : ViewModelTestBase
         vm.CurrentSheetIndex = 1;
 
         Assert.False(vm.IsDraggingConnectionDot);
+        Assert.True(isDraggingConnectionDotChanged);
         var ex = Record.Exception(() => vm.UpdateDragConnectionDot(currentXMm: 25, currentYMm: 32));
         Assert.Null(ex);
     }

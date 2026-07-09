@@ -1324,6 +1324,11 @@ public partial class MainWindow : Window
             _viewModel.StatusMessage = "配置するセルを先に選択してください";
             return;
         }
+        if (!_viewModel.IsSelectedCellWithinGrid())
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
         if (_viewModel.IsSelectedCellOccupied())
         {
             _viewModel.StatusMessage = "選択したセルには既に要素があります";

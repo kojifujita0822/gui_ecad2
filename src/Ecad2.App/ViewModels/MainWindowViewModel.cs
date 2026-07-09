@@ -1,3 +1,4 @@
+using System.Linq;
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
@@ -295,20 +296,28 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>縦コネクタをドラッグ中か(View側がMouseMove/Escの処理要否を判定するのに使う)。</summary>
     public bool IsDraggingConnector => _draggingConnector is not null;
 
-    /// <summary>ドラッグ中の縦コネクタを外部要因(Delete・シート切替・ドキュメント差し替え等、
-    /// SelectedConnectorのsetterを経由する全経路)により強制的にキャンセルする(T-041増分7隠密レビュー
-    /// 所見A対応)。CancelDragConnector()と同じ開始時位置への復元を行う(所見Y対応: 復元せず
-    /// _draggingConnectorをnullにするだけだと、シート切替のように対象が生きたまま残る経路で
-    /// UpdateDragConnector適用済みの半端な位置がMarkDirty()もされず黙って確定してしまう)。
-    /// IsDraggingConnectorの変更をOnPropertyChangedでView側へ明示通知する(MainWindow.xaml.csの
-    /// ViewModel_PropertyChangedがこれを受けてキャプチャ解放・Viewローカル一時フラグのリセット等の
-    /// 後始末を行う)。</summary>
-    private void ForceCancelDragConnectorIfAny()
+    /// <summary>ドラッグ中のいずれかの型(Connector/WireBreak/FreeLine/ConnectionDot)を外部要因
+    /// (Delete・シート切替・ドキュメント差し替え等、各SelectedXxxのsetterを経由する全経路)により
+    /// 強制的にキャンセルする骨格(T-045増分D、隠密所見「ForceCancelDrag*IfAny4箇所(3行同一)の
+    /// 共通化」対応、T-041増分7隠密レビュー所見A対応の一般化)。CancelDragXxx()と同じ開始時位置への
+    /// 復元を必ず行う(所見Y対応: 復元せず_draggingXxxをnullにするだけだと、シート切替のように
+    /// 対象が生きたまま残る経路でUpdateDragXxx適用済みの半端な位置がMarkDirty()もされず黙って
+    /// 確定してしまう——本ヘルパーはisActive/cancel/notifyを型ごとに明示的に渡す構造にすることで、
+    /// 新しい型を追加する際にcancel呼び出しの書き忘れがレビューで見えやすくなる)。notifyで
+    /// IsDraggingXxxの変更をView側へ明示通知する(MainWindow.xaml.csのViewModel_PropertyChangedが
+    /// これを受けてキャプチャ解放・Viewローカル一時フラグのリセット等の後始末を行う)。</summary>
+    private void ForceCancelIfAny(Func<bool> isActive, Action cancel, Action notify)
     {
-        if (_draggingConnector is null) return;
-        CancelDragConnector();
-        OnPropertyChanged(nameof(IsDraggingConnector));
+        if (!isActive()) return;
+        cancel();
+        notify();
     }
+
+    private void ForceCancelDragConnectorIfAny()
+        => ForceCancelIfAny(
+            () => _draggingConnector is not null,
+            CancelDragConnector,
+            () => OnPropertyChanged(nameof(IsDraggingConnector)));
 
     /// <summary>縦コネクタのドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、
     /// trueならisTopで指定した端点のみのリサイズ。startRowはドラッグ開始時のマウス位置(行)。
@@ -374,25 +383,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>縦コネクタのドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する(ドラッグ中は毎フレーム呼ばず、確定時の1回に集約)。</summary>
     public void ConfirmDragConnector()
-    {
-        if (_draggingConnector is VerticalConnector c &&
-            (c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow
-             || c.Column != _dragConnectorOrigColumn))
-            MarkDirty();
-        _draggingConnector = null;
-    }
+        => ConfirmDrag(ref _draggingConnector,
+            c => c.TopRow != _dragConnectorOrigTopRow || c.BottomRow != _dragConnectorOrigBottomRow
+                || c.Column != _dragConnectorOrigColumn);
 
     /// <summary>縦コネクタのドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragConnector()
-    {
-        if (_draggingConnector is VerticalConnector c)
+        => CancelDrag(ref _draggingConnector, c =>
         {
             c.TopRow = _dragConnectorOrigTopRow;
             c.BottomRow = _dragConnectorOrigBottomRow;
             c.Column = _dragConnectorOrigColumn;
-        }
-        _draggingConnector = null;
-    }
+        });
 
     /// <summary>選択中の縦コネクタを行方向に矢印キー1回分(delta=±1)平行移動する(T-041増分7、
     /// キーボード等価操作)。UpdateDragConnectorの本体移動と同じ「間隔を保ったままクランプ」方式。
@@ -516,11 +518,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 所見A対応、ForceCancelDragConnectorIfAnyと同型)。所見Y対応でCancelDragWireBreak()と同じ
     /// 開始時位置への復元を行う。</summary>
     private void ForceCancelDragWireBreakIfAny()
-    {
-        if (_draggingWireBreak is null) return;
-        CancelDragWireBreak();
-        OnPropertyChanged(nameof(IsDraggingWireBreak));
-    }
+        => ForceCancelIfAny(
+            () => _draggingWireBreak is not null,
+            CancelDragWireBreak,
+            () => OnPropertyChanged(nameof(IsDraggingWireBreak)));
 
     /// <summary>配線分断のドラッグを開始する(T-041増分7)。startRow/startBoundaryはドラッグ開始時の
     /// マウス位置(行・列境界0.5刻み)。</summary>
@@ -547,23 +548,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>配線分断のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する。</summary>
     public void ConfirmDragWireBreak()
-    {
-        if (_draggingWireBreak is WireBreak b &&
-            (b.Row != _dragWireBreakOrigRow || b.Boundary != _dragWireBreakOrigBoundary))
-            MarkDirty();
-        _draggingWireBreak = null;
-    }
+        => ConfirmDrag(ref _draggingWireBreak,
+            b => b.Row != _dragWireBreakOrigRow || b.Boundary != _dragWireBreakOrigBoundary);
 
     /// <summary>配線分断のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragWireBreak()
-    {
-        if (_draggingWireBreak is WireBreak b)
+        => CancelDrag(ref _draggingWireBreak, b =>
         {
             b.Row = _dragWireBreakOrigRow;
             b.Boundary = _dragWireBreakOrigBoundary;
-        }
-        _draggingWireBreak = null;
-    }
+        });
 
     /// <summary>選択中の配線分断を矢印キー1回分(deltaRow/deltaBoundary、いずれか一方は0)平行移動する
     /// (T-041増分7、キーボード等価操作)。点系は本体移動のみ。実際に動けた場合のみMarkDirty()する。</summary>
@@ -650,11 +644,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 所見A対応、ForceCancelDragConnectorIfAnyと同型)。所見Y対応でCancelDragFreeLine()と同じ
     /// 開始時位置への復元を行う。</summary>
     private void ForceCancelDragFreeLineIfAny()
-    {
-        if (_draggingFreeLine is null) return;
-        CancelDragFreeLine();
-        OnPropertyChanged(nameof(IsDraggingFreeLine));
-    }
+        => ForceCancelIfAny(
+            () => _draggingFreeLine is not null,
+            CancelDragFreeLine,
+            () => OnPropertyChanged(nameof(IsDraggingFreeLine)));
 
     /// <summary>自由線のドラッグを開始する(T-041増分7)。isEndpoint=falseなら本体移動、trueなら
     /// isStartで指定した端点(始点/終点)のみのリサイズ。startXMm/startYMmはドラッグ開始時のマウス
@@ -730,24 +723,17 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>自由線のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する。</summary>
     public void ConfirmDragFreeLine()
-    {
-        if (_draggingFreeLine is FreeLine line &&
-            (line.X1Mm != _dragFreeLineOrigX1 || line.Y1Mm != _dragFreeLineOrigY1 ||
-             line.X2Mm != _dragFreeLineOrigX2 || line.Y2Mm != _dragFreeLineOrigY2))
-            MarkDirty();
-        _draggingFreeLine = null;
-    }
+        => ConfirmDrag(ref _draggingFreeLine,
+            line => line.X1Mm != _dragFreeLineOrigX1 || line.Y1Mm != _dragFreeLineOrigY1 ||
+                    line.X2Mm != _dragFreeLineOrigX2 || line.Y2Mm != _dragFreeLineOrigY2);
 
     /// <summary>自由線のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragFreeLine()
-    {
-        if (_draggingFreeLine is FreeLine line)
+        => CancelDrag(ref _draggingFreeLine, line =>
         {
             line.X1Mm = _dragFreeLineOrigX1; line.Y1Mm = _dragFreeLineOrigY1;
             line.X2Mm = _dragFreeLineOrigX2; line.Y2Mm = _dragFreeLineOrigY2;
-        }
-        _draggingFreeLine = null;
-    }
+        });
 
     /// <summary>選択中の自由線を矢印キー1回分(deltaXMm/deltaYMm、いずれか一方は0)平行移動する
     /// (T-041増分7、キーボード等価操作)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AA
@@ -869,11 +855,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// ForceCancelDragConnectorIfAnyと同型)。所見Y対応でCancelDragConnectionDot()と同じ開始時
     /// 位置への復元を行う。</summary>
     private void ForceCancelDragConnectionDotIfAny()
-    {
-        if (_draggingConnectionDot is null) return;
-        CancelDragConnectionDot();
-        OnPropertyChanged(nameof(IsDraggingConnectionDot));
-    }
+        => ForceCancelIfAny(
+            () => _draggingConnectionDot is not null,
+            CancelDragConnectionDot,
+            () => OnPropertyChanged(nameof(IsDraggingConnectionDot)));
 
     /// <summary>接続点のドラッグを開始する(T-041増分7)。startXMm/startYMmはドラッグ開始時の
     /// マウス位置(mm実座標)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AD対応、
@@ -899,26 +884,37 @@ public sealed class MainWindowViewModel : ViewModelBase
         dot.YMm = Math.Clamp(_dragConnectionDotOrigYMm + (currentYMm - _dragConnectionDotStartYMm), 0, _dragConnectionDotMaxYMm);
     }
 
+    /// <summary>ドラッグ確定の骨格(T-045増分D、当初ConnectionDotのみのPoCだったが、隠密レビュー
+    /// (ecad2-t045-increment-d-review-onmitsu.md DoD(6))でConfirmDragConnector/ConfirmDragFreeLine
+    /// にも分岐が無く同型と判明したためConnector/WireBreak/FreeLineへも展開し4種全てに適用)。
+    /// draggingが非nullかつhasChangedがtrueならMarkDirty()し、draggingをnullへ戻す。Confirm/Cancel
+    /// とも「型固有の判定・復元ロジックのみdelegateとして渡し、if文の構造とnull化はここへ集約する」
+    /// 設計(隠密所見3.4節2.「スナップショット構造体」に相当)。</summary>
+    private void ConfirmDrag<T>(ref T? dragging, Func<T, bool> hasChanged) where T : class
+    {
+        if (dragging is not null && hasChanged(dragging)) MarkDirty();
+        dragging = null;
+    }
+
+    /// <summary>ドラッグキャンセルの骨格(T-045増分D、4種(Connector/WireBreak/FreeLine/
+    /// ConnectionDot)全てに適用)。draggingが非nullならrestoreで開始時位置へ復元してからnullへ
+    /// 戻す。</summary>
+    private void CancelDrag<T>(ref T? dragging, Action<T> restore) where T : class
+    {
+        if (dragging is not null) restore(dragging);
+        dragging = null;
+    }
+
     /// <summary>接続点のドラッグを確定する(T-041増分7)。開始時から実際に値が変化していれば
     /// MarkDirty()する。</summary>
     public void ConfirmDragConnectionDot()
-    {
-        if (_draggingConnectionDot is ConnectionDot dot &&
-            (dot.XMm != _dragConnectionDotOrigXMm || dot.YMm != _dragConnectionDotOrigYMm))
-            MarkDirty();
-        _draggingConnectionDot = null;
-    }
+        => ConfirmDrag(ref _draggingConnectionDot,
+            dot => dot.XMm != _dragConnectionDotOrigXMm || dot.YMm != _dragConnectionDotOrigYMm);
 
     /// <summary>接続点のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-041増分7)。</summary>
     public void CancelDragConnectionDot()
-    {
-        if (_draggingConnectionDot is ConnectionDot dot)
-        {
-            dot.XMm = _dragConnectionDotOrigXMm;
-            dot.YMm = _dragConnectionDotOrigYMm;
-        }
-        _draggingConnectionDot = null;
-    }
+        => CancelDrag(ref _draggingConnectionDot,
+            dot => { dot.XMm = _dragConnectionDotOrigXMm; dot.YMm = _dragConnectionDotOrigYMm; });
 
     /// <summary>選択中の接続点を矢印キー1回分(Shift無し)平行移動する(T-041増分7、キーボード
     /// 等価操作、1ステップ=CellMm)。maxXMm/maxYMmはページ境界(T-041増分7隠密レビュー所見AD対応、
@@ -1169,8 +1165,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// SelectedElementのデバイス名(T-017、プロパティパネルで編集可能)。ElementInstance.DeviceName
     /// を書き換えるだけでなく、Document.Devices(機器表)にも反映する。同名デバイスを参照する他要素
     /// も含めた一括リネームはSimulation.DeviceRenamerに委譲する(既存デバイスの改名時)。新規デバイス
-    /// 名(Document.Devicesに未登録)の場合はDeviceClass.Otherで新規登録する(忍者実機検証で発覚:
-    /// 単純代入だけでは機器表に反映されないバグの修正)。
+    /// 名(Document.Devicesに未登録)の場合は要素種別から解決したDeviceClass(T-045 P-020対応、
+    /// ResolveDeviceClass参照)で新規登録する(忍者実機検証で発覚: 単純代入だけでは機器表に反映
+    /// されないバグの修正)。
     /// </summary>
     public string SelectedElementDeviceName
     {
@@ -1192,7 +1189,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 if (newName.Length > 0)
                 {
                     if (!Document.Devices.ByName.ContainsKey(newName))
-                        Document.Devices.ByName[newName] = new Device { Name = newName, Class = DeviceClass.Other };
+                        Document.Devices.ByName[newName] = new Device { Name = newName, Class = ResolveDeviceClass(el) };
                 }
                 else if (oldName.Length > 0)
                 {
@@ -1284,6 +1281,66 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool IsSelectedCellOccupied()
         => SelectedCell is { } pos && CurrentSheet is Sheet sheet && sheet.Elements.Any(el => el.Pos == pos);
 
+    /// <summary>SelectedCellが現在のグリッド範囲内(行0〜Rows-1・列0〜Columns-1)か判定する
+    /// (T-045増分C、View層のTryPlaceElementが配置バー表示前に境界外を弾くために使う。所見B=
+    /// 境界チェック未追随でのサイレント失敗の解消)。選択(SelectedCell)自体の仕様範囲(行-1・
+    /// 列-2まで選択可、殿教示2026-07-07・docs/proposed.md P-022/P-024)には触れず、配置前の
+    /// フィードバック用の判定に留める(殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
+    public bool IsSelectedCellWithinGrid()
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, sheet);
+
+    private static bool IsWithinGridBounds(GridPos pos, Sheet sheet)
+        => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
+        && pos.Column >= 0 && pos.Column < sheet.Grid.Columns;
+
+    /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
+    /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
+    /// 共有する(IsWithinGridBounds)。</summary>
+    private bool ValidatePlacement(GridPos pos, Sheet sheet)
+        => IsWithinGridBounds(pos, sheet) && !sheet.Elements.Any(el => el.Pos == pos);
+
+    /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
+    /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
+    /// Lamp→Lamp、PushButtonNO/NC・EmergencyStop→PushButton、SelectSwitch→SelectSwitch、
+    /// Terminal→Terminal、Timer系(限時・瞬時とも)→Timer、Counter→Counter、
+    /// ThermalOverload/ThermalOverload3P・Motor・Breaker3P→Other(該当クラス無し)。</summary>
+    private static DeviceClass MapToDeviceClass(ElementKind kind) => kind switch
+    {
+        ElementKind.ContactNO or ElementKind.ContactNC or ElementKind.Coil or ElementKind.ContactorMain3P
+            => DeviceClass.Relay,
+        ElementKind.Lamp => DeviceClass.Lamp,
+        ElementKind.PushButtonNO or ElementKind.PushButtonNC or ElementKind.EmergencyStop
+            => DeviceClass.PushButton,
+        ElementKind.SelectSwitch => DeviceClass.SelectSwitch,
+        ElementKind.Terminal => DeviceClass.Terminal,
+        ElementKind.Timer or ElementKind.TimerContactNO or ElementKind.TimerContactNC
+            or ElementKind.TimerInstantContactNO or ElementKind.TimerInstantContactNC => DeviceClass.Timer,
+        ElementKind.Counter => DeviceClass.Counter,
+        _ => DeviceClass.Other,
+    };
+
+    /// <summary>要素からDeviceClassを解決する(T-045 P-020対応)。PartResolver.ComponentKindは
+    /// CreatesComponent=false(自作パーツRole=NonSimulated等)の場合に例外を投げるため、事前に
+    /// ガードしOtherへフォールバックする。セレクトSWはRole=ContactNO(電気的にはa接点と同一、
+    /// T-037往復2周目の既知制約)のためComponentKind経由では区別できない。T-045増分B修正
+    /// (隠密レビューCONFIRMED、ecad2-t045-increment-b-review-onmitsu.md): 固定Id完全一致判定は
+    /// Explorerコピー由来のId再採番(PartFolderStore.cs:94-110、T-035)に耐性が無く誤分類する
+    /// ため廃止し、PartEntryToGlyphGeometryConverter.cs:53-63と同型のCategory/Role/IsOrEligible
+    /// 判定へ置換する(element.PartIdでPartPalette.Entriesを動的検索、Idの新旧に依存しない)。
+    /// Category==""(基本図形フォルダ直下)をゲートにするのは、自作パーツ(Category="自作")が
+    /// Role=ContactNO・IsOrEligible=falseを偶然持つ場合の誤判定を防ぐため
+    /// (ecad2-t045-increment-b-fix-test-design-onmitsu.md 分類D)。</summary>
+    private DeviceClass ResolveDeviceClass(ElementInstance element)
+    {
+        var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == element.PartId);
+        if (entry is { Category: "", Definition.Role: PartRole.ContactNO, Definition.IsOrEligible: false })
+            return DeviceClass.SelectSwitch;
+
+        return PartResolver.CreatesComponent(element, PartLibrary)
+            ? MapToDeviceClass(PartResolver.ComponentKind(element, PartLibrary))
+            : DeviceClass.Other;
+    }
+
     /// <summary>
     /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、基準行
     /// (SelectedCellより上にある直近の既存要素行、殿裁定で上方向限定)との間に縦コネクタを
@@ -1292,6 +1349,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
+        if (!ValidatePlacement(pos, sheet)) return;
 
         const int cellWidth = 1; // 基本図形(BasicPartTemplates)は全て1セル幅
         var newElement = new ElementInstance
@@ -1304,10 +1362,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         MarkDirty();
 
         // 機器表(Document.Devices)への登録(T-036、殿承認2026-07-05)。SelectedElementDeviceNameの
-        // setterと同じ流儀: 新規デバイス名(未登録)のみDeviceClass.Otherで追加し、既存デバイス名なら
-        // 既存エントリを維持(上書きしない)。デバイス名空欄の場合は機器表を一切操作しない。
+        // setterと同じ流儀: 新規デバイス名(未登録)のみ要素種別から解決したDeviceClass(T-045
+        // P-020対応)で追加し、既存デバイス名なら既存エントリを維持(上書きしない)。デバイス名
+        // 空欄の場合は機器表を一切操作しない。
         if (deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName))
-            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = DeviceClass.Other };
+            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = ResolveDeviceClass(newElement) };
         DeviceTable.Refresh();
 
         if (!isOr) return;
@@ -1453,10 +1512,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel() : this(PartFolderStore.CreateDefault()) { }
 
     /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
-    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。</summary>
-    public MainWindowViewModel(PartFolderStore partFolderStore)
+    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。IDispatcherServiceは
+    /// 本番既定(WpfDispatcherService)を使う。</summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore) : this(partFolderStore, new WpfDispatcherService()) { }
+
+    /// <summary>T-045(P-016対応): テスト等からIDispatcherServiceも注入できるようにするための
+    /// コンストラクタ(SheetNavigationViewModelのDispatcher直接依存分離)。PartFolderStoreの
+    /// 2本立てパターン(T-042)と同型。</summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore, IDispatcherService dispatcherService)
     {
-        SheetNavigation = new SheetNavigationViewModel(this);
+        SheetNavigation = new SheetNavigationViewModel(this, dispatcherService);
         PartPalette = new PartPaletteViewModel(partFolderStore);
         // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
         // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。

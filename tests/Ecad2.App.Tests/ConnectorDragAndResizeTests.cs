@@ -253,11 +253,20 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
         Assert.True(vm.IsDraggingConnector);
 
+        // T-045補遺2(Stryker棚卸し、ForceCancelIfAnyのnotify()生存ミュータント対応): 最終値
+        // だけでなくPropertyChangedイベント自体が発火することを検証する。
+        bool isDraggingConnectorChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnector)) isDraggingConnectorChanged = true;
+        };
+
         // Delete相当: DeleteSelectedConnectorがSelectedConnector=nullを代入する経路。
         bool deleted = vm.DeleteSelectedConnector();
 
         Assert.True(deleted);
         Assert.False(vm.IsDraggingConnector);
+        Assert.True(isDraggingConnectorChanged);
         // 強制クリア後、UpdateDragConnectorを呼んでも削除済みの実体を書き換えない(例外も起きない)。
         var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
@@ -274,6 +283,12 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.SelectedConnector = c;
         vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
 
+        bool isDraggingConnectorChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnector)) isDraggingConnectorChanged = true;
+        };
+
         vm.Document.Sheets.Add(new Sheet
         {
             PageNumber = 2,
@@ -284,6 +299,7 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.CurrentSheetIndex = 1;   // SelectedCell=null経由でSelectedConnectorのsetterへ波及する
 
         Assert.False(vm.IsDraggingConnector);
+        Assert.True(isDraggingConnectorChanged);
         var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
     }
@@ -298,9 +314,16 @@ public class ConnectorDragAndResizeTests : ViewModelTestBase
         vm.SelectedConnector = c;
         vm.BeginDragConnector(c, isEndpoint: false, isTop: false, startRow: 3, startColumn: 4);
 
+        bool isDraggingConnectorChanged = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.IsDraggingConnector)) isDraggingConnectorChanged = true;
+        };
+
         vm.NewDocument();   // ReplaceDocument経由
 
         Assert.False(vm.IsDraggingConnector);
+        Assert.True(isDraggingConnectorChanged);
         Assert.False(vm.IsDirty);   // 新規文書がドラッグの残骸で理由なく未保存化しない
         var ex = Record.Exception(() => vm.UpdateDragConnector(currentRow: 8, currentColumn: 4));
         Assert.Null(ex);
