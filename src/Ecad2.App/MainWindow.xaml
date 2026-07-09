@@ -255,27 +255,15 @@
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F8"/>
                     </StackPanel>
                 </Button>
-                <Separator/>
-                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ"
-                        AutomationProperties.Name="自作パーツ"
-                        Click="OpenPartSelectionButton_Click"
-                        PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
-                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <!-- T-047: 手動配線系(F9/Shift+F9/F10)のツールバーボタン。GX Works3参考画像で
-                     F9/sF9が既存配置ボタン群と同一ツールバー行に区切り線を挟んで隣接配置される
-                     前例(隠密先行調査`docs/ecad2-t047-presurvey-onmitsu.md`2節)に倣う。殿裁定=
-                     1機能1ボタン(最大5ボタン)・非対応シート種別はグレーアウト。Shift+F9/F10は
-                     いずれもシート種別で挙動が切替わる1キーのため、機能ごとに別ボタンへ分割し、
-                     IsEnabledをシート種別(IsMainCircuitSheet/IsControlCircuitSheet)へ連動させる。
-                     意匠はT-040様式(StrokeThickness=1.0、境界ボックス統一)を延長した侍起草案
-                     (配置する記号そのものを模す: 自由線=線そのもの・接続点=●・配線分断=線の
-                     ギャップ・縦分岐線=縦線+上下T字)、実装後に殿目視で確定する。 -->
+                <!-- T-047: 手動配線系(F9/Shift+F9/F10)のツールバーボタン。既存F5〜F8と同一の
+                     ツールバー行に区切り線なしで連続配置(殿裁定2026-07-09、GX Works3のF5〜F10
+                     連続配置様式に統一)。殿裁定=1機能1ボタン(最大5ボタン)・非対応シート種別は
+                     グレーアウト。Shift+F9/F10はいずれもシート種別で挙動が切替わる1キーのため、
+                     機能ごとに別ボタンへ分割し、IsEnabledをシート種別(IsMainCircuitSheet/
+                     IsControlCircuitSheet)へ連動させる。意匠はT-040様式(StrokeThickness=1.0、
+                     境界ボックス統一)を延長した侍起草案(配置する記号そのものを模す: 自由線=
+                     線そのもの・接続点=●・配線分断=線のギャップ・縦分岐線=縦線+上下T字)、
+                     実装後に殿目視で確定する。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自由線(横線)記入 (F9)"
                         AutomationProperties.Name="自由線(横線)記入 (F9)"
                         Click="FreeLineHorizontalButton_Click"
@@ -324,6 +312,17 @@
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F10"/>
+                    </StackPanel>
+                </Button>
+                <Separator/>
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ"
+                        AutomationProperties.Name="自作パーツ"
+                        Click="OpenPartSelectionButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>
                     </StackPanel>
                 </Button>
             </ToolBar>
