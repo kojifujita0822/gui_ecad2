@@ -28,6 +28,16 @@
             <Setter Property="Height" Value="42"/>
             <Setter Property="Margin" Value="1"/>
             <Setter Property="Padding" Value="0"/>
+            <!-- T-047殿新注文その2(2026-07-09): 単純図形(縦線・横線等)のボタンはグレー化だけでは
+                 活性/無効の判別が難しいとの殿目視所見。IsEnabled=false時にボタン全体を半透明化する
+                 (殿選定=Windows標準的な無効表現・濃度差で単純図形でも判別可・実装最小)。基底
+                 ToolBarButtonStyle1箇所への追加のみで、継承するPlacementToolBarButtonStyle
+                 (F5〜F10・部品)・1段目(新規/開く等)双方に統一適用される。 -->
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="ToolBarIconStyle" TargetType="Path">
             <Setter Property="Width" Value="18"/>
