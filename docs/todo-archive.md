@@ -148,6 +148,29 @@
 
 （タスク完了時、todo.mdの詳細をここへ移す）
 
+### T-049 デバイス名編集中の未確定編集を確定してから保存 — 完全Done 2026-07-10
+
+**起票=P-013（隠密T-036デバイス名修正レビュー、2026-07-05）を殿裁定2026-07-10で承認**
+（確定してから保存する方式を採用、確認ダイアログは挟まない）。デバイス名欄の編集中に
+Ctrl+S/N/O・ウィンドウクローズを行うと、フォーカスが動かずUpdateSource契機が無いため
+未確定編集がサイレントに保存漏れ／無確認破棄されうる既存課題（T-019のIsDirty機構導入時点から）。
+
+経緯（パイプライン全段）:
+- 実装`bfa37cc`（侍、1ファイル=`MainWindow.xaml.cs`のみ。DeviceNameBox_LostKeyboardFocus/
+  PreviewKeyDownをCommitDeviceNameEditへ統合し、SaveDocument()・ConfirmDiscardIfDirty()の入口で
+  確定するよう追加）。ビルド0警告0エラー・テスト241件全合格
+- RED先行証明=不可と侍申告（View層code-behind=TextBoxバインディング挙動そのものが対象、既存
+  テスト基盤はViewModelのみ計装可・STA/Window未対応）——隠密レビューで妥当と確認（T-047型の
+  純粋関数切り出しも本件には適用不能と判定）
+- 隠密静的レビュー（`docs/ecad2-t049-review-onmitsu.md`）: 要修正なし。家老特記3観点（RED不可の
+  妥当性・CommitDeviceNameEdit呼び出し網羅・SetProperty早期returnトラップ）いずれも妥当、
+  code-reviewスキル（medium・8角度）の候補2件もVerify段階で両方REFUTED
+- 忍者実機（`docs/ecad2-t049-verification-ninja.md`）: 観点1〜4+Ctrl+O補足の全てOK。判定は
+  見た目でなく保存ファイル（.gcad）のデータで実施（フォーカス保持のままCtrl+S→"deviceName":"Y5"
+  反映、Ctrl+N/クローズ→未確定編集込みで破棄確認ダイアログ、回帰=通常のフォーカス外し経路も正常）
+- 範囲外の気づき: P-045（選択済み空セルへのF5配置でプロパティパネル未更新=SelectedCell不変で
+  通知スキップ、既存挙動）
+
 ### T-047 手動配線系（F9/F10系）のツールバーボタン作成 — 完全Done 2026-07-09
 
 **起票=殿指示2026-07-09**。T-041実装の手動配線4種（FreeLine横線=F9・縦線=Shift+F9／
