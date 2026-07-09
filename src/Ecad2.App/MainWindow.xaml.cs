@@ -136,23 +136,25 @@ public partial class MainWindow : Window
     // UpdateSourceTrigger=LostFocus(論理フォーカス)はCanvasArea等の独立FocusScope跨ぎで発火しない
     // ため(殿実機確認で発覚した回帰、診断ログで実測確認済み)、Explicit化しLostKeyboardFocus(物理
     // フォーカス喪失、スコープを跨いでも必ず発火)で明示的にUpdateSource()を呼ぶ(T-036追加修正)。
-    private void DeviceNameBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
-    {
-        DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-        RedrawCanvas();
-    }
+    private void DeviceNameBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
 
     // Enterキーでの即時確定(殿の期待仕様)。Tab・クリック等によるフォーカス移動はLostKeyboardFocus
     // でカバーされるため、ここではEnter押下時のみUpdateSource()を呼ぶ(フォーカスは維持したまま)。
-    // RedrawCanvas()もLostKeyboardFocus経路と同様に呼び、キャンバス上のデバイス名ラベル表示を
-    // 即時反映する(隠密レビュー指摘)。
     private void DeviceNameBox_PreviewKeyDown(object sender, KeyEventArgs e)
     {
-        if (e.Key == Key.Enter)
-        {
-            DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
-            RedrawCanvas();
-        }
+        if (e.Key == Key.Enter) CommitDeviceNameEdit();
+    }
+
+    // T-049(殿裁定): デバイス名編集中、フォーカスを保持したままCtrl+S/N/O・ウィンドウクローズが
+    // 実行されると、UpdateSourceTrigger=Explicit(上記コメント参照)ゆえLostKeyboardFocus/Enterの
+    // いずれも発火せず、編集内容がサイレントに保存漏れ/無確認破棄されうる(P-013)。保存・破棄判定
+    // (SaveDocument/ConfirmDiscardIfDirty)の入口で必ず本メソッドを呼び、確定してから判定する
+    // (確認ダイアログは挟まない、殿裁定)。SelectedElementDeviceNameのsetterは同値なら早期returnする
+    // ため(値変更が無い呼び出しは無害)、常時呼んでよい。
+    private void CommitDeviceNameEdit()
+    {
+        DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        RedrawCanvas();
     }
 
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
@@ -189,6 +191,10 @@ public partial class MainWindow : Window
         // (家老既定案、殿帰宅後に実挙動確認)。Ctrl+S/ツールバー/メニューいずれもここを通るため
         // 単一の関門になる。IsEnabledバインディングと二重防御。
         if (!_viewModel.HasProject) return;
+
+        // T-049: デバイス名編集中にフォーカスを保持したままの保存(Ctrl+S等)で編集が保存漏れ
+        // しないよう、保存前に確定させる(CommitDeviceNameEdit参照)。
+        CommitDeviceNameEdit();
 
         if (_viewModel.CurrentFilePath is string path)
             TrySaveToFile(path);
@@ -258,6 +264,10 @@ public partial class MainWindow : Window
     // T-024節推奨に基づく)。戻り値: true=文書破棄して続行可、false=中止(呼び出し元は何もしない)。
     private bool ConfirmDiscardIfDirty()
     {
+        // T-049: 新規/開く/ウィンドウクローズはいずれも本メソッドを通る単一の関門。IsDirty判定・
+        // 破棄確定のいずれもデバイス名編集中の未確定値を正しく反映させるため、判定前に確定させる。
+        CommitDeviceNameEdit();
+
         if (!_viewModel.IsDirty) return true;
 
         var result = MessageBox.Show(this,
