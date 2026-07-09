@@ -13,6 +13,13 @@ ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
 - [ecad2-stack-web-crossplatform.md](ecad2-stack-web-crossplatform.md) — Web＆クロスプラットフォーム系調査（忍者）
 - [ecad2-stack-native-lightweight.md](ecad2-stack-native-lightweight.md) — ネイティブ/軽量系調査（侍）
 
+## UI/UX作成の参考資料（殿指示2026-07-09で恒久保存）
+
+- **[ecad2-ladder-reference-systems-survey-onmitsu.md](ecad2-ladder-reference-systems-survey-onmitsu.md)** — ラダー編集・テストモードUI/UXの参考システム調査（OSS／商用無償版／国産公開資料の3系統12件、ライセンス・参照URL明記。最有望=Do-more Designer・LDmicro）
+- [ecad2-gxworks3-uiux-survey-onmitsu.md](ecad2-gxworks3-uiux-survey-onmitsu.md) — GX Works3 UI/UX調査（Web一次情報）
+- [ecad2-gxworks3-uiux-survey-onmitsu-part2.md](ecad2-gxworks3-uiux-survey-onmitsu-part2.md) — 同・実機追加調査（F-key併記アイコン・状態依存配色等の発見元）
+- [ecad2-t047-gx-icon-survey-onmitsu.md](ecad2-t047-gx-icon-survey-onmitsu.md) — GX Works3実プログラムの意匠資源調査（抽出可能な記号アイコン画像なし＝ベクター描画と推測）
+
 ## 運用
 
 - [todo.md](todo.md) — タスク台帳。家老が采配してよい根拠はここに Approved/In-progress とある行だけ。各役は起動時にここを確認する。
