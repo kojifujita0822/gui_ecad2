@@ -32,6 +32,8 @@ GuiEcad（ラダー図 CAD）で得た知見を活かし、制御盤設計・ラ
 - 実装ディレクトリへの書き込みは侍に一元化し、他役は調査・確認に専念する
 - 出力破損（court等の混入・raw <invoke> 表示）を検知したら同スキル §5 の離脱プロトコルに従う。
   併せて離脱前に `docs-notes/output-corruption-log.md` へ発生記録を1行追記する（対策効果の頻度比較のため。
-  記録が取れぬほど破損が激しい場合は復旧後に追記）
+  記録が取れぬほど破損が激しい場合は復旧後に追記）。**症状は一度出ると/clear後も再発を繰り返す傾向がある
+  （殿観察2026-07-10）**——破損後の再起動・/clear直後のセッションは同記録簿の直近記録を読み、
+  再発警戒を自覚してから作業に入ること（自覚が再発低減に効く可能性、同記録簿「運用知見」参照）
 - 担当パス（本実装）: `src/Ecad2.sln` ／ `src/Ecad2.Core/`（Model/Simulation/Rendering/Persistence）／ `src/Ecad2.Rendering.Wpf/` ／ `src/Ecad2.Pdf/` ／ `src/Ecad2.App/` ／ `tests/Ecad2.Core.Tests/` ／ `tests/Ecad2.App.Tests/`
 - `poc/` は実験場として本実装とは別に維持する
