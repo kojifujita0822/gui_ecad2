@@ -229,3 +229,38 @@ VerticalConnector=Shift+F9／WireBreak=F10／ConnectionDot=F10）がキーボー
 - 範囲外の気づき: P-043（記入中Tabがメニューバーへ抜ける、実害なし）。副次事象=T-047初回コミットが
   レビュー前にpushされた件から**push全面保留の新掟**確立（未レビュー実装コミットがmain上にある間はdocs含め保留）
 
+
+## T-050 TraceLogの全角ラテン文字正規化統一 — 完全Done（2026-07-10、往復3周+Stryker棚卸し）
+
+**起票**=P-014/P-015統合（殿裁定2026-07-10）：TraceLog環境変数判定の全角ラテン文字（ｆａｌｓｅ等）
+未正規化＋兄弟2ファイル（DeviceTableViewModel.Refresh/SheetNavigationViewModel.SelectedSheet setter）の
+同型旧値null化。いずれも既定OFFのオプトイン診断機能内。
+
+経緯（パイプライン全段）:
+- 初回実装`3190226`: NFKC正規化（string.Normalize）+兄弟2ファイル旧値null化修正、RED証明
+- 隠密レビュー: 指摘2件（不対サロゲートでArgumentException・SelectedSheetセッタold==new実バグ）→
+  1周目修正`e2f44d7`（経路X採用、RED証明2系統。xUnit InlineDataの不対サロゲートU+FFFD変換の罠を
+  コードポイントint渡しで回避=メモリ収蔵済み）
+- 隠密事後レビューで**新規バグ発見=2周目へ**（AddCommand/DeleteCommandがCurrentSheetIndexセッタ経由で
+  二重発火+old値不整合、ResetSheetsも呼び出し元の先行代入で誤old値。3独立エージェント一致CONFIRMED、
+  実害はTraceLog診断ログ限定。`docs/ecad2-t050-fix-review-onmitsu.md`）
+- 制度適用（テスト設計と実装の分離）: 隠密テスト設計→侍修正`1d6db37`（SetCurrentSheetIndexCore抽出+
+  通知移動方式+ViewModelBaseテストフック層3、RED証明8件、268件全合格）。教訓=旧値はセッタ内の
+  無条件捕捉でなく**変更前に呼び出し元で捕捉**が原則
+- 2周目隠密再レビュー=クリーン（5観点妥当、`docs/ecad2-t050-fix2-review-onmitsu.md`）。軽微2件
+  （reuse・wasEmpty重複判定）は残置=経過観察。テストコード静的レビューで新規指摘1件=
+  DeleteCommand境界値テスト4件が削除後のSelectedSheet実値を未検証
+- 殿裁定=**往復3周目で補強**→`7838956`（実値アサートx4、InlineData第3引数で期待値を手導出明示。
+  RED証明=Math.Min一時退行で補強前4/4 GREEN（検知不可の実測）→補強後3c末尾/3d下限がRED→復元後
+  268件全合格）。※前任侍の§5離脱（出力破損#3#4）を挟み、臨時引き継ぎ書
+  `docs-notes/handover-samurai-t050-round3.md`経由で新侍が完遂
+- 3周目隠密レビュー=クリーン（期待値を実装ロジックから独立に手導出し全4ケース一致・RED整合・
+  src残置なし・code-reviewスキル(none)）
+- 忍者実機=全観点OK（シート追加0→1含む・削除境界4種・改名・DRCジャンプ同期、回帰なし。
+  `docs-notes/ecad2-t050-realmachine-verification-ninja.md`。範囲外の気づきは既知P-005の再観測のみ）
+- Stryker手動棚卸し（往復2周超えクローズ時の掟、`docs/ecad2-t050-stryker-review-onmitsu.md`）:
+  App score 23.88%、T-050変更行に直接該当する生存ミュータントは3件のみ（常に真の防御ガード・
+  診断機能内catch変異・テストフック自身の未検証）→**殿裁定=経過観察でクローズ**（2026-07-10）
+- 特記: 期間中に出力破損#3〜#7が侍系列で頻発（Grep結果行改変型が主、Grep使用誘因疑い）、
+  §5離脱2回+フリーズ1回を挟みつつ引き継ぎ書2本で作業損失ゼロで完遂。侍ターミナルは
+  殿裁定で新規ウィンドウへ系列一新
