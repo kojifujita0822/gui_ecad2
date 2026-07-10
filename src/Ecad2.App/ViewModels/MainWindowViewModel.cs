@@ -1654,7 +1654,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 if (IsRowOccupied(sheet, row))
                 {
-                    StatusMessage = "最終行に要素があるため削除できません";
+                    // T-055増分2往復2周目(隠密レビュー指摘、CONFIRMED): DeleteRowCommand由来の
+                    // 「最終行に」固定文言をそのまま流用すると、縮小範囲内の先頭・中間行で拒否された
+                    // 場合にユーザーが実際の元凶ではなく旧最終行付近を確認しに行き誤誘導する。
+                    // 拒否した実際の行番号(表示は1始まり、SelectedCellDisplayと同じ規約)を含める。
+                    StatusMessage = $"行{row + 1}に要素があるため削除できません";
                     return;
                 }
             }

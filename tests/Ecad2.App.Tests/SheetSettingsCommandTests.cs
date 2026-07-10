@@ -132,17 +132,29 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
     }
 
-    [Fact]
-    public void Execute_WhenShrinkRangeHasElement_SetsWarningMessage()
+    /// <summary>
+    /// T-055増分2往復2周目(隠密レビュー指摘、CONFIRMED): DeleteRowCommand由来の「最終行に」固定
+    /// 文言をそのまま流用すると、縮小範囲内の先頭・中間行で拒否された場合にユーザーが実際の元凶
+    /// ではなく旧最終行付近を確認しに行き誤誘導する。拒否理由の行番号(1始まり表示)が先頭・中間・
+    /// 末尾いずれの位置でも実際の占有行と一致することを確認する。
+    /// RED証明手法: StatusMessageの行番号埋め込みを一時的に固定文言("最終行に要素があるため
+    /// 削除できません")へ戻してテスト実行→中間行(elementRow=7)で不一致となりRED(実測確認済み)。
+    /// 戻すとGREEN。
+    /// </summary>
+    [Theory]
+    [InlineData(5)]  // 縮小範囲の先頭行(新Rows)
+    [InlineData(7)]  // 縮小範囲の中間行
+    [InlineData(9)]  // 縮小範囲の末尾行(旧Rows-1)
+    public void Execute_WhenShrinkRangeHasElement_SetsWarningMessageWithActualRow(int elementRow)
     {
         var vm = CreateViewModel();
         vm.NewDocument();
         vm.CurrentSheet!.Grid.Rows = 10;
-        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(7, 1) });
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(elementRow, 1) });
 
         vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
 
-        Assert.Equal("最終行に要素があるため削除できません", vm.StatusMessage);
+        Assert.Equal($"行{elementRow + 1}に要素があるため削除できません", vm.StatusMessage);
     }
 
     /// <summary>対照ケース: 縮小後も範囲内に残る行(縮小対象外)の要素は拒否理由にならない。</summary>
