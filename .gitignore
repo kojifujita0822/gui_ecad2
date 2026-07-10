@@ -1,5 +1,6 @@
 bin/
 obj/
+version/
 *.user
 poc/wpf-focus-poc/WpfFocusPoc/poc-output.pdf
 SCREEN SHOT/
