@@ -543,6 +543,41 @@ public partial class MainWindow : Window
         TryPlaceActiveTool();
     }
 
+    // T-055増分3: 行の任意位置挿入・削除メニュー。ToGridPosで行番号を確定し、コードビハインドで
+    // ContextMenuを都度生成する(ecad2初のContextMenu、前例なし。調査書
+    // docs/ecad2-t055-increment3-precheck-onmitsu.md §1の推奨アプローチに倣う)。
+    // Command+CommandParameterでバインドし、CanExecuteの反映(グレーアウト)はWPF標準機構に任せる。
+    private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
+        var position = e.GetPosition(LadderCanvasHost);
+        var pos = LadderCanvasHost.ToGridPos(position);
+        if (pos.Row < 0 || pos.Row >= sheet.Grid.Rows) return;
+
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem
+        {
+            Header = $"行{pos.Row + 1}の前に行を挿入",
+            Command = _viewModel.InsertRowBeforeCommand,
+            CommandParameter = pos.Row,
+        });
+        menu.Items.Add(new MenuItem
+        {
+            Header = "末尾に行を追加",
+            Command = _viewModel.AddRowCommand,
+        });
+        menu.Items.Add(new MenuItem
+        {
+            Header = $"行{pos.Row + 1}を削除",
+            Command = _viewModel.DeleteRowAtCommand,
+            CommandParameter = pos.Row,
+        });
+
+        LadderCanvasHost.ContextMenu = menu;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
     // T-041増分7隠密レビュー所見C対応: Alt+Tab等の外的要因でマウスキャプチャが失われた場合、
     // 進行中のドラッグを安全にキャンセルする(掴んだ位置への復元、MarkDirty()しない)。
     // ReleaseMouseCapture()を能動的に呼んだ直後の正常フロー(MouseUp/Escの各分岐)でも本イベントは

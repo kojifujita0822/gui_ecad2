@@ -1333,6 +1333,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// Bus名の空文字は許容する(殿裁定、GuiEcad踏襲)。</summary>
     public ICommand UpdateSheetSettingsCommand { get; }
 
+    /// <summary>右クリックコンテキストメニューから、指定行(int、CommandParameter)の前に1行挿入する
+    /// (T-055増分3)。上限(GridSpec.MaxRows)到達時は無効化。RowOps.InsertRowで広義5種をシフトする。</summary>
+    public ICommand InsertRowBeforeCommand { get; }
+
+    /// <summary>右クリックコンテキストメニューから、指定行(int、CommandParameter)を削除する
+    /// (T-055増分3)。下限(GridSpec.MinRows)到達時は無効化。対象行に要素(広義5種)が存在する場合は
+    /// 削除を拒否しStatusMessageへ警告を出す(拒否か要素ごと削除かは殿確認待ちにつき、本コマンドは
+    /// 「要素が存在しないケース」のみ対応。存在するケースはRowOps.DeleteRowの対象外)。</summary>
+    public ICommand DeleteRowAtCommand { get; }
+
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
     public SheetNavigationViewModel SheetNavigation { get; }
 
@@ -1668,5 +1678,33 @@ public sealed class MainWindowViewModel : ViewModelBase
             FinishRowCountChange(sheet);
         },
         _ => CurrentSheet is not null);
+
+        // T-055増分3: 右クリックコンテキストメニュー経由の任意位置挿入・削除。
+        // CanExecuteはGrid.Rows上限/下限のみ判定(要素占有はAddRow/DeleteRowCommandと同じくExecute内で
+        // 判定してStatusMessageへ案内する既存流儀に揃える)。
+        InsertRowBeforeCommand = new RelayCommand(param =>
+        {
+            if (CurrentSheet is not Sheet sheet || param is not int row) return;
+            if (sheet.Grid.Rows >= GridSpec.MaxRows) return;
+            RowOps.InsertRow(sheet, row);
+            sheet.Grid.Rows++;
+            FinishRowCountChange(sheet);
+        },
+        param => CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows && param is int);
+
+        DeleteRowAtCommand = new RelayCommand(param =>
+        {
+            if (CurrentSheet is not Sheet sheet || param is not int row) return;
+            if (sheet.Grid.Rows <= GridSpec.MinRows) return;
+            if (IsRowOccupied(sheet, row))
+            {
+                StatusMessage = $"行{row + 1}に要素があるため削除できません";
+                return;
+            }
+            RowOps.DeleteRow(sheet, row);
+            sheet.Grid.Rows--;
+            FinishRowCountChange(sheet);
+        },
+        param => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows && param is int);
     }
 }

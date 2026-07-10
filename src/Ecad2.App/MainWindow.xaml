@@ -420,6 +420,7 @@
                                     PreviewMouseLeftButtonDown="LadderCanvasHost_PreviewMouseLeftButtonDown"
                                     PreviewMouseMove="LadderCanvasHost_PreviewMouseMove"
                                     PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp"
+                                    PreviewMouseRightButtonDown="LadderCanvasHost_PreviewMouseRightButtonDown"
                                     LostMouseCapture="LadderCanvasHost_LostMouseCapture">
                     <views:LadderCanvas.LayoutTransform>
                         <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
