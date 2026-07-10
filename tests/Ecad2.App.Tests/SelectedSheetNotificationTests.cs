@@ -76,24 +76,29 @@ public class SelectedSheetNotificationTests : ViewModelTestBase
     // ---- ケース3: DeleteCommand(境界値: 先頭/中間/末尾/下限) ----
 
     /// <summary>ケース3a〜3d。削除操作はSelectedSheetをちょうど1回発火し、旧値は削除された(=選択中の)
-    /// シート自身。現行バグは公開セッタ経由で縮小済みコレクションの誤った旧値のネスト通知が挟まり2回発火。</summary>
+    /// シート自身。現行バグは公開セッタ経由で縮小済みコレクションの誤った旧値のネスト通知が挟まり2回発火。
+    /// 往復3周目補強(テストコード静的レビュー指摘): 発火回数・旧値だけでなく、削除後に実際に選択される
+    /// べきシート(SelectedSheetの実値)まで検証する。第3引数は削除前indexで、削除前に期待シート参照を
+    /// 捕捉しておく(実装式Math.Minの複製を避け、仕様を試験に書き下す)。</summary>
     [Theory]
-    [InlineData(3, 0)]  // 3a: 先頭削除 [A,B,C]→[B,C]
-    [InlineData(3, 1)]  // 3b: 中間削除 [A,B,C]→[A,C]
-    [InlineData(3, 2)]  // 3c: 末尾削除 [A,B,C]→[A,B]
-    [InlineData(2, 1)]  // 3d: 下限 [A,B]→[A]
-    public void DeleteCommand_RaisesSelectedSheetChanged_ExactlyOnce(int totalSheets, int selectIndex)
+    [InlineData(3, 0, 1)]  // 3a: 先頭削除 [A,B,C]→[B,C]、選択=B
+    [InlineData(3, 1, 2)]  // 3b: 中間削除 [A,B,C]→[A,C]、選択=C
+    [InlineData(3, 2, 1)]  // 3c: 末尾削除 [A,B,C]→[A,B]、選択=B
+    [InlineData(2, 1, 0)]  // 3d: 下限 [A,B]→[A]、選択=A
+    public void DeleteCommand_RaisesSelectedSheetChanged_ExactlyOnce(int totalSheets, int selectIndex, int expectedIndexBeforeDelete)
     {
         var vm = CreateViewModel();
         ArrangeSheets(vm, totalSheets);
         vm.CurrentSheetIndex = selectIndex;
         var deleted = vm.SheetNavigation.SelectedSheet;
+        var expectedSelectedAfterDelete = vm.SheetNavigation.Sheets[expectedIndexBeforeDelete];
         var olds = SubscribeSelectedSheetOldValues(vm);
 
         vm.SheetNavigation.DeleteCommand.Execute(null);
 
         var only = Assert.Single(olds);
         Assert.Same(deleted, only);
+        Assert.Same(expectedSelectedAfterDelete, vm.SheetNavigation.SelectedSheet);
     }
 
     // ---- ケース4: ResetSheets経由(ReplaceDocument) ----
