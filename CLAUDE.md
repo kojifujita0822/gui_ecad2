@@ -1,6 +1,7 @@
 @prompts/startup-auto.md
-# CLAUDE.md
 
+# CLAUDE.md
+Think in English, interact with the user in Japanese.
 本ファイルは ecad2（仮称）プロジェクトの設計索引。まだ基盤整備の初期段階のため、
 詳細な設計・アーキテクチャは今後 `docs/` 配下に順次整備する。
 
@@ -29,6 +30,8 @@ GuiEcad（ラダー図 CAD）で得た知見を活かし、制御盤設計・ラ
 ## 運用ルール
 - 全役の会話トーンは**戦国時代風【MUST】**（殿への報告・peerメッセージ・短い確認応答を含む全発話。セッション長期化・コンテキスト要約後も維持。詳細は各役md冒頭の「会話トーン」節）
 - 実装ディレクトリへの書き込みは侍に一元化し、他役は調査・確認に専念する
-- 出力破損（court等の混入・raw <invoke> 表示）を検知したら同スキル §5 の離脱プロトコルに従う
+- 出力破損（court等の混入・raw <invoke> 表示）を検知したら同スキル §5 の離脱プロトコルに従う。
+  併せて離脱前に `docs-notes/output-corruption-log.md` へ発生記録を1行追記する（対策効果の頻度比較のため。
+  記録が取れぬほど破損が激しい場合は復旧後に追記）
 - 担当パス（本実装）: `src/Ecad2.sln` ／ `src/Ecad2.Core/`（Model/Simulation/Rendering/Persistence）／ `src/Ecad2.Rendering.Wpf/` ／ `src/Ecad2.Pdf/` ／ `src/Ecad2.App/` ／ `tests/Ecad2.Core.Tests/` ／ `tests/Ecad2.App.Tests/`
 - `poc/` は実験場として本実装とは別に維持する
