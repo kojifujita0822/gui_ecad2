@@ -48,6 +48,13 @@ UI/UX分岐は都度殿確認【MUST】。
 「要素」は**広義=5種すべて**（ElementInstance・VerticalConnector・WireBreak・GroupFrame・
 RungCommentのいずれかが最終行にあれば削除拒否。Undo未実装ゆえ配線・コメント等の暗黙消失も防ぐ
 安全側の解釈、増分1・3共通）。
+**増分1=完全クローズ（2026-07-10）**：実装`6a6eaf7`→隠密レビューで要修正1件（SelectedCell範囲外
+残置、CONFIRMED）→殿裁定=新末尾行へクランプ・列維持→修正`c28ec40`→隠密再レビュークリーン→
+忍者実機全6観点OK（`docs-notes/ecad2-t055-increment1-realmachine-verification-ninja.md`）だが
+新規指摘1件（DeleteRowCommand成功時に拒否警告StatusMessage残留）→往復2周目・Wチェック（隠密が
+根本原因=成功パスのクリア処理書き漏れと確定、AddRowCommand側の対称欠落も家老裁定で本往復へ吸収）
+→テスト設計→修正`0d2ed4d`（両コマンド成功パスへクリア追加、RED証明・304件全合格）→隠密再レビュー
+クリーン→忍者再確認OK（証跡2件）。**次は増分2（シート設定ダイアログ）へ**。
 
 ### T-054 部品選択リストの選択中部品を配置バー内に表示 — Approved（gated、殿裁定2026-07-10）
 
