@@ -65,3 +65,36 @@
 ## 4. 総括
 
 要修正2件（a: SelectedCell追随、b: テスト注記漏れ）は増分3のDoD（型ごとのテスト実測）そのものには影響しないが、aはユーザー体感バグ（誤削除リスク）に直結するため優先度高。侍への差し戻しを推奨。c/d/eは経過観察で足りる。
+
+---
+
+## 5. 往復1周目修正の再レビュー（コミット `e9d062a`）
+
+家老采配（再レビュー、2026-07-10）の3観点を確認。
+
+### 5-1. 指摘aの修正（SelectedCell追随）
+
+`InsertRowBeforeCommand`: `SelectedCell.Row >= row` で `+1`。`RowOps.InsertRow`の閾値規則（`e.Pos.Row >= targetRow`）と一致。
+`DeleteRowAtCommand`: `SelectedCell.Row > row` で `-1`。`RowOps.DeleteRow`の閾値規則（`e.Pos.Row > targetRow`）と一致。**規則は完全一致、判定OK。**
+
+RED先行証明の再現テストは実際には8件（Insert側4件・Delete側4件、コミットメッセージの「3件」は要約上の簡略化と見受けられる）。境界値（挿入点そのもの／削除点そのもの、対象前、対象後、`SelectedCell`が`null`のケース）を過不足なく突いている。`DeleteRowAtCommand_Execute_DoesNotShiftSelectedCellAtTargetRow`（削除対象行そのものを選択中のケース、`>`なので不変が正）も含め、同値分割・境界値分析の観点で網羅的。**aの経路を正しく突いている。**
+
+`dotnet build`（`--no-incremental`）→`dotnet test`（`--no-build`）で実測: **Core 45件・App 344件、全合格**（家老報告の数値と一致）。
+
+### 5-2. 指摘bの修正（テスト名・注記）
+
+テスト名を`DeleteRow_GroupFrame_TargetBeforeFrameStart_NoChangeWhenNotAfter`（誤読しうる旧名）から
+`DeleteRow_GroupFrame_TargetEqualsFrameStartRow_CurrentlyNoChange_PendingDecision`へ変更。XMLコメントで
+「本テストは現状の暫定挙動を記録するのみで確定仕様ではない」「将来枠ごと削除を実装する際は本テストを更新すること」を明記。**未実装挙動である旨が明確になった。適切。**
+
+### 5-3. 指摘cの修正（TryRejectOccupiedRow共通化）
+
+`TryRejectOccupiedRow(Sheet sheet, int row, string message)`を新設し、`DeleteRowCommand`（"最終行に..."固定文言）・
+`UpdateSheetSettingsCommand`（`$"行{row+1}に..."`、ループ内呼び出し）・`DeleteRowAtCommand`（`$"行{row+1}に..."`）の
+3箇所を置き換え。**文言は呼び出し元ごとに維持されたまま（差分で確認済み）、判定→設定→returnの構造も変化なし。
+振る舞いに変化なし、正しく共通化されている。**
+
+### 5-4. 結論
+
+**3件ともクリーン。往復2周目の指摘なし。** d（CanExecute境界チェック、P-049）・e（GroupFrame Visual*Mm、P-050）は
+pending合意のとおり本レビューでも対応不要として扱った。
