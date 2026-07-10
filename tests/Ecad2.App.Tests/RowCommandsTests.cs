@@ -147,6 +147,56 @@ public class RowCommandsTests : ViewModelTestBase
         Assert.False(vm.DeleteRowCommand.CanExecute(null));
     }
 
+    /// <summary>
+    /// T-055増分1隠密レビュー指摘(CONFIRMED)のRED先行証明対象。削除される最終行(row9)を
+    /// SelectedCellが指していた場合、削除後に選択解除(null)ではなく新しい末尾行(row8)へ
+    /// クランプすること(殿裁定)。列(Column)は維持される。
+    /// RED証明手法: DeleteRowCommandのExecute内クランプ処理(`if (SelectedCell is GridPos...)`)を
+    /// 一時的にコメントアウトしてテスト実行→SelectedCellが範囲外(row9)のまま残りRED(実測確認済み)。
+    /// 戻すとGREEN。
+    /// </summary>
+    [Fact]
+    public void DeleteRowCommand_Execute_WhenSelectedCellAtDeletedRow_ClampsToNewLastRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(9, 2);
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Equal(new GridPos(8, 2), vm.SelectedCell);
+    }
+
+    /// <summary>対照ケース: 削除される行より前を選択している場合はクランプ不要(範囲内のまま維持)。</summary>
+    [Fact]
+    public void DeleteRowCommand_Execute_WhenSelectedCellBeforeDeletedRow_RemainsUnchanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(3, 1);
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Equal(new GridPos(3, 1), vm.SelectedCell);
+    }
+
+    /// <summary>対照ケース: 未選択(null)のまま削除しても例外なく完了する。</summary>
+    [Fact]
+    public void DeleteRowCommand_Execute_WhenSelectedCellIsNull_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        Assert.Null(vm.SelectedCell);
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Null(vm.SelectedCell);
+        Assert.Equal(9, vm.CurrentSheet!.Grid.Rows);
+    }
+
     [Fact]
     public void DeleteRowCommand_Execute_WhenLastRowEmpty_DecreasesRows()
     {

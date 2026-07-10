@@ -1615,6 +1615,13 @@ public sealed class MainWindowViewModel : ViewModelBase
                     return;
                 }
                 sheet.Grid.Rows--;
+                // T-055増分1隠密レビュー指摘(CONFIRMED): 削除後にSelectedCellが範囲外(旧最終行)を
+                // 指したまま残ると、選択ハイライトが縮小後グリッド外に表示され続ける
+                // (LadderCanvas.DrawはIsWithinGridBounds相当のチェック無しに無条件描画するため)。
+                // 殿裁定=選択解除(null)ではなく新しい末尾行へクランプする(キーボード操作の
+                // 流れを途切れさせぬため)。
+                if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
+                    SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
                 MarkDirty();
                 NotifyCurrentSheetChanged();
             },
