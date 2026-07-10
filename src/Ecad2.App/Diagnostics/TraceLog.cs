@@ -54,7 +54,15 @@ internal static class TraceLog
     // (旧NormalizeFullWidthDigits)では全角ラテン文字(ｆａｌｓｅ/ｏｆｆ/ｎｏ等)が正規化されず
     // 無効化リストと不一致のまま誤って有効化される同型の穴が残存していた。NormalizationForm.FormKC
     // (互換分解)は全角英数字を半角へ一括変換するため、自前実装より広くカバーできる)。
-    private static string NormalizeFullWidth(string value) => value.Normalize(NormalizationForm.FormKC);
+    // T-050修正(隠密指摘1): string.NormalizeはUTF-16の不対サロゲートを含む不正な文字列に対し
+    // ArgumentExceptionを投げる(旧char単位ループは投げなかった)。TraceLog内の他メソッド
+    // (Write/LogPropertyChanged)と同じベストエフォート原則に揃え、例外時は正規化を諦めて
+    // 原文をそのまま返す(トレースログ機構の失敗が本来の起動処理を道連れにしてはならない)。
+    private static string NormalizeFullWidth(string value)
+    {
+        try { return value.Normalize(NormalizationForm.FormKC); }
+        catch (ArgumentException) { return value; }
+    }
 
     /// <summary>ViewModelBase.OnPropertyChangedからの一括フック(案B (a))。oldValueはSetProperty経由の
     /// 変更のみ安価に捕捉できたもの(取得できなければnull=不明、殿裁定「安くできる範囲」に基づき

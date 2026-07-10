@@ -122,10 +122,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 自体を経由すること側にあったため、対処はSheetNavigationViewModel.RenameCommand側
             // (RefreshSelectedSheet()のみ呼ぶ形)で行い、本setterは往復1周目の「常時無条件」の
             // ままとする(二重のモグラ叩きを避ける)。
+            // T-050修正(P-044): RefreshSelectedSheetの2引数化に伴い、変更前の選択シートを渡す。
+            // SetPropertyで_currentSheetIndexを更新する前に読み取るのみ(挙動を変える代入・分岐は
+            // 追加しない=P-030のsetter粒度モグラ叩き再発防止、家老厳守事項2026-07-10)。
+            var oldSelectedSheet = SheetNavigation.SelectedSheet;
             SetProperty(ref _currentSheetIndex, value);
             NotifyCurrentSheetDependentPropertiesChanged();
             SelectedCell = null;
-            SheetNavigation.RefreshSelectedSheet();
+            SheetNavigation.RefreshSelectedSheet(oldSelectedSheet);
         }
     }
 

@@ -30,4 +30,37 @@ public class TraceLogTests
     {
         Assert.Equal(expected, Invoke(input));
     }
+
+    /// <summary>
+    /// T-050修正(隠密指摘1): string.Normalize(FormKC)はUTF-16の不対サロゲートを含む不正な文字列で
+    /// ArgumentExceptionを投げる(旧char単位ループは投げなかった)。TraceLogのベストエフォート原則
+    /// (機構の失敗が本来の起動処理を道連れにしない)に沿い、例外を投げず原文を返すことを検証する。
+    /// 環境変数への不対サロゲート混入という異常入力でも起動が失敗しないことを保証する回帰テスト。
+    ///
+    /// 不対サロゲートはInlineDataに文字列リテラルで直接渡してはならない: xUnitのデータシリアライズが
+    /// 不対サロゲートをU+FFFD(置換文字)へ変換するため、テスト到達時には正常文字列となり検証が
+    /// 骨抜きになる(実測で判明)。コードポイント(int)と位置(string)を渡し、本メソッド内で
+    /// 不対サロゲートを組み立てることで、真に不正なUTF-16文字列をNormalizeへ与える。
+    /// </summary>
+    [Theory]
+    [InlineData(0xD800, "alone")]   // 単独high surrogate(下限)
+    [InlineData(0xDBFF, "alone")]   // 単独high surrogate(上限)
+    [InlineData(0xDC00, "alone")]   // 単独low surrogate(下限)
+    [InlineData(0xDFFF, "alone")]   // 単独low surrogate(上限)
+    [InlineData(0xD800, "suffix")]  // 正常値の末尾に不対サロゲート混在("false"+surrogate)
+    [InlineData(0xD800, "prefix")]  // 正常値の先頭に不対サロゲート混在(surrogate+"false")
+    public void NormalizeFullWidth_DoesNotThrow_OnIllFormedSurrogates(int surrogateCodePoint, string position)
+    {
+        char surrogate = (char)surrogateCodePoint;
+        string input = position switch
+        {
+            "suffix" => "false" + surrogate,
+            "prefix" => surrogate + "false",
+            _ => surrogate.ToString(),
+        };
+
+        var exception = Record.Exception(() => Invoke(input));
+
+        Assert.Null(exception);
+    }
 }

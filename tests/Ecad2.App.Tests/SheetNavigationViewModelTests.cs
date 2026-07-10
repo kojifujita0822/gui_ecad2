@@ -278,4 +278,28 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         Assert.True(isDirtyWhenDispatched);
     }
+
+    /// <summary>
+    /// T-050修正(隠密指摘2/経路X)のRED先行証明。DetermineOldSelectedSheetForAddは、AddCommandが
+    /// Sheets.Add実行前に呼んで「あるべきoldValue」を決める純粋関数。0枚(初回追加＝追加前は無選択)
+    /// ならnull、1枚以上なら追加前に選択されていたシート。0枚のとき敢えて非nullなcurrentを渡し
+    /// 「0枚なら常にnull」の契約を突く——旧バグ(Sheets.Add後にgetterを読み新シート自身をoldとして
+    /// 返しold==newになる、隠密CONFIRMED)を、この境界(sheetsCountBeforeAdd==0)が検出できるように
+    /// する。純粋関数の`sheetsCountBeforeAdd == 0`ガードを外すとInlineData(0)がREDになる。
+    /// </summary>
+    [Theory]
+    [InlineData(0)]  // 追加前0枚 → oldValueはnull(無選択)
+    [InlineData(1)]  // 追加前1枚 → oldValueは追加前の選択シート
+    [InlineData(3)]  // 追加前3枚 → oldValueは追加前の選択シート
+    public void DetermineOldSelectedSheetForAdd_ReturnsNullOnlyWhenSheetsEmpty(int sheetsCountBeforeAdd)
+    {
+        var current = new Sheet { Name = "既存シート", Grid = new GridSpec { Rows = 10, Columns = 20 } };
+
+        var result = SheetNavigationViewModel.DetermineOldSelectedSheetForAdd(sheetsCountBeforeAdd, current);
+
+        if (sheetsCountBeforeAdd == 0)
+            Assert.Null(result);
+        else
+            Assert.Same(current, result);
+    }
 }

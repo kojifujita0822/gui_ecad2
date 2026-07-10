@@ -44,16 +44,32 @@ public sealed class SheetNavigationViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// T-050修正(隠密指摘2/経路X、RED証明可能): AddCommandがSheets.Add実行前に呼び、追加後の
+    /// SelectedSheet変更通知へ渡す「あるべきoldValue」を決定する純粋関数。0枚(初回追加＝追加前は
+    /// 無選択)ならnull、1枚以上なら追加前に選択されていたシート。SelectedSheetセッタ内でoldを
+    /// 捕捉するとAddCommandのBeginInvoke遅延実行がSheets.Add後に走りold==new(新シート自身)になる
+    /// 構造的バグ(隠密CONFIRMED)を、追加前状態を確定できる時点で捕捉することで回避する。
+    /// internalはIVT経由のテスト用(境界値0/1/3のRED先行証明)。
+    /// </summary>
+    internal static Sheet? DetermineOldSelectedSheetForAdd(int sheetsCountBeforeAdd, Sheet? currentSelectedSheet)
+        => sheetsCountBeforeAdd == 0 ? null : currentSelectedSheet;
+
     /// <summary>CurrentSheetIndexが外部(DRC出力パネルのジャンプ等、T-018)から変更された際、
-    /// SelectedSheetのバインディング(左パネルの選択ハイライト)を同期させるために呼ぶ。</summary>
-    public void RefreshSelectedSheet() => OnPropertyChanged(nameof(SelectedSheet));
+    /// SelectedSheetのバインディング(左パネルの選択ハイライト)を同期させるために呼ぶ。
+    /// T-050修正(P-044): 旧値をnull化しないよう2引数版OnPropertyChangedへ置換。旧値はこのメソッド
+    /// 実行時点では既にCurrentSheetIndexが新値へ更新済みで局所的に復元不能なため、呼び出し元
+    /// (変更前の選択シートを知る側)から受け取る。</summary>
+    public void RefreshSelectedSheet(Sheet? oldValue) => OnPropertyChanged(nameof(SelectedSheet), oldValue);
 
     /// <summary>Document丸ごと差し替え(T-019: 新規/開く)後、SheetsをDocument.Sheetsへ再同期する。</summary>
     public void ResetSheets()
     {
+        // T-050修正(P-044): Sheets.Clear前に旧選択シートを捕捉し、旧値をnull化せず通知する。
+        var oldValue = SelectedSheet;
         Sheets.Clear();
         foreach (var sheet in _owner.Document.Sheets) Sheets.Add(sheet);
-        OnPropertyChanged(nameof(SelectedSheet));
+        OnPropertyChanged(nameof(SelectedSheet), oldValue);
     }
 
     public ICommand AddCommand { get; }
@@ -75,6 +91,11 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             if (param is not ValueTuple<string, bool> args) return;
             var (rawName, isMainCircuit) = args;
             bool wasEmpty = _owner.Document.Sheets.Count == 0;
+            // T-050修正(隠密指摘2/経路X): Sheets.Add実行前に「あるべきoldValue」を確定する
+            // (DetermineOldSelectedSheetForAdd参照)。後段のBeginInvokeはSheets.Add完了後に遅延実行
+            // されるため、その時点でSelectedSheetのgetterを読むと追加済みの新シート自身を返し
+            // old==newになる(隠密CONFIRMEDバグ)。追加前状態が残るこの時点で捕捉する必要がある。
+            Sheet? oldSelectedSheet = DetermineOldSelectedSheetForAdd(_owner.Document.Sheets.Count, SelectedSheet);
             int pageNumber = _owner.Document.Sheets.Count + 1;
             string name = rawName.Trim();
             if (name.Length == 0) name = $"シート{pageNumber}";
@@ -103,7 +124,15 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // ままになる。T-026実機確認で発見)。UI要素生成後の次フレームへ遅延させる。
             _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
-                () => SelectedSheet = sheet);
+                () =>
+                {
+                    // T-050修正(経路X): 旧実装の`SelectedSheet = sheet`(セッタ経由)は遅延実行時に
+                    // getterがold==newを招くため使わない。CurrentSheetIndexの設定はセッタと同じ
+                    // 手順で行い、SelectedSheetの変更通知だけ事前捕捉した正しい旧値で発火する。
+                    int index = Sheets.IndexOf(sheet);
+                    if (index >= 0) _owner.CurrentSheetIndex = index;
+                    OnPropertyChanged(nameof(SelectedSheet), oldSelectedSheet);
+                });
         });
 
         // 最後の1枚は削除不可（ドキュメントにシートが0枚の状態を作らない）。
@@ -119,7 +148,9 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 // 家老裁定: Sheets数を変える全経路で通知発火の不変条件を揃える(AddCommandと同型の
                 // 欠陥、現状のガードにより到達不能でも将来ガード変更時の再発を防ぐため揃えておく)。
                 _owner.NotifyHasProjectChanged();
-                OnPropertyChanged(nameof(SelectedSheet));
+                // T-050修正(P-044): 削除された選択シート(sheet)が旧値。ローカルに手元にあるため
+                // 旧値をnull化せず2引数版で通知する。
+                OnPropertyChanged(nameof(SelectedSheet), sheet);
             },
             () => Sheets.Count > 1);
 
@@ -148,12 +179,13 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // 必要は無い。CurrentSheetIndexへの代入はSelectedCellクリア等のクロスカット処理を
             // 伴うため、改名だけで記入中の縦コネクタ・自由線ドラフトが警告なく破棄される副作用
             // (所見L)を生んでいた。RemoveAt+Insertでズレたコンテナの選択ハイライトは
-            // RefreshSelectedSheet()の変更通知だけで再同期できる(SelectedSheetのgetterは
+            // RefreshSelectedSheetの変更通知だけで再同期できる(SelectedSheetのgetterは
             // CurrentSheetIndex経由でSheets[index]を返すため、indexが不変ならgetterの戻り値は
-            // 改名後のsheet参照を正しく指す)。
+            // 改名後のsheet参照を正しく指す)。T-050修正(P-044): 改名は同一シートに留まる操作
+            // (indexも参照も不変)ゆえ旧値=新値=当該sheet。2引数版へ旧値としてsheetを渡す。
             _dispatcher.BeginInvoke(
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
-                RefreshSelectedSheet);
+                () => RefreshSelectedSheet(sheet));
         });
     }
 }
