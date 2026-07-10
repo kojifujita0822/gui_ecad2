@@ -41,11 +41,30 @@ DeleteRowCommand = new RelayCommand(
 という過去の教訓を明記）。`DeleteRowCommand`の成功パスだけがこの慣習から逸脱しており、
 増分1実装時の単純な書き漏れと判断する（推測ではなく、既存パターンとの構造比較による確定）。
 
-**気づき（範囲外、報告のみ）**: `AddRowCommand`（:1597-1605）の成功パスにも同様に
-StatusMessageクリアが無い。AddRowCommand自体は拒否メッセージを出す経路を持たないため
-忍者の再現手順（削除→削除）では顕在化しないが、「削除拒否→行追加成功」という経路でも
-理論上同型の残留は起こりうる。今回のスコープ（DeleteRowCommand限定、家老采配原文）外のため
-自ら着手・設計対象化はせず、気づきとしてのみ記す。
+**追記（2026-07-10、家老裁定でスコープ吸収）**: `AddRowCommand`（:1597-1605）の成功パスにも
+同様にStatusMessageクリアが無い。当初は範囲外の気づきとして報告したが、「同じ増分1が導入した
+双子コマンドの同一欠陥であり、対称実装の片側残置は制度が戒める型」との家老裁量により、
+本往復2周目のスコープへ吸収された（P起票せず本設計書へ追補、下記2節末尾参照）。
+
+```csharp
+AddRowCommand = new RelayCommand(
+    () =>
+    {
+        if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows >= GridSpec.MaxRows) return;
+        sheet.Grid.Rows++;
+        MarkDirty();
+        NotifyCurrentSheetChanged();
+        // ← 成功パス: DeleteRowCommandと同型でStatusMessageに一切触れていない（欠落箇所）
+    },
+    () => CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
+```
+
+AddRowCommand自体は「拒否してStatusMessageへ警告をセットする」経路を持たない
+（上限到達時はCanExecute=falseでボタン自体が無効化されるのみ）。ゆえに忍者の再現手順
+（削除→削除）単体では顕在化しないが、「DeleteRowCommandの拒否で警告が出た直後、
+AddRowCommandを実行して成功する」という経路（あるいは他操作由来の任意メッセージが
+残っている状態でAddRowCommandが成功する経路）では、DeleteRowCommand側と全く同型の
+残留が起こる。
 
 ---
 
@@ -54,7 +73,7 @@ StatusMessageクリアが無い。AddRowCommand自体は拒否メッセージを
 ### 状態遷移表
 
 対象状態: `StatusMessage`（"" / 拒否警告文言 / 任意の他文言）。
-イベント: DeleteRowCommand実行（拒否 or 成功）。
+イベント: DeleteRowCommand実行（拒否 or 成功）／AddRowCommand実行（成功、対称追補分）。
 
 | # | 事前状態 | イベント | 事後状態（期待） | 種別 |
 |---|---|---|---|---|
@@ -63,6 +82,9 @@ StatusMessageクリアが無い。AddRowCommand自体は拒否メッセージを
 | 3 | ""（初期） | 削除→成功（最終行が空） | ""（不変） | 対照（誤クリアで別値が入らないことの確認） |
 | 4 | 拒否警告文言 | 削除→再度拒否（まだ要素あり） | 拒否警告文言（不変・冪等） | 対照（連続拒否での意図せぬ変化なし） |
 | 5 | 他操作由来の任意文言（例:「配置するセルを先に選択してください」） | 削除→成功 | **""（クリア）** | 境界（一律クリア方式の妥当性、特定文言決め打ちでないことの確認） |
+| 6 | 拒否警告文言（DeleteRowCommand由来） | **行追加→成功** | **""（クリア）** | **本体対称（AddRowCommand側、家老裁定で追補）** |
+| 7 | ""（初期） | 行追加→成功 | ""（不変） | 対照（対称、#3のAddRowCommand版） |
+| 8 | 他操作由来の任意文言 | 行追加→成功 | **""（クリア）** | 境界（対称、#5のAddRowCommand版） |
 
 ### テストケース仕様（xUnit、パラメタライズド活用）
 
@@ -103,6 +125,29 @@ public void DeleteRowCommand_Execute_OnRepeatedRejection_KeepsWarningMessage()
 }
 ```
 
+### AddRowCommand対称分の追補（#6・#7・#8、家老裁定でスコープ吸収）
+
+DeleteRowCommand側の`[Theory]`（#2・#3・#5）を**そのまま対称適用**する。AddRowCommandには
+「拒否してStatusMessageへ警告をセットする」経路自体が存在しない（1節の追記参照）ため、
+#1・#4に対応するAddRowCommand版（拒否時セット・連続拒否）は作らない——これは非対称ではなく、
+コマンドの性質上正しい非該当（ペア構成の対称性チェックは「両方に存在しうる遷移」にのみ適用する）。
+
+```
+[Theory]
+[InlineData("最終行に要素があるため削除できません")]  // #6: 直前がDeleteRowCommand拒否警告だったケース(本体対称)
+[InlineData("配置するセルを先に選択してください")]      // #8: 直前が無関係な他文言だったケース(境界、対称)
+[InlineData("")]                                        // #7: 直前が空だったケース(対照、対称)
+public void AddRowCommand_Execute_OnSuccess_ClearsStatusMessage(string priorMessage)
+{
+    // Arrange: Grid.Rows=10(上限未満)の状態でStatusMessageへpriorMessageを事前セット
+    // Act: AddRowCommand.Execute(null)
+    // Assert: Rows==11（成功したこと）かつ StatusMessage == ""
+}
+```
+
+RED先行証明は#2系と同じ理屈（現行コードは成功パスにクリア処理が無いためpriorMessageが
+非空のケースでAssert失敗＝RED、修正後は全InlineDataがGREEN）。
+
 ### RED先行証明の観点（侍実装時の指針）
 
 `#2`系（Theory）が今回の修正対象の核心。現行コード（成功パスにクリア処理なし）で実行すると、
@@ -114,10 +159,13 @@ public void DeleteRowCommand_Execute_OnRepeatedRejection_KeepsWarningMessage()
 
 ## 3. スコープ境界（侍実装時の遵守事項、便乗拡大禁止）
 
-- 触ってよい: `DeleteRowCommand`の成功パス（`sheet.Grid.Rows--`〜`NotifyCurrentSheetChanged()`の間）
-  へ`StatusMessage = "";`を1行追加するのみ。
-- 触らぬ: `AddRowCommand`（上記「気づき」参照、範囲外・P起票判断は家老に委ねる）。
-  成功時の新規メッセージ追加等のUX拡張（家老采配で明示的に除外）。
+- 触ってよい:
+  - `DeleteRowCommand`の成功パス（`sheet.Grid.Rows--`〜`NotifyCurrentSheetChanged()`の間）
+    へ`StatusMessage = "";`を1行追加。
+  - `AddRowCommand`の成功パス（`sheet.Grid.Rows++`〜`NotifyCurrentSheetChanged()`の間）
+    へ同様に`StatusMessage = "";`を1行追加（家老裁定で本往復スコープへ吸収、対称修正）。
+- 触らぬ: 成功時の新規メッセージ追加等のUX拡張（家老采配で明示的に除外）。両コマンド以外の
+  他コマンド・他ファイルへの波及は便乗拡大禁止。
 - 設計にないテストの追加は自由、設計にあるものを勝手に省くのは不可（役儀書の原則どおり）。
 
 ---
