@@ -1599,6 +1599,10 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows >= GridSpec.MaxRows) return;
                 sheet.Grid.Rows++;
+                // T-055増分1往復2周目(隠密テスト設計書、DeleteRowCommandと対称の書き漏れ):
+                // 成功パスでStatusMessageをクリアしないと、直前に表示された警告(拒否文言等)が
+                // 成功後も残留する。既存の状態変更操作の慣習(ReplaceDocument・Escキー処理)に揃える。
+                StatusMessage = "";
                 MarkDirty();
                 NotifyCurrentSheetChanged();
             },
@@ -1622,6 +1626,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 // 流れを途切れさせぬため)。
                 if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
                     SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
+                // T-055増分1往復2周目(隠密テスト設計書、根本原因確定): 成功パスにStatusMessage
+                // クリア処理が無く、直前の拒否警告(または他文言)が成功後も残留していた
+                // (拒否→要素除去→再削除で成功するがメッセージが残る、忍者実機発見)。
+                StatusMessage = "";
                 MarkDirty();
                 NotifyCurrentSheetChanged();
             },

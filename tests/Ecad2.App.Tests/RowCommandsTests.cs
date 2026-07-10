@@ -249,6 +249,88 @@ public class RowCommandsTests : ViewModelTestBase
         Assert.False(string.IsNullOrEmpty(vm.StatusMessage));
     }
 
+    /// <summary>
+    /// T-055増分1往復2周目(隠密テスト設計書#2/#3/#5、忍者実機発見「拒否→要素除去→再削除で
+    /// 成功するがメッセージが残る」の回帰テスト)。削除成功時にStatusMessageが直前の値
+    /// (拒否警告文言/他文言/空)に関わらず必ず""へクリアされること。
+    /// RED証明手法: DeleteRowCommandのExecute内成功パスの`StatusMessage = "";`を一時的に
+    /// コメントアウトしてテスト実行→priorMessageが非空の2ケースでpriorMessageのまま残りRED
+    /// (実測確認済み)。戻すとGREEN。
+    /// </summary>
+    [Theory]
+    [InlineData("最終行に要素があるため削除できません")]
+    [InlineData("配置するセルを先に選択してください")]
+    [InlineData("")]
+    public void DeleteRowCommand_Execute_OnSuccess_ClearsStatusMessage(string priorMessage)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.StatusMessage = priorMessage;
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Equal(9, vm.CurrentSheet!.Grid.Rows);
+        Assert.Equal("", vm.StatusMessage);
+    }
+
+    /// <summary>隠密テスト設計書#1。拒否パス自体は往復2周目の変更対象ではないが、状態遷移の
+    /// 完全性のため退行検知の網羅性を確保する。</summary>
+    [Fact]
+    public void DeleteRowCommand_Execute_OnRejection_SetsWarningMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        int lastRow = vm.CurrentSheet!.Grid.Rows - 1;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(lastRow, 1) });
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
+        Assert.Equal("最終行に要素があるため削除できません", vm.StatusMessage);
+    }
+
+    /// <summary>隠密テスト設計書#4。連続拒否で意図せぬ変化(メッセージ消失等)が無いことの対照。</summary>
+    [Fact]
+    public void DeleteRowCommand_Execute_OnRepeatedRejection_KeepsWarningMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        int lastRow = vm.CurrentSheet!.Grid.Rows - 1;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(lastRow, 1) });
+        vm.DeleteRowCommand.Execute(null);
+
+        vm.DeleteRowCommand.Execute(null);
+
+        Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
+        Assert.Equal("最終行に要素があるため削除できません", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// T-055増分1往復2周目(隠密テスト設計書#6/#7/#8、家老裁定でAddRowCommand側も対称吸収)。
+    /// 行追加成功時にStatusMessageが直前の値に関わらず必ず""へクリアされること。
+    /// RED証明手法: AddRowCommandのExecute内成功パスの`StatusMessage = "";`を一時的に
+    /// コメントアウトしてテスト実行→priorMessageが非空の2ケースで残りRED(実測確認済み)。戻すとGREEN。
+    /// </summary>
+    [Theory]
+    [InlineData("最終行に要素があるため削除できません")]
+    [InlineData("配置するセルを先に選択してください")]
+    [InlineData("")]
+    public void AddRowCommand_Execute_OnSuccess_ClearsStatusMessage(string priorMessage)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.StatusMessage = priorMessage;
+
+        vm.AddRowCommand.Execute(null);
+
+        Assert.Equal(11, vm.CurrentSheet!.Grid.Rows);
+        Assert.Equal("", vm.StatusMessage);
+    }
+
     [Theory]
     [InlineData("ElementInstance")]
     [InlineData("VerticalConnector")]
