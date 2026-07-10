@@ -41,6 +41,8 @@ public static class DesignRuleCheck
     public const string LoadNotReachableFromRight = "DRC-LOAD-002";
     /// <summary>2つ以上のコイル（負荷）が直列に接続されている（二重コイル）。</summary>
     public const string SeriesCoils = "DRC-LOAD-003";
+    /// <summary>自作パーツ参照(PartId)が現在のライブラリで解決できず、a接点(ContactNO)へ暗黙フォールバックしている（P-017）。</summary>
+    public const string UnresolvedPartId = "DRC-PART-001";
 
     /// <summary>
     /// クロスリファレンス完全性チェック（P3）。
@@ -253,6 +255,34 @@ public static class DesignRuleCheck
                 locs));
         }
         return diags;
+    }
+
+    /// <summary>
+    /// 部品参照解決チェック（P-017）。<see cref="ElementInstance.PartId"/> が設定されているのに
+    /// <paramref name="lib"/> で解決できない要素は <see cref="PartResolver.ComponentKind"/> が
+    /// 静かに ContactNO（a接点）へフォールバックする（PartResolver.cs:37-53）。配置時（部品が
+    /// 見つからない参照のまま配置）・読込時（<see cref="Persistence.PartFolderStore.Enumerate"/>
+    /// のID重複再採番で既存図面の参照が孤立）いずれの経路も「PartId設定済みなのに解決不可」という
+    /// 同一条件で検出できる。PartId が null（組込み種別を直接指定）の要素は対象外。
+    /// </summary>
+    public static IReadOnlyList<Diagnostic> CheckUnresolvedPartId(LadderDocument doc, PartLibrary? lib = null)
+    {
+        var diagnostics = new List<Diagnostic>();
+        foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
+        {
+            foreach (var elem in sheet.Elements)
+            {
+                if (string.IsNullOrEmpty(elem.PartId)) continue;
+                if (lib?.Get(elem.PartId) is not null) continue;
+
+                string name = elem.DeviceName ?? "";
+                var loc = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
+                diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, UnresolvedPartId, name,
+                    $"機器 {name}: 部品参照が見つからず、a接点として扱われています。部品の再選択をご確認ください。",
+                    [loc]));
+            }
+        }
+        return diagnostics;
     }
 
     /// <summary>全接点・パススルーを双方向導通扱いで BFS（負荷は通過しない）。静的配線到達可能性検査用。</summary>

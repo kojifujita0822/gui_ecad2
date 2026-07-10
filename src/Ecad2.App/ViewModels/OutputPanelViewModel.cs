@@ -68,6 +68,7 @@ public sealed class OutputPanelViewModel : ViewModelBase
         var results = new List<Diagnostic>();
         results.AddRange(DesignRuleCheck.CheckCrossReference(_owner.Document, _owner.PartLibrary));
         results.AddRange(DesignRuleCheck.CheckDeviceTypeConsistency(_owner.Document, _owner.PartLibrary));
+        results.AddRange(DesignRuleCheck.CheckUnresolvedPartId(_owner.Document, _owner.PartLibrary));
 
         foreach (var sheet in _owner.Document.Sheets)
         {
