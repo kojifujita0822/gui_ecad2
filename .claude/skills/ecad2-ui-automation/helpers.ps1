@@ -31,6 +31,8 @@ public class Ecad2Native {
     public const uint PW_RENDERFULLCONTENT = 0x2;
     public const uint MOUSEEVENTF_LEFTDOWN = 0x02;
     public const uint MOUSEEVENTF_LEFTUP = 0x04;
+    public const uint MOUSEEVENTF_RIGHTDOWN = 0x08;
+    public const uint MOUSEEVENTF_RIGHTUP = 0x10;
     public const uint MOUSEEVENTF_WHEEL = 0x0800;
     public const byte VK_CONTROL = 0x11;
     public const uint KEYEVENTF_KEYUP = 0x0002;
@@ -40,6 +42,14 @@ public class Ecad2Native {
         mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
         System.Threading.Thread.Sleep(80);
         mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(150);
+    }
+    public static void RightClick(int x, int y) {
+        SetCursorPos(x, y);
+        System.Threading.Thread.Sleep(150);
+        mouse_event(MOUSEEVENTF_RIGHTDOWN, 0, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(80);
+        mouse_event(MOUSEEVENTF_RIGHTUP, 0, 0, 0, UIntPtr.Zero);
         System.Threading.Thread.Sleep(150);
     }
     public static void Scroll(int x, int y, int delta) {
@@ -247,6 +257,18 @@ function Invoke-Ecad2CanvasClick {
     param([Parameter(Mandatory)][int]$RelativeX, [Parameter(Mandatory)][int]$RelativeY)
     $rect = Get-Ecad2WindowRect
     Invoke-Ecad2ScreenClick -X ($rect.Left + $RelativeX) -Y ($rect.Top + $RelativeY)
+}
+
+# ウィンドウ左上を原点とした相対座標で右クリックする（T-055増分3のコンテキストメニュー検証用に新設。
+# 【フォーカス・カーソル強奪注意】Invoke-Ecad2ScreenClickと同様、SetCursorPos+mouse_eventで
+# グローバルなマウスカーソルを動かすため、殿の実カーソル操作と衝突する。右クリックでのみ
+# 開くContextMenu（PreviewMouseRightButtonDownハンドラ）はUI Automationパターン経由で代替できない
+# ため座標右クリックが本質的に必要な唯一のケース）
+function Invoke-Ecad2CanvasRightClick {
+    param([Parameter(Mandatory)][int]$RelativeX, [Parameter(Mandatory)][int]$RelativeY)
+    $rect = Get-Ecad2WindowRect
+    Set-Ecad2Foreground
+    [Ecad2Native]::RightClick($rect.Left + $RelativeX, $rect.Top + $RelativeY)
 }
 
 function Invoke-Ecad2Scroll {

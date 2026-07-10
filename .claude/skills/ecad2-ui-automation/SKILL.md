@@ -131,6 +131,10 @@ $canvas = Find-Ecad2Element -AutomationId "CanvasArea"
 Write-Output $canvas.Current.BoundingRectangle   # まずキャンバス範囲を確認してから相対座標を決める
 Invoke-Ecad2CanvasClick -RelativeX 700 -RelativeY 370
 
+# キャンバス内で右クリック（ContextMenu表示等、右クリック固有の検証用。T-055増分3で新設）
+Invoke-Ecad2CanvasRightClick -RelativeX 700 -RelativeY 370
+# → メニュー項目の取得・実行は6節「ダイアログ・ポップアップの検出」を参照（通常のFindAllでは拾えない）
+
 # 見た目そのものを確認したい時だけスクリーンショット
 Save-Ecad2Screenshot -Path "$env:TEMP\claude\...\scratchpad\check1.png"
 # → 保存後は Read ツールで画像を開いて目視確認する
@@ -181,3 +185,36 @@ Ecad2.Appの内容だけが正しく撮れることを実証済み**（旧実装
   残し、実装担当（侍）へ再現手順とともに報告する。
 - リサイズ直後にプロセスが消えた → `$env:TEMP\ecad2-ui-automation-std{out,err}.log` と
   `$env:TEMP\ecad2-crash.log`（未処理例外ハンドラが記録）を確認する。
+- **ダイアログ・ポップアップ（OpenFileDialog、コードビハインド生成のContextMenu、カスタム
+  ダイアログ等）が `[System.Windows.Automation.AutomationElement]::RootElement.FindAll(Children,
+  Window条件)` では検出できないことがある**（2026-07-10、T-055増分3検証で実証。`Invoke-Ecad2Button`
+  でダイアログを開くボタンをInvokeしても、直後のFindAllでウィンドウが1件も増えず「開かれて
+  いない」ように見えるが、実際は正しく開いている）。代わりに **Win32 `EnumWindows` API で
+  対象プロセスの可視ウィンドウを直接列挙する**と確実に検出できる:
+  ```powershell
+  Add-Type @"
+  using System; using System.Text; using System.Runtime.InteropServices; using System.Collections.Generic;
+  public class WinEnumHelper {
+      public delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+      [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindowsProc p, IntPtr l);
+      [DllImport("user32.dll")] public static extern int GetWindowThreadProcessId(IntPtr hWnd, out int pid);
+      [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr hWnd);
+      public static List<IntPtr> GetVisible(int pid) {
+          var r = new List<IntPtr>();
+          EnumWindows((h, l) => { int p; GetWindowThreadProcessId(h, out p); if (p == pid && IsWindowVisible(h)) r.Add(h); return true; }, IntPtr.Zero);
+          return r;
+      }
+  }
+  "@
+  $handles = [WinEnumHelper]::GetVisible((Get-Ecad2Process).Id)
+  # 各ハンドルを [System.Windows.Automation.AutomationElement]::FromHandle([IntPtr]$h) で取得し中身を探索
+  ```
+- **ContextMenu表示中は `(Get-Ecad2Process).MainWindowHandle` がメインウィンドウではなく
+  メニュー自身のハンドルを指すことがある**（2026-07-10実証。.NETの`Process.MainWindowHandle`は
+  呼び出し時点で再検出されるため、ポップアップがメインウィンドウ候補に化けることがある）。
+  この状態で `Get-Ecad2WindowRect`/`Save-Ecad2Screenshot` 等メインウィンドウ前提のヘルパーを
+  呼ぶと、小さいメニューの矩形・メニューだけが写ったスクリーンショットが返り誤診断しやすい。
+  ContextMenu操作中は「直前に確定したメインウィンドウハンドル」を変数にキャッシュして使うか、
+  逆にこの現象自体を「メニューが正しく開いた証拠」として積極的に利用してよい（本スキルの
+  `Invoke-Ecad2CanvasRightClick`使用時はメニュー操作直後に`(Get-Ecad2Process).MainWindowHandle`
+  でメニュー要素を取得し、メニュー項目のInvoke後に再度呼べばメインウィンドウに戻る）。
