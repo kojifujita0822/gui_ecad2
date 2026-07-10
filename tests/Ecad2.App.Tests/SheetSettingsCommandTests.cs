@@ -108,6 +108,58 @@ public class SheetSettingsCommandTests : ViewModelTestBase
     }
 
     /// <summary>
+    /// T-055増分2往復1周目(隠密レビュー指摘、殿裁定): DeleteRowCommandは最終行のみ判定するが、
+    /// UpdateSheetSettingsCommandはダイアログ経由で一気に大きく縮小できるため、縮小される全行
+    /// (新Rows〜旧Rows-1)のいずれかに要素があれば拒否すること。先頭行・中間行・末尾行いずれの
+    /// 位置でも検出できることを境界値として確認する。
+    /// RED証明手法: UpdateSheetSettingsCommandのExecute内範囲チェックループを一時的に
+    /// コメントアウトしてテスト実行→全InlineDataでRowsが縮小されてしまいRED(実測確認済み)。
+    /// 戻すとGREEN。
+    /// </summary>
+    [Theory]
+    [InlineData(5)]  // 縮小範囲の先頭行(新Rows)
+    [InlineData(7)]  // 縮小範囲の中間行
+    [InlineData(9)]  // 縮小範囲の末尾行(旧Rows-1)
+    public void Execute_WhenShrinkRangeHasElement_RejectsAndDoesNotChangeRows(int elementRow)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(elementRow, 1) });
+
+        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+
+        Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
+    }
+
+    [Fact]
+    public void Execute_WhenShrinkRangeHasElement_SetsWarningMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(7, 1) });
+
+        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+
+        Assert.Equal("最終行に要素があるため削除できません", vm.StatusMessage);
+    }
+
+    /// <summary>対照ケース: 縮小後も範囲内に残る行(縮小対象外)の要素は拒否理由にならない。</summary>
+    [Fact]
+    public void Execute_WhenElementOutsideShrinkRange_AllowsShrink()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(2, 1) });
+
+        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+
+        Assert.Equal(5, vm.CurrentSheet!.Grid.Rows);
+    }
+
+    /// <summary>
     /// T-055増分1(SelectedCellクランプ)と同じ理由: Rows縮小でSelectedCellが範囲外になった場合、
     /// 選択解除ではなく新しい末尾行へクランプする(列は維持)。
     /// </summary>

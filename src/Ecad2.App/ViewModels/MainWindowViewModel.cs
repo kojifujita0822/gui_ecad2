@@ -1310,6 +1310,19 @@ public sealed class MainWindowViewModel : ViewModelBase
             || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
             || sheet.RungComments.Any(rc => rc.Row == row);
 
+    /// <summary>Grid.Rowsを変更する操作(Add/Delete/UpdateSheetSettings)共通の後処理(T-055増分2
+    /// 隠密レビュー指摘、rule of three超えの重複解消)。SelectedCellが新しい範囲を超えていれば
+    /// 選択解除ではなく新しい末尾行へクランプし(殿裁定)、StatusMessageクリア・MarkDirty・
+    /// CurrentSheet変更通知を行う。呼び出し元がsheet.Grid.Rowsへの代入を終えた後に呼ぶこと。</summary>
+    private void FinishRowCountChange(Sheet sheet)
+    {
+        if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
+            SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
+        StatusMessage = "";
+        MarkDirty();
+        NotifyCurrentSheetChanged();
+    }
+
     /// <summary>シート設定ダイアログ(T-055増分2)からUpdateSheetSettingsCommandへ渡すパラメータ。
     /// Grid.RowsとBus.LeftName/RightNameをまとめて変更する。</summary>
     public sealed record SheetSettings(int Rows, string LeftName, string RightName);
@@ -1609,12 +1622,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows >= GridSpec.MaxRows) return;
                 sheet.Grid.Rows++;
-                // T-055増分1往復2周目(隠密テスト設計書、DeleteRowCommandと対称の書き漏れ):
-                // 成功パスでStatusMessageをクリアしないと、直前に表示された警告(拒否文言等)が
-                // 成功後も残留する。既存の状態変更操作の慣習(ReplaceDocument・Escキー処理)に揃える。
-                StatusMessage = "";
-                MarkDirty();
-                NotifyCurrentSheetChanged();
+                FinishRowCountChange(sheet);
             },
             () => CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
 
@@ -1629,19 +1637,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                     return;
                 }
                 sheet.Grid.Rows--;
-                // T-055増分1隠密レビュー指摘(CONFIRMED): 削除後にSelectedCellが範囲外(旧最終行)を
-                // 指したまま残ると、選択ハイライトが縮小後グリッド外に表示され続ける
-                // (LadderCanvas.DrawはIsWithinGridBounds相当のチェック無しに無条件描画するため)。
-                // 殿裁定=選択解除(null)ではなく新しい末尾行へクランプする(キーボード操作の
-                // 流れを途切れさせぬため)。
-                if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
-                    SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
-                // T-055増分1往復2周目(隠密テスト設計書、根本原因確定): 成功パスにStatusMessage
-                // クリア処理が無く、直前の拒否警告(または他文言)が成功後も残留していた
-                // (拒否→要素除去→再削除で成功するがメッセージが残る、忍者実機発見)。
-                StatusMessage = "";
-                MarkDirty();
-                NotifyCurrentSheetChanged();
+                FinishRowCountChange(sheet);
             },
             () => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
 
@@ -1650,16 +1646,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (CurrentSheet is not Sheet sheet || param is not SheetSettings settings) return;
             if (settings.Rows < GridSpec.MinRows || settings.Rows > GridSpec.MaxRows) return;
+            // T-055増分2往復1周目(隠密レビュー指摘、殿裁定): DeleteRowCommandは最終行のみ判定するが、
+            // UpdateSheetSettingsCommandはダイアログ経由で一気に大きく縮小できるため、縮小される
+            // 全行(新Rows〜旧Rows-1)のいずれかに要素があれば拒否する(キーボードのみ到達不能・
+            // マウス経由のみ到達可という非対称の解消)。
+            for (int row = settings.Rows; row < sheet.Grid.Rows; row++)
+            {
+                if (IsRowOccupied(sheet, row))
+                {
+                    StatusMessage = "最終行に要素があるため削除できません";
+                    return;
+                }
+            }
             sheet.Grid.Rows = settings.Rows;
             sheet.Bus.LeftName = settings.LeftName;
             sheet.Bus.RightName = settings.RightName;
-            // AddRowCommand/DeleteRowCommandと同じ理由: Rows縮小でSelectedCellが範囲外になりうる
-            // (選択解除ではなく新しい末尾行へクランプ、殿裁定済みの方針を再適用)。
-            if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
-                SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
-            StatusMessage = "";
-            MarkDirty();
-            NotifyCurrentSheetChanged();
+            FinishRowCountChange(sheet);
         },
         _ => CurrentSheet is not null);
     }
