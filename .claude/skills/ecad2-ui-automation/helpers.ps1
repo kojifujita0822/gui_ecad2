@@ -26,6 +26,9 @@ public class Ecad2Native {
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
     [DllImport("user32.dll")]
     public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll")]
+    public static extern bool PrintWindow(IntPtr hWnd, IntPtr hdcBlt, uint nFlags);
+    public const uint PW_RENDERFULLCONTENT = 0x2;
     public const uint MOUSEEVENTF_LEFTDOWN = 0x02;
     public const uint MOUSEEVENTF_LEFTUP = 0x04;
     public const uint MOUSEEVENTF_WHEEL = 0x0800;
@@ -128,6 +131,10 @@ function Get-Ecad2Root {
     [System.Windows.Automation.AutomationElement]::FromHandle($proc.MainWindowHandle)
 }
 
+# 【フォーカス強奪注意】呼び出すと殿が操作中の他ウィンドウからフォーカスを奪う。Send-Ecad2Keys/
+# Invoke-Ecad2ScreenClick系（グローバル入力が本質的に必要な操作）が内部で必要時にのみ呼ぶ設計
+# のため、通常はこの関数を直接呼ぶ必要はない（2026-07-10、殿指示によりフォーカス非占有化を
+# 優先する運用へ変更。Invoke-Ecad2Button等のUI Automationパターン系はフォーカス不要）。
 function Set-Ecad2Foreground {
     $proc = Get-Ecad2Process
     if (-not $proc) { throw "Ecad2.App process not found." }
@@ -159,6 +166,12 @@ function Find-Ecad2Element {
 }
 
 # InvokePattern（ボタン等）→ 失敗時 SelectionItemPattern（ListItem/TreeItem等）→ TogglePattern の順で試す。
+# いずれもUI Automationのプログラム的パターン呼び出しのみで完結し、SetForegroundWindow・
+# SetCursorPos等のグローバル入力を一切使わない（2026-07-10実証）。ゆえにフォアグラウンド化・
+# マウスカーソル移動を伴わず、殿が他ウィンドウを操作中でも安全に呼べる。ボタン押下・リスト
+# 選択・テキスト入力(ValuePattern.SetValue)で完結する検証は極力この経路を使い、
+# Send-Ecad2Keys/Invoke-Ecad2ScreenClick系（フォーカス・カーソルを強制的に奪う）は
+# キーボードショートカット自体の検証・キャンバス内座標操作等、代替手段が無い場面に限定すること。
 function Invoke-Ecad2Element {
     param([Parameter(Mandatory)]$Element)
     $ip = $null
@@ -219,7 +232,10 @@ function Get-Ecad2WindowRect {
     [PSCustomObject]@{ Left = $rect.Left; Top = $rect.Top; Right = $rect.Right; Bottom = $rect.Bottom; Width = $rect.Right - $rect.Left; Height = $rect.Bottom - $rect.Top }
 }
 
-# キャンバス上のセルクリック等、座標が必要な操作専用（固定UIには使わない、Invoke-Ecad2Buttonを優先すること）
+# 【フォーカス・カーソル強奪注意】SetCursorPos+mouse_eventでグローバルなマウスカーソルを
+# 動かすため、呼び出し中は殿の実カーソル操作と衝突する。キャンバス上のセルクリック等、UI
+# Automationツリーで要素を辿れず座標指定が本質的に必要な操作専用（固定UIには使わない、
+# Invoke-Ecad2Buttonを優先すること）。
 function Invoke-Ecad2ScreenClick {
     param([Parameter(Mandatory)][int]$X, [Parameter(Mandatory)][int]$Y)
     Set-Ecad2Foreground
@@ -254,7 +270,11 @@ function Invoke-Ecad2CtrlScroll {
     [Ecad2Native]::CtrlScroll($ScreenX, $ScreenY, $Clicks, $DelayMs)
 }
 
-# キー送信（WPFアプリのためSendKeysが機能する。GuiEcad=WinUI3では届かなかったのと対照的）。
+# 【フォーカス強奪注意】SendKeysはWindowsのフォーカスウィンドウにしか届かないグローバル
+# キー入力のため、呼び出し中は殿のキーボード入力と衝突する。キーボードショートカット自体の
+# 検証（対応するボタンが無い/ショートカット固有の挙動を見たい場合）に限定し、単に「そのコマンドを
+# 実行したいだけ」ならボタンのInvoke-Ecad2Button経由（フォーカス不要）を優先すること。
+# WPFアプリのためSendKeysが機能する（GuiEcad=WinUI3では届かなかったのと対照的）。
 # 例: Send-Ecad2Keys "{ESC}" / Send-Ecad2Keys "^{TAB}"（Ctrl+Tab）/ Send-Ecad2Keys "{F5}"
 function Send-Ecad2Keys {
     param([Parameter(Mandatory)][string]$Keys)
@@ -263,12 +283,27 @@ function Send-Ecad2Keys {
     Start-Sleep -Milliseconds 200
 }
 
+# PrintWindow(user32.dll、PW_RENDERFULLCONTENT)で対象ウィンドウの内容を直接ビットマップへ
+# 描画する。CopyFromScreen(画面表示のキャプチャ)と異なり、対象ウィンドウがフォアグラウンドで
+# なくても・他ウィンドウに重なっていても正しく撮れる（2026-07-10、殿裁定によるフォーカス
+# 非占有化の一環。旧実装はCopyFromScreen専用でフォアグラウンド化が前提のため、他ウィンドウが
+# 前面にある状態で撮影すると誤ってそちらが写り込む事故があった＝実際に発生済み）。
+# PrintWindowが失敗した場合（環境依存、極めて稀）のみCopyFromScreen+フォアグラウンド化へ
+# フォールバックする。
 function Save-Ecad2Screenshot {
     param([Parameter(Mandatory)][string]$Path)
+    $proc = Get-Ecad2Process
+    if (-not $proc) { throw "Ecad2.App process not found." }
     $rect = Get-Ecad2WindowRect
     $bmp = New-Object System.Drawing.Bitmap $rect.Width, $rect.Height
     $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)
+    $hdc = $g.GetHdc()
+    $ok = [Ecad2Native]::PrintWindow($proc.MainWindowHandle, $hdc, [Ecad2Native]::PW_RENDERFULLCONTENT)
+    $g.ReleaseHdc($hdc)
+    if (-not $ok) {
+        Set-Ecad2Foreground
+        $g.CopyFromScreen($rect.Left, $rect.Top, 0, 0, $bmp.Size)
+    }
     $dir = Split-Path $Path
     if ($dir -and -not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $bmp.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
