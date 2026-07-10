@@ -179,6 +179,23 @@
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+P"/>
                     </StackPanel>
                 </Button>
+                <Separator/>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を追加 (Ctrl+Shift+Up)"
+                        AutomationProperties.Name="行を追加 (Ctrl+Shift+Up)"
+                        Command="{Binding AddRowCommand}">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M13,7 L13,13 M10,10 L16,10"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Shift+↑"/>
+                    </StackPanel>
+                </Button>
+                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を削除 (Ctrl+Shift+Down)"
+                        AutomationProperties.Name="行を削除 (Ctrl+Shift+Down)"
+                        Command="{Binding DeleteRowCommand}">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M10,10 L16,10"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Shift+↓"/>
+                    </StackPanel>
+                </Button>
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
                 <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点)、Shift+F5=OR(ORa接点)/

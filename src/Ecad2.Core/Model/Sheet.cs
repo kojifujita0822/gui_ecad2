@@ -30,6 +30,11 @@ public sealed class Sheet
 /// <summary>均一グリッドの行数・列数（セルの mm 寸法は DrawingTheme 側）。Row は内部座標のみ。</summary>
 public sealed class GridSpec
 {
+    /// <summary>行数の下限（T-055、殿裁定）。</summary>
+    public const int MinRows = 1;
+    /// <summary>行数の上限（T-055、殿裁定）。</summary>
+    public const int MaxRows = 60;
+
     public int Rows { get; set; } = 22;
     public int Columns { get; set; } = 40;
 }

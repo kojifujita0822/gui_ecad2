@@ -875,6 +875,16 @@ public partial class MainWindow : Window
                 NewButton_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+                // T-055増分1: 末尾行を1行追加する(ツールバー「行を追加」ボタンと同一コマンド)。
+                _viewModel.AddRowCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Down when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+                // T-055増分1: 末尾行を1行削除する(ツールバー「行を削除」ボタンと同一コマンド)。
+                _viewModel.DeleteRowCommand.Execute(null);
+                e.Handled = true;
+                break;
         }
     }
 

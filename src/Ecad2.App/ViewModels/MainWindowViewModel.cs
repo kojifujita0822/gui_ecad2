@@ -1,4 +1,6 @@
 using System.Linq;
+using System.Windows.Input;
+using Ecad2.App.Commands;
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
@@ -1291,6 +1293,23 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _statusMessage, value);
     }
 
+    /// <summary>末尾行を1行追加する(T-055増分1)。上限(GridSpec.MaxRows)到達時は無効化。</summary>
+    public ICommand AddRowCommand { get; }
+
+    /// <summary>末尾行を1行削除する(T-055増分1)。下限(GridSpec.MinRows)到達時は無効化。
+    /// 最終行に要素(広義5種、殿裁定)が存在する場合は削除を拒否しStatusMessageへ警告を出す。</summary>
+    public ICommand DeleteRowCommand { get; }
+
+    /// <summary>指定行に要素(広義5種: ElementInstance/VerticalConnector/WireBreak/GroupFrame/
+    /// RungComment、殿裁定2026-07-10)が存在するかを判定する(T-055増分1、削除拒否の判定に使う)。
+    /// internalはIVT経由のテスト用。</summary>
+    internal static bool IsRowOccupied(Sheet sheet, int row)
+        => sheet.Elements.Any(e => e.Pos.Row == row)
+            || sheet.Connectors.Any(c => Math.Min(c.TopRow, c.BottomRow) <= row && row <= Math.Max(c.TopRow, c.BottomRow))
+            || sheet.WireBreaks.Any(w => w.Row == row)
+            || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
+            || sheet.RungComments.Any(rc => rc.Row == row);
+
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
     public SheetNavigationViewModel SheetNavigation { get; }
 
@@ -1571,5 +1590,34 @@ public sealed class MainWindowViewModel : ViewModelBase
         PartLibrary = PartPalette.Library;
         DeviceTable = new DeviceTableViewModel(Document.Devices);
         OutputPanel = new OutputPanelViewModel(this);
+
+        // T-055増分1: 末尾行の追加・削除。CanExecuteはボタンのIsEnabled連動用、Execute内部の
+        // ガードはキーボードショートカット等CanExecuteを経由しない呼び出しに対する安全弁
+        // (二重化だが役割が異なるため許容、家老裁可済み)。
+        AddRowCommand = new RelayCommand(
+            () =>
+            {
+                if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows >= GridSpec.MaxRows) return;
+                sheet.Grid.Rows++;
+                MarkDirty();
+                NotifyCurrentSheetChanged();
+            },
+            () => CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
+
+        DeleteRowCommand = new RelayCommand(
+            () =>
+            {
+                if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows <= GridSpec.MinRows) return;
+                int lastRow = sheet.Grid.Rows - 1;
+                if (IsRowOccupied(sheet, lastRow))
+                {
+                    StatusMessage = "最終行に要素があるため削除できません";
+                    return;
+                }
+                sheet.Grid.Rows--;
+                MarkDirty();
+                NotifyCurrentSheetChanged();
+            },
+            () => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
     }
 }
