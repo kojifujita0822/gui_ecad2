@@ -1310,6 +1310,18 @@ public sealed class MainWindowViewModel : ViewModelBase
             || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
             || sheet.RungComments.Any(rc => rc.Row == row);
 
+    /// <summary>指定行が占有されていれば拒否メッセージ(message)をStatusMessageへ設定してtrueを返す
+    /// (T-055増分3往復1周目、隠密レビュー指摘c=DeleteRowCommand/UpdateSheetSettingsCommand/
+    /// DeleteRowAtCommandの3箇所到達によるrule of three解消)。呼び出し元はtrueが返ればreturnすること。
+    /// 文言は呼び出し元ごとに異なる(DeleteRowCommandは「最終行に」固定、他は実際の行番号)ためそのまま維持し、
+    /// 判定→設定のロジックのみ共通化する。</summary>
+    private bool TryRejectOccupiedRow(Sheet sheet, int row, string message)
+    {
+        if (!IsRowOccupied(sheet, row)) return false;
+        StatusMessage = message;
+        return true;
+    }
+
     /// <summary>Grid.Rowsを変更する操作(Add/Delete/UpdateSheetSettings)共通の後処理(T-055増分2
     /// 隠密レビュー指摘、rule of three超えの重複解消)。SelectedCellが新しい範囲を超えていれば
     /// 選択解除ではなく新しい末尾行へクランプし(殿裁定)、StatusMessageクリア・MarkDirty・
@@ -1641,11 +1653,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 if (CurrentSheet is not Sheet sheet || sheet.Grid.Rows <= GridSpec.MinRows) return;
                 int lastRow = sheet.Grid.Rows - 1;
-                if (IsRowOccupied(sheet, lastRow))
-                {
-                    StatusMessage = "最終行に要素があるため削除できません";
-                    return;
-                }
+                if (TryRejectOccupiedRow(sheet, lastRow, "最終行に要素があるため削除できません")) return;
                 sheet.Grid.Rows--;
                 FinishRowCountChange(sheet);
             },
@@ -1662,15 +1670,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             // マウス経由のみ到達可という非対称の解消)。
             for (int row = settings.Rows; row < sheet.Grid.Rows; row++)
             {
-                if (IsRowOccupied(sheet, row))
-                {
-                    // T-055増分2往復2周目(隠密レビュー指摘、CONFIRMED): DeleteRowCommand由来の
-                    // 「最終行に」固定文言をそのまま流用すると、縮小範囲内の先頭・中間行で拒否された
-                    // 場合にユーザーが実際の元凶ではなく旧最終行付近を確認しに行き誤誘導する。
-                    // 拒否した実際の行番号(表示は1始まり、SelectedCellDisplayと同じ規約)を含める。
-                    StatusMessage = $"行{row + 1}に要素があるため削除できません";
-                    return;
-                }
+                // T-055増分2往復2周目(隠密レビュー指摘、CONFIRMED): DeleteRowCommand由来の
+                // 「最終行に」固定文言をそのまま流用すると、縮小範囲内の先頭・中間行で拒否された
+                // 場合にユーザーが実際の元凶ではなく旧最終行付近を確認しに行き誤誘導する。
+                // 拒否した実際の行番号(表示は1始まり、SelectedCellDisplayと同じ規約)を含める。
+                if (TryRejectOccupiedRow(sheet, row, $"行{row + 1}に要素があるため削除できません")) return;
             }
             sheet.Grid.Rows = settings.Rows;
             sheet.Bus.LeftName = settings.LeftName;
@@ -1686,6 +1690,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (CurrentSheet is not Sheet sheet || param is not int row) return;
             if (sheet.Grid.Rows >= GridSpec.MaxRows) return;
+            // 隠密レビュー指摘a(往復1周目、CONFIRMED): SelectedCellもRowOpsと同じ規則(挿入点以降は+1)で
+            // 追随させる。据え置くと選択カーソルが指す座標と実要素の対応がずれ、直後の操作で誤操作を招く。
+            if (SelectedCell is GridPos sc && sc.Row >= row)
+                SelectedCell = sc with { Row = sc.Row + 1 };
             RowOps.InsertRow(sheet, row);
             sheet.Grid.Rows++;
             FinishRowCountChange(sheet);
@@ -1696,11 +1704,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (CurrentSheet is not Sheet sheet || param is not int row) return;
             if (sheet.Grid.Rows <= GridSpec.MinRows) return;
-            if (IsRowOccupied(sheet, row))
-            {
-                StatusMessage = $"行{row + 1}に要素があるため削除できません";
-                return;
-            }
+            if (TryRejectOccupiedRow(sheet, row, $"行{row + 1}に要素があるため削除できません")) return;
+            // 隠密レビュー指摘a(往復1周目、CONFIRMED): SelectedCellもRowOpsと同じ規則(削除点より後ろのみ
+            // -1)で追随させる(RowOps.DeleteRowの4種要素と同じ規則)。
+            if (SelectedCell is GridPos sc && sc.Row > row)
+                SelectedCell = sc with { Row = sc.Row - 1 };
             RowOps.DeleteRow(sheet, row);
             sheet.Grid.Rows--;
             FinishRowCountChange(sheet);

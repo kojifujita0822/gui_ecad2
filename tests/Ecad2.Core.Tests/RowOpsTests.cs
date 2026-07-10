@@ -246,8 +246,15 @@ public class RowOpsTests
         Assert.Equal(2, sheet.Frames[0].Height);
     }
 
+    /// <summary>
+    /// 隠密レビュー指摘b(往復1周目、CONFIRMED)対応: 枠開始行そのものが削除対象(TopLeft.Row==targetRow)の
+    /// ケース。GuiEcadでは「枠ごと削除」だが、これは「削除対象行に要素がある場合」論点(殿確認待ち、
+    /// 2026-07-10)に該当し、RowOps.DeleteRowの対象外(契約=targetRow行に要素なし)。本テストは現状の
+    /// 暫定挙動(無変化)を記録するのみで、確定仕様ではない。将来「枠ごと削除」を実装する際は本テストを
+    /// 更新すること(このAssertを検証済み仕様と誤読しないこと)。
+    /// </summary>
     [Fact]
-    public void DeleteRow_GroupFrame_TargetBeforeFrameStart_NoChangeWhenNotAfter()
+    public void DeleteRow_GroupFrame_TargetEqualsFrameStartRow_CurrentlyNoChange_PendingDecision()
     {
         var sheet = MakeSheet();
         sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 2 });

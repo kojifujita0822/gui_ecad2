@@ -292,6 +292,119 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
         Assert.Equal(9, vm.CurrentSheet!.Grid.Rows);
     }
 
+    /// <summary>
+    /// 隠密レビュー指摘a(往復1周目、CONFIRMED)のRED先行証明対象。SelectedCellが挿入点(targetRow)以降を
+    /// 指していた場合、実要素(RowOpsでシフトされる5種)と同じ規則で追随すること(据え置きだと選択カーソルが
+    /// 指す座標と実要素の対応がずれ、直後の操作で誤操作を招く)。
+    /// RED証明手法: InsertRowBeforeCommandのExecute内SelectedCellシフト処理を一時的にコメントアウトして
+    /// テスト実行→SelectedCellが挿入前の値のまま変化せずRED(実測確認済み)。戻すとGREEN。
+    /// </summary>
+    [Fact]
+    public void InsertRowBeforeCommand_Execute_ShiftsSelectedCellAtTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(3, 2);
+
+        vm.InsertRowBeforeCommand.Execute(3);
+
+        Assert.Equal(new GridPos(4, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void InsertRowBeforeCommand_Execute_ShiftsSelectedCellAfterTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(5, 2);
+
+        vm.InsertRowBeforeCommand.Execute(2);
+
+        Assert.Equal(new GridPos(6, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void InsertRowBeforeCommand_Execute_DoesNotShiftSelectedCellBeforeTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(1, 2);
+
+        vm.InsertRowBeforeCommand.Execute(3);
+
+        Assert.Equal(new GridPos(1, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void InsertRowBeforeCommand_Execute_WhenSelectedCellIsNull_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        Assert.Null(vm.SelectedCell);
+
+        vm.InsertRowBeforeCommand.Execute(3);
+
+        Assert.Null(vm.SelectedCell);
+    }
+
+    /// <summary>
+    /// 削除側の対称ケース(隠密レビュー指摘a)。SelectedCellが削除点(targetRow)より後ろを指していれば-1追随。
+    /// RowOps.DeleteRowの4種要素と同じ規則(targetRowより後ろのみシフト)をSelectedCellにも適用する。
+    /// RED証明手法: DeleteRowAtCommandのExecute内SelectedCellシフト処理を一時的にコメントアウトして
+    /// テスト実行→SelectedCellが削除前の値のまま変化せずRED(実測確認済み)。戻すとGREEN。
+    /// </summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_ShiftsSelectedCellAfterTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(5, 2);
+
+        vm.DeleteRowAtCommand.Execute(2);
+
+        Assert.Equal(new GridPos(4, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void DeleteRowAtCommand_Execute_DoesNotShiftSelectedCellAtTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(2, 2);
+
+        vm.DeleteRowAtCommand.Execute(2);
+
+        Assert.Equal(new GridPos(2, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void DeleteRowAtCommand_Execute_DoesNotShiftSelectedCellBeforeTargetRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(1, 2);
+
+        vm.DeleteRowAtCommand.Execute(2);
+
+        Assert.Equal(new GridPos(1, 2), vm.SelectedCell);
+    }
+
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsNull_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        Assert.Null(vm.SelectedCell);
+
+        vm.DeleteRowAtCommand.Execute(2);
+
+        Assert.Null(vm.SelectedCell);
+    }
+
     private static void PlaceElementAt(Sheet sheet, string elementType, int row)
     {
         switch (elementType)
