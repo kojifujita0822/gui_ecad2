@@ -1310,6 +1310,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
             || sheet.RungComments.Any(rc => rc.Row == row);
 
+    /// <summary>シート設定ダイアログ(T-055増分2)からUpdateSheetSettingsCommandへ渡すパラメータ。
+    /// Grid.RowsとBus.LeftName/RightNameをまとめて変更する。</summary>
+    public sealed record SheetSettings(int Rows, string LeftName, string RightName);
+
+    /// <summary>シート設定(Grid.Rows・Bus.LeftName/RightName)をまとめて更新する(T-055増分2)。
+    /// Rowsが上限/下限(GridSpec.MaxRows/MinRows)外の場合は何も変更せず拒否する(ダイアログ側の
+    /// 入力制約をすり抜けた場合の安全弁、AddRowCommand/DeleteRowCommandと同じ二重化方針)。
+    /// Bus名の空文字は許容する(殿裁定、GuiEcad踏襲)。</summary>
+    public ICommand UpdateSheetSettingsCommand { get; }
+
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
     public SheetNavigationViewModel SheetNavigation { get; }
 
@@ -1634,5 +1644,23 @@ public sealed class MainWindowViewModel : ViewModelBase
                 NotifyCurrentSheetChanged();
             },
             () => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
+
+        // T-055増分2: シート設定ダイアログ経由でGrid.Rows・Bus.LeftName/RightNameをまとめて更新。
+        UpdateSheetSettingsCommand = new RelayCommand(param =>
+        {
+            if (CurrentSheet is not Sheet sheet || param is not SheetSettings settings) return;
+            if (settings.Rows < GridSpec.MinRows || settings.Rows > GridSpec.MaxRows) return;
+            sheet.Grid.Rows = settings.Rows;
+            sheet.Bus.LeftName = settings.LeftName;
+            sheet.Bus.RightName = settings.RightName;
+            // AddRowCommand/DeleteRowCommandと同じ理由: Rows縮小でSelectedCellが範囲外になりうる
+            // (選択解除ではなく新しい末尾行へクランプ、殿裁定済みの方針を再適用)。
+            if (SelectedCell is GridPos selectedCell && selectedCell.Row >= sheet.Grid.Rows)
+                SelectedCell = selectedCell with { Row = sheet.Grid.Rows - 1 };
+            StatusMessage = "";
+            MarkDirty();
+            NotifyCurrentSheetChanged();
+        },
+        _ => CurrentSheet is not null);
     }
 }

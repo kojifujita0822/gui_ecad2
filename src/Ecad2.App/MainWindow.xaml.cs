@@ -178,6 +178,17 @@ public partial class MainWindow : Window
             _viewModel.SheetNavigation.AddCommand.Execute((dialog.SheetName, dialog.IsMainCircuit));
     }
 
+    // T-055増分2: シート設定ボタン。RenameSheetButton_Clickと同型、ダイアログ表示はView側の責務で
+    // UpdateSheetSettingsCommandへ(行数, 左母線名, 右母線名)を渡す。
+    private void SheetSettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.SheetNavigation.SelectedSheet is not Ecad2.Model.Sheet sheet) return;
+
+        var dialog = new Views.SheetSettingsDialog(sheet.Grid.Rows, sheet.Bus.LeftName, sheet.Bus.RightName) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.UpdateSheetSettingsCommand.Execute(new ViewModels.MainWindowViewModel.SheetSettings(dialog.Rows, dialog.LeftName, dialog.RightName));
+    }
+
     private const string GcadFileFilter = "GCADファイル (*.gcad)|*.gcad";
 
     // 上書き保存(T-019)。ファイルダイアログ表示はView側の責務、実際の保存(GcadSerializer呼び出し)

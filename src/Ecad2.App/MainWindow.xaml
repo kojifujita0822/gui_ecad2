@@ -380,6 +380,8 @@
                                 Command="{Binding SheetNavigation.DeleteCommand}"/>
                         <Button x:Name="RenameSheetButton" Content="名前変更" Margin="4,0,0,0" ToolTip="シート名変更"
                                 Click="RenameSheetButton_Click"/>
+                        <Button x:Name="SheetSettingsButton" Content="設定" Margin="4,0,0,0"
+                                ToolTip="シート設定(行数・母線名)" Click="SheetSettingsButton_Click"/>
                     </StackPanel>
                     <ListBox x:Name="SheetNavList" ItemsSource="{Binding SheetNavigation.Sheets}"
                              SelectedItem="{Binding SheetNavigation.SelectedSheet}"

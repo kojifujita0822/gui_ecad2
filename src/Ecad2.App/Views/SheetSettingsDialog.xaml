@@ -1,0 +1,21 @@
+<Window x:Class="Ecad2.App.Views.SheetSettingsDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="シート設定" Height="270" Width="320"
+        WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        ShowInTaskbar="False">
+    <StackPanel Margin="12">
+        <TextBlock Text="行数(1〜60):" Margin="0,0,0,4"/>
+        <TextBox x:Name="RowsBox" Margin="0,0,0,4"/>
+        <TextBlock x:Name="RowsErrorText" Text="1〜60の範囲で入力してください" Foreground="Red"
+                   Visibility="Collapsed" Margin="0,0,0,8"/>
+        <TextBlock Text="左母線名:" Margin="0,0,0,4"/>
+        <TextBox x:Name="LeftNameBox" Margin="0,0,0,12"/>
+        <TextBlock Text="右母線名:" Margin="0,0,0,4"/>
+        <TextBox x:Name="RightNameBox" Margin="0,0,0,12"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+            <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
+            <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>
+        </StackPanel>
+    </StackPanel>
+</Window>
