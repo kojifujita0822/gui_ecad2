@@ -53,5 +53,6 @@
 | P-044 | 隠密（T-050静的レビュー、範囲外気づき） | `SheetNavigationViewModel.cs`に旧値を捕捉しない1引数版`OnPropertyChanged`が同型で3箇所残存（`RefreshSelectedSheet`=高頻度・`ResetSheets`・`DeleteCommand`=対応コスト実質ゼロ）。P-015（旧値null化漏れ）の兄弟課題だがP-015原文の対象範囲外のためT-050の不備ではない。詳細=`docs/ecad2-t050-review-onmitsu.md` | T-050範囲外（P-015兄弟課題、既定OFFのオプトイン診断機能内） | 小（1ファイル3箇所） | approved（2026-07-10殿裁定：T-050修正と同時に侍が対応） |
 | P-045 | 忍者（T-049実機確認、範囲外の気づき） | あらかじめ選択済みの空セルへF5配置すると、プロパティパネルが「要素を選択してください」のまま更新されない（SelectedCellの値自体が配置前後で不変のため通知がスキップされる設計と忍者が静的確認。一度別セルへ選択を移し戻せば正常表示）。SetProperty早期returnトラップと同型テーマの新事例。詳細=`docs/ecad2-t049-verification-ninja.md` | T-049範囲外（既存挙動、T-049差分とは無関係） | 小〜中（通知経路の設計次第） | pending |
 | P-046 | 隠密（T-055調査、範囲外の気づき） | PDF出力機能がUIに未結線の疑い（`RenderPageCount`等の呼び出し元不在）。T-007でGuiEcadから移植されたPdf層が、App層のメニュー・コマンドから到達できない可能性。詳細=`docs/ecad2-t055-guiecad-row-busnumber-survey-onmitsu.md`派生の気づき節 | T-055範囲外（PDF出力の結線状況、要確認） | 不明（結線調査が先） | pending |
+| P-047 | 侍（T-050往復2周目の設計中） | `SelectedSheet`セッタ（シートタブ直接クリック経路、`MainWindow.xaml:368`のSelectedItemバインド実体）にも、Add/DeleteCommandと同根の二重発火が現存。ただしSheets構成を変えない「選択変更」経路であり、T-050往復2周目のスコープ（構成変更操作=Add/Delete/ResetSheets）外と家老仕分け（便乗拡大防止、2026-07-10）。実害はTraceLog診断ログ限定 | T-050範囲外（同根バグの別経路、構成変更でなく選択変更） | 小（Add/Deleteと同型の対処を横展開） | pending |
 
 <!-- 判断: pending（承認待ち） / approved → 移送先 T-ID / rejected -->
