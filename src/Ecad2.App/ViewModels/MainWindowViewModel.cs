@@ -103,34 +103,44 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _currentSheetIndex;
         set
         {
-            // T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大、増分1由来の構造的な穴): シート削除
-            // (SheetNavigationViewModel.DeleteCommand)で「非末尾シートを削除、かつそれが現在表示中」
-            // の場合、削除後のindex数値がたまたま削除前と一致するケースがある(Sheets[index]の実体は
-            // 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。CurrentSheetIndex
-            // は「値そのもの」ではなく「Document.Sheetsへの添字(キー)」に過ぎず、キーの数値が同じ
-            // でも参照先の実体(Sheets[index])が入れ替わりうる非対称性を持つ。よってプロパティ
-            // 自身の変更通知(OnPropertyChanged(nameof(CurrentSheet)))・クロスカット的クリア
-            // (前シートのSelectedCell・全選択状態/記入中状態の連鎖クリア、左パレット選択ハイライト
-            // 同期)は共に値変化の有無に関わらず常時実行する(SetPropertyの戻り値でガードしない)。
-            //
-            // T-041増分5隠密再レビュー往復2周目で、この無条件クロスカットクリアがシート改名
-            // (SheetNavigationViewModel.RenameCommand、参照だけが入れ替わりindex数値は不変)にも
-            // 波及し記入中ドラフトを警告なく破棄する副作用(所見L)を発見、一度はSelectedCellの
-            // setterと同じ粒度(変更通知のみ値変化時限定)へ統一したが、往復3周目でそれが本節
-            // 冒頭の症状1(削除時の再描画漏れ)を「削除直前にSelectedCellが既にnull」という別条件
-            // 下で再発させることが判明した。真因は改名の遅延再選択がCurrentSheetIndexへの代入
-            // 自体を経由すること側にあったため、対処はSheetNavigationViewModel.RenameCommand側
-            // (RefreshSelectedSheet()のみ呼ぶ形)で行い、本setterは往復1周目の「常時無条件」の
-            // ままとする(二重のモグラ叩きを避ける)。
             // T-050修正(P-044): RefreshSelectedSheetの2引数化に伴い、変更前の選択シートを渡す。
             // SetPropertyで_currentSheetIndexを更新する前に読み取るのみ(挙動を変える代入・分岐は
             // 追加しない=P-030のsetter粒度モグラ叩き再発防止、家老厳守事項2026-07-10)。
+            // T-050往復2周目(隠密CONFIRMED二重発火の解消): クロスカット処理はSetCurrentSheetIndexCoreへ
+            // 切り出し、公開セッタは従来どおり「コア + SelectedSheet通知(RefreshSelectedSheet)」の組で
+            // 構成する(公開挙動は不変)。DRC出力パネルのジャンプ等、SelectedSheet通知を自前で持たない
+            // 外部からの直接代入経路はこの公開セッタを使い、ちょうど1回の通知を得る。一方、コレクション
+            // 変更を伴い自前で正しい旧値の通知を撃つAddCommand/DeleteCommandはコアを直接呼び、公開
+            // セッタ経由のネスト通知(誤った旧値・二重発火)を避ける。
             var oldSelectedSheet = SheetNavigation.SelectedSheet;
-            SetProperty(ref _currentSheetIndex, value);
-            NotifyCurrentSheetDependentPropertiesChanged();
-            SelectedCell = null;
+            SetCurrentSheetIndexCore(value);
             SheetNavigation.RefreshSelectedSheet(oldSelectedSheet);
         }
+    }
+
+    /// <summary>CurrentSheetIndexの変更に伴うクロスカット処理(CurrentSheet依存プロパティの通知・
+    /// SelectedCellクリア)のみを行い、SelectedSheetの変更通知は呼び出し元に委ねる。SelectedSheet通知を
+    /// 自前で1回だけ発火する経路(SheetNavigationViewModelのAddCommand/DeleteCommand=コレクション変更後に
+    /// index確定するため公開セッタ経由だと二重発火・旧値不整合を起こす、T-050往復2周目/隠密CONFIRMED)
+    /// から呼ぶ。公開セッタはこのコアの直後にRefreshSelectedSheetを続けることで従来挙動を保つ。
+    ///
+    /// T-041増分5隠密レビュー指摘(観点3 CONFIRMED重大、増分1由来の構造的な穴): シート削除
+    /// (SheetNavigationViewModel.DeleteCommand)で「非末尾シートを削除、かつそれが現在表示中」
+    /// の場合、削除後のindex数値がたまたま削除前と一致するケースがある(Sheets[index]の実体は
+    /// 差し替わっているのに、int値としてのCurrentSheetIndexは変化しない)。CurrentSheetIndex
+    /// は「値そのもの」ではなく「Document.Sheetsへの添字(キー)」に過ぎず、キーの数値が同じ
+    /// でも参照先の実体(Sheets[index])が入れ替わりうる非対称性を持つ。よってプロパティ
+    /// 自身の変更通知(OnPropertyChanged(nameof(CurrentSheet)))・クロスカット的クリア
+    /// (前シートのSelectedCell・全選択状態/記入中状態の連鎖クリア、左パレット選択ハイライト
+    /// 同期)は共に値変化の有無に関わらず常時実行する(SetPropertyの戻り値でガードしない)。
+    /// T-041増分5往復3周目: 改名の遅延再選択がCurrentSheetIndexへの代入を経由し記入中ドラフトを
+    /// 破棄する副作用(所見L)は、RenameCommand側(RefreshSelectedSheetのみ呼ぶ形)で対処し、本処理は
+    /// 「常時無条件」のままとする(二重のモグラ叩きを避ける)。</summary>
+    internal void SetCurrentSheetIndexCore(int value)
+    {
+        SetProperty(ref _currentSheetIndex, value);
+        NotifyCurrentSheetDependentPropertiesChanged();
+        SelectedCell = null;
     }
 
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。
@@ -1485,6 +1495,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         // IsEnabledガード無しだと無効時も無条件ボクシングが発生する(finding7と同根)。
         object? oldSheetIndex = TraceLog.IsEnabled ? _currentSheetIndex : null;
         object? oldSelectedCell = TraceLog.IsEnabled ? _selectedCell : null;
+        // T-050往復2周目(隠密CONFIRMEDバグ2): SelectedSheetの旧値は、_currentSheetIndex=0の先行代入や
+        // Sheetsミラーの再構築より前=旧Documentの選択状態が残るこの時点で捕捉する。ResetSheets内部で
+        // 捕捉すると、_currentSheetIndex=0(新Document用)と未クリアの旧Sheetsミラーの組から旧Document先頭
+        // シートを誤った旧値として返す(参照型ゆえTraceLogのボクシング懸念はなく無条件捕捉でよい)。
+        var oldSelectedSheet = SheetNavigation.SelectedSheet;
 
         Document = newDocument;
         CurrentFilePath = filePath;
@@ -1519,6 +1534,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementKindDisplay));
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         SheetNavigation.ResetSheets();
+        // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
+        // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから
+        // ちょうど1回だけ通知する(RefreshSelectedSheetはOnPropertyChanged(SelectedSheet, oldValue)の
+        // 薄いラッパ。getterは新Document先頭=Sheets[0]を返すため new値も正しい)。
+        SheetNavigation.RefreshSelectedSheet(oldSelectedSheet);
         DeviceTable.Rebind(newDocument.Devices);
         // 隠密レビュー指摘(#1 CONFIRMED/#2 CONFIRMED軽微/#3 PLAUSIBLE→格上げ): 旧文書に紐づく
         // 状態を明示的にリセットしないと、新規/開く後もDRC結果の誤ジャンプ・沈黙、ステータス

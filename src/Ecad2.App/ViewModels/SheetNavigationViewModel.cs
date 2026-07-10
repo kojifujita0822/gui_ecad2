@@ -62,14 +62,15 @@ public sealed class SheetNavigationViewModel : ViewModelBase
     /// (変更前の選択シートを知る側)から受け取る。</summary>
     public void RefreshSelectedSheet(Sheet? oldValue) => OnPropertyChanged(nameof(SelectedSheet), oldValue);
 
-    /// <summary>Document丸ごと差し替え(T-019: 新規/開く)後、SheetsをDocument.Sheetsへ再同期する。</summary>
+    /// <summary>Document丸ごと差し替え(T-019: 新規/開く)後、SheetsをDocument.Sheetsへ再同期する。
+    /// T-050往復2周目(隠密CONFIRMEDバグ2): SelectedSheetの変更通知はここでは撃たない。旧値をここで
+    /// 内部捕捉すると、呼び出し元ReplaceDocumentが_currentSheetIndex=0を先行代入済みのため、未クリアの
+    /// 旧Sheetsミラー×新index=0の組から旧Document先頭シートを誤った旧値として返す。通知は呼び出し元が
+    /// Document差し替え前に捕捉した正しい旧値でRefreshSelectedSheet経由でちょうど1回だけ行う。</summary>
     public void ResetSheets()
     {
-        // T-050修正(P-044): Sheets.Clear前に旧選択シートを捕捉し、旧値をnull化せず通知する。
-        var oldValue = SelectedSheet;
         Sheets.Clear();
         foreach (var sheet in _owner.Document.Sheets) Sheets.Add(sheet);
-        OnPropertyChanged(nameof(SelectedSheet), oldValue);
     }
 
     public ICommand AddCommand { get; }
@@ -127,10 +128,13 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 () =>
                 {
                     // T-050修正(経路X): 旧実装の`SelectedSheet = sheet`(セッタ経由)は遅延実行時に
-                    // getterがold==newを招くため使わない。CurrentSheetIndexの設定はセッタと同じ
-                    // 手順で行い、SelectedSheetの変更通知だけ事前捕捉した正しい旧値で発火する。
+                    // getterがold==newを招くため使わない。T-050往復2周目(隠密CONFIRMED二重発火の解消):
+                    // CurrentSheetIndexの更新は公開セッタではなくSetCurrentSheetIndexCoreで行う。公開
+                    // セッタ経由だとコレクション変更済みの状態で誤った旧値のネスト通知が挟まり、直後の
+                    // 自前通知と合わせて二重発火するため。SelectedSheetの変更通知は事前捕捉した正しい旧値で
+                    // ちょうど1回だけ発火する。
                     int index = Sheets.IndexOf(sheet);
-                    if (index >= 0) _owner.CurrentSheetIndex = index;
+                    if (index >= 0) _owner.SetCurrentSheetIndexCore(index);
                     OnPropertyChanged(nameof(SelectedSheet), oldSelectedSheet);
                 });
         });
@@ -143,13 +147,16 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 int index = Sheets.IndexOf(sheet);
                 _owner.Document.Sheets.RemoveAt(index);
                 Sheets.RemoveAt(index);
-                _owner.CurrentSheetIndex = Math.Min(index, Sheets.Count - 1);
+                // T-050往復2周目(隠密CONFIRMED二重発火の解消): 公開セッタではなくSetCurrentSheetIndexCore。
+                // 公開セッタ経由だと、既に縮小済みのコレクションを削除前indexに近い値で読む誤った旧値の
+                // ネスト通知が挟まり、直後の自前通知(下)と合わせて二重発火するため。
+                _owner.SetCurrentSheetIndexCore(Math.Min(index, Sheets.Count - 1));
                 _owner.MarkDirty();
                 // 家老裁定: Sheets数を変える全経路で通知発火の不変条件を揃える(AddCommandと同型の
                 // 欠陥、現状のガードにより到達不能でも将来ガード変更時の再発を防ぐため揃えておく)。
                 _owner.NotifyHasProjectChanged();
                 // T-050修正(P-044): 削除された選択シート(sheet)が旧値。ローカルに手元にあるため
-                // 旧値をnull化せず2引数版で通知する。
+                // 旧値をnull化せず2引数版でちょうど1回通知する。
                 OnPropertyChanged(nameof(SelectedSheet), sheet);
             },
             () => Sheets.Count > 1);
