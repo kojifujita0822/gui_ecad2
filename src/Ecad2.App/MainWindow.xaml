@@ -271,9 +271,11 @@
                      グレーアウト。Shift+F9/F10はいずれもシート種別で挙動が切替わる1キーのため、
                      機能ごとに別ボタンへ分割し、IsEnabledをシート種別(IsMainCircuitSheet/
                      IsControlCircuitSheet)へ連動させる。意匠はT-040様式(StrokeThickness=1.0、
-                     境界ボックス統一)を延長した侍起草案(配置する記号そのものを模す: 自由線=
-                     線そのもの・接続点=●・配線分断=線のギャップ・縦分岐線=縦線+上下T字)、
-                     実装後に殿目視で確定する。 -->
+                     境界ボックス統一)。T-048(殿裁定2026-07-10、殿プレビュー承認済み)でグリフを確定=
+                     シート種別で描き分ける: 主回路シート用は配置する物そのものを素朴に模す(自由線横線=
+                     横線・自由線縦線=縦線・接続点=●)、制御シート用は殿提示サンプル意匠を基調とする
+                     (縦分岐線=矢印形[sample/sF9_sample、上端の●を中心に左右へ枝を貫通させ分岐を表現+
+                     縦線+下向き矢じり]・配線分断=はさみ形[sample/F10_sample])。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自由線(横線)記入 (F9)"
                         AutomationProperties.Name="自由線(横線)記入 (F9)"
                         Click="FreeLineHorizontalButton_Click"
@@ -300,7 +302,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding IsControlCircuitSheet}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M9,3 L9,15 M5,3 L13,3 M5,15 L13,15"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M9,3.3 m-1.3,0 a1.3,1.3 0 1 0 2.6,0 a1.3,1.3 0 1 0 -2.6,0 M4.5,3.3 L13.5,3.3 M9,4.6 L9,12 M5.5,9 L9,12.5 L12.5,9" Fill="Black"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF9"/>
                     </StackPanel>
                 </Button>
@@ -320,7 +322,7 @@
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding IsControlCircuitSheet}">
                     <StackPanel>
-                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9"/>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M5,3 L9,9 L12,13.5 M13,3 L9,9 L6,13.5 M6,12.2 A1.3,1.3 0 1 1 5.999,12.2 M12,12.2 A1.3,1.3 0 1 1 11.999,12.2"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F10"/>
                     </StackPanel>
                 </Button>
