@@ -1463,9 +1463,7 @@ public partial class MainWindow : Window
         // ツールバーボタン)ならisOr=trueで呼ばれるため、初期選択もOR版(ORa接点/ORb接点)を選ぶ
         // (Id一致かつIsOr一致を優先し、無ければId一致のみへフォールバック)。
         PlacementPartComboBox.ItemsSource = _viewModel.PartPalette.SelectionEntries;
-        PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.SelectionEntries
-            .FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id && e.IsOr == isOr)
-            ?? _viewModel.PartPalette.SelectionEntries.FirstOrDefault(e => e.Definition.Id == initialEntry.Definition.Id)
+        PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.ResolveEntry(initialEntry.Definition.Id, isOr)
             ?? _viewModel.PartPalette.SelectionEntries.FirstOrDefault();
         PlacementDeviceNameBox.Text = "";
         _viewModel.IsPlacementBarVisible = true;

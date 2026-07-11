@@ -632,6 +632,17 @@
                         </Style>
                     </ComboBox.ItemContainerStyle>
                 </ComboBox>
+                <!-- 選択中部品のサムネイル・名前表示エリア(T-054、殿裁定=P-023案A)。リスト側
+                     (PartSelectionList)にSelectedItemバインドを新設せず、配置バー内で完結させる
+                     (案B相当は不採用)。PlacementPartComboBox.SelectedItemをElementName経由で
+                     そのまま参照するため、初期選択(TryPlaceElement)・ドロップダウンでの選び直し
+                     いずれにも自動追従し、専用の同期コード(SelectionChangedハンドラ等)は不要。 -->
+                <Image x:Name="SelectedPartThumbnail"
+                       Source="{Binding SelectedItem.Thumbnail, ElementName=PlacementPartComboBox}"
+                       Width="24" Height="24" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                <TextBlock x:Name="SelectedPartNameText"
+                           Text="{Binding SelectedItem.DisplayName, ElementName=PlacementPartComboBox}"
+                           MinWidth="60" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <TextBox x:Name="PlacementDeviceNameBox" Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
                          AutomationProperties.Name="デバイス名"/>
                 <Button Content="OK" Width="60" VerticalAlignment="Center" IsDefault="True" Click="PlacementOkButton_Click" Margin="0,0,4,0"/>

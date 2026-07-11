@@ -62,4 +62,12 @@ public sealed class PartPaletteViewModel : ViewModelBase
 
         SelectionEntries = selectionEntries;
     }
+
+    /// <summary>PartId+IsOrから一致するSelectionEntryを解決する(T-033増分5のComboBox初期選択・
+    /// T-054の配置バー内選択中部品表示、双方で共有する照合ロジック)。IsOr込みの完全一致を優先し、
+    /// 無ければPartId一致のみへフォールバックする(OR系ツールバーボタンから開いた場合でも、
+    /// リストにOR版エントリが無い部品では通常版を初期表示するため)。</summary>
+    public PartSelectionEntryViewModel? ResolveEntry(string partId, bool isOr) =>
+        SelectionEntries.FirstOrDefault(e => e.Definition.Id == partId && e.IsOr == isOr)
+        ?? SelectionEntries.FirstOrDefault(e => e.Definition.Id == partId);
 }
