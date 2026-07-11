@@ -980,8 +980,12 @@ public partial class MainWindow : Window
     // 「削除」メニュー(T-063)。Key.Delete case(上記883行付近)と同じ削除ロジックをそのまま流用する。
     // IsCanvasFocused()判定はキー入力がキャンバス宛かを見るためのものでメニュークリックには不要、
     // 選択が無ければ各Delete*系は何もせずfalseを返すため無効化バインディングも付けていない。
+    // メニュークリックはフォーカス非依存で発火するため、Key.Delete caseと異なりDeviceNameBox編集中
+    // にも到達しうる。未確定入力を黙って破棄しないよう削除前にCommitDeviceNameEdit()で確定させる
+    // (隠密静的レビュー指摘、往復1周目)。
     private void DeleteMenuItem_Click(object sender, RoutedEventArgs e)
     {
+        CommitDeviceNameEdit();
         if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
             || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
             || _viewModel.DeleteSelectedConnectionDot())
