@@ -112,4 +112,55 @@ public class UndoManagerTests
 
         Assert.False(mgr.CanRedo);
     }
+
+    // ---- T-051バグ修正#1: Clear() (U-B1〜U-B4) ----
+
+    [Fact]
+    public void Clear_WithUndoHistory_MakesCanUndoFalse()
+    {
+        var mgr = new UndoManager();
+        mgr.RecordSnapshot(MakeDoc(1));
+
+        mgr.Clear();
+
+        Assert.False(mgr.CanUndo);
+    }
+
+    [Fact]
+    public void Clear_WithRedoHistory_MakesCanRedoFalse()
+    {
+        var mgr = new UndoManager();
+        mgr.RecordSnapshot(MakeDoc(1));
+        mgr.Undo(MakeDoc(2)); // Redo履歴を作る
+
+        mgr.Clear();
+
+        Assert.False(mgr.CanRedo);
+    }
+
+    [Fact]
+    public void Clear_WithBothHistories_MakesBothFalse()
+    {
+        var mgr = new UndoManager();
+        mgr.RecordSnapshot(MakeDoc(1));
+        mgr.RecordSnapshot(MakeDoc(2));
+        mgr.Undo(MakeDoc(3)); // Undo1件・Redo1件が残る状態を作る
+
+        mgr.Clear();
+
+        Assert.False(mgr.CanUndo);
+        Assert.False(mgr.CanRedo);
+    }
+
+    [Fact]
+    public void Clear_WhenAlreadyEmpty_DoesNotThrow()
+    {
+        var mgr = new UndoManager();
+
+        var exception = Record.Exception(() => mgr.Clear());
+
+        Assert.Null(exception);
+        Assert.False(mgr.CanUndo);
+        Assert.False(mgr.CanRedo);
+    }
 }

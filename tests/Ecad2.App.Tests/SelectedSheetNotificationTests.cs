@@ -158,4 +158,102 @@ public class SelectedSheetNotificationTests : ViewModelTestBase
         var only = Assert.Single(olds);
         Assert.Same(before, only);
     }
+
+    // ---- ケース6: Undo/Redo経由(T-051バグ修正#2) ----
+    //
+    // ApplyUndoRedoSnapshotの意味論(隠密テスト設計 docs/ecad2-t051-bugfix-test-design-onmitsu.md
+    // §2.1): Undo/Redoは操作直前に選択していたシートへ戻すのではなく、CurrentSheetIndexを新しい
+    // シート数の範囲へクランプするのみ。よって「クランプ後のindexが指すシート」が期待値になる。
+
+    /// <summary>S-B2。【RED証明の中核】修正前コードはApplyUndoRedoSnapshotがRefreshSelectedSheet
+    /// 相当を呼ばないため、SelectedSheetのPropertyChangedが一切発火しない(count=0でFAIL)。
+    /// 実装で判明: AddCommandはBeginInvoke経由(テストはImmediateDispatcherServiceで同期実行)で
+    /// 追加直後に新シートへ選択を自動移動する(T-050確立の既存仕様)ため、Undo実行直前の実際の選択は
+    /// 「追加したシート3」になっている。旧値はこのタイミング(Undo直前)で捕捉する。</summary>
+    [Fact]
+    public void UndoCommand_Execute_AfterAddCommand_RaisesSelectedSheetChanged_ExactlyOnce()
+    {
+        var vm = CreateViewModel();
+        ArrangeSheets(vm, 2);
+        vm.CurrentSheetIndex = 1;                             // シート2を選択中
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false)); // 追加直後、選択はシート3へ自動移動
+        var beforeUndo = vm.SheetNavigation.SelectedSheet;    // シート3(Undo実行直前の実際の選択)
+        var olds = SubscribeSelectedSheetOldValues(vm);
+
+        vm.UndoCommand.Execute(null);
+
+        var only = Assert.Single(olds);
+        Assert.Same(beforeUndo, only);
+    }
+
+    /// <summary>S-B2の続き。通知だけでなく、Undo後に実際に正しいシート(index=1、追加前のシート2)を
+    /// 指すことを確認する。</summary>
+    [Fact]
+    public void UndoCommand_Execute_AfterAddCommand_SelectedSheetContentPreserved()
+    {
+        var vm = CreateViewModel();
+        ArrangeSheets(vm, 2);
+        vm.CurrentSheetIndex = 1;
+        string expectedName = vm.SheetNavigation.SelectedSheet!.Name;
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false));
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(expectedName, vm.SheetNavigation.SelectedSheet?.Name);
+    }
+
+    /// <summary>S-B3。削除時にクランプされた位置(index=1、B)がUndo後も維持され、削除対象だった
+    /// C(index=2)へは戻らないことを明示する。</summary>
+    [Fact]
+    public void UndoCommand_Execute_AfterDeleteWithClamp_SelectedSheetStaysAtClampedIndex()
+    {
+        var vm = CreateViewModel();
+        ArrangeSheets(vm, 3);                                 // [A, B, C]
+        vm.CurrentSheetIndex = 2;                             // Cを選択中
+        vm.SheetNavigation.DeleteCommand.Execute(null);       // クランプでBへ(index=1)
+        Assert.Equal("シート2", vm.SheetNavigation.SelectedSheet?.Name); // 前提: クランプ後B
+
+        vm.UndoCommand.Execute(null);                         // Cが復元、3枚に戻る
+
+        Assert.Equal(3, vm.Document.Sheets.Count);
+        Assert.Equal("シート2", vm.SheetNavigation.SelectedSheet?.Name); // Cへは戻らない
+    }
+
+    /// <summary>S-B4。対称性点検(Redo方向)。クランプ計算はUndo後の現在index(=1)を基準に行われる
+    /// ため(意味論§2.1、追加時に自動移動した「シート3(index=2)」という選択位置自体はUndo/Redoの
+    /// 対象外)、Redo後もindex=1のまま=Undo直後と同じシート(シート2)を指し続ける。</summary>
+    [Fact]
+    public void RedoCommand_Execute_AfterUndo_RaisesSelectedSheetChanged_ExactlyOnce()
+    {
+        var vm = CreateViewModel();
+        ArrangeSheets(vm, 2);
+        vm.CurrentSheetIndex = 1;
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false));
+        vm.UndoCommand.Execute(null);
+        var beforeRedo = vm.SheetNavigation.SelectedSheet;    // Undo後、クランプでindex=1(シート2)
+        string beforeRedoName = beforeRedo!.Name;
+        var olds = SubscribeSelectedSheetOldValues(vm);
+
+        vm.RedoCommand.Execute(null);
+
+        var only = Assert.Single(olds);
+        Assert.Same(beforeRedo, only);
+        Assert.Equal(beforeRedoName, vm.SheetNavigation.SelectedSheet?.Name); // index=1のまま維持
+    }
+
+    /// <summary>S-B1。境界値(1↔2枚の往復)。1シートへAddCommandで2枚目を追加後Undoすると、
+    /// 残る唯一のシートが選択される。</summary>
+    [Fact]
+    public void UndoCommand_Execute_OnSingleSheetHistory_SelectsRemainingSheet()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();                                     // シート1枚のみ
+        string onlySheetName = vm.SheetNavigation.SelectedSheet!.Name;
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Single(vm.Document.Sheets);
+        Assert.Equal(onlySheetName, vm.SheetNavigation.SelectedSheet?.Name);
+    }
 }

@@ -1657,6 +1657,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         StatusMessage = "";
         Tool = ToolState.SelectDefault;
         OutputPanel.ClearResults();
+        // T-051バグ修正#1(隠密レビューCONFIRMED重大): 無関係な旧文書のUndo/Redo履歴を持ち越すと、
+        // 別ファイルへの切替後にUndoで旧文書の状態が復元され、それを保存すると新ファイルパスへ
+        // 誤って上書きされるデータ破損事故になる。文書差し替えの入口で必ず履歴を破棄する。
+        UndoManager.Clear();
         // 新規/開く直後は未保存の変更が無い状態(IsDirty=false)から始まる。
         IsDirty = false;
     }
@@ -1798,6 +1802,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void ApplyUndoRedoSnapshot(LadderDocument restored)
     {
         var oldDocument = Document;
+        // T-051バグ修正#2(隠密レビューCONFIRMED): Document差し替え前=旧文書の選択状態が残る
+        // この時点で捕捉する(ReplaceDocumentと同じ理由、SetCurrentSheetIndexCore後に読むと
+        // 既に新しいindex・ミラーの組から誤った値になる)。
+        var oldSelectedSheet = SheetNavigation.SelectedSheet;
         Document = restored;
         OnPropertyChanged(nameof(Document), oldDocument);
         SheetNavigation.ResetSheets();
@@ -1805,9 +1813,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         int clampedIndex = Math.Clamp(_currentSheetIndex, 0, Math.Max(0, restored.Sheets.Count - 1));
         SetCurrentSheetIndexCore(clampedIndex);
         NotifyCurrentSheetChanged();
+        // T-051バグ修正#2: AddCommand/DeleteCommand/RenameCommand等の既存コマンド群が律儀に発火
+        // させているSelectedSheet変更通知(T-050で確立済みの不変条件)をUndo/Redoでも発火させ、
+        // 左パレットのシート選択ハイライト崩れを防ぐ。意味論はクランプ位置維持(元のシートへ戻す
+        // のではない、docs/ecad2-t051-bugfix-test-design-onmitsu.md §2.1)。
+        SheetNavigation.RefreshSelectedSheet(oldSelectedSheet);
         // Undo/Redoが「シート0枚⇔1枚以上」の境界を跨ぐ可能性がある(最後の1枚のAdd/Deleteを取り消す場合)。
         NotifyHasProjectChanged();
         DeviceTable.Rebind(restored.Devices);
+        // T-051バグ修正#4(隠密レビューCONFIRMED): ReplaceDocumentと同じ理由(T-019の教訓)で、
+        // シート構成が変わった以上、旧文書に紐づくDRC結果は破棄する。放置すると存在しないページ
+        // 番号を指す診断が残留し、クリック時にJumpToが無言returnする「沈黙」不整合が再発する。
+        OutputPanel.ClearResults();
         MarkDirty();
     }
 }

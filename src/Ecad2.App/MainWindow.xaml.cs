@@ -931,10 +931,15 @@ public partial class MainWindow : Window
                 break;
             case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
                 // T-051: メニュー/ツールバーのInputGestureText表示(Ctrl+Z)と整合させる。
+                // T-051バグ修正#3(隠密レビューCONFIRMED重大): 既存Ctrl+S/O/Nと同型のガード。
+                // DeviceNameBox編集中の未確定入力を確定してからUndoを実行しないと、Undoで
+                // Documentが差し替わった後にフォーカスが外れた際、別の要素へ誤書き込みされうる。
+                CommitDeviceNameEdit();
                 _viewModel.UndoCommand.Execute(null);
                 e.Handled = true;
                 break;
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
+                CommitDeviceNameEdit();
                 _viewModel.RedoCommand.Execute(null);
                 e.Handled = true;
                 break;

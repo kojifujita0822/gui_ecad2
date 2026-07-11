@@ -40,4 +40,13 @@ public sealed class UndoManager
         _undoStack.Push(GcadSerializer.Serialize(current));
         return GcadSerializer.Deserialize(_redoStack.Pop());
     }
+
+    /// <summary>Undo/Redo履歴を全て破棄する(T-051バグ修正#1)。文書差し替え(新規/開く)の入口で呼び、
+    /// 無関係な旧文書のスナップショットが残存したままUndoされ別ファイルへ誤って上書き保存される
+    /// データ破損事故を防ぐ。既に空でも例外は投げない(Stack.Clear()の既定挙動)。</summary>
+    public void Clear()
+    {
+        _undoStack.Clear();
+        _redoStack.Clear();
+    }
 }

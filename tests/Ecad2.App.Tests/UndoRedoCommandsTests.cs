@@ -108,4 +108,113 @@ public class UndoRedoCommandsTests : ViewModelTestBase
     // Undo単独の効果としてRED証明可能な形では検証できない。ApplyUndoRedoSnapshot内の
     // MarkDirty()呼び出しはコード上の対応で足り、専用テストは追加しない(無意味なテストを
     // 追加しない方針)。
+
+    // ---- T-051バグ修正#1: ReplaceDocument(新規/開く)でUndo/Redo履歴がクリアされること ----
+
+    /// <summary>【RED証明の中核】修正前コードはReplaceDocumentがUndoManagerに触れないため、
+    /// 別ファイルへの切替後も旧文書のUndo履歴が残存し、無関係な旧状態への復元・誤上書き保存
+    /// (隠密レビュー#1、データ破損)が起こりうる。</summary>
+    [Fact]
+    public void NewDocument_ClearsUndoHistory_UndoCommandBecomesDisabled()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        Assert.True(vm.UndoCommand.CanExecute(null)); // 前提: Undo履歴がある
+
+        vm.NewDocument(); // ReplaceDocument経由で無関係な新文書へ差し替え
+
+        Assert.False(vm.UndoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void NewDocument_ClearsRedoHistory_RedoCommandBecomesDisabled()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.UndoCommand.Execute(null);
+        Assert.True(vm.RedoCommand.CanExecute(null)); // 前提: Undo直後はRedo履歴がある
+
+        vm.NewDocument();
+
+        Assert.False(vm.RedoCommand.CanExecute(null));
+    }
+
+    // ---- T-051バグ修正#4: Undo/Redoで出力パネルの診断残留が消えること ----
+
+    /// <summary>DRC-PART-001(部品参照未解決、T-052)を誘発する最小配置でDiagnostics≥1件を作る
+    /// (OutputPanelJumpToTestsと同型)。</summary>
+    private static void PlaceUnresolvedPartIdElement(MainWindowViewModel vm)
+        => vm.CurrentSheet!.Elements.Add(new Model.ElementInstance
+        {
+            PartId = "missing-id",
+            DeviceName = null,
+            Pos = new Model.GridPos(1, 1),
+        });
+
+    /// <summary>【RED証明の中核】修正前コードはApplyUndoRedoSnapshotがOutputPanel.ClearResults()を
+    /// 呼ばないため、シート構成が変わっても存在しないページ番号を指す診断が出力パネルに残留し、
+    /// クリック時にJumpToが無言returnする「沈黙」不整合(隠密レビュー#4、T-019の教訓の再発)が起こる。</summary>
+    [Fact]
+    public void UndoCommand_Execute_ClearsOutputPanelDiagnostics()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceUnresolvedPartIdElement(vm);
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.OutputPanel.RunDrcCommand.Execute(null);
+        Assert.True(vm.OutputPanel.Diagnostics.Count > 0); // 前提: 診断が残っている
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Empty(vm.OutputPanel.Diagnostics);
+    }
+
+    [Fact]
+    public void RedoCommand_Execute_ClearsOutputPanelDiagnostics()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceUnresolvedPartIdElement(vm);
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.UndoCommand.Execute(null);
+        vm.OutputPanel.RunDrcCommand.Execute(null);
+        Assert.True(vm.OutputPanel.Diagnostics.Count > 0); // 前提: Undo後に再度診断を作っておく
+
+        vm.RedoCommand.Execute(null);
+
+        Assert.Empty(vm.OutputPanel.Diagnostics);
+    }
+
+    [Fact]
+    public void UndoCommand_Execute_WhenNoDiagnostics_DoesNotThrow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        Assert.Empty(vm.OutputPanel.Diagnostics); // 前提: DRC未実行
+
+        var exception = Record.Exception(() => vm.UndoCommand.Execute(null));
+
+        Assert.Null(exception);
+        Assert.Empty(vm.OutputPanel.Diagnostics);
+    }
+
+    [Fact]
+    public void UndoCommand_Execute_ClearsSelectedDiagnostic()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceUnresolvedPartIdElement(vm);
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.OutputPanel.RunDrcCommand.Execute(null);
+        Assert.True(vm.OutputPanel.Diagnostics.Count > 0); // 前提
+        vm.OutputPanel.SelectedDiagnostic = vm.OutputPanel.Diagnostics[0];
+        Assert.NotNull(vm.OutputPanel.SelectedDiagnostic);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Null(vm.OutputPanel.SelectedDiagnostic);
+    }
 }
