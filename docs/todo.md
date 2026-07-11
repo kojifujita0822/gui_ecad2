@@ -547,6 +547,37 @@ BeginInvoke自動選択移動=T-050既存仕様の考慮漏れ）を発見・訂
 （1角度はAPI上限で中断、往復2周目の再々レビュー時に補完予定）。
 **家老仕分け＝殿裁定への明確な違反ゆえ範囲内欠陥、往復2周目（上限内）で侍へ差し戻し**。
 制度どおり隠密テスト設計起草→侍修正＋RED証明。
+**往復2周目修正完了（2026-07-11）**：コミットf2aaaad。隠密設計
+（`docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`）どおり、ApplyUndoRedoSnapshot内で
+SelectedCellを退避→SetCurrentSheetIndexCore→復元の局所対応（本体無変更）。T-selcell-1〜4全実装、
+RED証明実測=1/2/3がFAIL・4はPASS（設計書想定どおり）。Core64件・App414件（+4）全合格。
+設計書§4のスコープ外事項（Tool状態/記入中ドラフト）は指示どおり不触。
+**隠密再々レビュー（2026-07-11、`docs/ecad2-t051-round3-review-onmitsu.md`）**：主目的
+（nullリセット解消）は達成、T-selcell-1〜4設計書どおり・RED証明想定どおり・全合格。code-review
+残り1角度（language-pitfall）補完で**新規PLAUSIBLE1件**——SelectedCell復元がGrid.Rows範囲クランプ
+（FinishRowCountChange）を経由せず、シート追加Undo+その後の行数拡張の組合せでSelectedCellが
+範囲外座標を指しうる（クラッシュ無し・表示不整合止まり、verify確認済み。**往復2周目自体が持ち込んだ
+新規回帰**=8b1b734時点では経路自体が不存在）。既知の残課題（記入中ドラフト無警告消失、設計書§4で
+当初からDoD範囲外）も現状のまま。
+**殿裁定（2026-07-11）＝往復3周目で修正してからクローズ**（新規回帰を知りながら残さない方針）。
+制度どおり隠密テスト設計→侍修正＋RED証明→再レビュー→忍者実機。T-062着手はその後へ。
+**往復3周目修正完了（2026-07-11）**：コミット8a6eb13。隠密設計
+（`docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md`）どおり
+`ClampSelectedCellToSheetRowsヘルパー`新設・復元代入をRowクランプでラップ（基準=復元後
+CurrentSheet、Column対象外、FinishRowCountChange本体不触）。T-selclamp-1〜5全実装、RED証明実測=
+1/2/4/5がFAIL・3はPASS（設計書想定どおり）。Core64件・App419件（+5）全合格。
+**隠密最終レビュー（2026-07-11、`docs/ecad2-t051-round4-final-review-onmitsu.md`）＝通常観点(a)〜(d)
+全て妥当・クリーン確定**（ヘルパーはRowのみ純粋関数・RED整合・クランプ基準の実行順序正・PLAUSIBLE
+経路の封鎖を実測確認）。
+**Stryker手動棚卸しは技術的障害で延期（家老裁定2026-07-11）**：Ecad2.App（WPF）側が「重複する
+Compileアイテム」（NETSDK1022系）でDesignTimeBuild解析に失敗しmutation実行不能（obj/bin完全削除・
+_wpftmp系2717個削除・2回再試行とも解消せず。Core側は正常=score7.43%/49秒。Stryker内部Buildalyzer
+とWPF DesignTimeBuildの既知の相性問題と隠密Web調査で判明）。T-046/T-050では同一手順で正常動作
+実績→**家老の原因仮説=本日導入の.NET 10 SDK（10.0.301）**（global.json無しゆえBuildalyzerが
+SDK 10でDesignTimeBuildを走らせるようになった＝時期が完全に符合）。**T-062（net10移行）完了後に
+再試行し、T-051変更領域の棚卸しをそこで実施**（移行でSDK経路が正式化され解消する見込み。なお失敗
+するならglobal.json/csproj対処を侍へ采配）。テストコード静的レビューは最終レビュー内で実施済み。
+次＝忍者実機確認→クローズ。
 
 ### T-046 「必ず通過するテスト」防止の仕組み化 — In-progress（制度は運用開始済み、CI化のみ残置）
 
