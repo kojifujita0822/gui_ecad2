@@ -90,14 +90,20 @@
              の行0/1/3(Auto)はそれを単独専有する子要素を失い、WPF Gridの仕様上これらAuto行の実測
              サイズは実質0に潰れる。結果、ルートGrid自身の座標系(RootLayoutGrid基準)ではMainWorkAreaGrid
              の原点はラッパー経由で不変ではなくなる(ズレる)。PositionPlacementBarはこれを踏まえ、
-             TranslatePointの変換先をRootLayoutGridへ揃えることで整合させている。 -->
+             TranslatePointの変換先をRootLayoutGridへ揃えることで整合させている。
+             T-059(出力パネル高さドラッグ調整、殿直接指示2026-07-11): 本ラッパー内部にGridSplitter用の
+             行を1行追加(Auto/Auto/*/Auto/Auto、旧index3=OutputPanelAreaはindex4へ繰り下げ)。ラッパー
+             自身のGrid.RowSpan=4・ルートGrid(RootLayoutGrid)の行構成(5行)は不変——本ラッパー内部専用の
+             細分化のため、ラッパー外にあるStatusBarArea(Grid.Row="4"、RootLayoutGrid基準)の値には
+             影響しない。 -->
         <Grid x:Name="MainContentArea" Grid.Row="0" Grid.RowSpan="4"
               IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="*" MinHeight="200"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="160" MinHeight="80"/>
             </Grid.RowDefinitions>
 
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
@@ -496,11 +502,16 @@
             </Border>
         </Grid>
 
+        <!-- T-059(殿直接指示2026-07-11): メイン作業域⇔出力パネルの高さをドラッグ調整可能にする
+             (RightPanelArea、456行の上下分割と同一パターン)。 -->
+        <GridSplitter Grid.Row="3" Height="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
+
         <!-- 下部出力パネル: DesignRuleCheck(T-007移植済み)の結果を構造化DataGridで表示する(T-018、
              殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
              行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
-             (OutputPanelViewModel.SelectedDiagnostic参照)。 -->
-        <DockPanel x:Name="OutputPanelArea" Grid.Row="3" Height="160">
+             (OutputPanelViewModel.SelectedDiagnostic参照)。高さはGridSplitterでドラッグ調整可能
+             (T-059、既定160・MinHeight=80はMainContentArea.RowDefinitions側で指定)。 -->
+        <DockPanel x:Name="OutputPanelArea" Grid.Row="4">
             <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
                 <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"/>
             </Border>
