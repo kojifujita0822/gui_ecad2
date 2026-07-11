@@ -150,6 +150,18 @@ FileVersion=0.3.0.0/ProductVersion=0.3.0・起動→終了とも正常確認。g
 実装方針：Core層は完備（ElementKind・SymbolGlyphs・DeviceClassとも移植済み）ゆえ
 `BasicPartTemplates`へのPartDefinition追加＋サムネイル対応が主作業。規模小〜中。
 ロードマップ位置=T-062後の小粒群（T-063/065/066）と同グループ。
+**着手前調査完了（2026-07-11、隠密2、`docs/ecad2-t071-part-addition-design-onmitsu2.md`）**：
+対象10種は齟齬なく確定。PartDefinition追加方針は3グループ——①押釦NO/NC・表示灯（3種）は既存
+`PartRole`(InputNO/InputNC/Lamp)で対応可・規模小 ②モータ（1種）は`PartRole.NonSimulated`流用可、
+3端子(U/V/W)ポート定義が別途必要・規模小 ③タイマNO/NC・瞬時NO/NC・サーマル・非常停止（6種）は
+対応する`PartRole`が存在せず**`PartRole` enum拡張＋`PartResolver.ComponentKind()`のswitch拡張が
+必要**（既存Roleへの丸めは電気的挙動・機器分類双方が劣化するため非推奨）・規模小〜中。
+`DeviceClass`分類側は既に対応済みにつき追加実装不要。
+サムネイルは2経路：部品選択パレット本体(`PartThumbnailRenderer`)はPrimitivesから自動描画で対応可。
+配置バーの簡易アイコン(`PartEntryToGlyphGeometryConverter`)は新規10種とも既存の個別グリフ対応が無く
+汎用フォールバックとなる点が判明——**殿裁定（2026-07-11、プレビュー提示で選択）＝全10種分の
+専用グリフを新規作成**（GX Works3等参考の固有記号、T-048の「殿意匠提示→プレビュー承認制」を踏襲）。
+侍へ実装采配済み（2026-07-11）。
 
 **起票=GuiEcad未結線棚卸し（`docs/ecad2-guiecad-unwired-features-survey-onmitsu2.md`）のC区分から
 殿が個別指名**。GuiEcadではApp層実装のためecad2に論理ごと無し——検索対象（デバイス名/コメント等）・
