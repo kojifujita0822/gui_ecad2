@@ -1492,12 +1492,16 @@ public partial class MainWindow : Window
             _viewModel.StatusMessage = "配置するセルを先に選択してください";
             return;
         }
-        if (!_viewModel.IsSelectedCellWithinGrid())
+        // T-071バグ修正: initialEntry(クリックされた部品)のWidthCellsをプレチェックへ渡す。配置バー
+        // 表示後にコンボボックスで別部品へ切り替えられた場合はPlaceElementAtSelectedCell側の
+        // ValidatePlacement(実際に配置するpartIdのWidthCellsで再判定)が最終防御になる。
+        int cellWidth = initialEntry.Definition.WidthCells;
+        if (!_viewModel.IsSelectedCellWithinGrid(cellWidth))
         {
             _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
             return;
         }
-        if (_viewModel.IsSelectedCellOccupied())
+        if (_viewModel.IsSelectedCellOccupied(cellWidth))
         {
             _viewModel.StatusMessage = "選択したセルには既に要素があります";
             return;

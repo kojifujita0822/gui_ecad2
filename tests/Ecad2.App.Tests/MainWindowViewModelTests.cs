@@ -162,6 +162,40 @@ public class MainWindowViewModelTests : ViewModelTestBase
     }
 
     /// <summary>
+    /// T-071バグ修正(隠密テスト設計 docs/ecad2-t071-bugfix-test-design-onmitsu.md 表1)の回帰テスト。
+    /// WidthCells>1(Motor=3セル)配置時の境界外・重複配置の検出漏れを検証する。occupiedColumn>=0の
+    /// ケースは先に1セル部品(ContactNO)をその列へ配置してから、目的列cへMotor等を配置する。
+    /// </summary>
+    [Theory]
+    [InlineData(BasicPartTemplates.ContactNOId, 19, -1, true)]   // 1: 1セル部品、上限(既存回帰)
+    [InlineData(BasicPartTemplates.ContactNOId, 20, -1, false)]  // 2: 1セル部品、上限+1(既存回帰)
+    [InlineData(BasicPartTemplates.MotorId, 0, -1, true)]        // 3: 3セル部品、下限
+    [InlineData(BasicPartTemplates.MotorId, 17, -1, true)]       // 4: 3セル部品、[17,18,19]ちょうど収まる
+    [InlineData(BasicPartTemplates.MotorId, 18, -1, false)]      // 5: [18,19,20]、20が範囲外
+    [InlineData(BasicPartTemplates.MotorId, 19, -1, false)]      // 6: [19,20,21]、2列はみ出す
+    [InlineData(BasicPartTemplates.MotorId, 5, 5, false)]        // 7: アンカー自体に既存要素(従来の重複)
+    [InlineData(BasicPartTemplates.MotorId, 5, 6, false)]        // 8: +1列目に既存要素(新規重複ケース)
+    [InlineData(BasicPartTemplates.MotorId, 5, 7, false)]        // 9: +2列目に既存要素(新規重複ケース)
+    [InlineData(BasicPartTemplates.MotorId, 5, -1, true)]        // 10: 周辺すべて空き(正常系対称ケース)
+    public void PlaceElementAtSelectedCell_MultiCellWidthBoundaryAndOverlap_PlacesOnlyWhenValid(
+        string partId, int column, int occupiedColumn, bool expectPlaced)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        if (occupiedColumn >= 0)
+        {
+            vm.SelectedCell = new GridPos(0, occupiedColumn);
+            vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "", isOr: false);
+        }
+
+        vm.SelectedCell = new GridPos(0, column);
+        vm.PlaceElementAtSelectedCell(partId, "X001", isOr: false);
+
+        Assert.Equal(expectPlaced, vm.CurrentSheet!.Elements.Any(el => el.PartId == partId && el.Pos == new GridPos(0, column)));
+    }
+
+    /// <summary>
     /// T-045増分C(所見B=TryPlaceElementの境界チェック未追随の解消)の回帰テスト。IsSelectedCellWithinGrid
     /// はValidatePlacementと境界判定ロジックを共有する(IsWithinGridBounds)。境界は
     /// PlaceElementAtSelectedCell_BoundaryRowAndColumnと同じ8ケース。

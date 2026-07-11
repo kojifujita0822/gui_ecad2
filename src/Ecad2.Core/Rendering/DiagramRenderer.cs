@@ -837,6 +837,13 @@ public sealed class DiagramRenderer
         int lb = LeftBoundary(e), rb = RightBoundary(e);
         double width = e.CellWidth * Cell;
         var part = _lib?.Get(e.PartId);
+        // T-071バグ修正: e.Kindは自作パーツ配置時は常に既定値(ContactNO)のままのため、PartId経由で
+        // 配置された組込みパーツ(BasicPartTemplates)の種別判定にはPartResolver.ComponentKind経由の
+        // 解決が必須(853-855行のisLoad判定と同型パターン、隠密テスト設計 表2)。CreatesComponent=false
+        // (Role=NonSimulated、Motor等)はComponentKindが例外を投げるため事前にガードする。
+        ElementKind resolvedKind = part is not null && PartResolver.CreatesComponent(e, _lib)
+            ? PartResolver.ComponentKind(e, _lib)
+            : e.Kind;
 
         bool on = energized is not null && e.DeviceName is not null
                   && energized.TryGetValue(e.DeviceName, out var v) && v;
@@ -887,7 +894,7 @@ public sealed class DiagramRenderer
         }
 
         // 表示灯の中央にランプ色（色記号）を記入
-        if (e.Kind == ElementKind.Lamp &&
+        if (resolvedKind == ElementKind.Lamp &&
             e.Params.TryGetValue(ParamKeys.LampColor, out var lampColor) && !string.IsNullOrEmpty(lampColor))
         {
             var cs = _theme.Text(TextRole.DeviceName) with
@@ -897,7 +904,7 @@ public sealed class DiagramRenderer
             r.DrawText(lampColor, new(X(lb) + width / 2, YRow(e.Pos.Row)), cs);
         }
 
-        DrawElementLabel(r, e, lb, rb, width);
+        DrawElementLabel(r, e, lb, rb, width, resolvedKind);
     }
 
     /// <summary>配置プレビュー用に1要素を指定色（半透明可）で描く。Render の後に呼ぶこと
@@ -931,7 +938,7 @@ public sealed class DiagramRenderer
     // 機器名ラベルを記号の上・中央に描く。
     // Params["LabelDy"] (mm, 正で上へ) で要素ごとに高さオフセットを調整できる（密集時の重なり回避）。
     // コメントは図面には描かない（PDF の機器欄に記載する）。
-    private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width)
+    private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width, ElementKind resolvedKind)
     {
         if (!_opt.ShowDeviceNames) return;
         if (string.IsNullOrEmpty(e.DeviceName)) return;
@@ -948,7 +955,7 @@ public sealed class DiagramRenderer
 
         // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
         // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。
-        if (TimerContactMark(e.Kind) is string mark)
+        if (TimerContactMark(resolvedKind) is string mark)
             r.DrawText(mark, new(X(rb) + 0.3, yn),
                 _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
     }

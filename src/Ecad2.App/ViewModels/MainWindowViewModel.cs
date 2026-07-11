@@ -1420,27 +1420,39 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public PartLibrary PartLibrary { get; }
 
-    /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。</summary>
-    public bool IsSelectedCellOccupied()
-        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && sheet.Elements.Any(el => el.Pos == pos);
+    /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。
+    /// cellWidth>1(Motor等)の場合、占有列範囲[pos.Column, pos.Column+cellWidth-1]と既存要素の占有列範囲
+    /// [el.Pos.Column, el.Pos.Column+el.CellWidth-1]の交差判定に拡張する(T-071バグ修正、隠密テスト設計
+    /// docs/ecad2-t071-bugfix-test-design-onmitsu.md 表1)。既定cellWidth=1は従来の単一セル一致判定と
+    /// 数学的に等価(区間[c,c]同士の一致比較になるため回帰なし)。</summary>
+    public bool IsSelectedCellOccupied(int cellWidth = 1)
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsOccupied(pos, cellWidth, sheet);
 
     /// <summary>SelectedCellが現在のグリッド範囲内(行0〜Rows-1・列0〜Columns-1)か判定する
     /// (T-045増分C、View層のTryPlaceElementが配置バー表示前に境界外を弾くために使う。所見B=
     /// 境界チェック未追随でのサイレント失敗の解消)。選択(SelectedCell)自体の仕様範囲(行-1・
     /// 列-2まで選択可、殿教示2026-07-07・docs/proposed.md P-022/P-024)には触れず、配置前の
-    /// フィードバック用の判定に留める(殿裁定2026-07-09=下限0、選択の仕様は不変)。</summary>
-    public bool IsSelectedCellWithinGrid()
-        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, sheet);
+    /// フィードバック用の判定に留める(殿裁定2026-07-09=下限0、選択の仕様は不変)。cellWidthの
+    /// 意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
+    public bool IsSelectedCellWithinGrid(int cellWidth = 1)
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, cellWidth, sheet);
 
-    private static bool IsWithinGridBounds(GridPos pos, Sheet sheet)
+    private static bool IsWithinGridBounds(GridPos pos, int cellWidth, Sheet sheet)
         => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
-        && pos.Column >= 0 && pos.Column < sheet.Grid.Columns;
+        && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
+
+    private static bool IsOccupied(GridPos pos, int cellWidth, Sheet sheet)
+    {
+        int left = pos.Column, right = pos.Column + cellWidth - 1;
+        return sheet.Elements.Any(el =>
+            el.Pos.Row == pos.Row && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
+    }
 
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
     /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
-    /// 共有する(IsWithinGridBounds)。</summary>
-    private bool ValidatePlacement(GridPos pos, Sheet sheet)
-        => IsWithinGridBounds(pos, sheet) && !sheet.Elements.Any(el => el.Pos == pos);
+    /// 共有する(IsWithinGridBounds)。cellWidthの意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
+    private bool ValidatePlacement(GridPos pos, int cellWidth, Sheet sheet)
+        => IsWithinGridBounds(pos, cellWidth, sheet) && !IsOccupied(pos, cellWidth, sheet);
 
     /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
     /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
@@ -1492,13 +1504,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
-        if (!ValidatePlacement(pos, sheet)) return;
+        // T-071バグ修正: Motor(WidthCells=3)等の複数セル幅パーツに対応するため、配置するパーツの
+        // WidthCellsをPartLibraryから取得する(既定1、基本図形の大半は1セル幅のまま)。
+        int cellWidth = PartLibrary.Get(partId)?.WidthCells ?? 1;
+        if (!ValidatePlacement(pos, cellWidth, sheet)) return;
 
-        const int cellWidth = 1; // 基本図形(BasicPartTemplates)は全て1セル幅
         var newElement = new ElementInstance
         {
             Pos = pos,
             PartId = partId,
+            CellWidth = cellWidth,
             DeviceName = deviceName.Length > 0 ? deviceName : null,
         };
         sheet.Elements.Add(newElement);
