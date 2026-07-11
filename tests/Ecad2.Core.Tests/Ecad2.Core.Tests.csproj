@@ -22,6 +22,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Ecad2.Core\Ecad2.Core.csproj" />
+    <ProjectReference Include="..\..\src\Ecad2.Pdf\Ecad2.Pdf.csproj" />
   </ItemGroup>
 
 </Project>
