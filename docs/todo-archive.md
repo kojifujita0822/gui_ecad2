@@ -264,3 +264,559 @@ VerticalConnector=Shift+F9／WireBreak=F10／ConnectionDot=F10）がキーボー
 - 特記: 期間中に出力破損#3〜#7が侍系列で頻発（Grep結果行改変型が主、Grep使用誘因疑い）、
   §5離脱2回+フリーズ1回を挟みつつ引き継ぎ書2本で作業損失ゼロで完遂。侍ターミナルは
   殿裁定で新規ウィンドウへ系列一新
+
+### T-075 主要機能の仕様書整備 — 完全Done（2026-07-11）
+
+**起票=殿直接指示2026-07-11**（忍者からの上申を受け、家老が選択肢を提示して殿裁定）：「仕様かバグかの
+判断が難しいなら仕様書を作成してはどうか。後でヘルプ画面に使用方法を記載する予定ゆえ無駄にならない」。
+
+**背景**：T-062実機検証だけでも3度、仕様/バグの切り分けに難航（起動直後シート0件・横線記入ボタン
+無効・要素配置Undo不可、いずれも過去記録の発掘やコード読解で「仕様」と事後確認）。一次資料が無く
+検証のたび難航している実態があり、仕様書があれば検証は「仕様書と実機の突合」となり速度・精度向上、
+隠密の静的レビューとも共通基準にでき、将来のヘルプ画面へも流用可（T-077で転用予定）。
+
+**殿裁定（スコープ）**：**主要機能を体系的に網羅**——隠密がメニュー/ツールバー単位で一括調査・起草。
+`docs/spec/ecad2-spec-{領域}.md`を新規体系として作成（殿指示により`docs/spec/`へ保存）。対象=配置・
+結線・Undo/Redo・メニュー構成等主要機能一式。規模=中〜大（調査工数大）。
+**全11領域完了（2026-07-11、隠密）**：第1弾=シート/ドキュメント管理・結線操作・Undo/Redo（3件）、
+第2弾=メニュー・ツールバー全体構成（1件）、第3弾=配置操作（1件）、第4弾=機器表・BOM／設計チェック
+(DRC)・出力パネル／キャンバス表示／部品選択・自作パーツ管理／PDF出力・テストモード／ステータスバー・
+モード可視化（6件）。各仕様書は事実・伝聞・推測を峻別し出典（コード・殿裁定記録・実機検証記録）付き
+で整理、複数の重要な設計上の発見（配置操作と結線操作のシート種別依存の非対称性、P-050とGroupFrame
+配置単位の設計分岐の関連、PDF出力Core層の到達不能コード等）も収録。詳細は`docs/spec/`配下各ファイル
+参照。次＝T-077（ヘルプ「使い方」画面への転用）着手時の素材とする。
+
+隠密へ委譲。
+
+### T-074 「バージョン情報」ダイアログへのバージョン番号表示 — 完全Done（2026-07-11）
+
+**起票=殿直接指示2026-07-11**「次回からアプリの『ヘルプ』→『バージョン情報』にもバージョンいれて」。
+現状の実態（家老の事前検分）：`MainWindow.xaml:137`に「バージョン情報(_A)」メニュー項目は存在するが、
+Click/Command結線が無く器のみ（押下しても何も起きない）。
+**殿裁定（2026-07-11、プレビュー提示で選択）**：表示内容=**アプリ名+バージョン番号のみ**
+（シンプル、例「Ecad2 v0.3.0」）。著作権表示・ビルド日時等は含めない。
+**実装完了（2026-07-11）**：コミット`70d1bb3`。メニューへClickハンドラ結線＋新設`AboutDialog`
+（RenameDialog同型の単一階層モーダル）で「Ecad2 vX.Y.Z」のみ表示。バージョンは
+`Assembly.GetExecutingAssembly().GetName().Version`経由で`csproj`の`<Version>`と自動連動
+（ハードコードなし）。Core64件・App419件全合格、差分は予定範囲内のみ。
+**隠密静的レビュー（2026-07-11、`docs/archive/ecad2-t074-about-dialog-review-onmitsu.md`）＝3観点全クリーン**：
+表示文言の適合・Version取得方式の妥当性・既存ダイアログとの構造一貫性、いずれも問題なし
+（Revision常時0でMajor.Minor.Build表示となる点は現運用と整合する留意点として記録のみ）。
+**忍者実機確認＝3点全OK**：AboutDialog表示（スクショ+UIAテキスト直接読取で裏取り）・OKクローズ・
+クローズ後の画面遷移影響なし。多重化・例外なし。
+
+### T-073 ecad2-ui-automationスキルのSendKeysフォーカス誤爆対策 — 完全Done（2026-07-11）
+
+**起票=P-056（T-062実機回帰中の殿PC完全フリーズ、T-062節参照）を受けた殿直接指示の一連の経緯**：
+「実機確認でクラッシュの原因の調査から初めて」→忍者・隠密のWチェック調査（並行）→「enter試してみて」
+→忍者の実機試行でフォーカス誤爆によるモーダルダイアログ多重化を確認（フリーズ再現には至らず、安全に
+収拾済み）→「確認はできた、対策プランを検討して」→隠密が対策プラン検討→「3点対応して」で実装許可。
+
+**原因**：`Set-Ecad2Foreground`(helpers.ps1)がモーダルダイアログ表示中でも無条件に`SetForegroundWindow`を
+呼び、`ShowDialog`内部の`EnableWindow(FALSE)`と矛盾する状態を生む。SendKeysと組み合わさりフォーカス
+誤爆→意図しないコマンド誘発（実機でCtrl+O相当の再トリガーによるダイアログ多重化を確認）。
+技術裏付け=`docs/archive/ecad2-p056-sendkeys-freeze-onmitsu.md`（隠密）、実機記録=
+`docs-notes/ecad2-p056-sendkeys-freeze-investigation-ninja.md`（忍者）。
+
+**内容（対策プラン推奨案3点、隠密検討・殿裁可済み）**：
+1. `Set-Ecad2Foreground`へ`IsWindowEnabled`判定追加、モーダル無効化中はSetForegroundWindow自体をスキップ
+2. `Send-Ecad2Keys`へ長文字列ガード（20文字超は例外、`-Force`で明示解除）
+3. `SKILL.md`のトラブルシュート節へ危険パターン反映
+
+対象=`.claude/skills/ecad2-ui-automation/helpers.ps1`・`SKILL.md`の2ファイルのみ、src/への変更は伴わない
+（検証ツール側のみの改修）。
+**実装完了（2026-07-11）**：コミット`a8be0bd`。3点とも対策プランどおり実装。
+**隠密静的レビュー（2026-07-11、`docs/archive/ecad2-t073-p056-fix-review-onmitsu.md`）**：5節対策プランどおり
+正確な実装・致命的問題なしと確認（code-reviewスキル併用、境界値・既存呼び出し元6箇所への影響・
+リポジトリ全体の回帰、いずれも問題なし）。要修正1件（`SKILL.md:35-36`の参照先が実在しない見出し名を
+指す不整合、実害=読者が参照先を探せない）を往復1周目として侍へ差し戻し。経過観察4件（スタイル不統一等）
+は対応不要と仕分け。
+**往復1周目修正完了（2026-07-11）**：コミット`348be4d`（差分1行のみ）。隠密再レビューでクリーン確定。
+**忍者実機再検証（2026-07-11）＝3観点全OK**：(1)モーダル表示中`Set-Ecad2Foreground`呼び出しで
+`SetForegroundWindow`がスキップされフォアグラウンドはダイアログのまま変化なし (2)`Send-Ecad2Keys`
+21文字送信で`-Force`なし例外・`-Force`指定時は正常反映（対策前は1文字すら届かなかったのと対照）
+(3)Enter単独送信の再試行でダイアログ多重化が再発せず1枚のまま維持（対策前は2枚に増えていたのと対照）。
+フリーズ・異常兆候なし。詳細=`docs-notes/ecad2-p056-sendkeys-freeze-investigation-ninja.md`7〜8節。
+
+### T-072 v0.3仮リリースビルドの作成 — 完全Done（2026-07-11）
+
+**起票=殿直接指示2026-07-11**「T-062完了しマージまでできたらV0.3とする」。**T-062（.NET 10移行）の
+mainマージ完了を着手条件**とする。内容=T-057（v0.2）で確立したリリース手順の踏襲：
+`Ecad2.App.csproj`のVersionを0.3.0へ→フレームワーク依存publish（bin配下＋`C:\ECAD2\version\v0.3`の
+2箇所）→生成物の起動・終了を実機実測（FileVersion/ProductVersion=0.3.0確認）→gitタグ`v0.3`付与
+（家老）→csprojのみコミット。
+**留意**：.NET 10移行後の初リリースゆえ、配布物は**.NET 10ランタイム前提**となる（v0.2までの
+.NET 8前提から変わる。殿PCはSDK 10.0.301導入済みで問題なし。他環境へ配布する場合はランタイム要）。
+**実装完了（2026-07-11）**：コミット`b46dd36`（csproj Version 0.2.0→0.3.0の1行差分のみ）。
+フレームワーク依存publishでbin配下＋`C:\ECAD2\version\v0.3`の2箇所へ配置、実機実測で
+FileVersion=0.3.0.0/ProductVersion=0.3.0・起動→終了とも正常確認。gitタグ`v0.3`付与・push完了（家老）。
+仮リリース第二弾として殿の実機確認へ引き渡し。
+
+### T-071 経路B部品（押釦・タイマ接点等）の部品選択リスト追加 — 完全Done（2026-07-11）
+
+**起票=部品差分調査（`docs/ecad2-guiecad-hardcoded-parts-diff-survey-onmitsu2.md`）を受けた殿裁定**。
+**殿裁定3点**：(1)GuiEcadの専用ツールパレット（経路B）のUIは再現不要——既存UIのまま (2)経路Bの
+パーツは**「部品」（右パネルの部品選択リスト）から呼び出せればよい** (3)コイル・端子・a/b接点は
+既存7種と重複するため追加不要。
+追加対象（重複除外後）：**押釦NO/NC・タイマ接点NO/NC・瞬時接点NO/NC・表示灯・サーマル・非常停止・
+モータの約10種**（セレクトSWも既存リストに含まれるため同様に重複除外——P-010記録より家老検分。
+正確な対象一覧は調査書と突合の上、着手時に侍が確定・報告）。
+実装方針：Core層は完備（ElementKind・SymbolGlyphs・DeviceClassとも移植済み）ゆえ
+`BasicPartTemplates`へのPartDefinition追加＋サムネイル対応が主作業。規模小〜中。
+ロードマップ位置=T-062後の小粒群（T-063/065/066）と同グループ。
+**着手前調査完了（2026-07-11、隠密2、`docs/ecad2-t071-part-addition-design-onmitsu2.md`）**：
+対象10種は齟齬なく確定。PartDefinition追加方針は3グループ——①押釦NO/NC・表示灯（3種）は既存
+`PartRole`(InputNO/InputNC/Lamp)で対応可・規模小 ②モータ（1種）は`PartRole.NonSimulated`流用可、
+3端子(U/V/W)ポート定義が別途必要・規模小 ③タイマNO/NC・瞬時NO/NC・サーマル・非常停止（6種）は
+対応する`PartRole`が存在せず**`PartRole` enum拡張＋`PartResolver.ComponentKind()`のswitch拡張が
+必要**（既存Roleへの丸めは電気的挙動・機器分類双方が劣化するため非推奨）・規模小〜中。
+`DeviceClass`分類側は既に対応済みにつき追加実装不要。
+サムネイルは2経路：**①配置バーの選択中部品の大サムネイル(`PartThumbnailRenderer`)は新規10種とも
+既に自動対応済み（訂正前の報告は不正確だった）** ②コンボ内の小アイコン
+(`PartEntryToGlyphGeometryConverter`)のみ既存5種限定でCustomフォールバックとなる。
+**GuiEcadの専用グリフの正体＝実体の記号描画ロジック(`SymbolGlyphs.Draw`)をSVG化してツールボタンへ
+流用する仕組み**（`SvgRenderer.GenerateSymbolSvg`）、ecad2にも同型`SymbolGlyphs.Draw`が完備（隠密2、
+殿の実例指摘を受けた追加調査で判明）。
+実現方式2案：A=既存5種と同じGX様式簡略化アイコンで手作り（意匠統一、規模小〜中）／
+B=GuiEcad同様に実体記号描画をPath→Imageへ差し替えて流用（規模小、ただし既存5種とタッチが異なる）。
+**殿裁定（2026-07-11、プレビュー提示で選択）＝方式B（実体記号描画を流用）**。
+**実装完了（2026-07-11）**：コミット`c779210`。10種PartDefinition追加、配置バー小アイコンは方式B
+（`PartThumbnailRenderer`直接バインド、新規部品追加時に自動対応）。Core71件・App415件全合格。
+**隠密静的レビュー（2026-07-11、`docs/ecad2-t071-part-addition-review-onmitsu.md`）**：要修正2件
+CONFIRMED——①Motor(WidthCells=3)が「全パーツ1セル幅」前提を破り配置時の境界/重複チェックをすり抜ける
+（データ実害あり） ②タイマ限時/瞬時ラベルが生の`ElementInstance.Kind`参照で描画されない。
+DoD4（`PartEntryToGlyphGeometryConverterTests`削除の妥当性）は`PartThumbnailRenderer.Render`側の
+既存カバーで裏付け確認済み。
+**往復1周目修正完了（2026-07-11）**：コミット`e1fd101`。隠密テスト設計（境界値10ケース+ラベル7ケース）
+どおり、`IsWithinGridBounds`等をcellWidth対応へ拡張・`DiagramRenderer`のラベル解決を
+`PartResolver.ComponentKind`経由へ差し替え。★ケースRED→GREEN実測、Core71件・App425件全合格。
+隠密再レビューでクリーン確定（View層プレチェックとCore側最終判定の二重防御構造がT-033増分5の
+既存仕様と整合）。
+**忍者実機確認＝4観点中3点OK**：新規10種配置・Motor境界外/重複拒否・限/瞬ラベル表示（機器名設定後）・
+配置バー意匠混在、いずれも正常。範囲外の気づき（表示灯LampColorのUI結線が皆無）はP-057として
+`proposed.md`へ記録、T-071スコープ外として完全クローズ。
+
+### T-063 「名前を付けて保存」「削除」のメニュー露出 — 完全Done（2026-07-11）
+
+**起票=棚卸し「ほぼA区分」2件を1タスクに統合**。いずれも内部機能・キー操作は既存で、メニュー
+項目の露出のみ欠落。規模小（メニュー項目追加＋既存処理への結線のみ）。T-062後の肩慣らし筆頭。
+**実装完了（2026-07-11）**：コミット`4f8ea7f`。「名前を付けて保存」＝ファイルメニュー追加、
+SaveButtonと同じ`IsEnabled`バインディング＋既存`SaveDocumentAs()`へ結線。「削除」＝編集メニュー
+追加、Key.Delete caseと同一の5種`DeleteSelected*`呼び出しを流用（選択なし時は各メソッドがfalseを
+返し安全にno-op、既存のDeleteキー自体に可視的な無効化パターンが無いこととの整合を優先）。
+Core64件・App419件全合格、差分は予定範囲内のみ。
+**隠密静的レビュー（2026-07-11、`docs/archive/ecad2-t063-menu-review-onmitsu.md`）**：「名前を付けて保存」・
+他メニューとの一貫性はクリーン。**「削除」メニューで要修正1件CONFIRMED**——`DeleteMenuItem_Click`が
+`CommitDeviceNameEdit()`未呼び出し。Key.Delete caseは`IsCanvasFocused()`判定でDeviceNameBox編集中は
+到達し得ないが、メニュークリックはフォーカス非依存で発火するため「機器名未確定編集中に選択要素
+（＝編集対象そのもの）をメニューから削除する」新経路が生まれ、未確定入力が黙って破棄される
+（コードレベルで実害確認済み、クラッシュではないがUX実害）。
+**往復1周目修正完了（2026-07-11）**：コミット`0910658`（差分4行、`SaveAsMenuItem_Click`同型で
+`CommitDeviceNameEdit()`追加）。隠密再レビューでクリーン確定（SelectedElementの不変性まで確認）。
+**忍者実機確認＝全観点OK**：両メニューとも既存処理への結線が正常動作、Deleteキーとの対照実験も一致。
+補足の気づき（線要素は中心クリックでなく実体上クリックで選択、実害なし）は経過観察のみ。
+
+### T-062 .NET 10（net10.0-windows）への移行 — 完全Done（2026-07-11、mainマージ済み）
+
+**起票=殿直接指示2026-07-11**「.NET 10移行をタスク起票して。デバッグ範囲が広がることを懸念して
+移行は早いほうがいいかもな」。背景：(1)現行.NET 8（LTS）のMicrosoftサポートが**2026-11-10終了**（残り4ヶ月）。
+.NET 9（STS）も**同日2026-11-10終了**——当初の家老知識「9は2026年5月終了済み」は誤りで、STSの
+サポート期間が18ヶ月→24ヶ月へ変更されていたことが原因（隠密の一次情報裏取り2026-07-11で訂正、
+出典=learn.microsoft.com Lifecycle）。いずれにせよ9は4ヶ月後に切れるため移行先は
+.NET 10（LTS、**2028-11-14まで**）一択で結論不変 (2)AvalonDock（T-058採用候補）がnet8明示
+対象外・net10明示対応（`docs/ecad2-t058-avalondock-net8-precheck-onmitsu2.md`）——移行後にT-058
+PoCを行えばnet5フォールバックの不安も消える (3)殿の理=機能が増えるほど移行時の検証範囲が広がる
+ゆえ早期が得。
+内容：4プロジェクト（App/Rendering.Wpf=net8.0-windows→net10.0-windows、Core/Pdf=net8.0→net10.0）
+のTargetFramework更新＋依存NuGetパッケージ（PDFsharp等）の互換確認＋テスト全実行＋忍者実機確認
+（起動・主要操作の回帰）＋リリース手順（publish先2箇所）への影響確認。
+**前提確認事項（着手時）**：殿PCへの.NET 10 SDK導入有無（未導入なら移行前に殿へ依頼）、
+global.json等のSDK固定設定の有無、サポート期限の一次情報裏取り。
+**前提整備完了（2026-07-11）**：殿がwingetで.NET 10 SDK導入→家老検分で**10.0.301の導入を確認**
+（`dotnet --list-sdks`実測、8.0.422と併存）。global.jsonは無し（SDK固定なし、そのまま10が使われる
+環境ではなくTargetFramework側で制御——csproj更新で移行）。**残る待ちはT-051クローズのみ**、
+クローズ次第、侍へ着手采配。
+**ブランチ運用（殿裁定2026-07-11）**：**作業前に専用ブランチを作成し、テスト合格後にmainへマージ**
+（T-045と同じ運用=mainを直接汚さずリスク回避）。ブランチ名=`t062-net10-migration`（家老指定）。
+マージ条件=検証パイプライン完走後（ビルド・テスト全合格→隠密レビュー→忍者実機回帰の起動・主要操作
+確認まで通してから家老がマージ・push）。ブランチ作業中も他役の調査・レビューはmain基準で並行可。
+**移行作業完了（2026-07-11）**：コミット143e1c0（ブランチ上）。6ファイルのTargetFramework更新
+（本体4+テスト2——テスト2はProjectReference互換の構造的必然として侍上申→家老裁可の追加分）。
+PDFsharp 6.2.4は最新・net10互換で更新不要。`dotnet build --no-incremental`0警告0エラー
+（.NET 10固有の非推奨警告も無し）、テストCore64件・App419件全合格・退行なし。コードのモダナイズは
+指示どおり不着手。
+**隠密静的レビュー完了（2026-07-11、`docs/archive/ecad2-t062-migration-review-onmitsu.md`）＝家老指定4観点
+（TFM値・混入有無・PDFsharp互換・ビルドテスト実測）いずれもクリーン**。
+**忍者実機回帰は起動確認のみ完了・退行なし**（dotnet build 0警告0エラー→起動正常、ステータスバー
+初期値"ツール: Select"/"ズーム: 100%"も正常、クラッシュ・例外なし）。主要操作フロー（配置・結線・
+保存/読込・Undo/Redo）は殿のPC環境不調（P-056参照）により中断・未検証のまま持ち越し。
+**P-056（家老所見）→T-073で対策完了・解消**：本日の中断契機＝殿PCでキーボード入力が完全に不通となる
+フリーズが発生し、殿がスタートメニュー経由で手動再起動（マウスは生存）。原因調査（隠密の技術裏付け＋
+忍者の実機切り分け、Wチェック）の結果、**検証ヘルパー（`ecad2-ui-automation`スキル）側の実装課題**
+（`Set-Ecad2Foreground`がモーダルダイアログ表示中でも無条件`SetForegroundWindow`を呼び`EnableWindow(FALSE)`
+と矛盾する状態を生む）と判明、アプリ自体は健全と確認。対策は**T-073として正式分離・完全Done**
+（詳細はT-073節参照）。
+**主要操作フロー実機回帰完了（2026-07-11、`docs-notes/ecad2-t062-main-operations-regression-ninja.md`）
+＝4観点全OK、退行なし**：(1)配置操作=a接点/b接点/コイル/端子台の4種、正常配置・自動配線
+(2)結線操作=横線/縦線/縦分岐線/接続点、正常動作（シート種別依存のIsEnabled仕様[主回路/制御回路限定]
+は既存仕様と確認、退行でない） (3)保存/読込=新規作成→保存→読込のラウンドトリップ完全一致
+(4)Undo/Redo=シート追加/削除は正常動作、要素配置はUndo対象外（T-051のMVP仕様どおり、退行でない）。
+**mainマージ・push完了（2026-07-11）**。次＝T-072（v0.3仮リリース）着手判断。
+
+### T-059 出力パネルの高さをドラッグで調整可能にする — 完全Done（2026-07-11）
+
+**起票=殿直接指示2026-07-11**「出力パネルの高さをスライダーで調整できるようにしたい」。
+現状の実態（家老の事前検分）：`MainWindow.xaml:503`の`OutputPanelArea`（DockPanel）が
+`Height="160"`固定、所属行`Grid.Row="3"`もAutoで可変機構が無い。既存の右パネル
+（機器表⇔プロパティ、`MainWindow.xaml:435-456`）・3カラム分割（`MainWindow.xaml:431`）は
+いずれも`GridSplitter`によるドラッグリサイズが既に実装済みであり、本件も同一パターンの踏襲で足りる
+と判断。「スライダー」は文言上の表現であり、実装は既存踏襲のドラッグ式`GridSplitter`とする
+（機能的にはドラッグでサイズ調整＝要望と同じ、新規コントロール種別ではない）。侍へ着手を采配。
+**実装完了（2026-07-11）**：コミットc01b0fe。右パネル分割と同一パターンでAuto行(GridSplitter,
+Height=4)を新設、OutputPanelAreaはGrid.Row 3→4・固定初期値160+MinHeight=80へ、DockPanel側の
+明示Height撤去、メイン作業域に MinHeight=200。StatusBarAreaは別階層Gridのため対象外と判明（誤配線
+ではない）。Core53件・App346件変化なし全合格、差分1ファイルのみ。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝完全Done**（実機記録は T-052節参照）。
+
+### T-057 v0.2仮リリースビルドの作成 — 完全Done（2026-07-10）
+
+**起票=殿直接指示2026-07-10**「どこかで仮リリースをしたい。実機で確認して今後の機能を検討したい。
+v0.2でリリースできないか」。**殿裁定2点**：(1)タイミング=現時点のmainで今すぐ（進行中タスクの
+完了を待たない） (2)配布形態=フレームワーク依存型（軽量、.NET 8ランタイム前提でexe+dll一式）。
+現状の実態（家老の事前検分）：`Ecad2.App.csproj`にVersionタグ無し（暗黙1.0.0.0扱い）、gitタグも
+皆無、publish設定も未整備——ゼロからの新設。
+**着手順序（家老判断）**：ちょうどT-055増分2往復2周目（文言修正のみ、軽微）が進行中のため、
+コンテキスト断片化を避けるべくその完了を待ってから連続して着手する（数分程度の遅延見込み）。
+内容: `Ecad2.App.csproj`へ`<Version>0.2.0</Version>`追加、`dotnet publish -c Release
+--self-contained false`でフレームワーク依存の配布物一式を生成、動作確認後にgitタグ`v0.2`を付与。
+配布先・具体的な確認観点は着手時に必要なら都度殿確認。
+**T-057=完全Done（2026-07-10）**：`722bf92`（csproj Version=0.2.0のみ、+1行）。フレームワーク依存
+publishで生成物の起動→終了を侍が実機実測（FileVersion/ProductVersion=0.2.0確認）。gitタグ`v0.2`
+付与済み（家老）。仮リリース第一弾として殿の実機確認へ引き渡し。
+**リリース方針の殿裁定（2026-07-10）**：**本リリース（正式版）はインストーラー形式とする**。
+v0.2等、それまでの実機確認・機能検討目的のリリースは**仮リリース**と位置付け、フレームワーク
+依存型の簡易配布物で足りる（インストーラー整備は本リリース着手時の別タスク、具体的な技術選定
+＝MSI/WiX等は未定・将来検討）。
+
+### T-056 キャンバスのグリッド線表示切替機能 — 完全Done（2026-07-11）
+
+**起票=殿直接指示2026-07-10**「キャンバス画面のグリッド/非グリッド機能がない」。現状の実態
+（家老の事前検分）：`LadderCanvas.cs:29-32`で`ShowGrid=true`が**固定値としてハードコード**
+されており（T-030「グリッド線表示の有効化」殿直接依頼2026-07-03の経緯＝実機テストの行合わせ
+補助として常時表示化）、表示⇔非表示を切り替えるトグルUI（ボタン・メニュー・ショートカット等）
+は一切存在せぬ。**殿確認済み**：グリッド線の表示/非表示を切り替える新規機能の追加。
+**優先順位=T-052〜054より後**（殿裁定2026-07-10、現行キューT-055→T-052〜054の最後尾へ）。
+UI/UX分岐（トグルの配置場所・既定値・アイコン等）は着手時に都度殿確認【MUST】。
+**事前案起草完了（2026-07-11、隠密2、`docs/archive/ecad2-t056-grid-toggle-proposals-onmitsu2.md`）**：
+「表示(_V)」メニューに「グリッド表示(_G)」項目が既に存在するが未結線（器のみ）と判明。
+案A=同項目へIsCheckable+Command結線（コスト小、隠密2推奨）／案B=ツールバーへトグルボタン新設
+（トグル型UI先例皆無で新規スタイル要、コスト中）／案C=併用。既定値（現状ShowGrid=true維持か）・
+ショートカット（Ctrl+G候補、現行未使用）・永続化（ユーザー設定永続化機構がecad2に皆無と判明、
+新設ならコスト中〜大）の3論点も整理済み。
+**殿裁定4点確定（2026-07-11）**：(1)トグルUI=**案A（メニュー項目へIsCheckable+Command結線）**
+(2)既定値=**表示で起動（現状維持）** (3)ショートカット=**Ctrl+G割当**（現行未使用・衝突なし）
+(4)永続化=**今回は非永続**（起動毎に既定値、共通設定機構はP-052として別途）。
+**実装完了（2026-07-11）**：コミットfeb8d9c。裁定4点どおり——メニュー「グリッド表示」へ
+IsCheckable+IsChecked(TwoWay)結線・既定true・Ctrl+G追加・非永続。VMへ`IsGridVisible`新設
+（既存CanvasScale同型）、LadderCanvasの`_renderer`readonly解除+ShowGrid経由再構築（Core層無改修）、
+PropertyChanged検知→ShowGrid同期→RedrawCanvas()の即時反映。Core64件・App395件（+3）全合格、
+差分は裁定範囲と完全一致。
+**隠密レビュークリーン（2026-07-11）**：4観点（裁定4点一致・renderer再構築方式の妥当性
+[リーク/競合なし・PDF非波及のT-040原則維持]・Ctrl+G衝突なし・SetProperty早期returnトラップ
+非該当[単純boolトグル、同値時不発火もテスト済み]）とも問題なし、隠密実測で全合格確認。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝完全Done**。検証中に忍者がCtrl+G「描画反映されず」
+とNG誤診断→殿の実機操作で正常確認・訂正（原因=UIA経由キー送信の検証手順側、副次知見3として
+スキル追記候補。実機記録はT-052節参照）。
+
+### T-055 行数拡張のGuiEcad方式踏襲＋母線番号入力の同仕様化 — 完全Done（全増分1〜3、2026-07-11）
+
+**起票=殿直接指示2026-07-10**「10行ではまったく足りないのでgui_ecadの方式を参考にして欲しい。
+なお母線番号入力も同じ仕様にしたい」。
+現状の実態（家老・探索役の事前検分2026-07-10）：行追加機能は不在、新規シートは`Rows=10`固定
+（`SheetNavigationViewModel.cs:106`・`MainWindowViewModel.cs:1472`）、配置・選択とも上限
+`Grid.Rows-1`でクランプ（T-045境界ガード）、描画側`TotalRows`の拡張分岐はUI操作では到達不能。
+**第一段=隠密のGuiEcad方式調査**（`C:\Users\kojif\Desktop\生産物\gui_ecad`）：
+(1)行の追加・管理方式（UI操作・データモデル・上限・既定行数・描画/ページとの関係）
+(2)母線番号入力の仕様（UI・入力契機・データ保持・描画・保存形式）
+**隠密調査完了（2026-07-10、`docs/archive/ecad2-t055-guiecad-row-busnumber-survey-onmitsu.md`）＋
+殿裁定3点（2026-07-10）**：
+1. 「母線番号入力」の正体=**母線名（LeftName/RightName、文字列の手動編集）**——GuiEcadに数値の
+   母線番号は不在と判明したための概念確定（回路番号CircuitNumberは対象外）
+2. 行追加UI=**GuiEcad全系統踏襲**（ツールバー行±・Ctrl+Shift+Up/Down・右クリック任意位置挿入・
+   シート設定ダイアログ数値入力）
+3. 既定行数・上限=**既定10・上限60で統一**（GuiEcad内部の不統一[既定8/10/22・上限バラバラ]は
+   持ち込まない。下限1）
+次の段取り=侍がT-050往復2周目の後に**増分計画を起草**→殿裁可→増分実装。設計中の新たな
+UI/UX分岐は都度殿確認【MUST】。
+**計画起草完了＋殿裁可（2026-07-10）**：計画書=`docs/archive/ecad2-t055-implementation-plan-samurai.md`
+（3増分リスク低→高、`d47b700`収蔵）。**開かれた論点6点の殿裁定**=(1)行±ボタンはツールバー大型
+（`ToolBarButtonStyle`同型）(2)要素の存在する行の削除は**拒否（警告）**（Undo未実装ゆえの安全策、
+増分1・3共通）(3)コンテキストメニュー文言はGuiEcad踏襲 (4)シート設定は新規ダイアログ
+（RenameDialog拡張は不採用）(5)増分順序は提案どおり裁可 (6)`Sheet.Lines`（`CircuitLine.Row`）は
+シフト対象外＋明示コメント（家老配下探索で実質未使用と確定=書込経路`CircuitNumberer.Number`・
+読取経路`CircuitByRow`とも呼び出し元なしのデッドコード、JSONへ空配列直列化のみ）。
+増分1（末尾行加減算）を侍へ采配（2026-07-10）。
+**補足裁定（2026-07-10、侍の着手前確認への回答）**：裁定(2)「要素の存在する行の削除は拒否」の
+「要素」は**広義=5種すべて**（ElementInstance・VerticalConnector・WireBreak・GroupFrame・
+RungCommentのいずれかが最終行にあれば削除拒否。Undo未実装ゆえ配線・コメント等の暗黙消失も防ぐ
+安全側の解釈、増分1・3共通）。
+**増分1=完全クローズ（2026-07-10）**：実装`6a6eaf7`→隠密レビューで要修正1件（SelectedCell範囲外
+残置、CONFIRMED）→殿裁定=新末尾行へクランプ・列維持→修正`c28ec40`→隠密再レビュークリーン→
+忍者実機全6観点OK（`docs-notes/ecad2-t055-increment1-realmachine-verification-ninja.md`）だが
+新規指摘1件（DeleteRowCommand成功時に拒否警告StatusMessage残留）→往復2周目・Wチェック（隠密が
+根本原因=成功パスのクリア処理書き漏れと確定、AddRowCommand側の対称欠落も家老裁定で本往復へ吸収）
+→テスト設計→修正`0d2ed4d`（両コマンド成功パスへクリア追加、RED証明・304件全合格）→隠密再レビュー
+クリーン→忍者再確認OK（証跡2件）。**次は増分2（シート設定ダイアログ）へ**。
+****増分2=完全クローズ（2026-07-10）**：実装`4a91c38`→隠密レビューで要修正1件（占有チェック欠落、
+PLAUSIBLE→殿裁定=拒否）+cleanup1件（トリプレット重複→殿裁定=共有ヘルパー化）→修正`accaf6a`
+（往復1周目）→隠密再レビューで新規指摘1件（拒否文言が「最終行」固定でDeleteRowCommand流用、
+縮小範囲内の任意行での拒否に不一致、CONFIRMED）→修正`b1054a9`（往復2周目、実行番号を含む文言へ）
+→隠密再レビュークリーン確定（4観点妥当・要修正なし）→忍者実機全6観点OK
+（`docs-notes/ecad2-t055-increment2-realmachine-verification-ninja.md`、往復1・2周目の両修正とも
+実機で機能を実証）。副次知見=ダイアログ（別トップレベルウィンドウ）はSave-Ecad2Screenshotで
+写らずスキル恒久対応は別途検討（実害なし、忍者証跡は個別対応済み）。**次は増分3（任意位置挿入・
+削除、最高リスク）へ**——PoC推奨、着手前に段取り検討。
+
+**増分3進行中（2026-07-10）**：隠密事前調査（`docs/archive/ecad2-t055-increment3-precheck-onmitsu.md`）＝
+ContextMenu基盤・行シフト処理ともGuiEcad実装（`RowOps.ShiftRows`等、実物照合済み）を同型踏襲すれば
+見通し良好、**独立PoCフェーズは不要**の所見。実装`33a59f9`（ContextMenu基盤・RowOps・
+InsertRowBeforeCommand/DeleteRowAtCommand、削除は「対象行に要素なし」契約のみ）→隠密レビューで
+要修正2件（a: SelectedCellがRowシフトに追随せず誤操作リスク、CONFIRMED／b: テスト名が未実装挙動を
+確定仕様のごとく誤読させる、CONFIRMED）+cleanup1件（c: 占有拒否ブロックがrule of three到達、
+過去裁定の「3箇所到達で再検討」条件成立）→修正`e9d062a`（往復1周目、TryRejectOccupiedRowへ共通化
+含む）→隠密再レビュークリーン確定（3件とも往復2周目の指摘なし）→忍者実機確認**6観点中5観点OK**
+（右クリックメニュー・任意位置挿入5種シフト・要素なし削除・SelectedCell追随・境界値クランプ）。
+**新規検出→殿裁定確定（2026-07-11）**：GroupFrame内部削除のHeight--ロジック（計画書明記、Core層は
+単体テスト済み）が、コマンド層の`IsRowOccupied`判定（GroupFrame範囲全体を占有とみなす）により
+実機で到達不能なデッドコード疑いと判明していた件。既存の未確定論点「削除対象行そのものに要素が
+ある場合、拒否か要素ごと削除か」（計画書109行目）と表裏一体と判明し、殿裁定を仰いだ結果：
+**要素ごと削除（GuiEcad同型）を採用**。**適用範囲は増分3（任意位置削除＝`DeleteRowAtCommand`）
+のみ**——既にクローズ済みの増分1（`DeleteRowCommand`・末尾行削除）・増分2
+（`UpdateSheetSettingsCommand`・シート設定でのRows縮小）は現状の「拒否（警告）」のまま維持し、
+遡及修正は行わない（殿裁定2026-07-11）。
+**設計調査＋テスト設計完了（2026-07-11、`docs/archive/ecad2-t055-increment3-delete-occupied-design-onmitsu.md`）**：
+GuiEcad5種の削除条件・実行順序を実物照合済み（ElementInstance/WireBreak/RungComment=Row一致で削除、
+VerticalConnector=端点一致のみ削除、GroupFrame=開始行一致で枠ごと削除／内部にかかればHeight--）。
+改修方針＝`IsRowOccupied`自体は不変・`DeleteRowAtCommand`のみ占有拒否撤廃・`RowOps.DeleteRow`を
+GuiEcad同型へ拡張（戻り値に削除ElementInstance群を追加、呼び出し元で機器表クリーンアップ）。
+テスト設計＝境界値9パターン含め起草済み。新規論点（SelectedCellが削除対象行を指す場合の据え置き
+挙動の要否）は隠密よりUI/UX分岐の可能性ありと申し送りありしも、クラッシュ等の実害なし・隠密自身も
+「家老裁量で据え置きのまま実装→忍者実機確認で違和感あれば再検討」の代替案を提示済みにつき、
+**家老裁定＝据え置きのまま実装、忍者実機確認で違和感の有無を確認**（往復発生時のみ改めて殿へ）。
+**実装完了（2026-07-11）**：コミット424130e。`RowOps.DeleteRow`をGuiEcad同型へ拡張（実行順序厳守・
+戻り値`IReadOnlyList<ElementInstance>`追加）、`DeleteRowAtCommand`の占有拒否撤廃＋機器表
+クリーンアップ（`CleanupRemovedDeviceNames`新設）、境界値9パターン（B1〜B9）全実装。実装中に
+既存Theory1件がVerticalConnector共有ヘルパーと新設端点削除の組合せで意図せず失敗→設計書§3.3の
+「VerticalConnectorは個別Factで扱う」指示どおり専用Factへ分離し解消（範囲内修正）。
+Core64件（+11）・App349件（+3）全合格、差分4ファイル、増分1・2は不可侵維持。
+**隠密レビュー（2026-07-11、`docs/archive/ecad2-t055-increment3-round2-review-onmitsu.md`）**：家老指定
+5観点は全てOK（実行順序・境界値9パターン・機器表クリーンアップ・Theory分離・増分1/2不可侵）だが、
+code-review併用で**重大データ破損バグ2件を検出（いずれもCONFIRMED・再現手順明示）**：
+a=削除対象行そのものを選択中に削除→PropertyChanged未発火→UIが削除前要素の情報を表示したまま→
+後の編集Tab確定でシフト後の別要素を`DeviceRenamer.Rename`が**ドキュメント全体誤改名**。
+b=削除行より後ろを選択中→SelectedCellの-1シフト代入が`RowOps.DeleteRow`より先に実行され
+シフト前座標系でSelectedElement評価→誤った要素情報が永続表示（機構自体はe9d062a由来の既存コード、
+占有行削除の解禁で到達頻度が実質上昇）。根本原因共通=行削除がSelectedCellの実データ変化を通知せぬ
+設計。隠密の恒久対応推奨=削除後に無条件でSelectedElement系PropertyChangedを発火する方式への転換。
+c=`CleanupRemovedDeviceNames`が機器表クリーンアップ3箇所目の重複→共通ヘルパー抽出推奨
+（増分2の同型裁定「同一往復で相乗り」前例に倣い家老裁量で本往復へ吸収）。d〜gは経過観察。
+**家老仕分け＝a・b・cとも範囲内欠陥として往復1周目（要素ごと削除対応の初回往復）**。データ破損
+ゆえ忍者実機確認より修正を先行。制度【MUST】適用：隠密テスト設計起草→侍修正＋RED証明の順。
+**往復1周目修正完了（2026-07-11）**：コミット19b4574。隠密テスト設計
+（`docs/archive/ecad2-t055-increment3-selectedcell-bugfix-test-design-onmitsu.md`、T-a1〜a3・T-b1〜b2）を
+全実装。a=`NotifySelectedElementChanged()`新設（削除完了後に無条件でSelectedElement系4プロパティ
+通知）。b=設計書(ii)方式採用——`RowOps.DeleteRow`実行後にSelectedCellシフト代入・通知を行う順序
+変更で「未シフトElementsでの一時誤評価」自体を排除（単発発火で正しい値のみ）。c=
+`RemoveDeviceIfUnreferenced`共通ヘルパーへ3箇所一本化。**RED証明実測**=T-a1「Expected:True
+Actual:False」・T-b1「Expected:"A001" Actual:"B001"」とも設計書予測どおり失敗→修正後GREEN。
+Core64件・App392件（+5）全合格、差分2ファイル、RowOps.cs不変。
+**隠密再レビュークリーン確定（2026-07-11）**：4観点（設計書突合・RED証明整合・(ii)方式の4懸念
+[クランプ二重通知・通知タイミング・クリーンアップ順序・SetProperty早期returnトラップ再発]検証
+=いずれもREFUTED・共通ヘルパー参照透過）とも問題なし、往復2周目の指摘なし。ビルド・テストも
+隠密実測で全合格確認。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝増分3完全クローズ、T-055全増分Done**
+（SelectedCell据え置きの使用感も違和感なし。実機記録はT-052節参照）。
+d（CanExecute境界チェック不足、P-049）・e（GroupFrame Visual*Mm座標未追随、P-050）は実害なしに
+つきproposed.mdへpending記録済み、対応不要。実機確認詳細=
+`docs-notes/ecad2-t055-increment3-realmachine-verification-ninja.md`。
+
+**増分2着手前の殿裁定（2026-07-10）**：Bus名（LeftName/RightName）の空文字入力は**許容**
+（GuiEcad踏襲、自由記述で空文字も有効な値として保存可）。
+**増分2トリガーUIの殿裁定（2026-07-10、侍の着手前確認への回答）**：左パレット（シート
+ナビゲーション）下部の既存ボタン列（＋/－/名前変更、`MainWindow.xaml:376-383`）に**「設定」
+ボタンを追加**（同型の小型ボタン、既存UIの文脈に沿う最小差分。ダブルクリック案は不採用）。
+**増分2隠密レビュー指摘の裁定（2026-07-10）**：(3)`UpdateSheetSettingsCommand`にDeleteRowCommand
+同型の`IsRowOccupied`チェックが無く、Rows一気縮小でキーボードのみ到達不能・マウス経由のみ到達可
+という非対称が生じる問題（キーボードファースト方針に抵触）→**殿裁定=同じ位置で拒否（警告）**、
+DeleteRowCommandと同じ占有チェックを追加し往復1周目として侍へ采配。(4)StatusMessage/MarkDirty/
+NotifyCurrentSheetChangedのトリプレット重複（rule of three超え、CONFIRMED・実害なし）→**殿裁定=
+今回の往復で共有ヘルパー化**（同一往復に相乗り、便乗拡大ではなく指摘対応の一環）。
+
+### T-054 部品選択リストの選択中部品を配置バー内に表示 — 完全Done（2026-07-11）
+
+**起票=P-023を殿裁定で承認（案A採用）**。部品選択リストはSelectedItemバインドが元々皆無で選択
+状態の保持先が存在しない設計（隠密調査）。案A=配置バー内に選択中部品情報を表示する方式
+（既存disabled化と非競合、実装コスト小）。案の詳細=`docs/archive/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md`
+**実装完了（2026-07-11）**：コミット762d9c8。ElementPlacementBarへサムネイル+名前表示エリア追加
+（ComboBoxとデバイス名入力欄の間）。`PlacementPartComboBox.SelectedItem`をElementNameバインドで
+直接参照（初期選択・選び直しとも自動追従、同期コード不要）。`TryPlaceElement`内の照合ロジック
+重複を`PartPaletteViewModel.ResolveEntry`へ抽出共有。配置場所は既存パターン踏襲の明白な選択として
+侍判断（殿確認省略、異論あれば差し戻し可と申告——実機確認証跡で殿の目に触れる前提）。
+Core64件・App387件（+4）全合格、差分4ファイル。
+**隠密レビュークリーン（2026-07-11）**：3観点（SelectedItem直接バインドのnull安全・ResolveEntry
+移設の挙動等価・案B不採用のスコープ遵守）とも問題なし、境界値テストのカバーも適切、隠密実測で
+全合格確認。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝完全Done**（配置場所の見た目はスクショ証跡あり、
+実機記録はT-052節参照）。
+
+### T-053 機器表「種別」列の日本語表示化 — 完全Done（2026-07-11）
+
+**起票=P-020を殿裁定で承認（案A採用+PDF表記統一）**。ElementKind→DeviceClassマッピング自体は
+T-045増分Bで実装済みと判明（隠密調査による前提修正）、残るは表示のみ。案A=「重大度」列の既存
+`DiagnosticSeverityToTextConverter`と同型のConverter新設。**日本語ラベルはPDF出力の既存表記と
+統一する（殿裁定）**。案の詳細=`docs/archive/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md`
+**実装完了（2026-07-11）**：コミット9f54aac。`DeviceClassToTextConverter`新設・種別列へ適用。
+文言一致の実現手段=侍の技術判断で**Core層`DeviceClassLabel`のpublic化＋App層から直接参照**を採用
+（コピー方式は二箇所保守の追従漏れリスク、DiagramRendererは既にApp層から広く参照される公開クラス
+ゆえ層構造と整合、との理由付き）。Core64件・App383件（+18）全合格、差分4ファイル。
+**隠密レビュークリーン（2026-07-11）**：3観点（同型性・public化の依存方向正当・PDF側不変+文言一致
+テスト済み）とも問題なし、隠密実測で全合格確認。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝完全Done**（実機記録はT-052節参照）。
+
+### T-052 未解決PartIdフォールバックのDRC警告追加 — 完全Done（2026-07-11）
+
+**起票=P-017を殿裁定で承認（案A採用）**。`PartResolver`が未解決PartId（参照切れ）を警告なく
+`ElementKind.ContactNO`へフォールバックする既存挙動に対し、DRCへ新規警告項目を追加（既存の
+出力パネル・ジャンプ機構を流用、実装コスト小）。案B（プレースホルダ描画）は不採用。
+案の詳細=`docs/archive/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md`
+**実装完了（2026-07-11）**：コミット9393b8f、Core48件（基準45+3）・App344件全合格。隠密レビュー
+（code-reviewスキルmedium併用）で手動観点3点は適合と確認の上、要修正候補3件・経過観察4件を検出
+（`docs/archive/ecad2-t052-review-onmitsu.md`）。家老仕分け＝3件とも範囲内欠陥として往復1周目で侍へ采配：
+(1) JumpTo誤ジャンプ（`OutputPanelViewModel.cs:96-98`、DeviceName未入力要素で診断クリック時に
+別要素へ誤って選択移動、通常UI操作で到達可能） (2) 文言不自然（`DesignRuleCheck.cs:278-282`、
+DeviceName空だと「機器 : 〜」と表示、`CheckSeriesCoils`の"(無名)"フォールバック先例に倣う）
+(3) 判定ロジック重複（`DesignRuleCheck.cs:276`、`PartResolver.cs`内3箇所と同一判定を独自複製、
+共通ヘルパー抽出）。経過観察4件（大文字小文字比較・DRC走査重複・OrderBy重複・e.Kind前提依存）は
+実害軽微/経路無しにつき対応不要、proposed.mdへ記録不要（軽微な観察記録のみ）。
+**往復1周目修正完了（2026-07-11）**：コミットd4bad3d。#1は`PartResolver.IsUnresolvedPartId`経由で
+JumpTo判定を修正、#2は`CheckSeriesCoils`先例の"(無名)"表記へ統一、#3は`PartResolver.IsUnresolvedPartId`
+へ一本化しDesignRuleCheck/JumpTo双方から参照。Core53件（+5）・App346件（+2）全合格、範囲外検出なし。
+**隠密再レビュークリーン確定（2026-07-11）**：3件とも往復2周目の指摘なし（`docs/archive/ecad2-t052-review-onmitsu.md`4節）。
+**忍者実機全観点OK（2026-07-11、6件一括検証）＝完全Done**。検証中にDataGrid UI仮想化がUIA探索の
+全行取得を妨げる罠を検知（誤診断未遂、殿の指摘で解消、副次知見としてスキル追記候補）。
+実機記録=`docs-notes/ecad2-t052-t059-t055inc3-t053-t054-t056-realmachine-verification-ninja.md`。
+
+### T-051 シート追加・削除操作をUndo対象に含める — 完全Done（2026-07-11）
+
+**起票=P-032（忍者T-041増分5実機確認）を殿裁定で承認**したが、着手前の侍調査（2026-07-10）で
+**前提が崩れた**：ecad2にはUndo機構自体が未実装（UndoStack・Undoコマンド・Ctrl+Z配線とも不在、
+`MainWindowViewModel.cs:82-84`の注釈にも「Undo機能自体が未実装」と明記。メニュー「元に戻す」は
+表示のみ未配線）。家老の独立grepでも確認。**忍者の実機再検証（2026-07-10、4試行すべてUndo不作動、
+`docs/archive/ecad2-t051-precheck-undo-verification-ninja.md`証跡9枚）で確定**——P-032/P-042の原観測は
+誤認と忍者自身が訂正済み。副次所見=「元に戻す」「やり直し」ボタンが操作履歴皆無でも常時
+IsEnabled=True（履歴と非連動）——Undo基盤新設時に併せて対処すべき事項として記録。
+「シートのみ追加の小修正」ではなくUndo/Redo基盤のゼロからの新設＝構造的大仕事となるため、
+一旦保留（殿裁定2026-07-10）としていたが、**殿直接指示（2026-07-11）「先行でUndo機能を検討して
+ほしい」により再開**。まずはスコープ再定義＝基盤新設の設計調査（隠密へ委譲、2026-07-11）から着手。
+**設計調査完了（2026-07-11、`docs/archive/ecad2-t051-undo-redo-design-survey-onmitsu.md`）**：
+(1) GuiEcadに前例あり（`IUndoCommand`+`CommandHistory`、コマンド逆操作記録型、App層約700行28種類、
+要素配置〜配線〜グループ枠〜シート構造まで広く網羅、ただしテスト0件） (2) ecad2現行はModel層
+mutable POCO・DeepCloneは葉ノードのみ・Command層は`RelayCommand`直書きで統一規律なし、
+MarkDirty同型の「記録漏れ」構造リスクあり (3) 設計3案（A=コマンドパターン/コスト大、
+B=Memento/Sheet単位/コスト中、C=GcadSerializer流用の全体スナップショット/コスト小〜中）、
+隠密所感=C推奨 (4) 段階導入MVP3候補（候補1=シート追加削除のみ[起票背景P-032に直結、案Cと相性良]、
+候補2=要素配置削除、候補3=行挿入削除[T-055直後ゆえ仕様確定待ちが妥当]）、隠密所感=候補1推奨。
+不明点：GroupFrameのApp層コマンド有無未発見、Params/Comment専用セッター有無未確認、
+案B/Cの実性能未計測。
+**殿裁定確定（2026-07-11）**：設計方式=**案C（GcadSerializer流用の全体スナップショット）**、
+MVP対象範囲=**候補1（シート追加/削除のみ）**。次段取り=侍が実装計画を起草（T-055方式踏襲：
+計画書起草→殿裁可→実装）。あわせて副次所見（「元に戻す」「やり直し」ボタンが履歴皆無でも常時
+IsEnabled=True）も本基盤新設時に対処する。GroupFrame/Params/Comment関連の不明点はMVP範囲外
+（シート単位操作のみ）につき今回は追跡不要。
+**実装計画起草完了＋開かれた論点4点の裁定（2026-07-11）**：計画書=
+`docs/archive/ecad2-t051-implementation-plan-samurai.md`（UndoManager新設・RecordSnapshotは操作直前・
+Redo履歴クリアは新規操作時のみ・ApplyUndoRedoSnapshot新設[ReplaceDocument不流用]・UIは既存
+プレースホルダへのCommand結線のみ・IsEnabled連動はCommandManager.RequerySuggested自動）。
+論点裁定：(1)巻き戻し範囲=**シート構成のみ復元**（SelectedCell/Tool状態/StatusMessageは現状維持、
+殿裁定） (2)IsDirty=**Undo後も未保存扱いのまま**（保存時点追跡はMVP過剰、殿裁定） (3)DoD(2)の
+「Insert」=家老のDoD文言の綾であり、RenameCommand内部のInsert（シート数を変えぬ実装詳細）は
+対象外という侍解釈が正（家老裁定） (4)ボタン配置=既存プレースホルダ結線のみで新規UI無し、
+UI/UX分岐なしと確認（家老承認）。**実装GO（2026-07-11）**。
+**実装完了（2026-07-11）**：コミット0693755。計画書1.1〜1.4節どおり（UndoManager新設・
+UndoCommand/RedoCommand・ApplyUndoRedoSnapshot[シート構成のみ復元+MarkDirty維持=論点1・2裁定
+どおり]・Add/DeleteCommandへRecordSnapshot・既存プレースホルダ結線+Ctrl+Z/Y・IsEnabled自動連動）。
+テスト=UndoManagerTests単体10件+UndoRedoCommandsTests結合6件。計画書2節の1項目（Undo後IsDirty=true
+専用テスト）のみ、IsDirty setterがprivate＋直前操作が既にMarkDirty済みでRED証明可能な形にできず
+見送り（技術的縮小、テストファイル内コメント明記）——隠密レビューで妥当性確認要。
+Core64件・App365件（+16）全合格、差分7ファイル、計画書スコープと完全一致。
+**隠密レビュー（2026-07-11、`docs/archive/ecad2-t051-review-onmitsu.md`）＝重大4件、全CONFIRMED**：
+#1（データ破損・最重要）=`ReplaceDocument`（新規/開く）がUndoManagerをクリアせず（Clear手段自体も
+未実装）、文書A編集→文書Bを開く→Ctrl+Z→Aの内容が復元→Ctrl+SでBのファイルへA内容を上書き保存＝
+**データ消失経路**。#3（データ破損）=DeviceNameBox編集中のCtrl+Z/Yに`CommitDeviceNameEdit()`ガードが
+無く（既存Ctrl+S/O/N=T-049にはあり）、未確定入力の消失または無関係要素への誤書き込み。
+#2（表示不整合）=Undo/Redoの度に左パレットのシート選択ハイライトが崩れる（ResetSheetsのClear()が
+Reset通知→WPF Selectorが選択破棄、SelectedSheet通知不発火）。#4（表示不整合）=DRC実行後の
+Undo/Redoで存在しないシートを指す診断が出力パネルに残留（`OutputPanel.ClearResults()`未呼び出し、
+T-019で対処済みの「沈黙」不整合の再発）。根本＝ReplaceDocumentの「文書差し替え時の状態リセット
+責務」がApplyUndoRedoSnapshot新設時に横展開されず4箇所に分散して漏れた。IsDirtyテスト省略は機能上
+妥当と確認（軽微指摘のみ）。
+**家老仕分け＝4件とも範囲内欠陥として往復1周目**。データ破損2件を含むゆえ忍者実機確認より修正先行
+（増分3と同じ流れ）。制度【MUST】適用：隠密テスト設計起草→侍修正＋RED証明。
+**テスト設計起草完了（2026-07-11、`docs/archive/ecad2-t051-bugfix-test-design-onmitsu.md`）**：
+#1=UndoManager.Clear新設前提、RED中核=NewDocument後CanUndo=false（単体4+結合2件、LoadFromFileは
+同一ReplaceDocument経由ゆえ追加不要と整理）。#2=RefreshSelectedSheet活用前提、既存
+SelectedSheetNotificationTests（T-050のPropertyChangedForTestフック）へケース6統合、意味論整理=
+Undo/Redoは「クランプされた選択位置」を維持するのみ（元のシートへは戻らない）、境界値4件。
+#3=**既存Ctrl+S/O/Nにも専用テストが皆無**（MainWindow.xaml.cs直接操作テストが技術的に不可）と
+判明、テスト設計対象外としコードレビュー静的確認+忍者実機確認で担保する整理（観点明記済み）。
+#4=RED中核=DRC実行後Undo→Diagnostics.Count==0、境界値4件。侍へ往復1周目采配（T-056完了後着手）。
+**往復1周目修正完了（2026-07-11）**：コミット8b1b734。#1=UndoManager.Clear()新設+ReplaceDocument
+入口で呼び出し、#2=ApplyUndoRedoSnapshotへRefreshSelectedSheet追加、#3=Ctrl+Z/Yケースへ
+CommitDeviceNameEdit()追加（Ctrl+S/O/N同型）、#4=OutputPanel.ClearResults()追加。RED証明3件実測。
+Core64件・App410件（+15）全合格。往復中に侍がテスト設計側の誤り（S-B2/S-B4、AddCommandの
+BeginInvoke自動選択移動=T-050既存仕様の考慮漏れ）を発見・訂正。
+**隠密再レビュー（2026-07-11、`docs/archive/ecad2-t051-round2-review-onmitsu.md`）**：4観点妥当（設計訂正も
+コード実物裏取りでバグ隠蔽に非ずと確認）。**ただし新発見1件CONFIRMED**——`ApplyUndoRedoSnapshot`が
+殿裁定（SelectedCell現状維持）に反しUndo/Redoの都度SelectedCellを無条件nullリセット（初回実装
+0693755由来の既存バグ、隠密自身の初回レビュー見落としと率直に自己申告）。PLAUSIBLE1件（デバイス名
+編集確定直後のUndoで見た目上消える）は忍者実機観点へ追記。code-review10角度中9角度完了
+（1角度はAPI上限で中断、往復2周目の再々レビュー時に補完予定）。
+**家老仕分け＝殿裁定への明確な違反ゆえ範囲内欠陥、往復2周目（上限内）で侍へ差し戻し**。
+制度どおり隠密テスト設計起草→侍修正＋RED証明。
+**往復2周目修正完了（2026-07-11）**：コミットf2aaaad。隠密設計
+（`docs/archive/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`）どおり、ApplyUndoRedoSnapshot内で
+SelectedCellを退避→SetCurrentSheetIndexCore→復元の局所対応（本体無変更）。T-selcell-1〜4全実装、
+RED証明実測=1/2/3がFAIL・4はPASS（設計書想定どおり）。Core64件・App414件（+4）全合格。
+設計書§4のスコープ外事項（Tool状態/記入中ドラフト）は指示どおり不触。
+**隠密再々レビュー（2026-07-11、`docs/archive/ecad2-t051-round3-review-onmitsu.md`）**：主目的
+（nullリセット解消）は達成、T-selcell-1〜4設計書どおり・RED証明想定どおり・全合格。code-review
+残り1角度（language-pitfall）補完で**新規PLAUSIBLE1件**——SelectedCell復元がGrid.Rows範囲クランプ
+（FinishRowCountChange）を経由せず、シート追加Undo+その後の行数拡張の組合せでSelectedCellが
+範囲外座標を指しうる（クラッシュ無し・表示不整合止まり、verify確認済み。**往復2周目自体が持ち込んだ
+新規回帰**=8b1b734時点では経路自体が不存在）。既知の残課題（記入中ドラフト無警告消失、設計書§4で
+当初からDoD範囲外）も現状のまま。
+**殿裁定（2026-07-11）＝往復3周目で修正してからクローズ**（新規回帰を知りながら残さない方針）。
+制度どおり隠密テスト設計→侍修正＋RED証明→再レビュー→忍者実機。T-062着手はその後へ。
+**往復3周目修正完了（2026-07-11）**：コミット8a6eb13。隠密設計
+（`docs/archive/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md`）どおり
+`ClampSelectedCellToSheetRowsヘルパー`新設・復元代入をRowクランプでラップ（基準=復元後
+CurrentSheet、Column対象外、FinishRowCountChange本体不触）。T-selclamp-1〜5全実装、RED証明実測=
+1/2/4/5がFAIL・3はPASS（設計書想定どおり）。Core64件・App419件（+5）全合格。
+**隠密最終レビュー（2026-07-11、`docs/archive/ecad2-t051-round4-final-review-onmitsu.md`）＝通常観点(a)〜(d)
+全て妥当・クリーン確定**（ヘルパーはRowのみ純粋関数・RED整合・クランプ基準の実行順序正・PLAUSIBLE
+経路の封鎖を実測確認）。
+**忍者実機8観点全OK（2026-07-11、`docs-notes/ecad2-t051-realmachine-verification-ninja.md`）＝
+完全Done**。基本Undo/Redo・IsEnabled連動（積年の副次所見解消を実機確認）・#1〜#4修正・
+SelectedCell維持+クランプ（T-selclamp-1相当の実機裏付け）まで回帰なし。(h)のPLAUSIBLE事項
+（デバイス名編集確定直後のUndoで見た目上消える、Redoで復元可・恒久喪失でない）は実機再現→
+P-055としてpending記録。副次発見（UIA InvokePatternがモーダル制約を無視して背後ボタン連打可→
+同一ダイアログ3枚重なり）はスキル追記候補として忍者へ采配。
+**Stryker手動棚卸しは技術的障害で延期（家老裁定2026-07-11）**：Ecad2.App（WPF）側が「重複する
+Compileアイテム」（NETSDK1022系）でDesignTimeBuild解析に失敗しmutation実行不能（obj/bin完全削除・
+_wpftmp系2717個削除・2回再試行とも解消せず。Core側は正常=score7.43%/49秒。Stryker内部Buildalyzer
+とWPF DesignTimeBuildの既知の相性問題と隠密Web調査で判明）。T-046/T-050では同一手順で正常動作
+実績→**家老の原因仮説=本日導入の.NET 10 SDK（10.0.301）**（global.json無しゆえBuildalyzerが
+SDK 10でDesignTimeBuildを走らせるようになった＝時期が完全に符合）。**T-062（net10移行）完了後に
+再試行し、T-051変更領域の棚卸しをそこで実施**（移行でSDK経路が正式化され解消する見込み。なお失敗
+するならglobal.json/csproj対処を侍へ采配）。テストコード静的レビューは最終レビュー内で実施済み。
+次＝忍者実機確認→クローズ。
