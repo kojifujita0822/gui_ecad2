@@ -33,6 +33,12 @@ public static class PartResolver
         return ElementCatalog.CreatesComponent(e.Kind);
     }
 
+    /// <summary>PartId が設定されているのに <paramref name="lib"/> で解決できないか（未解決参照）。
+    /// true の場合 <see cref="ComponentKind"/> は静かに <see cref="ElementInstance.Kind"/>
+    /// （既定値=ContactNO）へフォールバックする（<see cref="Ecad2.Simulation.DesignRuleCheck.CheckUnresolvedPartId"/> 対象）。</summary>
+    public static bool IsUnresolvedPartId(ElementInstance e, PartLibrary? lib) =>
+        !string.IsNullOrEmpty(e.PartId) && lib?.Get(e.PartId) is null;
+
     /// <summary>Component に用いる種別。自作パーツは役割から組込み種別へ写像（Evaluator が評価できる形）。</summary>
     public static ElementKind ComponentKind(ElementInstance e, PartLibrary? lib)
     {

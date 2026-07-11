@@ -31,7 +31,7 @@ public sealed class OutputPanelViewModel : ViewModelBase
         {
             if (!SetProperty(ref _selectedDiagnostic, value)) return;
             if (value is { Locations.Count: > 0 } diagnostic)
-                JumpTo(diagnostic.Locations[0], diagnostic.DeviceName);
+                JumpTo(diagnostic);
         }
     }
 
@@ -52,7 +52,7 @@ public sealed class OutputPanelViewModel : ViewModelBase
     public void JumpToDiagnostic(Diagnostic diagnostic)
     {
         if (diagnostic.Locations.Count == 0) return;
-        JumpTo(diagnostic.Locations[0], diagnostic.DeviceName);
+        JumpTo(diagnostic);
     }
 
     /// <summary>DRC結果をクリアする(T-019: 新規/開くでDocumentを差し替えた際、旧文書の結果が
@@ -83,18 +83,26 @@ public sealed class OutputPanelViewModel : ViewModelBase
     }
 
     // 該当箇所(ページ-行)のシート・セルへ選択を移す。同じ行に選択中診断のDeviceNameと一致する
-    // 要素があればそれを、無ければ行内の先頭要素、それも無ければ列0を選択する(近似ジャンプ)。
-    private void JumpTo(CircuitRef location, string deviceName)
+    // 要素があればそれを選ぶ。DeviceName未入力のDRC-PART-001はさらにPartId未解決の要素を優先する
+    // (隠密レビュー指摘: 同一行に名前付き要素とDeviceName未入力の未解決要素が並ぶと、列を見ない
+    // 「行内先頭要素」フォールバックだけでは無関係な要素へ誤ジャンプする)。それも無ければ行内の
+    // 先頭要素、それも無ければ列0を選択する(近似ジャンプ)。
+    private void JumpTo(Diagnostic diagnostic)
     {
+        var location = diagnostic.Locations[0];
         int sheetIndex = _owner.Document.Sheets.FindIndex(s => s.PageNumber == location.PageNumber);
         if (sheetIndex < 0) return;
         _owner.CurrentSheetIndex = sheetIndex;
 
         var sheet = _owner.Document.Sheets[sheetIndex];
         int row = location.CircuitNumber - 1;
+        string deviceName = diagnostic.DeviceName;
 
         var element = (string.IsNullOrEmpty(deviceName) ? null : sheet.Elements.FirstOrDefault(e =>
                 e.Pos.Row == row && string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)))
+            ?? (diagnostic.Code == DesignRuleCheck.UnresolvedPartId
+                ? sheet.Elements.FirstOrDefault(e => e.Pos.Row == row && PartResolver.IsUnresolvedPartId(e, _owner.PartLibrary))
+                : null)
             ?? sheet.Elements.FirstOrDefault(e => e.Pos.Row == row);
 
         _owner.SelectedCell = element?.Pos ?? new GridPos(row, 0);

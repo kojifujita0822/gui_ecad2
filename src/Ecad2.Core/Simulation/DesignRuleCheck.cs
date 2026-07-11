@@ -272,13 +272,15 @@ public static class DesignRuleCheck
         {
             foreach (var elem in sheet.Elements)
             {
-                if (string.IsNullOrEmpty(elem.PartId)) continue;
-                if (lib?.Get(elem.PartId) is not null) continue;
+                if (!PartResolver.IsUnresolvedPartId(elem, lib)) continue;
 
                 string name = elem.DeviceName ?? "";
+                // DeviceName未入力時の表示は既存CheckSeriesCoilsの"(無名)"フォールバックに倣う
+                // （Diagnostic.DeviceName自体は空文字のまま保持——JumpToの行内先頭要素フォールバック判定に使うため）。
+                string displayName = string.IsNullOrEmpty(name) ? "(無名)" : name;
                 var loc = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
                 diagnostics.Add(new Diagnostic(DiagnosticSeverity.Warning, UnresolvedPartId, name,
-                    $"機器 {name}: 部品参照が見つからず、a接点として扱われています。部品の再選択をご確認ください。",
+                    $"機器 {displayName}: 部品参照が見つからず、a接点として扱われています。部品の再選択をご確認ください。",
                     [loc]));
             }
         }

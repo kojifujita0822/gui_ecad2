@@ -58,4 +58,21 @@ public class DesignRuleCheckPartIdTests
 
         Assert.Empty(diagnostics);
     }
+
+    /// <summary>往復1周目・隠密指摘#2: DeviceName未入力時の文言は"(無名)"で自然な表示にする
+    /// (既存CheckSeriesCoilsのフォールバックに倣う)。Diagnostic.DeviceName自体は空文字のまま
+    /// (JumpToの行内フォールバック判定に使うため、"(無名)"へ書き換えない)。</summary>
+    [Fact]
+    public void CheckUnresolvedPartId_DeviceNameEmpty_MessageShowsMuMei_ButDiagnosticDeviceNameStaysEmpty()
+    {
+        var elem = new ElementInstance { PartId = "missing-id", DeviceName = null, Pos = new GridPos(0, 0) };
+        var doc = MakeDoc(elem);
+        var lib = new PartLibrary();
+
+        var diagnostics = DesignRuleCheck.CheckUnresolvedPartId(doc, lib);
+
+        var d = Assert.Single(diagnostics);
+        Assert.Equal("", d.DeviceName);
+        Assert.Contains("機器 (無名): 部品参照が見つからず", d.Message);
+    }
 }
