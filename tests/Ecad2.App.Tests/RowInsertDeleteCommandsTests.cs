@@ -453,6 +453,115 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
         Assert.Null(vm.SelectedCell);
     }
 
+    // ---- T-055増分3往復1周目: 隠密レビュー指摘a・bの回帰テスト ----
+    // テスト設計書: docs/ecad2-t055-increment3-selectedcell-bugfix-test-design-onmitsu.md §2
+
+    /// <summary>
+    /// T-a1【RED証明の中核】(設計書§2.1、指摘a=B2)。削除対象行そのものを選択中に削除すると、
+    /// SelectedElement系PropertyChangedが発火すること。
+    /// RED証明: 修正前コードはsc.Row > rowがfalse(3>3=false)のためSelectedCellのsetterを
+    /// 通らず、この発火が一切起きない(git stashで修正前コードへ戻し実測確認済み)。
+    /// </summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsTargetRow_RaisesSelectedElementDeviceNameChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X001", Pos = new GridPos(3, 1) });
+        vm.SelectedCell = new GridPos(3, 1);
+        bool raised = false;
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(vm.SelectedElementDeviceName)) raised = true; };
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.True(raised);
+    }
+
+    /// <summary>T-a2(設計書§2.1)。削除対象行の要素が消え、シフトで別要素が来る場合、最終的に
+    /// SelectedElementがその別要素を正しく指すこと。末尾はT-ab1(直接読み取りと最終発火時点の
+    /// 値の一致)を兼ねる。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsTargetRow_ShiftedElementBecomesSelected()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X001", Pos = new GridPos(3, 1) });
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "Y001", Pos = new GridPos(4, 1) });
+        vm.SelectedCell = new GridPos(3, 1);
+        string? lastCaptured = null;
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(vm.SelectedElementDeviceName)) lastCaptured = vm.SelectedElementDeviceName; };
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.Equal("Y001", vm.SelectedElementDeviceName);
+        Assert.Equal(vm.SelectedElementDeviceName, lastCaptured); // T-ab1
+    }
+
+    /// <summary>T-a3(設計書§2.1)。削除対象行の要素が消え、シフトで来る要素が無い場合、
+    /// SelectedElementがnullになること。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsTargetRow_AndNoShiftedElement_ClearsSelectedElement()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X001", Pos = new GridPos(3, 1) });
+        vm.SelectedCell = new GridPos(3, 1);
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.Null(vm.SelectedElement);
+        Assert.False(vm.HasSelectedElement);
+    }
+
+    /// <summary>
+    /// T-b1【RED証明の中核】(設計書§2.2、指摘b=B4一般ケース)。削除対象行より後ろを選択中、
+    /// PropertyChangedの最終発火時点でのSelectedElementDeviceNameが正しい(シフト後)要素を
+    /// 指すこと。末尾はT-ab1を兼ねる。
+    /// RED証明: 修正前コードはSelectedCell = sc with { Row = 4 }の代入(RowOps.DeleteRow実行前)で
+    /// 1回だけ発火し、その時点のsheet.Elementsは未シフトのため行4の要素("B001")が拾われる。
+    /// 事後の再通知が無いため記録リストは["B001"]のみとなり期待値"A001"と一致せずFAIL
+    /// (git stashで修正前コードへ戻し実測確認済み)。
+    /// </summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsAfterTargetRow_FinalNotificationReflectsShiftedElement()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "B001", Pos = new GridPos(4, 1) });
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "A001", Pos = new GridPos(5, 1) });
+        vm.SelectedCell = new GridPos(5, 1);
+        var captured = new List<string>();
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(vm.SelectedElementDeviceName)) captured.Add(vm.SelectedElementDeviceName); };
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.Equal("A001", captured[^1]);
+        Assert.Equal(vm.SelectedElementDeviceName, captured[^1]); // T-ab1
+    }
+
+    /// <summary>T-b2(設計書§2.2、指摘bの最小境界=B3)。削除対象の直後を選択中、shift幅=1の最小ケース。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_WhenSelectedCellIsImmediatelyAfterTargetRow_FinalNotificationReflectsShiftedElement()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "A001", Pos = new GridPos(4, 1) });
+        vm.SelectedCell = new GridPos(4, 1);
+        var captured = new List<string>();
+        vm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(vm.SelectedElementDeviceName)) captured.Add(vm.SelectedElementDeviceName); };
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.Equal(new GridPos(3, 1), vm.SelectedCell);
+        Assert.Equal("A001", captured[^1]);
+        Assert.Equal(vm.SelectedElementDeviceName, captured[^1]); // T-ab1
+    }
+
     private static void PlaceElementAt(Sheet sheet, string elementType, int row)
     {
         switch (elementType)

@@ -1231,14 +1231,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                     // 空文字確定(旧名を手放す場合)。DeleteSelectedElementと同一ポリシー: 他要素から
                     // まだ参照されていれば機器表エントリを保持、参照が無ければ削除する(忍者実機検証で
                     // 発覚: 機器表への孤立残存バグの修正、T-036)。
-                    bool stillReferenced = Document.Sheets.Any(s =>
-                        s.Elements.Any(e => string.Equals(e.DeviceName, oldName, StringComparison.OrdinalIgnoreCase)));
-                    if (!stillReferenced)
-                    {
-                        var key = Document.Devices.ByName.Keys
-                            .FirstOrDefault(k => string.Equals(k, oldName, StringComparison.OrdinalIgnoreCase));
-                        if (key is not null) Document.Devices.ByName.Remove(key);
-                    }
+                    RemoveDeviceIfUnreferenced(oldName);
                 }
             }
 
@@ -1264,17 +1257,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         sheet.Elements.Remove(el);
         MarkDirty();
 
-        if (deviceName is not null)
-        {
-            bool stillReferenced = Document.Sheets.Any(s =>
-                s.Elements.Any(e => string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)));
-            if (!stillReferenced)
-            {
-                var key = Document.Devices.ByName.Keys
-                    .FirstOrDefault(k => string.Equals(k, deviceName, StringComparison.OrdinalIgnoreCase));
-                if (key is not null) Document.Devices.ByName.Remove(key);
-            }
-        }
+        if (deviceName is not null) RemoveDeviceIfUnreferenced(deviceName);
 
         OnPropertyChanged(nameof(SelectedElement));
         OnPropertyChanged(nameof(HasSelectedElement));
@@ -1282,6 +1265,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         DeviceTable.Refresh();
         return true;
+    }
+
+    /// <summary>指定デバイス名が、Document.Sheets全体のどの要素からも参照されなくなっていれば
+    /// Document.Devices.ByNameから該当エントリを除去する(T-055増分3往復1周目、隠密レビュー指摘c=
+    /// SelectedElementDeviceNameセッター・DeleteSelectedElement・CleanupRemovedDeviceNamesの
+    /// 3箇所で複製されていた「参照有無判定→除去」ロジックを一本化)。DeviceTable.Refresh()は
+    /// 呼び出し元の責務(呼び出し元が複数回連続で呼ぶ場合があるため、ここでは呼ばない)。</summary>
+    private void RemoveDeviceIfUnreferenced(string deviceName)
+    {
+        bool stillReferenced = Document.Sheets.Any(s =>
+            s.Elements.Any(e => string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)));
+        if (stillReferenced) return;
+        var key = Document.Devices.ByName.Keys
+            .FirstOrDefault(k => string.Equals(k, deviceName, StringComparison.OrdinalIgnoreCase));
+        if (key is not null) Document.Devices.ByName.Remove(key);
     }
 
     /// <summary>行削除で「要素ごと削除」(T-055増分3、RowOps.DeleteRow)された複数のElementInstanceに対し、
@@ -1292,15 +1290,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (removed.Count == 0) return;
         foreach (var deviceName in removed.Select(e => e.DeviceName).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase))
-        {
-            bool stillReferenced = Document.Sheets.Any(s =>
-                s.Elements.Any(e => string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)));
-            if (stillReferenced) continue;
-            var key = Document.Devices.ByName.Keys
-                .FirstOrDefault(k => string.Equals(k, deviceName, StringComparison.OrdinalIgnoreCase));
-            if (key is not null) Document.Devices.ByName.Remove(key);
-        }
+            RemoveDeviceIfUnreferenced(deviceName);
         DeviceTable.Refresh();
+    }
+
+    /// <summary>SelectedElement系4プロパティ(SelectedElement/HasSelectedElement/
+    /// SelectedElementKindDisplay/SelectedElementDeviceName)のPropertyChangedを無条件で発火する
+    /// (T-055増分3往復1周目、隠密レビュー指摘a・bの恒久対応)。DeleteRowAtCommandは行削除で
+    /// SelectedCellの座標が指す実データ(要素の有無・内容)が変わりうるが、SelectedCell自体の
+    /// setterは「値が変化した場合のみ」通知する(削除対象行そのものを選択中=座標は不変というケースで
+    /// 通知が抜け落ちる、指摘a)ため、削除完了後に明示的に呼ぶ。</summary>
+    private void NotifySelectedElementChanged()
+    {
+        OnPropertyChanged(nameof(SelectedElement));
+        OnPropertyChanged(nameof(HasSelectedElement));
+        OnPropertyChanged(nameof(SelectedElementKindDisplay));
+        OnPropertyChanged(nameof(SelectedElementDeviceName));
     }
 
     private string _statusMessage = "";
@@ -1738,11 +1743,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 対象行の要素(広義5種)はRowOps.DeleteRowが「要素ごと削除」する(GuiEcad同型)。
             // SelectedCellが削除対象行そのものを指す場合の据え置き(sc.Row > rowのみ-1)は現状維持
             // (家老裁定、要素ごと削除方式でも選択位置は動かさない。忍者実機確認で違和感があれば再検討)。
-            if (SelectedCell is GridPos sc && sc.Row > row)
-                SelectedCell = sc with { Row = sc.Row - 1 };
+            //
+            // T-055増分3往復1周目(隠密レビュー指摘a・b、恒久対応): RowOps.DeleteRowを先に実行して
+            // sheet.Elementsを確定させてから、SelectedCellのシフト代入・SelectedElement系通知を行う
+            // 順序へ変更した(指摘b=旧実装は削除前にシフト代入していたため、未シフトのsheet.Elementsで
+            // SelectedElementが一時的に誤評価されていた)。加えて、削除対象行そのものを選択中
+            // (sc.Row == row、SelectedCellの値自体は不変)でもNotifySelectedElementChanged()を
+            // 無条件で呼ぶことで、setterの「値が変化した場合のみ通知」という性質による通知漏れ
+            // (指摘a)を解消する。
             var removed = RowOps.DeleteRow(sheet, row);
             sheet.Grid.Rows--;
             CleanupRemovedDeviceNames(removed);
+            if (SelectedCell is GridPos sc && sc.Row > row)
+                SelectedCell = sc with { Row = sc.Row - 1 };
+            NotifySelectedElementChanged();
             FinishRowCountChange(sheet);
         },
         param => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows && param is int);
