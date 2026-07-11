@@ -113,6 +113,7 @@
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N" Click="NewButton_Click"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
                 <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S" Click="SaveButton_Click" IsEnabled="{Binding HasProject}"/>
+                <MenuItem Header="名前を付けて保存(_A)..." Click="SaveAsMenuItem_Click" IsEnabled="{Binding HasProject}"/>
                 <Separator/>
                 <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P"/>
                 <Separator/>
@@ -125,6 +126,8 @@
                 <MenuItem Header="切り取り(_T)" InputGestureText="Ctrl+X"/>
                 <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C"/>
                 <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V"/>
+                <Separator/>
+                <MenuItem Header="削除(_D)" InputGestureText="Delete" Click="DeleteMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>

@@ -235,6 +235,15 @@ public partial class MainWindow : Window
             TrySaveToFile(dialog.FileName);
     }
 
+    // 「名前を付けて保存」メニュー(T-063)。SaveDocument()と同じ前提チェック・確定処理を経た上で、
+    // パス確定済みでも常にSaveDocumentAsへ進む点のみSaveDocument()と異なる。
+    private void SaveAsMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_viewModel.HasProject) return;
+        CommitDeviceNameEdit();
+        SaveDocumentAs();
+    }
+
     // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する(隠密調査
     // docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。修正(往復2周目、忍者実機検出):
     // 開く側と同じ欠陥(ex.Messageの生の技術的文面をそのまま表示)が無いよう、一般向け日本語文面
@@ -966,6 +975,17 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
         }
+    }
+
+    // 「削除」メニュー(T-063)。Key.Delete case(上記883行付近)と同じ削除ロジックをそのまま流用する。
+    // IsCanvasFocused()判定はキー入力がキャンバス宛かを見るためのものでメニュークリックには不要、
+    // 選択が無ければ各Delete*系は何もせずfalseを返すため無効化バインディングも付けていない。
+    private void DeleteMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
+            || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
+            || _viewModel.DeleteSelectedConnectionDot())
+            RedrawCanvas();
     }
 
     private bool IsCanvasFocused() => IsWithin(LadderCanvasHost, Keyboard.FocusedElement as DependencyObject);
