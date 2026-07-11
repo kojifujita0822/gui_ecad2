@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -463,5 +464,23 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Same(existingRevisions, vm.Document.Info.Revisions);
         Assert.Single(vm.Document.Info.Revisions);
         Assert.Equal("A", vm.Document.Info.Revisions[0].Rev);
+    }
+
+    /// <summary>T-079(P-058): PlaceElementAtSelectedCellはSelectedCell自体を変更しないため
+    /// SelectedCellのsetter経由の通知連鎖が起きない。要素追加後にSelectedElement系4プロパティの
+    /// 変更通知が発火することを確認する(修正前は発火せずRED、侍実測で確認済み)。</summary>
+    [Fact]
+    public void PlaceElementAtSelectedCell_RaisesSelectedElementDeviceNameChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 0);
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        vm.PlaceElementAtSelectedCell("contact-no", "X001", isOr: false);
+
+        Assert.Contains(nameof(vm.SelectedElementDeviceName), raised);
+        Assert.Contains(nameof(vm.HasSelectedElement), raised);
     }
 }
