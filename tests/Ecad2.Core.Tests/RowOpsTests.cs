@@ -190,9 +190,14 @@ public class RowOpsTests
         Assert.Equal(4, GetRow(sheet, elementType));
     }
 
+    // T-055増分3差し込み(殿裁定2026-07-11)により本Theoryから"VerticalConnector"を除外した。
+    // 共有PlaceElementAtヘルパーはVerticalConnectorを(row, row+1)で配置するため、row=2/targetRow=3
+    // だとBottomRow(3)==targetRowとなり新設の端点削除ロジック(B5/B6参照)が誤って発火してしまう
+    // (要素ごと削除が入る前は単純シフト判定のみだったため無害だった)。VerticalConnectorの
+    // 「両端点とも対象行より前」ケースは専用Factで検証する(下記
+    // DeleteRow_VerticalConnector_BothEndpointsBeforeTarget_DoesNotShift)。
     [Theory]
     [InlineData("ElementInstance")]
-    [InlineData("VerticalConnector")]
     [InlineData("WireBreak")]
     [InlineData("RungComment")]
     public void DeleteRow_DoesNotShiftElementAtOrBeforeTargetRow(string elementType)
@@ -203,6 +208,18 @@ public class RowOpsTests
         RowOps.DeleteRow(sheet, targetRow: 3);
 
         Assert.Equal(2, GetRow(sheet, elementType));
+    }
+
+    [Fact]
+    public void DeleteRow_VerticalConnector_BothEndpointsBeforeTarget_DoesNotShift()
+    {
+        var sheet = MakeSheet();
+        sheet.Connectors.Add(new VerticalConnector { Column = 2, TopRow = 0, BottomRow = 1 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Equal(0, sheet.Connectors[0].TopRow);
+        Assert.Equal(1, sheet.Connectors[0].BottomRow);
     }
 
     [Fact]
@@ -232,7 +249,7 @@ public class RowOpsTests
         Assert.Equal(3, sheet.Connectors[0].BottomRow);
     }
 
-    // ---- DeleteRow: GroupFrame(契約=targetRow行に要素なし。開始行より後ろのみ実装対象) ----
+    // ---- DeleteRow: GroupFrame(開始行より後ろは位置シフトのみ) ----
 
     [Fact]
     public void DeleteRow_GroupFrame_StartRowAfterTarget_ShiftsPositionOnly()
@@ -246,22 +263,153 @@ public class RowOpsTests
         Assert.Equal(2, sheet.Frames[0].Height);
     }
 
+    // ---- DeleteRow: 要素ごと削除(T-055増分3差し込み、殿裁定2026-07-11) ----
+    // 対象行の要素(広義5種)は拒否せず削除する(GuiEcad同型)。設計・境界値の出典:
+    // docs/ecad2-t055-increment3-delete-occupied-design-onmitsu.md §1〜3。
+
+    [Theory]
+    [InlineData("ElementInstance")]
+    [InlineData("WireBreak")]
+    [InlineData("RungComment")]
+    public void DeleteRow_RemovesElementAtTargetRow(string elementType)
+    {
+        var sheet = MakeSheet();
+        PlaceElementAt(sheet, elementType, row: 3);
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        int count = elementType switch
+        {
+            "ElementInstance" => sheet.Elements.Count,
+            "WireBreak" => sheet.WireBreaks.Count,
+            "RungComment" => sheet.RungComments.Count,
+            _ => throw new ArgumentOutOfRangeException(nameof(elementType)),
+        };
+        Assert.Equal(0, count);
+    }
+
+    [Fact]
+    public void DeleteRow_ReturnsRemovedElementInstances()
+    {
+        var sheet = MakeSheet();
+        sheet.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "CR1", Pos = new GridPos(3, 1) });
+
+        var removed = RowOps.DeleteRow(sheet, targetRow: 3);
+
+        var removedEl = Assert.Single(removed);
+        Assert.Equal("CR1", removedEl.DeviceName);
+    }
+
+    /// <summary>B5: TopRow==targetRow(上端一致)→削除される。</summary>
+    [Fact]
+    public void DeleteRow_VerticalConnector_TopRowEqualsTarget_RemovesConnector()
+    {
+        var sheet = MakeSheet();
+        sheet.Connectors.Add(new VerticalConnector { Column = 2, TopRow = 3, BottomRow = 6 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Empty(sheet.Connectors);
+    }
+
+    /// <summary>B6: BottomRow==targetRow(下端一致)→削除される。</summary>
+    [Fact]
+    public void DeleteRow_VerticalConnector_BottomRowEqualsTarget_RemovesConnector()
+    {
+        var sheet = MakeSheet();
+        sheet.Connectors.Add(new VerticalConnector { Column = 2, TopRow = 1, BottomRow = 3 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Empty(sheet.Connectors);
+    }
+
+    // B7(範囲を跨ぐが端点でない→削除されず端点のみシフト)は既存の
+    // DeleteRow_VerticalConnector_ShiftsTopAndBottomIndependently で検証済み。
+
+    /// <summary>B1: Height=1(最小)の枠が削除対象そのもの→枠ごと削除(Height--で0にする経路ではない)。</summary>
+    [Fact]
+    public void DeleteRow_GroupFrame_HeightOne_TargetEqualsStartRow_RemovesFrame()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 1 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Empty(sheet.Frames);
+    }
+
     /// <summary>
-    /// 隠密レビュー指摘b(往復1周目、CONFIRMED)対応: 枠開始行そのものが削除対象(TopLeft.Row==targetRow)の
-    /// ケース。GuiEcadでは「枠ごと削除」だが、これは「削除対象行に要素がある場合」論点(殿確認待ち、
-    /// 2026-07-10)に該当し、RowOps.DeleteRowの対象外(契約=targetRow行に要素なし)。本テストは現状の
-    /// 暫定挙動(無変化)を記録するのみで、確定仕様ではない。将来「枠ごと削除」を実装する際は本テストを
-    /// 更新すること(このAssertを検証済み仕様と誤読しないこと)。
+    /// 開始行==対象行(Height>1)→枠ごと削除。旧テスト(暫定「無変化」挙動)の更新版
+    /// (2026-07-11殿裁定「要素ごと削除」採用によりGroupFrameも枠ごと削除が確定仕様となった)。
     /// </summary>
     [Fact]
-    public void DeleteRow_GroupFrame_TargetEqualsFrameStartRow_CurrentlyNoChange_PendingDecision()
+    public void DeleteRow_GroupFrame_TargetEqualsFrameStartRow_RemovesFrame()
     {
         var sheet = MakeSheet();
         sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 2 });
 
         RowOps.DeleteRow(sheet, targetRow: 3);
 
+        Assert.Empty(sheet.Frames);
+    }
+
+    /// <summary>B2: 対象行が終端行ちょうど→Height--(内部詰め、開始行不変)。</summary>
+    [Fact]
+    public void DeleteRow_GroupFrame_TargetAtEndRow_DecreasesHeight()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 3 }); // 範囲3-5
+
+        RowOps.DeleteRow(sheet, targetRow: 5);
+
         Assert.Equal(3, sheet.Frames[0].TopLeft.Row);
         Assert.Equal(2, sheet.Frames[0].Height);
+    }
+
+    /// <summary>B3: 対象行が開始行の直後(内部の最初の行)→Height--(内部詰め)。</summary>
+    [Fact]
+    public void DeleteRow_GroupFrame_TargetJustAfterStartRow_DecreasesHeight()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 3 }); // 範囲3-5
+
+        RowOps.DeleteRow(sheet, targetRow: 4);
+
+        Assert.Equal(3, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(2, sheet.Frames[0].Height);
+    }
+
+    /// <summary>B4: 対象行が開始行の直前→位置のみ-1(StartRowAfterTargetの境界隣接版)。</summary>
+    [Fact]
+    public void DeleteRow_GroupFrame_TargetJustBeforeStartRow_ShiftsPositionOnly()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 3 });
+
+        RowOps.DeleteRow(sheet, targetRow: 2);
+
+        Assert.Equal(2, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(3, sheet.Frames[0].Height);
+    }
+
+    /// <summary>B9: 同一行に5種すべてが同時存在→全種が削除される(複合ケース、対称性点検)。</summary>
+    [Fact]
+    public void DeleteRow_AllFiveTypesAtTargetRow_AllRemoved()
+    {
+        var sheet = MakeSheet();
+        sheet.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(3, 1) });
+        sheet.Connectors.Add(new VerticalConnector { Column = 2, TopRow = 3, BottomRow = 4 });
+        sheet.WireBreaks.Add(new WireBreak { Boundary = 2.5, Row = 3 });
+        sheet.RungComments.Add(new RungComment { Row = 3, Text = "注記" });
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(3, 1), Width = 3, Height = 1 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Empty(sheet.Elements);
+        Assert.Empty(sheet.Connectors);
+        Assert.Empty(sheet.WireBreaks);
+        Assert.Empty(sheet.RungComments);
+        Assert.Empty(sheet.Frames);
     }
 }

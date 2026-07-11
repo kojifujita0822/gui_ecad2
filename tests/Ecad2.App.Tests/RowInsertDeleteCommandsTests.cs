@@ -1,5 +1,6 @@
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
+using Ecad2.Persistence;
 
 namespace Ecad2.App.Tests;
 
@@ -229,10 +230,9 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
     }
 
     /// <summary>
-    /// 対象行に要素(広義5種、殿裁定2026-07-10)があれば削除拒否。RowOps.DeleteRowの契約
-    /// (targetRow行に要素なし)を満たさない入力を、コマンド側のIsRowOccupiedガードで弾く。
-    /// RED証明手法: DeleteRowAtCommandのExecute内`IsRowOccupied`呼び出しを一時的に`false`固定へ
-    /// 差し替えてテスト実行→全InlineDataがRows減少してしまいRED(実測確認済み)。戻すとGREEN。
+    /// T-055増分3差し込み(殿裁定2026-07-11): 対象行に要素(広義5種)があっても拒否せず「要素ごと削除」
+    /// する(GuiEcad同型)。旧挙動(拒否・Rows不変)からの転換確認。型ごとのシフト/削除規則自体は
+    /// Ecad2.Core.Tests.RowOpsTestsで検証済みのため、ここではコマンドとしてRowsが減ることのみ確認する。
     /// </summary>
     [Theory]
     [InlineData("ElementInstance")]
@@ -240,7 +240,7 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
     [InlineData("WireBreak")]
     [InlineData("GroupFrame")]
     [InlineData("RungComment")]
-    public void DeleteRowAtCommand_Execute_WhenTargetRowOccupied_RejectsAndDoesNotDecreaseRows(string elementType)
+    public void DeleteRowAtCommand_Execute_WhenTargetRowOccupied_DeletesElementAndDecreasesRows(string elementType)
     {
         var vm = CreateViewModel();
         vm.NewDocument();
@@ -249,11 +249,12 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
 
         vm.DeleteRowAtCommand.Execute(3);
 
-        Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
+        Assert.Equal(9, vm.CurrentSheet!.Grid.Rows);
     }
 
+    /// <summary>占有拒否撤廃の確認(旧テストの転換)。対象行に要素があっても拒否文言は出ない。</summary>
     [Fact]
-    public void DeleteRowAtCommand_Execute_WhenTargetRowOccupied_SetsStatusMessage()
+    public void DeleteRowAtCommand_Execute_WhenTargetRowOccupied_DoesNotSetRejectionMessage()
     {
         var vm = CreateViewModel();
         vm.NewDocument();
@@ -262,7 +263,54 @@ public class RowInsertDeleteCommandsTests : ViewModelTestBase
 
         vm.DeleteRowAtCommand.Execute(3);
 
-        Assert.Equal("行4に要素があるため削除できません", vm.StatusMessage);
+        Assert.Equal("", vm.StatusMessage);
+    }
+
+    /// <summary>設計書B8: Grid.Rows=2(下限MinRows=1到達直前)での削除は、クランプではなく通常どおり
+    /// 1へ減算されること(下限ガードは`Rows &lt;= MinRows`のみで弾くため、Rows=2はまだ許可範囲)。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_AtOneAboveMinRows_DecreasesToMinRows()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = GridSpec.MinRows + 1;
+
+        vm.DeleteRowAtCommand.Execute(0);
+
+        Assert.Equal(GridSpec.MinRows, vm.CurrentSheet!.Grid.Rows);
+    }
+
+    /// <summary>削除された要素のDeviceNameが他のどの要素からも参照されなくなった場合、機器表
+    /// (Document.Devices.ByName)から該当エントリが除去されること(DeleteSelectedElementの既存
+    /// クリーンアップパターンをRowOps.DeleteRowの複数削除へ拡張した回帰テスト)。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_RemovesDeviceTableEntry_WhenNoLongerReferenced()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(3, 0);
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.False(vm.Document.Devices.ByName.ContainsKey("X001"));
+    }
+
+    /// <summary>対照ケース: 削除したDeviceNameが他シートの別要素から参照されていれば機器表エントリは残る。</summary>
+    [Fact]
+    public void DeleteRowAtCommand_Execute_KeepsDeviceTableEntry_WhenStillReferencedElsewhere()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.SelectedCell = new GridPos(3, 0);
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+        vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X001", Pos = new GridPos(7, 0) });
+
+        vm.DeleteRowAtCommand.Execute(3);
+
+        Assert.True(vm.Document.Devices.ByName.ContainsKey("X001"));
     }
 
     [Fact]

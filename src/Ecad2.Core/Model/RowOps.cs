@@ -33,15 +33,39 @@ public static class RowOps
     }
 
     /// <summary>
-    /// targetRow行を削除し、削除行より後ろの4種(ElementInstance/VerticalConnector/WireBreak/RungComment)の
-    /// Rowを-1シフトする。GroupFrameは、開始行が削除行より後ろなら位置のみ-1シフトする。
-    /// 【契約】targetRow行には要素(広義5種)が存在しないこと（呼び出し元で
-    /// <c>MainWindowViewModel.IsRowOccupied(sheet, targetRow) == false</c> を確認済みであること）を前提とする。
-    /// targetRow行に要素が存在する場合の扱い（拒否か要素ごと削除か）は未確定（殿確認待ち、2026-07-10）のため、
-    /// 本メソッドの対象外（GroupFrameの「枠ごと削除」「内部削除によるHeight短縮」は未実装）。
+    /// targetRow行を削除する。targetRow行にある要素(広義5種)は「要素ごと削除」する
+    /// （GuiEcad同型、殿裁定2026-07-11。設計出典: docs/ecad2-t055-increment3-delete-occupied-design-onmitsu.md §1/§2）。
+    /// 実行順序【重要、変更禁止】: (1)4種(ElementInstance/VerticalConnector/WireBreak/RungComment)の
+    /// うちtargetRow該当分を先に削除 (2)GroupFrameの削除/Height--判定（まだシフトしていない元の座標系で判定）
+    /// (3)4種の残存要素をtargetRowより後ろのみ-1シフト (4)GroupFrameの位置シフト（同じく元の座標系での
+    /// 判定→シフト実行）。この順序を崩すと、GroupFrame判定がシフト後の座標を見てしまい誤判定する。
+    /// VerticalConnectorは端点(TopRow/BottomRowいずれか)がtargetRowと一致する場合のみ削除する。範囲が
+    /// targetRowを跨ぐだけで端点が一致しない場合は削除されず、該当する端点のみ-1シフトして残る。
+    /// GroupFrameは開始行(TopLeft.Row)がtargetRowと一致すれば枠ごと削除、開始行がtargetRowより前で
+    /// 終端行(TopLeft.Row+Height-1)がtargetRow以降なら内部詰め(Height--)。
     /// </summary>
-    public static void DeleteRow(Sheet sheet, int targetRow)
+    /// <returns>削除されたElementInstanceの一覧（呼び出し元での機器表クリーンアップ用）。</returns>
+    public static IReadOnlyList<ElementInstance> DeleteRow(Sheet sheet, int targetRow)
     {
+        var removedElements = sheet.Elements.Where(e => e.Pos.Row == targetRow).ToList();
+        foreach (var e in removedElements) sheet.Elements.Remove(e);
+
+        var removedConnectors = sheet.Connectors
+            .Where(c => c.TopRow == targetRow || c.BottomRow == targetRow).ToList();
+        foreach (var c in removedConnectors) sheet.Connectors.Remove(c);
+
+        var removedBreaks = sheet.WireBreaks.Where(w => w.Row == targetRow).ToList();
+        foreach (var w in removedBreaks) sheet.WireBreaks.Remove(w);
+
+        var removedComments = sheet.RungComments.Where(rc => rc.Row == targetRow).ToList();
+        foreach (var rc in removedComments) sheet.RungComments.Remove(rc);
+
+        foreach (var f in sheet.Frames.ToList())
+        {
+            if (f.TopLeft.Row == targetRow) sheet.Frames.Remove(f);
+            else if (f.TopLeft.Row < targetRow && f.TopLeft.Row + f.Height - 1 >= targetRow) f.Height--;
+        }
+
         foreach (var e in sheet.Elements)
             if (e.Pos.Row > targetRow) e.Pos = e.Pos with { Row = e.Pos.Row - 1 };
         foreach (var c in sheet.Connectors)
@@ -53,7 +77,10 @@ public static class RowOps
             if (w.Row > targetRow) w.Row -= 1;
         foreach (var rc in sheet.RungComments)
             if (rc.Row > targetRow) rc.Row -= 1;
+
         foreach (var f in sheet.Frames)
             if (f.TopLeft.Row > targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row - 1 };
+
+        return removedElements;
     }
 }

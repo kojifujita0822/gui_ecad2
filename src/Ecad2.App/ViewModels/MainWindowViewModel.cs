@@ -1284,6 +1284,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>行削除で「要素ごと削除」(T-055増分3、RowOps.DeleteRow)された複数のElementInstanceに対し、
+    /// DeleteSelectedElement(単一削除)と同じ規則で機器表(Document.Devices)クリーンアップを行う。
+    /// 削除された要素群のDeviceNameのうち、他のどのシートのどの要素からも参照されなくなったものだけ
+    /// Document.Devices.ByNameから除去する(重複DeviceNameはDistinctで1回のみ判定)。</summary>
+    private void CleanupRemovedDeviceNames(IReadOnlyList<ElementInstance> removed)
+    {
+        if (removed.Count == 0) return;
+        foreach (var deviceName in removed.Select(e => e.DeviceName).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            bool stillReferenced = Document.Sheets.Any(s =>
+                s.Elements.Any(e => string.Equals(e.DeviceName, deviceName, StringComparison.OrdinalIgnoreCase)));
+            if (stillReferenced) continue;
+            var key = Document.Devices.ByName.Keys
+                .FirstOrDefault(k => string.Equals(k, deviceName, StringComparison.OrdinalIgnoreCase));
+            if (key is not null) Document.Devices.ByName.Remove(key);
+        }
+        DeviceTable.Refresh();
+    }
+
     private string _statusMessage = "";
 
     /// <summary>ステータスバーへの一時的な案内メッセージ(例: セル未選択時の配置操作案内)。</summary>
@@ -1351,8 +1370,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>右クリックコンテキストメニューから、指定行(int、CommandParameter)を削除する
     /// (T-055増分3)。下限(GridSpec.MinRows)到達時は無効化。対象行に要素(広義5種)が存在する場合は
-    /// 削除を拒否しStatusMessageへ警告を出す(拒否か要素ごと削除かは殿確認待ちにつき、本コマンドは
-    /// 「要素が存在しないケース」のみ対応。存在するケースはRowOps.DeleteRowの対象外)。</summary>
+    /// 拒否せず「要素ごと削除」する(GuiEcad同型、殿裁定2026-07-11。DeleteRowCommand/
+    /// UpdateSheetSettingsCommandは現状の拒否のまま、本コマンド限定の適用)。</summary>
     public ICommand DeleteRowAtCommand { get; }
 
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
@@ -1704,13 +1723,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (CurrentSheet is not Sheet sheet || param is not int row) return;
             if (sheet.Grid.Rows <= GridSpec.MinRows) return;
-            if (TryRejectOccupiedRow(sheet, row, $"行{row + 1}に要素があるため削除できません")) return;
-            // 隠密レビュー指摘a(往復1周目、CONFIRMED): SelectedCellもRowOpsと同じ規則(削除点より後ろのみ
-            // -1)で追随させる(RowOps.DeleteRowの4種要素と同じ規則)。
+            // T-055増分3差し込み(殿裁定2026-07-11): 占有拒否(TryRejectOccupiedRow)を撤廃し、
+            // 対象行の要素(広義5種)はRowOps.DeleteRowが「要素ごと削除」する(GuiEcad同型)。
+            // SelectedCellが削除対象行そのものを指す場合の据え置き(sc.Row > rowのみ-1)は現状維持
+            // (家老裁定、要素ごと削除方式でも選択位置は動かさない。忍者実機確認で違和感があれば再検討)。
             if (SelectedCell is GridPos sc && sc.Row > row)
                 SelectedCell = sc with { Row = sc.Row - 1 };
-            RowOps.DeleteRow(sheet, row);
+            var removed = RowOps.DeleteRow(sheet, row);
             sheet.Grid.Rows--;
+            CleanupRemovedDeviceNames(removed);
             FinishRowCountChange(sheet);
         },
         param => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows && param is int);
