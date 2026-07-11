@@ -134,7 +134,7 @@
                 <MenuItem Header="テストモード(_M)" InputGestureText="F5"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
-                <MenuItem Header="バージョン情報(_A)"/>
+                <MenuItem Header="バージョン情報(_A)" Click="AboutMenuItem_Click"/>
             </MenuItem>
         </Menu>
 

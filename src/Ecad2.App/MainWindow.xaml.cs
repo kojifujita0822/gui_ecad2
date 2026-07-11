@@ -165,6 +165,13 @@ public partial class MainWindow : Window
         RedrawCanvas();
     }
 
+    // ヘルプ→バージョン情報。表示のみで状態変更を伴わないためViewModelへの委譲なし(T-074)。
+    private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Views.AboutDialog { Owner = this };
+        dialog.ShowDialog();
+    }
+
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
     // ViewModelのRenameCommandへ委譲する。
     private void RenameSheetButton_Click(object sender, RoutedEventArgs e)
