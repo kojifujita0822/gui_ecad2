@@ -165,6 +165,15 @@ public partial class MainWindow : Window
         RedrawCanvas();
     }
 
+    // T-066関連バグB(隠密静的レビュー指摘、往復1周目): 機器表の型式セル編集中はUpdateSourceTrigger
+    // 既定(LostFocus)のCellEditEndingで確定するため、フォーカスを保持したままのCtrl+S/新規/クローズ
+    // では確定されない。CommitDeviceNameEditと並べて保存・破棄判定の入口で必ず呼び、無警告破棄を防ぐ。
+    private void CommitDeviceTableEdit()
+    {
+        DeviceTableGrid.CommitEdit(DataGridEditingUnit.Cell, true);
+        DeviceTableGrid.CommitEdit(DataGridEditingUnit.Row, true);
+    }
+
     // ヘルプ→バージョン情報。表示のみで状態変更を伴わないためViewModelへの委譲なし(T-074)。
     private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
     {
@@ -182,11 +191,16 @@ public partial class MainWindow : Window
     }
 
     // 機器表(型式列)のセル編集確定(T-066)。Bindingが直接Device.Modelへ書き戻すため、ここでは
-    // MarkDirty()のみ呼ぶ(キャンセル時はEditAction==Cancelのため呼ばない)。
+    // MarkDirty()のみ呼ぶ(キャンセル時はEditAction==Cancelのため呼ばない)。まだBindingが確定する
+    // 前のタイミングで発火するため、編集要素(TextBox)の新値と旧値(Device.Model)を比較し、実際に
+    // 変化した場合のみMarkDirty()する(隠密静的レビュー指摘C、往復1周目。同値ガード規約に合わせる)。
     private void DeviceTableGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
-        if (e.EditAction == DataGridEditAction.Commit)
-            _viewModel.MarkDirty();
+        if (e.EditAction != DataGridEditAction.Commit) return;
+        if (e.Row.Item is not Ecad2.Model.Device device) return;
+        if (e.EditingElement is not TextBox textBox) return;
+        if (textBox.Text == (device.Model ?? "")) return;
+        _viewModel.MarkDirty();
     }
 
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
@@ -238,6 +252,7 @@ public partial class MainWindow : Window
         // T-049: デバイス名編集中にフォーカスを保持したままの保存(Ctrl+S等)で編集が保存漏れ
         // しないよう、保存前に確定させる(CommitDeviceNameEdit参照)。
         CommitDeviceNameEdit();
+        CommitDeviceTableEdit();
 
         if (_viewModel.CurrentFilePath is string path)
             TrySaveToFile(path);
@@ -258,6 +273,7 @@ public partial class MainWindow : Window
     {
         if (!_viewModel.HasProject) return;
         CommitDeviceNameEdit();
+        CommitDeviceTableEdit();
         SaveDocumentAs();
     }
 
@@ -319,6 +335,7 @@ public partial class MainWindow : Window
         // T-049: 新規/開く/ウィンドウクローズはいずれも本メソッドを通る単一の関門。IsDirty判定・
         // 破棄確定のいずれもデバイス名編集中の未確定値を正しく反映させるため、判定前に確定させる。
         CommitDeviceNameEdit();
+        CommitDeviceTableEdit();
 
         if (!_viewModel.IsDirty) return true;
 

@@ -456,7 +456,8 @@
                     <DockPanel Grid.Row="0">
                         <TextBlock DockPanel.Dock="Top" Text="機器表" FontWeight="Bold" Margin="4"/>
                         <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
+                                  CanUserAddRows="False" CanUserDeleteRows="False">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="機器名" Binding="{Binding Name}" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}" IsReadOnly="True"/>

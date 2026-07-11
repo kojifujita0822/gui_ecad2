@@ -13,13 +13,13 @@ public partial class DocumentInfoDialog : Window
     public DocumentInfoDialog(DocumentInfo current)
     {
         InitializeComponent();
-        CompanyNameBox.Text = current.CompanyName;
-        TitleBox.Text = current.Title;
-        DrawingNoBox.Text = current.DrawingNo;
-        CustomerBox.Text = current.Customer;
-        DesignerBox.Text = current.Designer;
-        DrafterBox.Text = current.Drafter;
-        CheckerBox.Text = current.Checker;
+        CompanyNameBox.Text = current.CompanyName ?? "";
+        TitleBox.Text = current.Title ?? "";
+        DrawingNoBox.Text = current.DrawingNo ?? "";
+        CustomerBox.Text = current.Customer ?? "";
+        DesignerBox.Text = current.Designer ?? "";
+        DrafterBox.Text = current.Drafter ?? "";
+        CheckerBox.Text = current.Checker ?? "";
         DateBox.Text = current.Date ?? "";
         Loaded += (_, _) =>
         {
