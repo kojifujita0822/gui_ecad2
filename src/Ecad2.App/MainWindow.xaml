@@ -19,7 +19,6 @@
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
-        <converters:PartEntryToGlyphGeometryConverter x:Key="PartEntryToGlyph"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -609,11 +608,12 @@
                           Data="M2,3 L12,3 L12,9 L7,9 L4,13 L4,9 L2,9 Z"/>
                 </Button>
                 <!-- 種別選択(T-033増分4/5、殿注文=省スペース化+表示どおりの動作): 文字表記から
-                     シンボルのみ表示へ変更。項目は部品選択リストと同じ7種(ORa/ORb含む、
-                     PartPaletteViewModel.SelectionEntries、並び順もリストと同一)。ツールバー2段目
-                     (T-040)と同じGX様式グリフをPartEntryToGlyphGeometryConverterでDefinition.Id+
-                     IsOrから引く(閉状態・ドロップダウン項目とも同一ItemTemplateのため自動的に
-                     揃う)。ToolTip・AutomationProperties.Nameは正式名称(DisplayName、IsOr時は
+                     シンボルのみ表示へ変更。項目は部品選択リストと同じ全種(ORa/ORb含む、
+                     PartPaletteViewModel.SelectionEntries、並び順もリストと同一)。アイコンは
+                     PartSelectionEntryViewModel.Thumbnail(PartThumbnailRenderer生成のImageSource)を
+                     そのまま流用する(T-071、殿裁定=方式B。実体記号描画への統一のため専用手作り
+                     Geometryは廃止、選択中部品の大サムネイル欄と生成元が同一になり新規部品追加時も
+                     自動対応)。ToolTip・AutomationProperties.Nameは正式名称(DisplayName、IsOr時は
                      「ORa接点」等)を維持し(忍者のUIA検証互換)、コントロール自体は選択中の部品名を
                      動的反映、ドロップダウン各項目はItemContainerStyleでその部品自身の名称を持つ。
                      ドロップダウンで選んだ項目そのものがOR属性も決める(PlacementOkButton_Click参照、
@@ -624,8 +624,7 @@
                           AutomationProperties.Name="{Binding SelectedItem.DisplayName, RelativeSource={RelativeSource Self}, FallbackValue=種別選択}">
                     <ComboBox.ItemTemplate>
                         <DataTemplate>
-                            <Path Style="{StaticResource PlacementToolBarIconStyle}"
-                                  Data="{Binding Converter={StaticResource PartEntryToGlyph}}"/>
+                            <Image Source="{Binding Thumbnail}" Width="14" Height="14" Stretch="Uniform"/>
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                     <ComboBox.ItemContainerStyle>

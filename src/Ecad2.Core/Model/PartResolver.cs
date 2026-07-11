@@ -53,6 +53,12 @@ public static class PartResolver
             PartRole.Terminal => ElementKind.Terminal,
             PartRole.InputNO => ElementKind.PushButtonNO,
             PartRole.InputNC => ElementKind.PushButtonNC,
+            PartRole.TimerContactNO => ElementKind.TimerContactNO,
+            PartRole.TimerContactNC => ElementKind.TimerContactNC,
+            PartRole.TimerInstantContactNO => ElementKind.TimerInstantContactNO,
+            PartRole.TimerInstantContactNC => ElementKind.TimerInstantContactNC,
+            PartRole.ThermalOverload => ElementKind.ThermalOverload,
+            PartRole.EmergencyStop => ElementKind.EmergencyStop,
             _ => throw new InvalidOperationException(
                 $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };

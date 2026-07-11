@@ -3,7 +3,14 @@ using System.Text.Json.Serialization;
 namespace Ecad2.Model;
 
 /// <summary>自作パーツの電気的役割（テストモード挙動）。NetlistBuilder で既定種別へ写像する。</summary>
-public enum PartRole { ContactNO, ContactNC, Coil, Lamp, Terminal, NonSimulated, InputNO, InputNC }
+public enum PartRole
+{
+    ContactNO, ContactNC, Coil, Lamp, Terminal, NonSimulated, InputNO, InputNC,
+    // T-071: 経路B部品追加（押釦以外の残り6種）。既存Roleへの丸めは電気的挙動・機器分類双方が
+    // 劣化するため、専用Roleとして追加する（着手前調査 docs/ecad2-t071-part-addition-design-onmitsu2.md 2節）。
+    TimerContactNO, TimerContactNC, TimerInstantContactNO, TimerInstantContactNC,
+    ThermalOverload, EmergencyStop,
+}
 
 /// <summary>
 /// パーツ図形プリミティブ（パーツローカル座標＝セル単位。原点=最左ポート点・行中心線=y0、+x右/+y下）。
