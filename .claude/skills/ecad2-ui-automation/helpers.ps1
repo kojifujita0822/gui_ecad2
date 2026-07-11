@@ -23,6 +23,8 @@ public class Ecad2Native {
     [DllImport("user32.dll")]
     public static extern bool SetForegroundWindow(IntPtr hWnd);
     [DllImport("user32.dll")]
+    public static extern bool IsWindowEnabled(IntPtr hWnd);
+    [DllImport("user32.dll")]
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
     [DllImport("user32.dll")]
     public static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
@@ -148,6 +150,9 @@ function Get-Ecad2Root {
 function Set-Ecad2Foreground {
     $proc = Get-Ecad2Process
     if (-not $proc) { throw "Ecad2.App process not found." }
+    if (-not [Ecad2Native]::IsWindowEnabled($proc.MainWindowHandle)) {
+        return   # モーダルダイアログ表示中と推定、メインウィンドウのアクティブ化はしない(P-056対策)
+    }
     [Ecad2Native]::SetForegroundWindow($proc.MainWindowHandle) | Out-Null
     Start-Sleep -Milliseconds 300
 }
@@ -299,7 +304,10 @@ function Invoke-Ecad2CtrlScroll {
 # WPFアプリのためSendKeysが機能する（GuiEcad=WinUI3では届かなかったのと対照的）。
 # 例: Send-Ecad2Keys "{ESC}" / Send-Ecad2Keys "^{TAB}"（Ctrl+Tab）/ Send-Ecad2Keys "{F5}"
 function Send-Ecad2Keys {
-    param([Parameter(Mandatory)][string]$Keys)
+    param([Parameter(Mandatory)][string]$Keys, [switch]$Force)
+    if ($Keys.Length -gt 20 -and -not $Force) {
+        throw "Send-Ecad2Keys: キー文字列が長すぎます('$Keys', $($Keys.Length)文字)。ショートカットキー検証以外の用途(ファイルパス入力等)が疑われます。ダイアログへの入力は別手段(最近使ったファイル一覧・UIボタン操作等)を優先してください。意図的な場合は -Force を指定。"
+    }
     Set-Ecad2Foreground
     [System.Windows.Forms.SendKeys]::SendWait($Keys)
     Start-Sleep -Milliseconds 200
