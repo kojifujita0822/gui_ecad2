@@ -157,10 +157,15 @@ FileVersion=0.3.0.0/ProductVersion=0.3.0・起動→終了とも正常確認。g
 対応する`PartRole`が存在せず**`PartRole` enum拡張＋`PartResolver.ComponentKind()`のswitch拡張が
 必要**（既存Roleへの丸めは電気的挙動・機器分類双方が劣化するため非推奨）・規模小〜中。
 `DeviceClass`分類側は既に対応済みにつき追加実装不要。
-サムネイルは2経路：部品選択パレット本体(`PartThumbnailRenderer`)はPrimitivesから自動描画で対応可。
-配置バーの簡易アイコン(`PartEntryToGlyphGeometryConverter`)は新規10種とも既存の個別グリフ対応が無く
-汎用フォールバックとなる点が判明——**殿裁定（2026-07-11、プレビュー提示で選択）＝全10種分の
-専用グリフを新規作成**（GX Works3等参考の固有記号、T-048の「殿意匠提示→プレビュー承認制」を踏襲）。
+サムネイルは2経路：**①配置バーの選択中部品の大サムネイル(`PartThumbnailRenderer`)は新規10種とも
+既に自動対応済み（訂正前の報告は不正確だった）** ②コンボ内の小アイコン
+(`PartEntryToGlyphGeometryConverter`)のみ既存5種限定でCustomフォールバックとなる。
+**GuiEcadの専用グリフの正体＝実体の記号描画ロジック(`SymbolGlyphs.Draw`)をSVG化してツールボタンへ
+流用する仕組み**（`SvgRenderer.GenerateSymbolSvg`）、ecad2にも同型`SymbolGlyphs.Draw`が完備（隠密2、
+殿の実例指摘を受けた追加調査で判明）。
+実現方式2案：A=既存5種と同じGX様式簡略化アイコンで手作り（意匠統一、規模小〜中）／
+B=GuiEcad同様に実体記号描画をPath→Imageへ差し替えて流用（規模小、ただし既存5種とタッチが異なる）。
+**殿裁定（2026-07-11、プレビュー提示で選択）＝方式B（実体記号描画を流用）**。
 侍へ実装采配済み（2026-07-11）。
 
 **起票=GuiEcad未結線棚卸し（`docs/ecad2-guiecad-unwired-features-survey-onmitsu2.md`）のC区分から
