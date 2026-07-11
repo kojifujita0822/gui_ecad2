@@ -1,4 +1,5 @@
 using Ecad2.App.ViewModels;
+using Ecad2.Model;
 
 namespace Ecad2.App.Tests;
 
@@ -216,5 +217,72 @@ public class UndoRedoCommandsTests : ViewModelTestBase
         vm.UndoCommand.Execute(null);
 
         Assert.Null(vm.OutputPanel.SelectedDiagnostic);
+    }
+
+    // ---- T-051往復2周目: ApplyUndoRedoSnapshotがSelectedCellを無条件nullリセットするバグの修正
+    // (隠密再レビューCONFIRMED、docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md) ----
+
+    /// <summary>【RED証明の中核】T-selcell-1: シート数不変・クランプ非発動でも、修正前コードは
+    /// SetCurrentSheetIndexCore経由でSelectedCellが無条件nullになりFAILする。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WithoutClamp_PreservesSelectedCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = new GridPos(3, 2);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(3, 2), vm.SelectedCell);
+    }
+
+    /// <summary>T-selcell-2: 対称性点検(Redo方向)。</summary>
+    [Fact]
+    public void RedoCommand_Execute_WithoutClamp_PreservesSelectedCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = new GridPos(3, 2);
+        vm.UndoCommand.Execute(null);
+
+        vm.RedoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(3, 2), vm.SelectedCell);
+    }
+
+    /// <summary>【RED証明の中核・境界値】T-selcell-3: CurrentSheetIndexがクランプされ実際に別シートへ
+    /// 切り替わる場合でも、SelectedCellの座標値自体は変えない(DeleteRowAtCommandのクランプ意味論と
+    /// 整合、T-055増分3)。修正前コードはSetCurrentSheetIndexCore経由でSelectedCellが無条件nullに
+    /// なりFAILする。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WithClamp_PreservesSelectedCellCoordinates()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false));
+        vm.SelectedCell = new GridPos(7, 4);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(1, vm.CurrentSheetIndex);
+        Assert.Equal(new GridPos(7, 4), vm.SelectedCell);
+    }
+
+    /// <summary>T-selcell-4: 退行なし確認。SelectedCellが未選択(null)の場合、Undo後もnullのまま。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WhenSelectedCellIsNull_RemainsNull()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Null(vm.SelectedCell);
     }
 }

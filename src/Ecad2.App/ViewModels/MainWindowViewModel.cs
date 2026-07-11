@@ -1806,12 +1806,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         // この時点で捕捉する(ReplaceDocumentと同じ理由、SetCurrentSheetIndexCore後に読むと
         // 既に新しいindex・ミラーの組から誤った値になる)。
         var oldSelectedSheet = SheetNavigation.SelectedSheet;
+        // T-051往復2周目(隠密再レビューCONFIRMED、docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md):
+        // SetCurrentSheetIndexCoreは「常時無条件」でSelectedCell=nullを実行する既存仕様(T-041由来、
+        // AddCommand/DeleteCommand等の複数呼び出し元が依存)のため、そのままではUndo/Redoでも
+        // SelectedCellが強制クリアされ、殿裁定(SelectedCellは巻き戻さず現状維持)に反する。
+        // SetCurrentSheetIndexCore本体は変えず、呼び出し前後で局所的に退避・復元する(座標値はそのまま
+        // 据え置く=DeleteRowAtCommandのクランプ意味論と整合、T-055増分3)。
+        var oldSelectedCell = SelectedCell;
         Document = restored;
         OnPropertyChanged(nameof(Document), oldDocument);
         SheetNavigation.ResetSheets();
         // シート数が変化しうるため、CurrentSheetIndexを新しい範囲へクランプする。
         int clampedIndex = Math.Clamp(_currentSheetIndex, 0, Math.Max(0, restored.Sheets.Count - 1));
         SetCurrentSheetIndexCore(clampedIndex);
+        SelectedCell = oldSelectedCell;
         NotifyCurrentSheetChanged();
         // T-051バグ修正#2: AddCommand/DeleteCommand/RenameCommand等の既存コマンド群が律儀に発火
         // させているSelectedSheet変更通知(T-050で確立済みの不変条件)をUndo/Redoでも発火させ、
