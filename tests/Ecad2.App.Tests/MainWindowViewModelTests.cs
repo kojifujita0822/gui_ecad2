@@ -415,4 +415,53 @@ public class MainWindowViewModelTests : ViewModelTestBase
 
         Assert.Equal(DeviceClass.Terminal, vm.Document.Devices.ByName["TB2"].Class);
     }
+
+    /// <summary>T-065: ApplyDocumentInfoが8フィールドをDocument.Infoへ反映しMarkDirty()すること。</summary>
+    [Fact]
+    public void ApplyDocumentInfo_UpdatesFieldsAndMarksDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        ResetDirtyViaSave(vm);
+        var info = new DocumentInfo
+        {
+            CompanyName = "テスト社",
+            Title = "テスト図面",
+            DrawingNo = "D-001",
+            Customer = "テスト客先",
+            Designer = "設計太郎",
+            Drafter = "製図次郎",
+            Checker = "検図三郎",
+            Date = "2026-07-12",
+        };
+
+        vm.ApplyDocumentInfo(info);
+
+        Assert.Equal("テスト社", vm.Document.Info.CompanyName);
+        Assert.Equal("テスト図面", vm.Document.Info.Title);
+        Assert.Equal("D-001", vm.Document.Info.DrawingNo);
+        Assert.Equal("テスト客先", vm.Document.Info.Customer);
+        Assert.Equal("設計太郎", vm.Document.Info.Designer);
+        Assert.Equal("製図次郎", vm.Document.Info.Drafter);
+        Assert.Equal("検図三郎", vm.Document.Info.Checker);
+        Assert.Equal("2026-07-12", vm.Document.Info.Date);
+        Assert.True(vm.IsDirty);
+    }
+
+    /// <summary>T-065: Revisions(改定履歴)はApplyDocumentInfoの編集対象外(殿裁定2026-07-12)で
+    /// あり、既存のリスト参照・内容とも変化しないこと。</summary>
+    [Fact]
+    public void ApplyDocumentInfo_DoesNotChangeRevisions()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var existingRevisions = vm.Document.Info.Revisions;
+        existingRevisions.Add(new RevisionEntry { Rev = "A", Date = "2026-01-01", Description = "初版", By = "太郎" });
+
+        vm.ApplyDocumentInfo(new DocumentInfo { CompanyName = "新社名" });
+
+        Assert.Same(existingRevisions, vm.Document.Info.Revisions);
+        Assert.Single(vm.Document.Info.Revisions);
+        Assert.Equal("A", vm.Document.Info.Revisions[0].Rev);
+    }
 }

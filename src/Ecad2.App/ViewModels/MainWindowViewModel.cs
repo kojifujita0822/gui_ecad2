@@ -106,6 +106,21 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>ドキュメントに未保存の変更が生じたことを記録する(T-019)。</summary>
     public void MarkDirty() => IsDirty = true;
 
+    /// <summary>ドキュメント情報(T-065)を一括反映しMarkDirty()する。Revisions(改定履歴)は
+    /// 編集対象外(殿裁定2026-07-12)のため変更しない。</summary>
+    public void ApplyDocumentInfo(DocumentInfo info)
+    {
+        Document.Info.CompanyName = info.CompanyName;
+        Document.Info.Title = info.Title;
+        Document.Info.DrawingNo = info.DrawingNo;
+        Document.Info.Customer = info.Customer;
+        Document.Info.Designer = info.Designer;
+        Document.Info.Drafter = info.Drafter;
+        Document.Info.Checker = info.Checker;
+        Document.Info.Date = info.Date;
+        MarkDirty();
+    }
+
     private int _currentSheetIndex;
 
     /// <summary>現在表示中のシートのインデックス（Document.Sheets への添字）。左パレットのシート

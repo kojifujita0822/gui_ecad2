@@ -172,6 +172,23 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
     }
 
+    // 図面→ドキュメント情報。ダイアログ表示自体はView側の責務のためcode-behindで行い、
+    // 結果の反映はViewModelのApplyDocumentInfoへ委譲する(RenameSheetButton_Clickと同型、T-065)。
+    private void DocumentInfoMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Views.DocumentInfoDialog(_viewModel.Document.Info) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.ApplyDocumentInfo(dialog.Result);
+    }
+
+    // 機器表(型式列)のセル編集確定(T-066)。Bindingが直接Device.Modelへ書き戻すため、ここでは
+    // MarkDirty()のみ呼ぶ(キャンセル時はEditAction==Cancelのため呼ばない)。
+    private void DeviceTableGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (e.EditAction == DataGridEditAction.Commit)
+            _viewModel.MarkDirty();
+    }
+
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
     // ViewModelのRenameCommandへ委譲する。
     private void RenameSheetButton_Click(object sender, RoutedEventArgs e)

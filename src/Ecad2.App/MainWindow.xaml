@@ -128,6 +128,9 @@
                 <Separator/>
                 <MenuItem Header="削除(_D)" InputGestureText="Delete" Click="DeleteMenuItem_Click"/>
             </MenuItem>
+            <MenuItem Header="図面(_D)">
+                <MenuItem Header="ドキュメント情報(_I)" Click="DocumentInfoMenuItem_Click" IsEnabled="{Binding HasProject}"/>
+            </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>
             </MenuItem>
@@ -453,10 +456,10 @@
                     <DockPanel Grid.Row="0">
                         <TextBlock DockPanel.Dock="Top" Text="機器表" FontWeight="Bold" Margin="4"/>
                         <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
-                                  IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding">
                             <DataGrid.Columns>
-                                <DataGridTextColumn Header="機器名" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}"/>
+                                <DataGridTextColumn Header="機器名" Binding="{Binding Name}" IsReadOnly="True"/>
+                                <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}" IsReadOnly="True"/>
                                 <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
                             </DataGrid.Columns>
                         </DataGrid>
