@@ -52,6 +52,14 @@
 Click/Commandハンドラが結線されておらず、押下しても何も起きない。テストモードと異なりUI/UX面での
 新規設計要素は比較的少なく（既存の保存ダイアログパターン踏襲等で足りる見込み）、結線調査＋実装で
 完結する可能性が高いが、詳細は未調査。着手順序・スコープは未着手（キュー整理待ち）。
+**結線調査を隠密2へ采配（2026-07-11）→出力破損2回検知により§5離脱・調査中断**。引き継ぎ=
+`docs-notes/handover-onmitsu2-t060.md`（DoD(1)(2)はほぼ完了：Pdf層API棚卸し・GuiEcad結線パターン
+実物照合済み。残=CrossReferenceBuilder/EnableBorder相当のecad2側存否・PdfPreviewDialog中身・
+正式調査書の書き起こし）。**調査途中の重要判明**：P-001「PdfExporterが1ページで打ち切られる」は
+T-002 PoC限定の簡易実装の話で、本実装Core層`DiagramRenderer`は最初から複数ページ設計
+（`RenderPageCount`・クロスリファレンス専用ページ・BOM専用ページ完備）＝**P-001の懸念は現行
+アーキテクチャに当てはまらず実質解消済み**。再開は隠密2の新セッション起動後、引き継ぎ書の
+「次の1手」から（Grep回避・Read直読中心の注意書きあり）。
 
 ### T-059 出力パネルの高さをドラッグで調整可能にする — In-progress（実装完了・忍者実機確認待ち、殿直接指示2026-07-11）
 
@@ -297,6 +305,14 @@ Redo履歴クリアは新規操作時のみ・ApplyUndoRedoSnapshot新設[Replac
 「Insert」=家老のDoD文言の綾であり、RenameCommand内部のInsert（シート数を変えぬ実装詳細）は
 対象外という侍解釈が正（家老裁定） (4)ボタン配置=既存プレースホルダ結線のみで新規UI無し、
 UI/UX分岐なしと確認（家老承認）。**実装GO（2026-07-11）**。
+**実装完了（2026-07-11）**：コミット0693755。計画書1.1〜1.4節どおり（UndoManager新設・
+UndoCommand/RedoCommand・ApplyUndoRedoSnapshot[シート構成のみ復元+MarkDirty維持=論点1・2裁定
+どおり]・Add/DeleteCommandへRecordSnapshot・既存プレースホルダ結線+Ctrl+Z/Y・IsEnabled自動連動）。
+テスト=UndoManagerTests単体10件+UndoRedoCommandsTests結合6件。計画書2節の1項目（Undo後IsDirty=true
+専用テスト）のみ、IsDirty setterがprivate＋直前操作が既にMarkDirty済みでRED証明可能な形にできず
+見送り（技術的縮小、テストファイル内コメント明記）——隠密レビューで妥当性確認要。
+Core64件・App365件（+16）全合格、差分7ファイル、計画書スコープと完全一致。
+次＝隠密静的レビュー（計画書突合含む）→忍者実機確認（Ctrl+Z/Y・IsEnabled連動の見た目）。
 
 ### T-046 「必ず通過するテスト」防止の仕組み化 — In-progress（制度は運用開始済み、CI化のみ残置）
 
