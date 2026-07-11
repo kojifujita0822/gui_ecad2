@@ -25,7 +25,7 @@
 
 ### 1. 貴殿の比較書推奨形との整合
 
-**整合している（事実）。** `docs/ecad2-t039-design-comparison-onmitsu.md`で提案した(a)`OnPropertyChanged`
+**整合している（事実）。** `docs/archive/ecad2-t039-design-comparison-onmitsu.md`で提案した(a)`OnPropertyChanged`
 一括フック、(b)フォーカスのクラスハンドラ、(c)Clickのクラスハンドラが、いずれもコミット562a0adで
 その通りに実装されている（`ViewModelBase.cs`18-29行目、`App.xaml.cs`32-40行目）。
 
@@ -193,7 +193,7 @@ try/catchで隔離するという1点の修正で、finding 1・2の大半が構
 ## 出典
 
 - コミット562a0ad（`git show`で全文確認）
-- `docs/ecad2-t039-design-comparison-onmitsu.md`（拙者の推奨形）
+- `docs/archive/ecad2-t039-design-comparison-onmitsu.md`（拙者の推奨形）
 - `docs-notes/ecad2-t039-trace-log-field-feedback-ninja.md`（忍者現場意見）
 - WPF公式ドキュメント（Microsoft Learn、WebSearchで確認: "Class handlers are invoked before instance
   handlers"）

@@ -73,7 +73,7 @@ Angle A独立確認、実装追跡で成立を確認済み）。
 ### [CONFIRMED・要修正] Name一致によるOR対象判定が同名重複パーツで破綻する
 `PartPaletteViewModel.cs`53行目`Entries.Where(e => e.Category == "" && (e.Definition.Name ==
 "a接点" || e.Definition.Name == "b接点"))`は`Definition.Id`の一意性を見ずName文字列のみで判定
-する。T-035（`docs/ecad2-t035-review-onmitsu.md`）で明らかになった「ファイルコピーで
+する。T-035（`docs/archive/ecad2-t035-review-onmitsu.md`）で明らかになった「ファイルコピーで
 `Id`は重複検出・再採番されるが`Name`は変更されずそのまま残る」という挙動と組み合わさると、
 図形/直下に同名"a接点"の複製（Idは異なる）が存在する場合、この`Where`が両方にヒットし、
 部品選択リストに「ORa接点」が重複表示される。**verdict: CONFIRMED**（コードロジックの追跡で
@@ -111,6 +111,6 @@ enum（`PartRole.ContactNO`/`ContactNC`）が存在し、`BasicPartTemplates.Con
 ## 出典
 - コミット`8ebc05d`（`git show`・`git diff 8ebc05d~1..8ebc05d`で全文確認）
 - `code-review`スキル（mediumレベル、8角度×並列finder→1-vote verify）
-- `docs/ecad2-t035-review-onmitsu.md`（Name重複問題の背景）
+- `docs/archive/ecad2-t035-review-onmitsu.md`（Name重複問題の背景）
 - `src/Ecad2.Core/Persistence/BasicPartTemplates.cs`（`PartRole`設定済みの実装確認）
 - `src/Ecad2.App/Views/ElementPlacementDialog.xaml.cs`・`MainWindowViewModel.cs`（isOr伝搬経路の追跡）

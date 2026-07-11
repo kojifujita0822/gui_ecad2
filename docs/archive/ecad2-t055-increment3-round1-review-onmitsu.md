@@ -10,7 +10,7 @@
 | 観点 | 判定 | 根拠 |
 |---|---|---|
 | 1. 挿入処理の5種要素シフトが調査書§2.2のGuiEcad規則と整合するか | **OK** | `RowOps.InsertRow`はGuiEcad `RowOps.ShiftRows`(inclusive=true)の閾値・加算方向と完全一致（実物照合済み） |
-| 2. GroupFrame内部挿入時のHeight伸縮規則(§2.3)、計画書追記の整合性 | **OK** | `RowOps.cs:28-32`のGroupFrame分岐がGuiEcad `InsertRowCommand.Execute`と一致。計画書差分(`docs/ecad2-t055-implementation-plan-samurai.md`)も同規則を正確に追記 |
+| 2. GroupFrame内部挿入時のHeight伸縮規則(§2.3)、計画書追記の整合性 | **OK** | `RowOps.cs:28-32`のGroupFrame分岐がGuiEcad `InsertRowCommand.Execute`と一致。計画書差分(`docs/archive/ecad2-t055-implementation-plan-samurai.md`)も同規則を正確に追記 |
 | 3. ContextMenu基盤が推奨アプローチ(§1)に沿っているか | **OK** | `ToGridPos`で行確定→コードビハインドで動的生成→`RelayCommand`実行、調査書推奨どおり |
 | 4. 「削除対象行に要素なし」ケースの削除処理が正しいか | **OK** | `IsRowOccupied`（開始行・内部行とも占有判定）で事前ガードしており、`RowOps.DeleteRow`の契約（対象行に要素なし）と整合。契約違反経路は現状存在しない |
 
@@ -36,7 +36,7 @@
 
 **c. `DeleteRowAtCommand`の占有拒否ブロックがrule of three到達**
 `src/Ecad2.App/ViewModels/MainWindowViewModel.cs:1699`付近。
-`IsRowOccupied`判定→`StatusMessage`設定→`return`という同一パターンが`DeleteRowCommand`(1639)・`UpdateSheetSettingsCommand`(1665)・`DeleteRowAtCommand`(1699、今回)の3箇所に到達した。過去裁定（`docs/ecad2-t055-increment2-round1-review-onmitsu.md:63`）は「2箇所間の不統一」指摘をrule of three未達で見送っており、恒久却下ではなく「3箇所到達で再検討」という条件付きだった。今回その条件を満たした。共通private helper（例: `TryRejectOccupiedRow(Sheet, int)`）への抽出を検討する好機。
+`IsRowOccupied`判定→`StatusMessage`設定→`return`という同一パターンが`DeleteRowCommand`(1639)・`UpdateSheetSettingsCommand`(1665)・`DeleteRowAtCommand`(1699、今回)の3箇所に到達した。過去裁定（`docs/archive/ecad2-t055-increment2-round1-review-onmitsu.md:63`）は「2箇所間の不統一」指摘をrule of three未達で見送っており、恒久却下ではなく「3箇所到達で再検討」という条件付きだった。今回その条件を満たした。共通private helper（例: `TryRejectOccupiedRow(Sheet, int)`）への抽出を検討する好機。
 
 ### 2-3. 経過観察（PLAUSIBLE、現状無害・将来の脆さ）
 

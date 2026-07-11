@@ -1,7 +1,7 @@
 # T-045増分D第2波（ConfirmDrag/CancelDrag骨格を4種全てへ展開）差分再レビュー（隠密）
 
 > 2026-07-09 隠密レビュー。対象コミット`9225c3a`（`refactor(app): T-045増分D第2波 ConfirmDrag/
-> CancelDrag骨格を4種全てへ展開`、親`0375459`）。前回レビュー（`docs/ecad2-t045-increment-d-review-onmitsu.md`）のDoD(6)実査（侍PoC所見の誤認発覚）を受け、家老が展開見送りを撤回し
+> CancelDrag骨格を4種全てへ展開`、親`0375459`）。前回レビュー（`docs/archive/ecad2-t045-increment-d-review-onmitsu.md`）のDoD(6)実査（侍PoC所見の誤認発覚）を受け、家老が展開見送りを撤回し
 > 采配した第2波。`code-review`スキル（8角度、6エージェント並行、1-vote検証2件）をhigh effortで
 > 併用。実測検証（`dotnet test`全件・ドラッグ関連フィルタ実行）も併用した。
 

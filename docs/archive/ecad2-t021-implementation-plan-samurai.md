@@ -10,7 +10,7 @@
 - 論点5＝quasimode不採用。パンは矢印カーソル移動＋画面端自動追従スクロール／ホイール自由スクロール
 - **案C（論点4）＝配置後入力は当面モーダルElementPlacementDialogのまま**でよい。真の非モーダル化はT-033へ分離（今回スコープ外）
 
-参照：`docs/ecad2-t021-keyboard-spec.md`（確定サマリ）／`docs/ecad2-t021-enter-placement-survey-onmitsu.md`（隠密調査）／
+参照：`docs/archive/ecad2-t021-keyboard-spec.md`（確定サマリ）／`docs/archive/ecad2-t021-enter-placement-survey-onmitsu.md`（隠密調査）／
 現行実装 `src/Ecad2.App/MainWindow.xaml.cs`・`src/Ecad2.App/Views/LadderCanvas.cs`・`ViewModels/ToolState.cs`
 
 ---

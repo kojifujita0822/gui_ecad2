@@ -71,7 +71,7 @@ Esc/4層設計そのものの問題ではなく(1)由来の副作用として現
 ### (5) オーバーレイ要素のUIA到達性の静的確認 — **問題なし（推奨通りの構成）**
 
 `ElementPlacementBar`は同一Window内の通常の`Border`+`StackPanel`（Popup不使用、隠密の事前調査
-`docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md`の推奨通り）であり、既存の
+`docs/archive/ecad2-t033-ui-automation-impact-survey-onmitsu.md`の推奨通り）であり、既存の
 `ecad2-ui-automation`スキルの`Get-Ecad2Root`（`AutomationElement.FromHandle`+`Descendants`探索）が
 そのまま到達できる構成になっている。Popup特有の別HWND化・フォーカス委譲の懸念は生じない。
 `Visibility=Collapsed`時はWPF標準挙動としてレイアウト・AutomationPeer共に非対象になるため、
@@ -110,8 +110,8 @@ Esc/4層設計そのものの問題ではなく(1)由来の副作用として現
 - `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`（`PlaceElementAtSelectedCell`, `IsSelectedCellOccupied`, `CurrentSheetIndex`）
 - `src/Ecad2.App/ViewModels/OutputPanelViewModel.cs`（`JumpTo`）
 - `src/Ecad2.Core/Model/Sheet.cs`（`Elements`の型、重複Pos制約の有無）
-- `docs/ecad2-t033-implementation-plan-samurai.md`（3.3節・6.2節、家老依頼の背景）
-- `docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md`（隠密の事前調査、観点5の前提）
-- `docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（フォーカス集約設計の先例）
+- `docs/archive/ecad2-t033-implementation-plan-samurai.md`（3.3節・6.2節、家老依頼の背景）
+- `docs/archive/ecad2-t033-ui-automation-impact-survey-onmitsu.md`（隠密の事前調査、観点5の前提）
+- `docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（フォーカス集約設計の先例）
 - `code-review`スキル（high、finder 8角度→verify 10件、全件CONFIRMED、Agent実行ログ）
 - Microsoft Learn「Focus Overview - WPF」（観点3・初期フォーカスタイミングの一次情報）

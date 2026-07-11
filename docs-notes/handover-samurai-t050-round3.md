@@ -12,9 +12,9 @@
 
 - DoD: RED先行証明必須（**補強前は検知できないことを実測で確認**してから実装）、既存268件+新規分すべて合格
 - スコープ: 当該テストのみ。他テスト・実装コードは触らぬこと（便乗拡大禁止）
-- 参照: `docs-notes/handover-next-session.md` 2節・`docs/ecad2-t050-fix2-review-onmitsu.md`
+- 参照: `docs-notes/handover-next-session.md` 2節・`docs/archive/ecad2-t050-fix2-review-onmitsu.md`
   「テストコード自体の静的レビュー」節（指摘の原文）
-- 完了後はT-055増分計画の起草へ（`docs/ecad2-t055-guiecad-row-busnumber-survey-onmitsu.md`参照）
+- 完了後はT-055増分計画の起草へ（`docs/archive/ecad2-t055-guiecad-row-busnumber-survey-onmitsu.md`参照）
 
 ## 2. 現在の状態（三区分）
 

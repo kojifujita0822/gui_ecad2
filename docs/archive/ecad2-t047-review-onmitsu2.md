@@ -61,13 +61,13 @@
 - **file**: `src/Ecad2.App/MainWindow.xaml.cs:1096-1119`（`ToolButtonPreviewKeyDown`/`ConsumeToolButtonFocusRestore`）、`759,824-853`（矢印キー/Enter確定の`IsCanvasFocused()`ガード）、`1301-1329`（新設3ボタンのClickハンドラ）
 - **対象**: 「自由線(横線)記入」「自由線(縦線)記入」「縦分岐線記入」の3ボタン（「接続点記入」「配線分断記入」は即時確定のため対象外）
 
-**事象**: ユーザーがTabキーでツールバーへフォーカス移動し、上記3ボタンのいずれかをEnter/Spaceで押下すると、`ConsumeToolButtonFocusRestore`が「キーボード起因」と判定してキャンバスへフォーカスを戻さない（既存の`懸念4`対応ポリシー、`docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`）。記入モード自体は正常に開始されるが、続く矢印キーでの調整・Enterでの確定は`IsCanvasFocused()`を必須条件としており、フォーカスがボタン上に残ったままだと一切発火しない。
+**事象**: ユーザーがTabキーでツールバーへフォーカス移動し、上記3ボタンのいずれかをEnter/Spaceで押下すると、`ConsumeToolButtonFocusRestore`が「キーボード起因」と判定してキャンバスへフォーカスを戻さない（既存の`懸念4`対応ポリシー、`docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`）。記入モード自体は正常に開始されるが、続く矢印キーでの調整・Enterでの確定は`IsCanvasFocused()`を必須条件としており、フォーカスがボタン上に残ったままだと一切発火しない。
 
 **既存ボタンとの違い**: 既存6ボタン（a接点配置等、`BuiltinPlaceButton_Click`）は同じフォーカス保持ポリシーを持つが、「キャンバスをマウスクリックして配置」という代替完了経路がある（`TryPlaceActiveTool()`はクリック起点でも成立）。一方、新設3ボタンの記入モード（自由線・縦コネクタ）は、`LadderCanvasHost`のマウスイベントハンドラが`Tool.Mode==PlaceConnector/PlaceLine`中は何も確定処理をしない設計のため、**マウスによる確定代替手段が皆無**。この非対称性が既存ボタンには無かった新規リスクを生んでいる。
 
 **完全な手詰まりではない**: `CyclePanelFocus()`（Shift+Tabの独自巡回、`SheetNavList→LadderCanvasHost→DeviceTableGrid`）にツールバーは含まれないため、Shift+Tabを2回押せばキャンバスへ到達し継続操作は可能。ただしこれは非自明な回避策であり、素直に矢印キーやマウスクリックを試すユーザーには「無反応」に見える。ステータスメッセージ（「左右キーで長さを調整しEnterで確定」等）も未達成のまま表示され続け、誤解を招く。
 
-**既存記録との関係**: `docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`は既存3ボタン（SelectDefault/BuiltinPlace/OpenPartSelection）のみを分析対象としており、新設のようなマウス代替なし記入系ボタンへの適用は検証範囲外。「既知・容認済みの制約」として記録された形跡は見当たらなかった（`docs/ecad2-t047-presurvey-onmitsu.md`も「後続フロー自体は変更不要」と推測記述のみで本件は未検証）。
+**既存記録との関係**: `docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`は既存3ボタン（SelectDefault/BuiltinPlace/OpenPartSelection）のみを分析対象としており、新設のようなマウス代替なし記入系ボタンへの適用は検証範囲外。「既知・容認済みの制約」として記録された形跡は見当たらなかった（`docs/archive/ecad2-t047-presurvey-onmitsu.md`も「後続フロー自体は変更不要」と推測記述のみで本件は未検証）。
 
 **推奨**: 忍者の実機検証観点に「Tab+Enterでの3ボタン起動→キーボードのみでの続行可否」を追加するか、侍側で修正（例: 新設3ボタンのみ`ConsumeToolButtonFocusRestore`を使わず常時`FocusCanvas()`を呼ぶ、他10ボタンとは異なる専用ポリシーとする）を検討されたい。
 

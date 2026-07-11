@@ -18,7 +18,7 @@ DoD(1)〜(6)いずれも出典付きで確認でき、`code-review`8角度でも
 
 ### (1)(2) 計画書増分C節どおり・殿裁定（既存様式に揃える）どおりか
 
-`docs/ecad2-t045-implementation-plan-samurai.md`増分C節の「`TryPlaceElement`が増分Bの検証関数を
+`docs/archive/ecad2-t045-implementation-plan-samurai.md`増分C節の「`TryPlaceElement`が増分Bの検証関数を
 呼ぶよう変更し、UXの即時フィードバックを強化する」という記述どおり、`MainWindow.xaml.cs:1327`
 付近に境界チェックが追加された：
 

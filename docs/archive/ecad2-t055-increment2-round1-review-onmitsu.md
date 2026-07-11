@@ -69,5 +69,5 @@ FinishRowCountChange呼び出し」の順序・内容が旧来のインライン
 ## 出典
 
 - 差分: `git show accaf6a`直読
-- 増分2初回レビュー: `docs/ecad2-t055-increment2-review-onmitsu.md`
+- 増分2初回レビュー: `docs/archive/ecad2-t055-increment2-review-onmitsu.md`
 - code-reviewスキル実行記録: 本セッション内、Agent(finder)×8＋Agent(verifier)×6を並列実行

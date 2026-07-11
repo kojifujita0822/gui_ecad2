@@ -12,7 +12,7 @@
 
 ### 観点1: 設計書どおりの実装か
 
-**妥当。** 経路X（`docs/ecad2-t050-fix-test-design-onmitsu.md`が推奨した方式）が採用され、`DetermineOldSelectedSheetForAdd(int sheetsCountBeforeAdd, Sheet? currentSelectedSheet) => sheetsCountBeforeAdd == 0 ? null : currentSelectedSheet`という純粋関数が新設された。`[Theory]`0/1/3枚の境界値テストも設計書どおり。0枚のケースで意図的に非nullな`current`を渡し「0枚なら常にnull」の契約を突くテスト設計も的確。
+**妥当。** 経路X（`docs/archive/ecad2-t050-fix-test-design-onmitsu.md`が推奨した方式）が採用され、`DetermineOldSelectedSheetForAdd(int sheetsCountBeforeAdd, Sheet? currentSelectedSheet) => sheetsCountBeforeAdd == 0 ? null : currentSelectedSheet`という純粋関数が新設された。`[Theory]`0/1/3枚の境界値テストも設計書どおり。0枚のケースで意図的に非nullな`current`を渡し「0枚なら常にnull」の契約を突くテスト設計も的確。
 
 ### 観点2: CurrentSheetIndexセッタへの波及（P-030前科箇所ゆえ厳しく）
 

@@ -110,10 +110,10 @@
 
 ## 出典・参照
 
-- 対象コミット`767325b`（隠密最終レビュークリーン、`docs/ecad2-t041-increment7-review-onmitsu-4.md`）
+- 対象コミット`767325b`（隠密最終レビュークリーン、`docs/archive/ecad2-t041-increment7-review-onmitsu-4.md`）
 - スクリーンショット: `$env:TEMP\claude\...\scratchpad\t041-inc7-*.png`（セッションローカル、
   74枚）
-- 検証観点の出典: 家老采配（2026-07-08）、`docs/ecad2-t041-increment7-review-onmitsu.md`〜
+- 検証観点の出典: 家老采配（2026-07-08）、`docs/archive/ecad2-t041-increment7-review-onmitsu.md`〜
   `-4.md`（往復4周の所見X/Y/Z/AA/AB/AC/AD経緯）
-- 忍者の静的レビュー: `docs/ecad2-t041-increment7-test-review-ninja.md`（テストコード観点、
+- 忍者の静的レビュー: `docs/archive/ecad2-t041-increment7-test-review-ninja.md`（テストコード観点、
   今回の実機確認で対応関係を裏付け）

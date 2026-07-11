@@ -23,7 +23,7 @@
   なし、殿裁定（`docs/todo.md`T-055節「増分2着手前の殿裁定」）と一致。
 - トリガーUI=左パレット設定ボタン: `MainWindow.xaml`に既存の＋/－/名前変更ボタン列と同型
   （Content+Margin+ToolTip+Click）で追加、殿裁定（「増分2トリガーUIの殿裁定」）と一致。
-- 計画書（`docs/ecad2-t055-implementation-plan-samurai.md`増分2節）の新設ダイアログ方針・
+- 計画書（`docs/archive/ecad2-t055-implementation-plan-samurai.md`増分2節）の新設ダイアログ方針・
   専用DTO(record)方針とも一致（RenameDialog/AddSheetDialog同型を明記どおり踏襲）。
 
 ### (2) RED証明の整合 — 妥当
@@ -101,7 +101,7 @@ SheetNavigationViewModel.cs等、増分1関連ファイルへの波及なし。
 ## 出典
 
 - 差分: `git show 4a91c38`直読
-- 計画書: `docs/ecad2-t055-implementation-plan-samurai.md`増分2節
+- 計画書: `docs/archive/ecad2-t055-implementation-plan-samurai.md`増分2節
 - 殿裁定: `docs/todo.md` T-055節
-- 増分1レビュー先例: `docs/ecad2-t055-increment1-review-onmitsu.md`
+- 増分1レビュー先例: `docs/archive/ecad2-t055-increment1-review-onmitsu.md`
 - code-reviewスキル実行記録: 本セッション内、Agent(finder)×8＋Agent(verifier)×5を並列実行

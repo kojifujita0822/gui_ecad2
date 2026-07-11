@@ -8,7 +8,7 @@
 
 ## 1. 背景
 
-`docs/ecad2-t045-increment-b-review-onmitsu.md`で報告したCONFIRMEDバグ：
+`docs/archive/ecad2-t045-increment-b-review-onmitsu.md`で報告したCONFIRMEDバグ：
 `ResolveDeviceClass`（`MainWindowViewModel.cs:1323-1329`）が
 `element.PartId == BasicPartTemplates.SelectSwitchId`という固定Id完全一致でセレクトSWを判定して
 いるため、T-035（Explorerコピー機能）で複製されたセレクトSWは`PartFolderStore.Enumerate()`

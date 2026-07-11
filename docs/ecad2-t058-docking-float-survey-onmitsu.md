@@ -96,7 +96,7 @@ MS-PLで商用配布方針と矛盾せず、保守が極めて活発、導入コ
 ### 参考：既存の非モーダル浮動オーバーレイ実装（ElementPlacementBar）
 
 `MainWindow.xaml:587-648`（T-033）は、Popupを使わず同一Window内オーバーレイとして配置後入力バーを
-浮動表示する既存実装（`docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md`に設計判断根拠あり）。
+浮動表示する既存実装（`docs/archive/ecad2-t033-ui-automation-impact-survey-onmitsu.md`に設計判断根拠あり）。
 これはAvalonDock導入前でも「同一ウィンドウ内での動的表示位置制御」の先行パターンとして参考になるが、
 「別ウィンドウへの切り離し」を意味する今回のフロート化とは性質が異なる点に注意。
 

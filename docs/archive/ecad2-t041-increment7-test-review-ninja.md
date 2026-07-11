@@ -6,7 +6,7 @@
 >
 > 対象：`tests/Ecad2.App.Tests/ConnectorDragAndResizeTests.cs`・`WireBreakDragTests.cs`・
 > `FreeLineDragAndResizeTests.cs`・`ConnectionDotDragTests.cs`（コミット`cbc74ac`時点）
-> 背景：`docs/ecad2-t041-increment7-review-onmitsu-2.md`の所見X/Y/Z/AAに対する侍の修正
+> 背景：`docs/archive/ecad2-t041-increment7-review-onmitsu-2.md`の所見X/Y/Z/AAに対する侍の修正
 > （`cbc74ac`）が、テストでどこまで裏付けられているかを確認する。
 
 ---
@@ -110,7 +110,7 @@
 
 ## 出典・参照
 
-- `docs/ecad2-t041-increment7-review-onmitsu-2.md`（所見X/Y/Z/AAの原本）
+- `docs/archive/ecad2-t041-increment7-review-onmitsu-2.md`（所見X/Y/Z/AAの原本）
 - 対象コミット`cbc74ac`（`git show`で全差分確認）
 - `tests/Ecad2.App.Tests/ConnectorDragAndResizeTests.cs`・`WireBreakDragTests.cs`・
   `FreeLineDragAndResizeTests.cs`・`ConnectionDotDragTests.cs`・`ViewModelTestBase.cs`

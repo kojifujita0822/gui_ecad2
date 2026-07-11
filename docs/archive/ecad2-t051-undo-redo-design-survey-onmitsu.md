@@ -80,7 +80,7 @@
 `MainWindowViewModel.cs`内38箇所＋`MainWindow.xaml.cs`3箇所＋`SheetNavigationViewModel.cs`3箇所の
 計44箇所。これらは「各操作の変更完了地点」としてUndo記録のフック候補地点そのものだが、裏を返せば
 **「MarkDirty呼び忘れ」と同型の「Undo記録漏れ」リスクが構造的に存在する**（GuiEcadのDirty判定不備の
-教訓が`docs/ecad2-guiecad-code-survey-onmitsu.md`に記録されている）。
+教訓が`docs/archive/ecad2-guiecad-code-survey-onmitsu.md`に記録されている）。
 
 ### 副次所見（引き継ぎ済み、再掲）
 「元に戻す」「やり直し」ボタンは操作履歴皆無でも常時`IsEnabled=True`（履歴と非連動）。Undo基盤新設時に
@@ -152,7 +152,7 @@
 - GroupFrame（グループ枠）のApp層Add/Remove/編集コマンドの有無（未発見、UI未実装の可能性）
 - `Params`・`Comment`編集のUI経由専用セッターの有無
 - 案B・案Cそれぞれの実際のパフォーマンス（シリアライズ/DeepCloneのコスト実測）は未計測（机上の推測）
-- GuiEcad `CommandHistory`のUndoDepth＝Dirty判定運用の詳細（`docs/ecad2-guiecad-code-survey-onmitsu.md`に
+- GuiEcad `CommandHistory`のUndoDepth＝Dirty判定運用の詳細（`docs/archive/ecad2-guiecad-code-survey-onmitsu.md`に
   存在の記録のみ、実装詳細は本調査スコープ外で未確認）
 
 ---
@@ -163,5 +163,5 @@
 - ecad2: `src/Ecad2.Core/Model/*.cs`、`src/Ecad2.Core/Persistence/GcadSerializer.cs`、
   `src/Ecad2.App/Commands/RelayCommand.cs`、`src/Ecad2.App/ViewModels/MainWindowViewModel.cs`、
   `src/Ecad2.App/ViewModels/SheetNavigationViewModel.cs`、`src/Ecad2.App/MainWindow.xaml:115-116,160-168`
-- 背景：`docs/todo.md`T-051節、`docs/ecad2-t051-precheck-undo-verification-ninja.md`、
-  `docs/ecad2-guiecad-code-survey-onmitsu.md`
+- 背景：`docs/todo.md`T-051節、`docs/archive/ecad2-t051-precheck-undo-verification-ninja.md`、
+  `docs/archive/ecad2-guiecad-code-survey-onmitsu.md`

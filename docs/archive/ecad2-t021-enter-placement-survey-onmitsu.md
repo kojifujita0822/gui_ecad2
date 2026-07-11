@@ -29,7 +29,7 @@ Issue #6179で9ラウンド格闘の末に断念した経緯（`docs/ecad2-keybo
 
 ### 観点1: 現行の浮動インライン入力のフォーカス取得・返却
 
-**事実**: `docs/ecad2-t021-keyboard-spec.md` 論点4は「入力は浮動インライン（非モーダル）を基本とする」
+**事実**: `docs/archive/ecad2-t021-keyboard-spec.md` 論点4は「入力は浮動インライン（非モーダル）を基本とする」
 と規定しているが、現行実装の`ElementPlacementDialog`（`src/Ecad2.App/Views/ElementPlacementDialog.xaml`）
 は**独立した`Window`であり、`TryPlaceElement`（`src/Ecad2.App/MainWindow.xaml.cs:246`）から
 `dialog.ShowDialog()`で呼ばれる通常の"モーダルダイアログ"**である。「モーダル非ネスト規約」

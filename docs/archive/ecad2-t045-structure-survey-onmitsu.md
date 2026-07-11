@@ -230,6 +230,6 @@ Dispatcher非依存のため影響なし。
 - `tests/Ecad2.App.Tests/SheetNavigationViewModelTests.cs`（P-016影響テスト）
 - `tests/Ecad2.App.Tests/ViewModelTestBase.cs`（P-019/T-042の2本立てコンストラクタ先例）
 - `docs/proposed.md`（P-016/P-020/P-021/P-022/P-024/P-025原案）
-- `docs/ecad2-t041-increment7-review-onmitsu.md`〜`-4.md`（4種ドラッグ状態機械の往復レビュー、
+- `docs/archive/ecad2-t041-increment7-review-onmitsu.md`〜`-4.md`（4種ドラッグ状態機械の往復レビュー、
   所見A/Y/AB/AC/ADの原本）
 - `Explore`エージェント2件（並行、P-025ホットスポット計測・P-016依存箇所列挙）

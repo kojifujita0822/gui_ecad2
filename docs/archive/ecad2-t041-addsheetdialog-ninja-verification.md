@@ -26,7 +26,7 @@
 
 ## 範囲外検出
 
-なし。前回申し送った「UIから主回路シートを作成する手段が見当たらない」（`docs/ecad2-t041-increment123-ninja-verification.md`）は本ダイアログの実装により解消された。
+なし。前回申し送った「UIから主回路シートを作成する手段が見当たらない」（`docs/archive/ecad2-t041-increment123-ninja-verification.md`）は本ダイアログの実装により解消された。
 
 ---
 
@@ -35,4 +35,4 @@
 - スクリーンショット: `$env:TEMP\claude\...\scratchpad\t041-addsheetdialog1.png`（ダイアログ初期表示）、
   `t041-addsheet-maincircuit.png`（主回路A生成後）、`t041-addsheet-emptyname.png`（空欄自動採番）、
   `t041-addsheet-cancel.png`（キャンセル後）
-- 前回報告: `docs/ecad2-t041-increment123-ninja-verification.md`（範囲外検出の解消元）
+- 前回報告: `docs/archive/ecad2-t041-increment123-ninja-verification.md`（範囲外検出の解消元）

@@ -57,7 +57,7 @@ GuiEcadのキーボード配置は9ラウンドの修正の末、フレームワ
   奪われて当然でよい（現行モーダルと同じ挙動）。問題は**バーを閉じた後**にキャンバス側の
   グローバルショートカット（F5-F8, Esc等）が正しく機能を取り戻すか。
 
-### 3.2 T-021モグラ叩き構造の教訓（`docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`）
+### 3.2 T-021モグラ叩き構造の教訓（`docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`）
 
 - T-021では「フォーカス喪失のたびに個別ハンドラへ`FocusCanvas()`を後追いで足す」方式が3往復の
   モグラ叩きを生み、さらにEnter/Space非対称バグ（`LostKeyboardFocus`のNewFocus判定が原理的に

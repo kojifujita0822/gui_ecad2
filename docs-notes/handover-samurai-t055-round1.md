@@ -14,7 +14,7 @@
 - 殿裁定の反映事項（増分1に適用）:
   1. 行＋/行－ボタンは**ツールバー大型**（`ToolBarButtonStyle`同型、`元に戻す`等と同じ見た目）
   2. **要素の存在する行の削除は拒否（警告）**——増分1・増分3共通の掟
-- 参照: `docs/ecad2-t055-implementation-plan-samurai.md`（起草済み計画書、増分1〜3の全体像）、
+- 参照: `docs/archive/ecad2-t055-implementation-plan-samurai.md`（起草済み計画書、増分1〜3の全体像）、
   `docs/todo.md` T-055節（殿裁定原文）
 
 ## 2. 現在の状態（三区分）

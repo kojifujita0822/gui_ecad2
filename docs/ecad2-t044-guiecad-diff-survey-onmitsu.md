@@ -139,6 +139,6 @@ bool NothingBetweenRailAndColumn(int row, int column)
 - `C:\Users\kojif\Desktop\生産物\gui_ecad\docs\drawing-spec.md`
 - `src\Ecad2.App\ViewModels\MainWindowViewModel.cs`（現行、`d04c9a3`後）
 - `src\Ecad2.Core\Simulation\NetlistBuilder.cs`・`src\Ecad2.Core\Rendering\DiagramRenderer.cs`
-- `docs\ecad2-t040-wire-survey-onmitsu.md`（前回のGuiEcad手動配線UI調査）
+- `docs\archive/ecad2-t040-wire-survey-onmitsu.md`（前回のGuiEcad手動配線UI調査）
 - `docs\ecad2-t044-review-onmitsu.md`（T-044所見1、CONFIRMED重大バグ）
 - Exploreエージェントによるコード調査（事実は「確認」、推測は「推測」と明記して報告）

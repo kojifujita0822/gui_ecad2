@@ -1,6 +1,6 @@
 # T-055増分3 バグ修正a・b テスト設計（隠密起草）
 
-家老采配（2026-07-11、隠密レビュー`docs/ecad2-t055-increment3-round2-review-onmitsu.md`の要修正
+家老采配（2026-07-11、隠密レビュー`docs/archive/ecad2-t055-increment3-round2-review-onmitsu.md`の要修正
 a・b対応）。バグ修正・往復案件のためテスト設計と実装を分離する制度【MUST】（`onmitsu.md`
 「テスト設計の起草」節）に従い、仕様側から設計する。**侍はこの設計をコードへ落とす。設計に無い
 テスト追加は自由、設計にあるものを省くのは不可。**
@@ -9,7 +9,7 @@ a・b対応）。バグ修正・往復案件のためテスト設計と実装を
 
 ## 0. 前提（恒久対応の実装方針、隠密提案）
 
-`docs/ecad2-t055-increment3-round2-review-onmitsu.md`§2-1で提案した恒久対応：
+`docs/archive/ecad2-t055-increment3-round2-review-onmitsu.md`§2-1で提案した恒久対応：
 **`DeleteRowAtCommand`の`RowOps.DeleteRow`実行後、SelectedCellの状態(null/row以下/rowより後ろの
 いずれでも)に関わらず無条件で`SelectedElement`系4プロパティ（`SelectedElement`・
 `HasSelectedElement`・`SelectedElementKindDisplay`・`SelectedElementDeviceName`）の
@@ -140,7 +140,7 @@ PropertyChanged時点で観測された値が一致すること**
 ---
 
 ## 出典
-- `docs/ecad2-t055-increment3-round2-review-onmitsu.md`（指摘a・bの詳細、verify結果）
+- `docs/archive/ecad2-t055-increment3-round2-review-onmitsu.md`（指摘a・bの詳細、verify結果）
 - `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`（`SelectedCell`setter:201-239、
   `SelectedElement`getter:1161-1162、`DeleteRowAtCommand`:1733-1748、
   `NotifyCurrentSheetDependentPropertiesChanged`:165-170）

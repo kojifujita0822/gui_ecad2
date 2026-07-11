@@ -1,7 +1,7 @@
 # T-041増分1 修正往復1周目レビュー（隠密、正式再レビュー）
 
 > 2026-07-07 隠密レビュー。対象コミット`1edf36c`（`fix(app): T-041増分1修正往復1周目 - SelectedCell
-> のsetterへ選択排他クリアを集約`）。隠密指摘（`docs/ecad2-t041-increment1-review-onmitsu.md`観点2、
+> のsetterへ選択排他クリアを集約`）。隠密指摘（`docs/archive/ecad2-t041-increment1-review-onmitsu.md`観点2、
 > CONFIRMED4件）への対応。家老指定観点＋新規テスト実行による実測検証を行った。
 
 ---
@@ -93,7 +93,7 @@ public bool DeleteSelectedConnector()
 ### 新規テスト5件の実効性 —— **確認済み（実測）**
 
 上記の通り実行し全件合格。各テストが対応するCONFIRMED観点と1対1で対応しており、テスト名も
-`docs/ecad2-t041-increment1-review-onmitsu.md`の観点番号・再現手順を踏まえた命名になっている
+`docs/archive/ecad2-t041-increment1-review-onmitsu.md`の観点番号・再現手順を踏まえた命名になっている
 （可読性・トレーサビリティとも良好）。
 
 ### 便乗変更なし —— **確認済み**
@@ -146,4 +146,4 @@ setter**を呼び出す構造になったため、「連結中の縦コネクタ
 - `tests/Ecad2.App.Tests/SelectedConnectorExclusivityTests.cs`（新規5件、実行して合格を実測）
 - `dotnet test`実行結果（フィルタ実行5/5合格、`src/Ecad2.sln`全体でCore14件・App37件合格、増分2
   分の追加テストを含む現HEAD時点の値のため件数は増分1単体の値と一致しない点に留意）
-- `docs/ecad2-t041-increment1-review-onmitsu.md`（初回レビュー、CONFIRMED4件・所見A/B）
+- `docs/archive/ecad2-t041-increment1-review-onmitsu.md`（初回レビュー、CONFIRMED4件・所見A/B）

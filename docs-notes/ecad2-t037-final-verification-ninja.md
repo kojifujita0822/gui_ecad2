@@ -1,7 +1,7 @@
 # T-037 軽い差分確認 検証記録（忍者）
 
 2026-07-06。対象コミット `8a6077a`（IsOrEligible後方互換補正、往復3周目）。
-隠密最終レビュー（`docs/ecad2-t037-review-onmitsu-3.md`）クリーン後の実機差分確認。
+隠密最終レビュー（`docs/archive/ecad2-t037-review-onmitsu-3.md`）クリーン後の実機差分確認。
 
 ## 前提確認
 - `git status --short`：src/配下は未コミット変更なし（クリーン）。未追跡は隠密のレビュー文書2件のみ。

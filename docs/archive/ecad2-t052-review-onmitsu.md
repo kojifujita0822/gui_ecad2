@@ -10,7 +10,7 @@
 ## 1. 手動観点（家老指定）
 
 1. **DRC文言・Severity=Warningが殿裁定文言通りか** — 一致確認。
-   `docs/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md` P-017案Aの文言例
+   `docs/archive/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md` P-017案Aの文言例
    「機器 {name}: 部品参照が見つからず、a接点として扱われています。部品の再選択をご確認ください。」と
    `DesignRuleCheck.cs:281`の実装が完全一致。Severity=Warningも一致（`DesignRuleCheck.cs:280`）。
 2. **既存ジャンプ機構の流用のみで新規UI無し（変更3ファイルの妥当性）** — 妥当。

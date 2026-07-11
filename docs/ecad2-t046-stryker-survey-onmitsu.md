@@ -123,5 +123,5 @@ dotnet stryker -p "Ecad2.App.csproj" -c 4 --output <出力先>
 - [Stryker.NET公式ドキュメント（Introduction/Configuration）](https://stryker-mutator.io/docs/stryker-net/introduction/)
 - [Microsoft Learn: Mutation testing - .NET](https://learn.microsoft.com/en-us/dotnet/core/testing/mutation-testing)
 - `src/Ecad2.App/Ecad2.App.csproj`（`UseWPF=true`、`net8.0-windows`の構成確認）
-- `docs/ecad2-t045-structure-survey-onmitsu.md`（並行して実施したT-045調査、Stryker実測に
+- `docs/archive/ecad2-t045-structure-survey-onmitsu.md`（並行して実施したT-045調査、Stryker実測に
   用いたビルド環境の前提を共有）

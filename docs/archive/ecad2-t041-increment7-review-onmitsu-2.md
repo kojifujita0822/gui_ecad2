@@ -223,7 +223,7 @@ VerticalConnector（約155行）/WireBreak（約93行）/FreeLine（約160行）
   `FreeLineDragAndResizeTests.cs`・`ConnectionDotDragTests.cs`
 - WPF最小再現プログラム（スクラッチパッド、`Canvas.CaptureMouse()`/`ReleaseMouseCapture()`と
   `LostMouseCapture`の同期発火を実測、`src`/`tests`は未変更）
-- `docs/ecad2-t041-increment7-review-onmitsu.md`（コミットa471260、初回レビュー、所見A/B/C
+- `docs/archive/ecad2-t041-increment7-review-onmitsu.md`（コミットa471260、初回レビュー、所見A/B/C
   の原本）
 - `code-review`スキル（line-by-line diff scan・cross-file/品質・ConnectionDot専用検証、
   3エージェント並行、CONFIRMED2件（所見X・Y、うち1件は隠密自身の実測でも独立に実証）・

@@ -90,7 +90,7 @@ Phase1（8フィンダー角度）で挙がった候補を重複排除し8件に
 ## 出典
 
 - 差分: `git show 6a6eaf7`直読
-- 計画書: `docs/ecad2-t055-implementation-plan-samurai.md`
+- 計画書: `docs/archive/ecad2-t055-implementation-plan-samurai.md`
 - 引き継ぎ書: `docs-notes/handover-samurai-t055-round1.md`
 - 殿裁定: `docs/todo.md` T-055節
 - code-reviewスキル実行記録: 本セッション内、Agent(finder)×8＋Agent(verifier)×7を並列実行

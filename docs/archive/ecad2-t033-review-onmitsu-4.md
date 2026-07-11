@@ -1,7 +1,7 @@
 # T-033 増分2 再レビュー（隠密、往復1周目）
 
 > 2026-07-07 隠密レビュー。対象コミット `bfa8994`（`fix(app): T-033増分2 - 配置バーの座標系不整合を修正(往復1周目)`）。
-> 前回の正式レビュー `docs/ecad2-t033-review-onmitsu-3.md`（要修正・重大2件）に対する修正の再レビュー。
+> 前回の正式レビュー `docs/archive/ecad2-t033-review-onmitsu-3.md`（要修正・重大2件）に対する修正の再レビュー。
 > 家老指定観点(1)〜(5)＋経過観察の再評価＋`code-review`スキル（medium、8角度finder→1-vote verify）併用。
 
 ---
@@ -106,7 +106,7 @@ verifyエージェントが実測（最小WPFプログラムでの`Measure`/`Arr
 
 **判定: CONFIRMED（今回のコミット範囲外・未対応のまま残存）**
 
-前回レビューのfinder所見2（`docs/ecad2-t033-review-onmitsu-3.md:132`、PLAUSIBLE）で指摘した
+前回レビューのfinder所見2（`docs/archive/ecad2-t033-review-onmitsu-3.md:132`、PLAUSIBLE）で指摘した
 「右母線列（`Column==grid.Columns`）選択時、`CellRectDip`が右母線外側の余白矩形を返し、配置バーの
 表示位置と選択セルの視覚的対応が崩れる」問題は、今回の座標系修正（`TranslatePoint`変換先の変更のみ）
 では一切対応されていない。`LadderCanvasHost.CellRectDip(cell)`の呼び出し自体（648行目）は不変であり、
@@ -137,7 +137,7 @@ verifyエージェントが実測（最小WPFプログラムでの`Measure`/`Arr
 ## 出典・参照
 
 - 対象コミット `bfa8994`（`git show`で全差分確認）
-- `docs/ecad2-t033-review-onmitsu-3.md`（前回正式レビュー、CONFIRMED2件）
+- `docs/archive/ecad2-t033-review-onmitsu-3.md`（前回正式レビュー、CONFIRMED2件）
 - `src/Ecad2.App/MainWindow.xaml`（全文確認、64-90/272/328-331/401/474-489行目付近）
 - `src/Ecad2.App/MainWindow.xaml.cs`（599-661行目、`TryPlaceElement`/`PositionPlacementBar`）
 - `src/Ecad2.App/Views/LadderCanvas.cs`（`CellRectDip`119-126行目）

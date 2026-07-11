@@ -1,12 +1,12 @@
 # T-033 増分1 PoC結果 — 2026-07-07（侍）
 
-対象: `poc/t033-inline-bar-poc/`。プラン`docs/ecad2-t033-implementation-plan-samurai.md`4.2節のPoC確認3項目。
+対象: `poc/t033-inline-bar-poc/`。プラン`docs/archive/ecad2-t033-implementation-plan-samurai.md`4.2節のPoC確認3項目。
 
 ---
 
 ## 技術選定の経緯
 
-当初Popupで着手したが、隠密のUIA影響調査（`docs/ecad2-t033-ui-automation-impact-survey-onmitsu.md`）
+当初Popupで着手したが、隠密のUIA影響調査（`docs/archive/ecad2-t033-ui-automation-impact-survey-onmitsu.md`）
 で「Popupは別HWND化(`WS_EX_NOACTIVATE`)でWin32フォーカスが渡りにくく、IsDefault/IsCancel・SendKeys
 到達に懸念」との所見を受け、**同一Window内オーバーレイ（Grid直下にBorder+Visibility+Margin位置決め）
 へ切り替えて再検証した**。Popup版でも一旦3項目を確認したが、自分のPoCの検証手法（`InputManager.

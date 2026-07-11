@@ -2,8 +2,8 @@
 
 > 2026-07-09 隠密起草。制度＝テスト設計と実装の分離（`onmitsu.md`）を適用（修正往復1周目）。
 > 対象コミット`4ecae77`（main、T-047手動配線系ボタン新設）。必読資料：
-> `docs/ecad2-t047-review-onmitsu2.md`所見1（隠密2）、`docs/ecad2-t047-ninja-verification.md`
-> （忍者、観点4）、`docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（懸念4原設計）。
+> `docs/archive/ecad2-t047-review-onmitsu2.md`所見1（隠密2）、`docs/archive/ecad2-t047-ninja-verification.md`
+> （忍者、観点4）、`docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（懸念4原設計）。
 > 静的検討のみ・共有main上への一時注入検証は行っていない（`feedback_no_live_injection_on_
 > shared_main`の家老裁定どおり）。
 
@@ -100,7 +100,7 @@ private void ConsumeToolButtonFocusRestore(object sender)
 
 ### 1-3. 懸念4（T-021、選択ツールのTab迷子防止）の非再発の整合確認
 
-`docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`根拠3のトレース表（68-88行目）
+`docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`根拠3のトレース表（68-88行目）
 に、本修正で追加される3行を合成すると以下のようになる：
 
 | 経路 | 修正後の挙動 | 懸念4への影響 |
@@ -185,7 +185,7 @@ xUnitの`[Theory]`+`[InlineData]`で全7値（`ToolMode`enum全列挙、`ToolSta
 ### 2-3. 忍者実機観点で担保する範囲【必須】
 
 フォーカスの実際の移動先はUI Automation（`AutomationElement.FocusedElement`、忍者が
-`ecad2-ui-automation`スキルで既に使用中の手法、`docs/ecad2-t047-ninja-verification.md`
+`ecad2-ui-automation`スキルで既に使用中の手法、`docs/archive/ecad2-t047-ninja-verification.md`
 58-70行目で実績あり）で検証する。以下、**状態遷移**と**対称性**の技法を適用した観点表。
 
 #### 状態遷移表（記入中3ボタン共通のモデル）
@@ -207,7 +207,7 @@ xUnitの`[Theory]`+`[InlineData]`で全7値（`ToolMode`enum全列挙、`ToolSta
 
 #### 対称性表（5ボタン×起動経路の網羅、T-041増分7の教訓を踏まえ全種を明記）
 
-忍者実機記録（`ecad2-t047-ninja-verification.md`4-a/4-cで確認済みなのは「縦分岐線記入」
+忍者実機記録（`archive/ecad2-t047-ninja-verification.md`4-a/4-cで確認済みなのは「縦分岐線記入」
 （上下キー）と「自由線(横線)記入」（左右キー）の2件のみ。**残る「自由線(縦線)記入」
 （上下キー）は未検証**（同記録「不明点」に明記済み）ため、以下の対称表で全種を漏れなく
 確認されたい：
@@ -230,13 +230,13 @@ xUnitの`[Theory]`+`[InlineData]`で全7値（`ToolMode`enum全列挙、`ToolSta
 #### マウス起動経路の非回帰確認
 
 忍者既存検証の観点(3)（UI Automation Invoke＝マウス相当起動）は全ボタンで既にOK確認済み
-（`ecad2-t047-ninja-verification.md`50-54行目）。本修正がマウス起動経路（常にFocusCanvas
+（`archive/ecad2-t047-ninja-verification.md`50-54行目）。本修正がマウス起動経路（常にFocusCanvas
 済み）に影響しないことは1-2節の設計上明らかだが、念のため縦分岐線記入1件の再確認で足りる
 （対称性の全数再検証は不要、設計上マウス経路は修正の分岐対象外のため）。
 
 ### 2-4. RED証明の形（忍者実機観点、karo指定の必須要件）
 
-**既にRED証明は実質完了している**：`docs/ecad2-t047-ninja-verification.md`の4-a・4-cは、
+**既にRED証明は実質完了している**：`docs/archive/ecad2-t047-ninja-verification.md`の4-a・4-cは、
 修正前（コミット`4ecae77`）の実機での再現記録そのものであり、スクリーンショット3枚
 （`t047-finding1-focus-stuck-connector-ninja.png`／`t047-newfinding-arrowkey-hijacked-ninja.png`
 ／`t047-newfinding-unintended-dot-persists-ninja.png`）付きで証拠化済み。修正後は、

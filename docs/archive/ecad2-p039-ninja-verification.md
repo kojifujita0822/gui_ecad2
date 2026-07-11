@@ -61,7 +61,7 @@
 
 ## 出典・参照
 
-- 対象コミット`86bf96e`（隠密最終レビュークリーン、`docs/ecad2-p039-review-onmitsu.md`）
+- 対象コミット`86bf96e`（隠密最終レビュークリーン、`docs/archive/ecad2-p039-review-onmitsu.md`）
 - スクリーンショット: `$env:TEMP\claude\...\scratchpad\p039-*.png`（セッションローカル、17枚）
 - 検証観点の出典: 家老采配（2026-07-08）
-- 参考: `docs/ecad2-t041-increment7-ninja-verification.md`（範囲外検出1の初出、本件で解消を確認）
+- 参考: `docs/archive/ecad2-t041-increment7-ninja-verification.md`（範囲外検出1の初出、本件で解消を確認）

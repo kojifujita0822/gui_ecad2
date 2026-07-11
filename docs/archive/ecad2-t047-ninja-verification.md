@@ -3,7 +3,7 @@
 検証日: 2026-07-09
 対象コミット: `4ecae77`（main上、手動配線系F9/Shift+F9/F10のツールバーボタン新設）
 ブランチ: `main`
-参照: 隠密2静的レビュー `docs/ecad2-t047-review-onmitsu2.md`（要修正1件=所見1）
+参照: 隠密2静的レビュー `docs/archive/ecad2-t047-review-onmitsu2.md`（要修正1件=所見1）
 
 ## 総合判定: **要修正**
 

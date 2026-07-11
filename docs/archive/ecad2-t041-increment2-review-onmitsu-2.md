@@ -1,7 +1,7 @@
 # T-041増分2 修正往復1周目レビュー（隠密、正式再レビュー）
 
 > 2026-07-07 隠密レビュー。対象コミット`f5cbde8`（`fix(app): T-041増分2修正往復1周目 - 記入中
-> 状態(draft)をSelectedCellのsetterへ集約`）。隠密指摘（`docs/ecad2-t041-increment2-review-onmitsu.md`
+> 状態(draft)をSelectedCellのsetterへ集約`）。隠密指摘（`docs/archive/ecad2-t041-increment2-review-onmitsu.md`
 > 観点(3)CONFIRMED・観点(4)・所見D）への対応。家老指定観点＋実測検証を行った。
 
 ---
@@ -138,5 +138,5 @@ if (topRow == bottomRow) return false;
 - `src/Ecad2.App/Views/LadderCanvas.cs`（`ConnectorEndpointsDip`）
 - `tests/Ecad2.App.Tests/ConnectorDraftTests.cs`（新規3件、実行して合格を実測）
 - `dotnet test`実行結果（フィルタ実行12/12合格、`src/Ecad2.sln`全体でCore14件・App46件合格）
-- `docs/ecad2-t041-increment2-review-onmitsu.md`（初回レビュー、観点(3)CONFIRMED・観点(4)・所見C/D）
-- `docs/ecad2-t041-increment1-review-onmitsu-2.md`（`SelectedCell`setter集約パターンの確立経緯）
+- `docs/archive/ecad2-t041-increment2-review-onmitsu.md`（初回レビュー、観点(3)CONFIRMED・観点(4)・所見C/D）
+- `docs/archive/ecad2-t041-increment1-review-onmitsu-2.md`（`SelectedCell`setter集約パターンの確立経緯）

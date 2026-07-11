@@ -12,7 +12,7 @@
 
 ## 1. 要件（殿裁定・確定事項）
 
-参照: `docs/todo.md` T-041行、`docs/ecad2-t041-manual-wiring-survey-onmitsu.md`（隠密調査）。
+参照: `docs/todo.md` T-041行、`docs/archive/ecad2-t041-manual-wiring-survey-onmitsu.md`（隠密調査）。
 
 1. 対象＝**4種すべて**（制御回路`VerticalConnector`・`WireBreak`＋主回路`FreeLine`・`ConnectionDot`）
    ※初版時点では前2種のみと解釈していたが、殿裁定で後2種も今回まとめて基盤化と確定（**スコープ増**）

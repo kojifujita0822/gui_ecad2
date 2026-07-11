@@ -1,7 +1,7 @@
 # T-043 往復2周目修正レビュー（隠密、修正上限）
 
 > 2026-07-07 隠密レビュー。対象コミット `e7e03c2`（`fix(app): T-043往復2周目 - Converter側の同族Id
-> 完全一致退行をCategory/Role/IsOrEligibleベースへ`）。隠密指摘（`docs/ecad2-t043-review-onmitsu-2.md`
+> 完全一致退行をCategory/Role/IsOrEligibleベースへ`）。隠密指摘（`docs/archive/ecad2-t043-review-onmitsu-2.md`
 > 所見1、CONFIRMED）への対応。家老指定観点(1)〜(5)＋`code-review`スキル（medium、統合4角度→
 > 1-vote verify）併用。**上限消化ゆえ最大限慎重に検証した。**
 
@@ -115,5 +115,5 @@ RootDir直下に、`Role`/`IsOrEligible`を省略またはRole=ContactNO・IsOrE
 - `src/Ecad2.Core/Persistence/PartFolderStore.cs`（Category計算・SaveCustom・SeedBasics）
 - `src/Ecad2.Core/Model/PartDefinition.cs`（Role/IsOrEligibleのデフォルト値）
 - `tests/Ecad2.App.Tests/PartEntryToGlyphGeometryConverterTests.cs`（新規回帰テスト4件）
-- `docs/ecad2-t043-review-onmitsu-2.md`（往復1周目レビュー、所見1のCONFIRMED退行）
+- `docs/archive/ecad2-t043-review-onmitsu-2.md`（往復1周目レビュー、所見1のCONFIRMED退行）
 - `code-review`スキル（medium、統合4角度→1-vote verify、CONFIRMED2・該当なし多数）

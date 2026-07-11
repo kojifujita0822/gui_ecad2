@@ -4,7 +4,7 @@
 変更ファイル: `src/Ecad2.App/App.xaml.cs`・`src/Ecad2.App/Diagnostics/TraceLog.cs`・
 `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`。
 
-前回再レビュー原本（`docs/ecad2-t039-re-review-onmitsu.md`）のCONFIRMED4件を追跡表として
+前回再レビュー原本（`docs/archive/ecad2-t039-re-review-onmitsu.md`）のCONFIRMED4件を追跡表として
 突合、＋`code-review`スキル（highレベル、8角度×並列finder→1-vote verify）を併用。
 
 ---
@@ -103,7 +103,7 @@
 
 ## 出典
 - コミット`beeabc2`（`git show`・`git diff beeabc2~1..beeabc2`で全文確認）
-- 前回再レビュー`docs/ecad2-t039-re-review-onmitsu.md`（CONFIRMED4件原本）
+- 前回再レビュー`docs/archive/ecad2-t039-re-review-onmitsu.md`（CONFIRMED4件原本）
 - `code-review`スキル（highレベル、8角度×並列finder→1-vote verify）
 - .NET 8実機での`NormalizeFullWidthDigits`・`string.Normalize(FormKC)`比較検証（verify時に
   該当エージェントが使い捨てプロジェクトで検証）

@@ -14,7 +14,7 @@ T-015は元々「左パレットの図形ビジュアルプレビュー」だっ
   `Category`（テキスト）＋`Definition.Name`（テキスト）のみで、**図形そのもののビジュアルは一切ない**。
   自作パーツは名前だけでは形状を判別できない。
 
-## 技術的土台（既調査、`docs/ecad2-preimplementation-survey-onmitsu.md`）
+## 技術的土台（既調査、`docs/archive/ecad2-preimplementation-survey-onmitsu.md`）
 
 `DiagramRenderer.DrawPreview(IRenderer r, ElementInstance e, Color color)`（1要素だけを指定色で
 描く既存メソッド、配置ゴースト表示用）を流用し、`DrawingVisual`→`RenderTargetBitmap`化する薄い

@@ -1,6 +1,6 @@
 # T-033 非モーダル化の技術選定がUI Automationへ与える影響 — 静的調査（隠密）
 
-> 2026-07-07 隠密調査。家老依頼、対象は`docs/ecad2-t033-implementation-plan-samurai.md` 3.3節・6.2節の
+> 2026-07-07 隠密調査。家老依頼、対象は`docs/archive/ecad2-t033-implementation-plan-samurai.md` 3.3節・6.2節の
 > 論点。**静的調査のみ（T-033は実装未着手のためPoC実測ではなくWeb一次情報＋既存コード調査に基づく）。**
 > 実装技術（Popup／同一Window内オーバーレイ）の選定自体は侍の技術裁量事項であり、本書はその判断材料の提示に留める。
 
@@ -123,5 +123,5 @@
 - [AccessKeyManager Class (Microsoft Learn)](https://learn.microsoft.com/en-us/dotnet/api/system.windows.input.accesskeymanager)
 - [Keyboard Handling in WPF Popup Class | Mike-Ward.Net](https://mike-ward.net/2013/09/23/keyboard-handling-in-wpf-popup-class/)
 - [ButtonAutomationPeer.cs (dotnetframework.org)](http://www.dotnetframework.org/default.aspx/4@0/4@0/DEVDIV_TFS/Dev10/Releases/RTMRel/wpf/src/Framework/System/Windows/Automation/Peers/ButtonAutomationPeer@cs/1305600/ButtonAutomationPeer@cs)（隠密WebFetchで`Invoke()`実装を直接確認）
-- `docs/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（本調査の前提・T-021の未解決の不明点との対応関係）
+- `docs/archive/ecad2-t021-focus-design-consolidation-plan-onmitsu.md`（本調査の前提・T-021の未解決の不明点との対応関係）
 - `src/Ecad2.App/Views/ElementPlacementDialog.xaml(.cs)`、`.claude/skills/ecad2-ui-automation/{SKILL.md,helpers.ps1}`（現状把握のためのコード確認）

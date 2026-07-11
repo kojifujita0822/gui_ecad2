@@ -3,7 +3,7 @@
 > 2026-07-08 隠密レビュー。対象コミットcbc74ac（所見X/Y/Z/AA修正、親4154fb8）。家老指定観点
 > (1)〜(4)＋`code-review`スキル（所見X/Y検証・removed-behavior/cross-file、2エージェント
 > 並行）併用。実測検証（`dotnet test`、WPF最小再現プログラムでの所見X修正後の順序検証）も
-> 併用した。忍者の静的レビュー（`docs/ecad2-t041-increment7-test-review-ninja.md`）で提起
+> 併用した。忍者の静的レビュー（`docs/archive/ecad2-t041-increment7-test-review-ninja.md`）で提起
 > された「ConnectionDotへの境界クランプ拡大」についても本レビューで判断を示す。
 
 ---
@@ -129,8 +129,8 @@ ConnectionDot}IfAny()`はいずれも`_dragging*=null`直書きから`CancelDrag
 - `tests/Ecad2.App.Tests/FreeLineDragAndResizeTests.cs`
 - WPF最小再現プログラム（スクラッチパッド、所見X修正後の順序を実測検証、`src`/`tests`は
   未変更）
-- `docs/ecad2-t041-increment7-review-onmitsu-2.md`（前回レビュー、所見X/Y/Z/AAの原本）
-- `docs/ecad2-t041-increment7-test-review-ninja.md`（忍者の静的レビュー、ConnectionDot境界
+- `docs/archive/ecad2-t041-increment7-review-onmitsu-2.md`（前回レビュー、所見X/Y/Z/AAの原本）
+- `docs/archive/ecad2-t041-increment7-test-review-ninja.md`（忍者の静的レビュー、ConnectionDot境界
   クランプの指摘）
 - `code-review`スキル（所見X/Y検証・removed-behavior/cross-file、2エージェント並行、
   CONFIRMED2件（所見AB、独立2エージェント発見・うち1件実測クラッシュ再現）・所見複数）

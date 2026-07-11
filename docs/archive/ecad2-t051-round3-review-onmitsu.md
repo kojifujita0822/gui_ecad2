@@ -1,7 +1,7 @@
 # T-051往復2周目修正 再々レビュー（隠密）
 
-対象: コミット`f2aaaad`（隠密再レビュー`docs/ecad2-t051-round2-review-onmitsu.md`§2-1のCONFIRMED
-対応、テスト設計書=`docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`）。家老指定4観点の
+対象: コミット`f2aaaad`（隠密再レビュー`docs/archive/ecad2-t051-round2-review-onmitsu.md`§2-1のCONFIRMED
+対応、テスト設計書=`docs/archive/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`）。家老指定4観点の
 手動確認＋`code-review`スキル残り1角度（language-pitfall、前回API上限で中断分の補完）を実施。
 
 **結論を先に：主目的（SelectedCell無条件nullリセットの解消）は正しく機能、T-selcell-1〜4全て設計書
@@ -90,7 +90,7 @@ Downキー操作で一発修復されるが、Up/Left/Rightでは修復されな
 
 ### 2-2. 【既知・DoD範囲外】記入中ドラフト（Tool状態）が退避・復元の過程で無警告に破棄される
 
-隠密自身のテスト設計書（`docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md` §4）で
+隠密自身のテスト設計書（`docs/archive/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md` §4）で
 「実装方式次第で記入中ドラフトが巻き込まれるリスクがある、DoD範囲外だが気づいたら家老へ別途報告
 されたい」と明記していた懸念が、実際に実装どおりに顕在化していることをfinderが確認した。
 
@@ -131,8 +131,8 @@ dotnet test src/Ecad2.sln --no-build
 ---
 
 ## 出典
-- `docs/ecad2-t051-round2-review-onmitsu.md`（起点、SelectedCell矛盾のCONFIRMED詳細）
-- `docs/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`（テスト設計、§4の既知課題）
+- `docs/archive/ecad2-t051-round2-review-onmitsu.md`（起点、SelectedCell矛盾のCONFIRMED詳細）
+- `docs/archive/ecad2-t051-selectedcell-bugfix-test-design-onmitsu.md`（テスト設計、§4の既知課題）
 - `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`（`ApplyUndoRedoSnapshot`:1802-1837、
   `FinishRowCountChange`:1364-1371、`AddRowCommand`:1692-1699、`SelectedCell`setter:212-250）
 - `src/Ecad2.App/ViewModels/SheetNavigationViewModel.cs`（`RecordSnapshot`呼び出し:111/151行、

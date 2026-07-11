@@ -119,6 +119,6 @@ PDF出力に影響しない」という既存の設計原則と同型）。
 - `src/Ecad2.App/MainWindow.xaml.cs`（`TryPlaceWireBreak`、F10ハンドラ、クリック排他分岐拡張）
 - `src/Ecad2.App/Views/LadderCanvas.cs`（`HitTestWireBreak`、`SelectedWireBreakBrush`）
 - `tests/Ecad2.App.Tests/WireBreakSelectionTests.cs`（新規6件、実行して合格を実測）
-- `docs/ecad2-t041-key-flow-proposal-samurai.md`（4節、点系の記入フロー原案）
-- `docs/ecad2-t041-increment1-review-onmitsu-2.md`（`SelectedCell`setter集約パターンの確立経緯）
-- `docs/ecad2-t041-increment2-review-onmitsu.md`（シート切替中の状態リーク、対比参照）
+- `docs/archive/ecad2-t041-key-flow-proposal-samurai.md`（4節、点系の記入フロー原案）
+- `docs/archive/ecad2-t041-increment1-review-onmitsu-2.md`（`SelectedCell`setter集約パターンの確立経緯）
+- `docs/archive/ecad2-t041-increment2-review-onmitsu.md`（シート切替中の状態リーク、対比参照）

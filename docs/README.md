@@ -20,6 +20,10 @@ ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
 - [ecad2-gxworks3-uiux-survey-onmitsu-part2.md](ecad2-gxworks3-uiux-survey-onmitsu-part2.md) — 同・実機追加調査（F-key併記アイコン・状態依存配色等の発見元）
 - [ecad2-t047-gx-icon-survey-onmitsu.md](ecad2-t047-gx-icon-survey-onmitsu.md) — GX Works3実プログラムの意匠資源調査（抽出可能な記号アイコン画像なし＝ベクター描画と推測）
 
+## アーカイブ
+
+- `docs/archive/` — 完了・取り止め済みタスクの調査書・レビュー書置き場（T-076、2026-07-11整理。docs/直下は進行中タスクの調査書のみに縮小）。
+
 ## 運用
 
 - [todo.md](todo.md) — タスク台帳。家老が采配してよい根拠はここに Approved/In-progress とある行だけ。各役は起動時にここを確認する。

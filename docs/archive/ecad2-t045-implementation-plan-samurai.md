@@ -1,6 +1,6 @@
 # T-045 実装計画（侍起草）
 
-> 2026-07-08 侍起草。入力＝隠密の構造調査`docs/ecad2-t045-structure-survey-onmitsu.md`。
+> 2026-07-08 侍起草。入力＝隠密の構造調査`docs/archive/ecad2-t045-structure-survey-onmitsu.md`。
 > 本計画は**起草のみ**であり、実装はまだ行わない。起草完了後は殿裁可待ちで停止する
 > （殿は現在離席中、帰還後に家老が上申する）。
 
@@ -242,7 +242,7 @@ T-041の教訓（修正往復が定型化しやすい——所見発見→修正
 
 ## 出典・参照
 
-- `docs/ecad2-t045-structure-survey-onmitsu.md`（隠密の構造調査、本計画の一次入力）
+- `docs/archive/ecad2-t045-structure-survey-onmitsu.md`（隠密の構造調査、本計画の一次入力）
 - `docs/proposed.md`（P-016/P-020/P-021/P-022/P-024/P-025原案）
 - `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`（配置系・ドラッグ系メソッド全般、コンストラクタ2本立てパターン`:1452-1457`）
 - `src/Ecad2.App/ViewModels/SheetNavigationViewModel.cs`（Dispatcher依存箇所）

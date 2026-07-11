@@ -9,13 +9,13 @@
 ## 結論：**要修正（重大・再発）。所見Lは解消されたが、その解消手段が往復1周目で解消した
 はずの観点3本体（シート削除で再描画が飛ばない）を、別の条件下で再発させている**
 
-`docs/ecad2-t041-increment5-review-onmitsu-2.md`の所見L（改名で記入中ドラフトが警告なく破棄
+`docs/archive/ecad2-t041-increment5-review-onmitsu-2.md`の所見L（改名で記入中ドラフトが警告なく破棄
 される）は解消を確認した。しかし所見M対応（`CurrentSheetIndex`のsetterを`SelectedCell`と同じ
 粒度へ統一：クロスカット的クリアは無条件、プロパティ自身の変更通知`OnPropertyChanged(nameof
 (CurrentSheet))`は`SetProperty`が真を返した場合のみ）が、**「index数値が変わらず、かつ削除
 直前に`SelectedCell`が既に`null`だった（＝記入中でも選択中でもない通常の削除操作）」という
 条件下で、`CurrentSheet`のPropertyChangedが一切発火しなくなる**という新たな後退を生んでいる。
-これは`docs/ecad2-t041-increment5-review-onmitsu.md`（初回レビュー）で報告した症状1「画面には
+これは`docs/archive/ecad2-t041-increment5-review-onmitsu.md`（初回レビュー）で報告した症状1「画面には
 削除されたS0の最終描画がそのまま残り続ける」の再発そのものである。
 
 ---
@@ -117,7 +117,7 @@ CurrentSheetの変更通知は発火したか: False
 - 最小再現プログラム（スクラッチパッド、`src`/`tests`は未変更）：`ViewModelBase.SetProperty`
   と現行`CurrentSheetIndex`/`SelectedCell`のロジックを再現し、削除シナリオ（index不変・
   SelectedCell既にnull）でPropertyChangedが一切発火しないことを実測
-- `docs/ecad2-t041-increment5-review-onmitsu.md`（初回レビュー、観点3 CONFIRMEDの原本、症状1）
-- `docs/ecad2-t041-increment5-review-onmitsu-2.md`（前回レビュー、所見L/M/N/Oの原本）
+- `docs/archive/ecad2-t041-increment5-review-onmitsu.md`（初回レビュー、観点3 CONFIRMEDの原本、症状1）
+- `docs/archive/ecad2-t041-increment5-review-onmitsu-2.md`（前回レビュー、所見L/M/N/Oの原本）
 - `tests/Ecad2.App.Tests/SheetNavigationViewModelTests.cs`（新規回帰テスト2件、105-164行目、
   いずれも削除前にSelectedCellを明示セットしておりこの再発を検出しない）

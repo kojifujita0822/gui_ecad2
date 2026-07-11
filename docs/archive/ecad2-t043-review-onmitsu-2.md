@@ -1,7 +1,7 @@
 # T-043 往復1周目修正レビュー（隠密）
 
 > 2026-07-07 隠密レビュー。対象コミット `de93462`（`fix(app): T-043往復1周目 - ORサムネイル判定を
-> Id完全一致からIsOrEligible/Roleベースへ`）。隠密レビュー（`docs/ecad2-t043-review-onmitsu.md`所見1、
+> Id完全一致からIsOrEligible/Roleベースへ`）。隠密レビュー（`docs/archive/ecad2-t043-review-onmitsu.md`所見1、
 > CONFIRMED）指摘の退行への対応。家老指定観点(1)〜(4)＋`code-review`スキル（medium、統合3角度→
 > 1-vote verify）併用。
 
@@ -82,7 +82,7 @@ ItemTemplate」のため、**ドロップダウン展開時だけでなく、閉
 は変更に含まれておらず、今回未対処のまま残存している。
 
 **位置づけ**：これは今回のコミット（de93462）が新たに持ち込んだ退行ではなく、既存（増分4・5由来）の
-弱点がConverter側に残ったまま、という状況。ただし前回の隠密所見（`docs/ecad2-t033-review-onmitsu-7.md`
+弱点がConverter側に残ったまま、という状況。ただし前回の隠密所見（`docs/archive/ecad2-t033-review-onmitsu-7.md`
 所見1、`docs/observations.md`#17）は「グリフPath Dataの二重/三重ハードコード」という重複の観点であり、
 「Id再採番でコピー由来パーツの表示が壊れる」という具体的な退行シナリオへの言及はしていなかった。今回の
 verifyで新たに明確になった実害である。
@@ -118,6 +118,6 @@ PartSelectionEntryViewModel entry`のまま、`entry.Definition.IsOrEligible`/`e
 - `src/Ecad2.Core/Persistence/PartFolderStore.cs`（Id重複検出・再採番ロジック）
 - `src/Ecad2.App/MainWindow.xaml`（`PlacementPartComboBox`定義）
 - `tests/Ecad2.App.Tests/PartThumbnailRendererTests.cs`（新規回帰テスト2件）
-- `docs/ecad2-t033-review-onmitsu-7.md`（グリフPath Data重複の前回所見）・`docs/observations.md`#17
-- `docs/ecad2-t043-review-onmitsu.md`（T-043初回レビュー、所見1のCONFIRMED退行）
+- `docs/archive/ecad2-t033-review-onmitsu-7.md`（グリフPath Data重複の前回所見）・`docs/observations.md`#17
+- `docs/archive/ecad2-t043-review-onmitsu.md`（T-043初回レビュー、所見1のCONFIRMED退行）
 - `code-review`スキル（medium、統合3角度→1-vote verify、CONFIRMED1・該当なし多数）

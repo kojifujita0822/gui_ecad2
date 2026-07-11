@@ -123,7 +123,7 @@ DoD：
    （DoD(1)〜(4)を満たす形、本ファイルの「検証済み」区分をベースに再利用可）。
 4. 家老へ調査完了報告（本セッションでは異常検知のみ報告済み、正式な調査完了報告はまだ）。
 5. T-056（グリッド線表示切替の事前案起草）は家老から追加采配済み、T-060完了後に着手する約束をしている
-   （`docs/ecad2-t056-grid-toggle-proposals-onmitsu2.md`へ、`docs/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md`が書式参考）。
+   （`docs/archive/ecad2-t056-grid-toggle-proposals-onmitsu2.md`へ、`docs/archive/ecad2-uiux-proposals-p017-p020-p023-onmitsu.md`が書式参考）。
 
 ---
 

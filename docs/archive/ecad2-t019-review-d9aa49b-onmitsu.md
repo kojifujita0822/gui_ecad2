@@ -17,7 +17,7 @@ HasProject通知修正。`code-review`スキル(medium、8観点finder→1-vote 
 
 | # | 判定 | 内容 |
 |---|------|------|
-| 1 | **CONFIRMED（最重要）** | ウィンドウを閉じる操作(右上×ボタン・Alt+F4)に`ConfirmDiscardIfDirty()`が組み込まれていない。`Closing`/`OnClosing`ハンドラがMainWindow.xaml/xaml.cs・App.xaml.csのいずれにも存在せず、新規/開くの入口(NewButton_Click/OpenButton_Click)からのみ呼ばれる。未保存の変更(IsDirty=true)がある状態で閉じると確認なしにデータが失われる。GuiEcadのOnMenuRestart(`docs/ecad2-guiecad-code-survey-onmitsu.md` T-024節、確認処理を経由せず即Exit)と同種の「入口分散」再発にあたる。 |
+| 1 | **CONFIRMED（最重要）** | ウィンドウを閉じる操作(右上×ボタン・Alt+F4)に`ConfirmDiscardIfDirty()`が組み込まれていない。`Closing`/`OnClosing`ハンドラがMainWindow.xaml/xaml.cs・App.xaml.csのいずれにも存在せず、新規/開くの入口(NewButton_Click/OpenButton_Click)からのみ呼ばれる。未保存の変更(IsDirty=true)がある状態で閉じると確認なしにデータが失われる。GuiEcadのOnMenuRestart(`docs/archive/ecad2-guiecad-code-survey-onmitsu.md` T-024節、確認処理を経由せず即Exit)と同種の「入口分散」再発にあたる。 |
 | 2 | **CONFIRMED（構造リスク）** | 「変更操作の入口で明示的にMarkDirty()を呼ぶ」方式は、GuiEcadの「Undo対象外操作へのMarkDirty呼び忘れ」問題と本質的に同型の「新規変更操作追加時の呼び忘れ」リスクを抱える。実際、本コミット自体が「NotifyHasProjectChanged呼び出しが当初漏れ、後の実機検出で発覚・修正」という前例を含んでおり、リスクの実在性を裏付ける。IsDirty/MarkDirtyの単体テストは0件（`tests/Ecad2.Core.Tests/`該当なし、そもそも対象がEcad2.App層でテスト対象外）。 |
 | 3 | CONFIRMED（軽微） | `RenameCommand`はシート名を変更前と同じ文字列にリネームしても`MarkDirty()`を無条件で呼ぶ。同ファイル内の`SelectedElementDeviceName`セッターには`oldName==newName`の同値ガードがあるのに非対称。実害は「不要な未保存確認ダイアログが出る」false-positiveのみ。 |
 | 4 | PLAUSIBLE（将来リスク） | `NewDocument()`と`SheetNavigationViewModel.AddCommand`のシート生成コード(`PageNumber`/`Name`命名規則/`Grid{Rows=10,Columns=20}`)が重複。現時点で値は完全一致し実害なし。将来デフォルトグリッドサイズ変更時に片方修正漏れで不整合を招くリスクに留まる。 |

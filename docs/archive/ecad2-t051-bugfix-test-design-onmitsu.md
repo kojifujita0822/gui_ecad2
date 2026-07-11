@@ -1,6 +1,6 @@
 # T-051 バグ修正#1〜#4 テスト設計（隠密起草）
 
-家老采配（2026-07-11、`docs/ecad2-t051-review-onmitsu.md`の要修正4件対応）。バグ修正・往復案件の
+家老采配（2026-07-11、`docs/archive/ecad2-t051-review-onmitsu.md`の要修正4件対応）。バグ修正・往復案件の
 ためテスト設計と実装を分離する制度【MUST】（`onmitsu.md`「テスト設計の起草」節）に従い、仕様側から
 設計する。**侍はこの設計をコードへ落とす。設計に無いテスト追加は自由、設計にあるものを省くのは不可。**
 
@@ -210,7 +210,7 @@ S-B4（往復）で対称性を確認する形とした。
 ---
 
 ## 出典
-- `docs/ecad2-t051-review-onmitsu.md`（指摘#1〜#4の詳細、verify結果）
+- `docs/archive/ecad2-t051-review-onmitsu.md`（指摘#1〜#4の詳細、verify結果）
 - `src/Ecad2.App/ViewModels/SheetNavigationViewModel.cs`（`RefreshSelectedSheet`:63、
   `ResetSheets`:70-74、`AddCommand`/`DeleteCommand`:90-166）
 - `src/Ecad2.App/MainWindow.xaml.cs`（`CommitDeviceNameEdit`:154-158、`SaveDocument`:199-214）

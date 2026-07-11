@@ -6,7 +6,7 @@ Shift+矢印で端点伸縮」について、**平行移動は曖昧さが少な
 判断**のため、着手前に原案を提示する（`docs-notes/roles/samurai.md`「予定範囲の厳守」・
 過去教訓「UI/UX分岐は必ず殿へ複数案を提示」に基づく）。
 
-実装プラン`docs/ecad2-t041-implementation-plan-samurai.md`6節でも「記入時のキー操作フローの
+実装プラン`docs/archive/ecad2-t041-implementation-plan-samurai.md`6節でも「記入時のキー操作フローの
 具体形は侍が原案を用意してから改めて提示する」としており、移動・リサイズのキー操作フローも
 同じ性質の未確定事項と位置づける。
 

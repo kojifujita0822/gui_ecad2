@@ -2,11 +2,11 @@
 
 検証日: 2026-07-09
 対象コミット: `afeb068`（フォーカス修正）+ `cffef19`（並び替え）、main上・push保留中
-参照: 隠密テスト設計書 `docs/ecad2-t047-fix-test-design-onmitsu.md`
+参照: 隠密テスト設計書 `docs/archive/ecad2-t047-fix-test-design-onmitsu.md`
 
 ## 総合判定: **全観点OK（GREEN）**
 
-家老指定観点(1)〜(4)いずれも良好。前回検証（`docs/ecad2-t047-ninja-verification.md`）で発見した
+家老指定観点(1)〜(4)いずれも良好。前回検証（`docs/archive/ecad2-t047-ninja-verification.md`）で発見した
 所見1・新規重大所見とも解消を確認した。
 
 ---

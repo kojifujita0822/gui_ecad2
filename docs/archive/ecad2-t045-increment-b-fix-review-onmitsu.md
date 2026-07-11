@@ -18,7 +18,7 @@ severityは低いと判断するが、事実として報告し対応要否は家
 
 ### (1) 設計書どおりの実装か
 
-`docs/ecad2-t045-increment-b-fix-test-design-onmitsu.md`の同値分割4分類（A:元Id／B:再採番Id
+`docs/archive/ecad2-t045-increment-b-fix-test-design-onmitsu.md`の同値分割4分類（A:元Id／B:再採番Id
 相当／C:純正ContactNO／D:自作パーツ）を`[Theory]+[MemberData]`（`SelectSwitchClassificationCases()`、
 `MainWindowViewModelTests.cs`）でそのまま実装していることを確認した。既存の
 `PlaceElementAtSelectedCell_WithContactPart_SetsDeviceClassRelay`（ケースC相当）・

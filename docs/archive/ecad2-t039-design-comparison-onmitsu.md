@@ -62,7 +62,7 @@ protected void OnPropertyChanged([CallerMemberName] string? propertyName = null)
 ### 1-3. FocusScopeは`CanvasArea`の1箇所のみ（事実）
 
 `MainWindow.xaml`265行目`<ScrollViewer x:Name="CanvasArea" ... FocusManager.IsFocusScope="True">`が唯一。
-T-036観点6の根本原因（`docs/ecad2-t036-observation6-onmitsu.md`）となったFocusScope跨ぎ問題の当該箇所。
+T-036観点6の根本原因（`docs/archive/ecad2-t036-observation6-onmitsu.md`）となったFocusScope跨ぎ問題の当該箇所。
 
 ### 1-4. Clickハンドラはコードビハインド直接配線が主体（事実）
 
@@ -195,6 +195,6 @@ Serilog等のライブラリは3プロジェクトいずれの`.csproj`にも存
 ## 出典
 
 - `docs-notes/ecad2-t039-trace-log-field-feedback-ninja.md`（忍者現場意見、評価軸）
-- `docs/ecad2-t036-observation6-onmitsu.md`（FocusScope構造・T-036実績、前回隠密調査）
+- `docs/archive/ecad2-t036-observation6-onmitsu.md`（FocusScope構造・T-036実績、前回隠密調査）
 - `docs-notes/ecad2-t038-uia-diagnostic-handoff-draft-ninja.md`（診断ログ標準形の実績）
 - コードベース事実確認: Exploreエージェント委譲調査（`ViewModelBase.cs`は本隠密が直接再確認）

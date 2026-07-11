@@ -1,7 +1,7 @@
 # T-021 増分(v)追加修正（コミット340f53d+7e70c3d）実機検証記録
 
 忍者による実機検証。対象: 母線可視スクロール追加修正（殿直接指示、2026-07-05）。
-静的レビュー: `docs/ecad2-t021-increment-v-review-340f53d-onmitsu.md`（隠密、要修正#1確認済み合格）。
+静的レビュー: `docs/archive/ecad2-t021-increment-v-review-340f53d-onmitsu.md`（隠密、要修正#1確認済み合格）。
 
 ## 検証環境
 

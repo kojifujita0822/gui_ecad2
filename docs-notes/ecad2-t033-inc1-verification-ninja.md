@@ -4,7 +4,7 @@
 - 対象: main先端 d399b06（実装コミット 4d73864 含む、隠密再レビュー=クリーン済み）
 - 検証者: 忍者（UI Automation + 物理クリック合成、`.claude/skills/ecad2-ui-automation` 使用）
 - 事前確認: `git status --short` クリーン（src未コミット変更なし）、`dotnet build src/Ecad2.App` 警告0・エラー0
-- 観点の正: `docs/ecad2-t033-implementation-plan-samurai.md` 5節＋`docs/ecad2-t033-review-onmitsu-2.md` 末尾申し送り＋家老追加4点(a)〜(d)＋家老追加観点（位置実挙動、殿目視起点）
+- 観点の正: `docs/archive/ecad2-t033-implementation-plan-samurai.md` 5節＋`docs/archive/ecad2-t033-review-onmitsu-2.md` 末尾申し送り＋家老追加4点(a)〜(d)＋家老追加観点（位置実挙動、殿目視起点）
 
 ## 総合判定: 全観点OK（NGなし）— 増分1クローズ可と具申
 

@@ -59,7 +59,7 @@ Core14+App194＝208件全合格。加えて`dotnet test --filter "FullyQualified
 
 ## DoD(2) 所見Y型再発防止の実効性 — CONFIRMED（計画書DoD文言と実装の防御力にギャップ）
 
-`docs/ecad2-t045-implementation-plan-samurai.md:149-150`のDoD文言：
+`docs/archive/ecad2-t045-implementation-plan-samurai.md:149-150`のDoD文言：
 
 > 外枠共通化により「所見Y型」のような欠陥が構造的に再発しにくくなっていること（**新規追加時に
 > 共通ヘルパー経由で自動的に復元が効く設計**）

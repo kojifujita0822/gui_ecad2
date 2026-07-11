@@ -5,7 +5,7 @@
 家老指定3観点の手動確認＋`code-review`スキル併用（medium相当、Agent 2体並列：正しさ観点／
 簡潔化・効率観点）を実施。
 
-**結論：対策プラン（`docs/ecad2-p056-sendkeys-freeze-onmitsu.md`5節、5.1案A＋5.2案A＋5.3）どおりに
+**結論：対策プラン（`docs/archive/ecad2-p056-sendkeys-freeze-onmitsu.md`5節、5.1案A＋5.2案A＋5.3）どおりに
 正確に実装されている。機能面の致命的な問題は無し。軽微な指摘4件（うち1件は実害ありのため要修正
 推奨、他3件は経過観察でよい）。**
 

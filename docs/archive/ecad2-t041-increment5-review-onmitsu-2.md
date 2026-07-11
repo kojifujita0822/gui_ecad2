@@ -10,7 +10,7 @@
 ## 結論：**観点(1)(2)自体はクリア。ただし`code-review`併用により、この修正が新たな
 重大な副作用（記入中ドラフトの黙示的破棄）を生んでいることをCONFIRMED。侍へ追加修正を要する**
 
-`docs/ecad2-t041-increment5-review-onmitsu.md`（前回レビュー）で指摘した「シート削除でindex数値が
+`docs/archive/ecad2-t041-increment5-review-onmitsu.md`（前回レビュー）で指摘した「シート削除でindex数値が
 偶然一致するケース」自体は正しく解消されている。しかし、その解消手段（`CurrentSheetIndex`の
 setterから早期returnを除去し、値変化の有無に関わらず後続処理を常時実行する方式）が、
 シート削除以外の**既存の正常系（改名）**にも波及し、従来は早期returnで抑えられていた副作用
@@ -166,7 +166,7 @@ sF9で縦コネクタ記入開始(_connectorDraft設定, Tool.Mode=PlaceLine)
   `RenameSheetButton_Click`96-103行目）
 - `tests/Ecad2.App.Tests/SheetNavigationViewModelTests.cs`（新規2件、105-164行目）
 - `tests/Ecad2.App.Tests/SelectedConnectorExclusivityTests.cs`（54行目コメント）
-- `docs/ecad2-t041-increment5-review-onmitsu.md`（前回レビュー、観点3 CONFIRMEDの原本）
+- `docs/archive/ecad2-t041-increment5-review-onmitsu.md`（前回レビュー、観点3 CONFIRMEDの原本）
 - `docs-notes/handover-next-session.md`（次回セッションへの申し送り）
 - `code-review`スキル（line-by-line/removed-behavior角度＋cross-file/品質角度、2エージェント
   並行、CONFIRMED1件・所見4件）

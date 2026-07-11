@@ -76,7 +76,7 @@ App層新規テスト（3階層連鎖ケース）・Core層`NetlistBuilderOrChai
 基準行/配置行の左側にWireBreakのみ存在する場合、縦分岐を誤って省略し孤立ネットが生じうる」という
 メカニズムを提起した。これを検証するため、ecad2内で`WireBreak`を生成するUI操作の有無をGrepで確認
 した：`ToolMode.PlaceWireBreak`はenum値として定義されているのみで、ツールバーボタン・キーバインド・
-専用コマンドは一切実装されていない（前回のT-040調査`docs/ecad2-t040-wire-survey-onmitsu.md`でも
+専用コマンドは一切実装されていない（前回のT-040調査`docs/archive/ecad2-t040-wire-survey-onmitsu.md`でも
 「専用コマンド・RoutedCommand・KeyBinding(XAML InputBinding含む)も無し」と確認済み）。`sheet.WireBreaks`
 自体はCore層のデータモデルとしてGuiEcadから移植済みで、`NetlistBuilder`/`DiagramRenderer`は消費する
 実装を持つが、**ユーザーがWireBreakを実際に生成する手段が現状のecad2に存在しない**ため、この懸念は
@@ -124,7 +124,7 @@ App層新規テスト（3階層連鎖ケース）・Core層`NetlistBuilderOrChai
 - `src/Ecad2.Core/Simulation/NetlistBuilder.cs`（`LeftRailReached`/`Severed`/`AddHorizontalWireUnions`）
 - `src/Ecad2.Core/Rendering/DiagramRenderer.cs`（`LeftTerminator`、T-026/P-003の意図的差分）
 - `src/Ecad2.App/ViewModels/ToolState.cs`（`ToolMode.PlaceWireBreak`未配線の確認）
-- `docs/ecad2-t040-wire-survey-onmitsu.md`（WireBreak/手動配線UI未実装の前回調査）
+- `docs/archive/ecad2-t040-wire-survey-onmitsu.md`（WireBreak/手動配線UI未実装の前回調査）
 - `docs/ecad2-t044-review-onmitsu.md`（所見1、CONFIRMED重大バグの初回指摘）
 - `docs/ecad2-t044-guiecad-diff-survey-onmitsu.md`（GuiEcad比較、判定基準集約の技術的負債の既出言及）
 - `code-review`スキル（medium、統合4角度→1-vote verify、REFUTED1・参考記録1・該当なし多数）

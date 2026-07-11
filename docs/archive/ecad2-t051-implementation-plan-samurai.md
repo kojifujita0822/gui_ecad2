@@ -3,7 +3,7 @@
 殿裁定を受けての実装計画。本書は**起草段階**であり、実装はまだ着手していない。殿裁可後に着手する。
 
 前提資料:
-- `docs/ecad2-t051-undo-redo-design-survey-onmitsu.md`（隠密、設計調査。GuiEcad前例・ecad2現行アーキテクチャ・案A/B/C比較・段階導入MVP案）
+- `docs/archive/ecad2-t051-undo-redo-design-survey-onmitsu.md`（隠密、設計調査。GuiEcad前例・ecad2現行アーキテクチャ・案A/B/C比較・段階導入MVP案）
 - `docs/todo.md` T-051節
 - 家老采配DoD5点（2026-07-11）
 

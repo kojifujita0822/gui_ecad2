@@ -3,7 +3,7 @@
 ## 背景
 
 殿裁定更新（2026-07-06）：T-037は当初案（部品選択リストへORa/ORb追加・固定7種化、隠密調査
-`docs/ecad2-p010-or-fixed-parts-investigation-onmitsu.md`の案1）を**実施したうえで**、
+`docs/archive/ecad2-p010-or-fixed-parts-investigation-onmitsu.md`の案1）を**実施したうえで**、
 加えて「OR入力の専用UI」を新設する。範囲は右パネル・ツールバーでの専用表記まで。インライン
 バー（T-033浮動入力）でのOR表記は別途相談のため今回スコープ外。
 

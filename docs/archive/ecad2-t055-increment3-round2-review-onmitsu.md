@@ -1,7 +1,7 @@
 # T-055増分3 実装コードレビュー（隠密、増分3差し込み分）
 
 対象: コミット`424130e`（削除対象行への「要素ごと削除」対応、GuiEcad同型）。設計書=
-`docs/ecad2-t055-increment3-delete-occupied-design-onmitsu.md`。家老指定5観点の手動確認＋
+`docs/archive/ecad2-t055-increment3-delete-occupied-design-onmitsu.md`。家老指定5観点の手動確認＋
 `code-review`スキル（high、8角度→7候補→1-vote verify）を併用。
 
 ---

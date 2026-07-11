@@ -1,7 +1,7 @@
 # T-051 Undo/Redo基盤 コードレビュー（隠密）
 
 対象: コミット`0693755`（Undo/Redo基盤・案C、MVP対象範囲=シート追加/削除のみ）。設計書=
-`docs/ecad2-t051-implementation-plan-samurai.md`。家老指定5観点の手動確認＋`code-review`
+`docs/archive/ecad2-t051-implementation-plan-samurai.md`。家老指定5観点の手動確認＋`code-review`
 スキル（high、2角度→5候補→1-vote verify）を併用。
 
 **結論を先に：4件全てCONFIRMED。うち2件（#1・#3）は明確なデータ破損リスクを伴う重大バグ。

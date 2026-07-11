@@ -10,7 +10,7 @@
 ## 1. GuiEcad実ソース：5種の「行削除時の要素ごと削除」挙動照合
 
 `C:\Users\kojif\Desktop\生産物\gui_ecad\src\GuiEcad.App\Commands\ElementCommands.cs:436-473`
-（`DeleteRowCommand.Execute`）を実物照合。既存precheck文書（`docs/ecad2-t055-increment3-precheck-onmitsu.md`
+（`DeleteRowCommand.Execute`）を実物照合。既存precheck文書（`docs/archive/ecad2-t055-increment3-precheck-onmitsu.md`
 §2.3）はGroupFrame部分のみの抜粋だったため、本書で5種全体・実行順序を含め再照合する。
 
 ```csharp
@@ -212,6 +212,6 @@ public void DeleteRow_RemovesElementAtTargetRow(string elementType) { ... }
 - ecad2: `src/Ecad2.Core/Model/RowOps.cs`、`src/Ecad2.Core/Model/Element.cs:121-163`、
   `src/Ecad2.App/ViewModels/MainWindowViewModel.cs:1259-1285,1300-1323,1703-1716`、
   `tests/Ecad2.Core.Tests/RowOpsTests.cs`
-- 背景：`docs/todo.md`T-055節、`docs/ecad2-t055-implementation-plan-samurai.md`、
-  `docs/ecad2-t055-increment3-precheck-onmitsu.md`、`docs/ecad2-t055-increment3-round1-review-onmitsu.md`、
+- 背景：`docs/todo.md`T-055節、`docs/archive/ecad2-t055-implementation-plan-samurai.md`、
+  `docs/archive/ecad2-t055-increment3-precheck-onmitsu.md`、`docs/archive/ecad2-t055-increment3-round1-review-onmitsu.md`、
   `docs-notes/handover-next-session.md`

@@ -1,6 +1,6 @@
 # T-051（Undo/Redo基盤MVP）実機確認記録（忍者）
 
-対象コミット: `8a6eb13`（往復3周分込み、隠密最終レビュー`docs/ecad2-t051-round4-final-review-onmitsu.md`でクリーン確定済み）。
+対象コミット: `8a6eb13`（往復3周分込み、隠密最終レビュー`docs/archive/ecad2-t051-round4-final-review-onmitsu.md`でクリーン確定済み）。
 家老指定8観点(a)〜(h)を`ecad2-ui-automation`スキルで検証。
 
 **結論を先に：8観点すべてOK（回帰なし）。(h)はPLAUSIBLE事項として再現を確認したが、家老指定どおり「再現すれば記録のみ」の扱いとする（恒久喪失でないことも確認済み）。**
@@ -63,7 +63,7 @@
 
 ### (h) PLAUSIBLE追試：デバイス名編集確定直後のUndo実行で編集内容が見た目上消えるか — 再現（記録のみ）
 
-`docs/ecad2-t051-round2-review-onmitsu.md`§2-2で指摘されたPLAUSIBLE事項を実機で再現した。
+`docs/archive/ecad2-t051-round2-review-onmitsu.md`§2-2で指摘されたPLAUSIBLE事項を実機で再現した。
 
 - (e)の手順の直後、Redoを実行→シート2が復元されると同時に、シート1のX1要素も「X2」に
   正しく復元された（機器表・キャンバス表示・プロパティパネルの3箇所すべてで確認）
@@ -112,7 +112,7 @@
 家老指定8観点すべてOK、回帰なし。T-051（Undo/Redo基盤MVP）はクローズ可能な水準にあると判断する。
 
 ## 出典
-- `docs/ecad2-t051-round2-review-onmitsu.md`（観点(d)申し送り・§2-1/2-2 PLAUSIBLE事項の出典）
-- `docs/ecad2-t051-round4-final-review-onmitsu.md`（往復3周目クリーン確定）
-- `docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md`（T-selclamp系シナリオ、(g)クランプ検証の再現手順出典）
+- `docs/archive/ecad2-t051-round2-review-onmitsu.md`（観点(d)申し送り・§2-1/2-2 PLAUSIBLE事項の出典）
+- `docs/archive/ecad2-t051-round4-final-review-onmitsu.md`（往復3周目クリーン確定）
+- `docs/archive/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md`（T-selclamp系シナリオ、(g)クランプ検証の再現手順出典）
 - `.claude/skills/ecad2-ui-automation/SKILL.md`（既知の罠、EnumWindows手法）

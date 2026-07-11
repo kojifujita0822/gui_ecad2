@@ -71,7 +71,7 @@ Line 313 [Statement mutation]: notify();
 後始末を行う」（コメント307-308行）という実際の消費者が存在するため、**テスト補強価値あり**
 と判断する（PropertyChangedEventHandlerを購読し発火回数を確認するテストを追加すれば検出可能）。
 `isActive()`ガード削除（Line 311）は、`CancelDrag<T>`自体が`if (dragging is not null)`という
-内側ガードを持つ二重ガード構造（前回`docs/ecad2-t045-increment-d-review-onmitsu.md`所見で
+内側ガードを持つ二重ガード構造（前回`docs/archive/ecad2-t045-increment-d-review-onmitsu.md`所見で
 REFUTED判定した「ConnectionDot固有の非対称」ではなく4型共通の構造）のため、外側ガード削除でも
 実害が観測されにくい――**補強優先度は低いと判断する**。
 

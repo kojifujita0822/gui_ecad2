@@ -1,7 +1,7 @@
 # T-019 実装プラン（侍起草）
 
 対象: ドキュメント管理（GcadSerializer Load/Save、新規/開く/保存のメニュー・ツールバー接続）
-前提: main直での作業。GcadSerializerは実装済み（T-007でGuiEcadよりバイト単位同一移植、`docs/ecad2-guiecad-code-survey-onmitsu.md` T-024節参照）。
+前提: main直での作業。GcadSerializerは実装済み（T-007でGuiEcadよりバイト単位同一移植、`docs/archive/ecad2-guiecad-code-survey-onmitsu.md` T-024節参照）。
 
 ## 現状（着手前の確認事項）
 

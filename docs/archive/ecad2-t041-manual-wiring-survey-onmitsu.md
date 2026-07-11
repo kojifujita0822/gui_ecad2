@@ -2,7 +2,7 @@
 
 > 2026-07-07 隠密調査。家老采配（殿裁定＝手動配線基盤を本命化、T-041前倒し・スコープに「消去」を
 > 追加）。観点(1)〜(5)を静的コード調査＋Explore委譲（GuiEcad移植元）で検証した。前回の
-> `docs/ecad2-t040-wire-survey-onmitsu.md`（F9/sF9「記入」のみの規模調査）を土台に、今回は
+> `docs/archive/ecad2-t040-wire-survey-onmitsu.md`（F9/sF9「記入」のみの規模調査）を土台に、今回は
 > 「消去」を含めた統合設計の材料を厚くする。急がずとも良いとの指示のため、判断材料の列挙を優先し、
 > 実装方式の断定は避けた。
 
@@ -93,7 +93,7 @@ Add/Delete/Move各操作が専用コマンドクラス（`ElementCommands.cs`の
 `DeleteConnectorCommand`等）として実装されUndo/Redoに対応する。**ecad2はUndo機能自体を意図的に
 不採用**としている（`MainWindowViewModel.cs:81-85`のコメント「ecad2はUndo機能自体が未実装なため、
 変更操作の入口で明示的にMarkDirty()を呼ぶ方式を採る」）。これはGuiEcadのUndo深度依存Dirty判定が
-構造的欠陥だった反省（`docs/ecad2-guiecad-code-survey-onmitsu.md` T-024節）を踏まえた設計方針。
+構造的欠陥だった反省（`docs/archive/ecad2-guiecad-code-survey-onmitsu.md` T-024節）を踏まえた設計方針。
 → **T-041の記入・消去は、GuiEcadのコマンドオブジェクトをそのまま移植するのではなく、ecad2の
 既存OR自動生成・要素削除と同じ「直接List操作＋MarkDirty()」の流儀に揃えるのが整合的**と考える。
 
@@ -205,7 +205,7 @@ F9/sF9とは別に「消去」専用のツールモード・キー（例：GX Wo
 - `src/Ecad2.App/Views/LadderCanvas.cs`（107-115行目`ToGridPos`）
 - `src/Ecad2.Core/Model/Element.cs`（77-140行目`FreeLine`/`ConnectionDot`/`VerticalConnector`/
   `WireBreak`）・`src/Ecad2.Core/Model/Sheet.cs`（4-28行目、各リスト保持・`MainCircuit`）
-- `docs/ecad2-t040-wire-survey-onmitsu.md`（前回調査、記入のみの規模調査）
+- `docs/archive/ecad2-t040-wire-survey-onmitsu.md`（前回調査、記入のみの規模調査）
 - `docs/ecad2-ui-ux-design-brief.md`（103行目、右クリック補助方針）
 - `docs/todo.md`（T-041項目、F9/sF9・主回路用の記述）
 - `docs/images/t040-gx-ladder-toolbar-reference.png`（GX Works3ツールバー参考画像、末尾アイコンの

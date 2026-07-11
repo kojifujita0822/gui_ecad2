@@ -178,5 +178,5 @@
   コメントあり）
 - `docs-notes/roles/onmitsu.md`「テスト設計の起草」（本設計が従う新制度の規定）
 - `tests/Ecad2.App.Tests/ConnectorDragAndResizeTests.cs`（既存テスト、追加先）
-- `docs/ecad2-t041-increment7-review-onmitsu.md`〜`-4.md`（T-041増分7の一連のレビュー、
+- `docs/archive/ecad2-t041-increment7-review-onmitsu.md`〜`-4.md`（T-041増分7の一連のレビュー、
   カバレッジ不整合の実例）

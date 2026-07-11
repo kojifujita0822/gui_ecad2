@@ -58,7 +58,7 @@ mainブランチ（net8.0時点）と同件数・同結果で回帰なし。
 家老指定4観点いずれもクリーン。差分は6csprojのTFM更新1行ずつのみで、機能的な変更は皆無。
 PDFsharp含め依存パッケージの互換性も一次情報で確認済み。忍者実機回帰へ回して差し支えない。
 
-なお、懸案のStryker実行障害（`docs/ecad2-t051-stryker-analysis-blocker-onmitsu.md`）は、
+なお、懸案のStryker実行障害（`docs/archive/ecad2-t051-stryker-analysis-blocker-onmitsu.md`）は、
 現在SDK=`10.0.301`・`global.json`無しの状態で、本移行によりTargetFramework=net10.0が
 SDKバージョンと一致する。家老仮説（SDK/TFM不一致がBuildalyzerの解析失敗を招いていた）の
 検証は、マージ完了後にmain上で家老の采配により改めて実施される。
@@ -68,4 +68,4 @@ SDKバージョンと一致する。家老仮説（SDK/TFM不一致がBuildalyze
 ## 出典
 - コミット`143e1c0`（`git show 143e1c0`の全差分）
 - https://www.nuget.org/packages/PDFsharp/6.2.4 （TFM対応確認）
-- `docs/ecad2-t051-stryker-analysis-blocker-onmitsu.md`（Stryker障害・家老仮説の出典）
+- `docs/archive/ecad2-t051-stryker-analysis-blocker-onmitsu.md`（Stryker障害・家老仮説の出典）

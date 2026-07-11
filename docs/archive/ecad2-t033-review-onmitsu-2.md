@@ -7,7 +7,7 @@
 
 ## 結論：クリーン。忍者の実機確認へ進めてよい
 
-前回レビュー（`docs/ecad2-t033-review-onmitsu.md`）で指摘した重大な欠陥（マウス経路6系統の
+前回レビュー（`docs/archive/ecad2-t033-review-onmitsu.md`）で指摘した重大な欠陥（マウス経路6系統の
 素通し）は、`IsPlacementBarVisible`（ViewModel単一の真実源）へのIsEnabledバインドにより
 **恒久的に解消された**ことをXAML構造・WPFのIsEnabled合成仕様の両面で確認した。残る指摘は
 いずれも軽微（cleanup系・将来の拡張時リスク低減提案）で、往復完了の妨げにはならない。
@@ -117,5 +117,5 @@ Tab連打での初期フォーカス順、既存要素編集中に別セルへF5
 - `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`（`IsPlacementBarVisible`）
 - `src/Ecad2.App/Converters/InverseBooleanConverter.cs`（新規）
 - コミット`ae2db4b`（T-019、既存の`HasProject`ガードの導入元、観点3の裏付け）
-- `docs/ecad2-t033-review-onmitsu.md`（前回レビュー、往復0周目相当）
+- `docs/archive/ecad2-t033-review-onmitsu.md`（前回レビュー、往復0周目相当）
 - `code-review`スキル（medium、finder 8角度→verify 4件、CONFIRMED1・PLAUSIBLE3・REFUTED1）

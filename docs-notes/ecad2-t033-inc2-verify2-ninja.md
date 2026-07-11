@@ -1,7 +1,7 @@
 # T-033 増分2 修正（往復2周目、5c73b66）再検証（忍者）
 
 > 対象コミット `5c73b66`（Margin残留自己参照汚染の修正、`ElementPlacementBar.Margin=Thickness(0)`を
-> Measure()前に追加）。隠密再レビュー `docs/ecad2-t033-review-onmitsu-5.md`（クリーン）を受けての実機
+> Measure()前に追加）。隠密再レビュー `docs/archive/ecad2-t033-review-onmitsu-5.md`（クリーン）を受けての実機
 > 再検証。診断ログ（T-038運用、温存中）による数値証明も併せて実施。
 > ログ全文: `docs-notes/ecad2-t033-diag-pass2-ninja.log`
 

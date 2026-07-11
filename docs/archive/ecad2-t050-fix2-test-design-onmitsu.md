@@ -1,6 +1,6 @@
 # T-050修正 往復2周目 テスト設計（隠密起草）
 
-対象：`docs/ecad2-t050-fix-review-onmitsu.md`で発見した新規バグ2件（AddCommand/DeleteCommandの二重発火・old値不整合、ResetSheetsのタイミング不正確性）の修正。テスト設計と実装の分離【MUST】に基づき仕様側からの設計のみ。実装は侍へ委譲。
+対象：`docs/archive/ecad2-t050-fix-review-onmitsu.md`で発見した新規バグ2件（AddCommand/DeleteCommandの二重発火・old値不整合、ResetSheetsのタイミング不正確性）の修正。テスト設計と実装の分離【MUST】に基づき仕様側からの設計のみ。実装は侍へ委譲。
 
 ---
 
@@ -140,7 +140,7 @@ public void DetermineOldSelectedSheetForDelete_ReturnsDeletedSheet(...)
 
 ## 不明点
 
-- 層2（純粋関数切り出し）が`DeleteCommand`・`ResetSheets`双方で実現可能かは、侍の修正方針（`docs/ecad2-t050-fix-review-onmitsu.md`が提案した「CurrentSheetIndexセッタのネスト通知を経由させない」方向を採るか等）に依存する。方針確定後、層2の対象範囲を再確認する必要がある。
+- 層2（純粋関数切り出し）が`DeleteCommand`・`ResetSheets`双方で実現可能かは、侍の修正方針（`docs/archive/ecad2-t050-fix-review-onmitsu.md`が提案した「CurrentSheetIndexセッタのネスト通知を経由させない」方向を採るか等）に依存する。方針確定後、層2の対象範囲を再確認する必要がある。
 - ケース4（ResetSheets経由）のテストは`ReplaceDocument`（`MainWindowViewModel`のprivateメソッド）を`LoadFromFile`/`NewDocument`等の公開経路から間接的に駆動する必要があり、既存テストのセットアップパターン（もしあれば）に倣う。
 
 ## 派生提案の有無

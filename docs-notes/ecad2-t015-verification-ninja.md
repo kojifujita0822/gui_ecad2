@@ -1,7 +1,7 @@
 # T-015実機検証記録（忍者）
 
 対象: f881005〜2d5f3dc（部品選択リストへのサムネイル追加）。隠密静的レビュー合格済み
-（`docs/ecad2-t015-review-onmitsu.md`、要修正候補#1はP-009起票済み・#2は2d5f3dcで解消）。
+（`docs/archive/ecad2-t015-review-onmitsu.md`、要修正候補#1はP-009起票済み・#2は2d5f3dcで解消）。
 
 ## 観点別結果
 
@@ -17,7 +17,7 @@
 
 ## 範囲外の気づき（家老判断待ち、拙者からは修正しない）
 
-1. **部品選択リストの固定種とツールバー固定種の不一致**: ツールバーには「OR a接点配置(Shift+F5)」「OR b接点配置(Shift+F6)」ボタンがあるが、部品選択リスト(`PartPaletteViewModel`が読み込む`BasicPartTemplates.All()`)には ORa/ORb が定義されておらず、代わりに「セレクトSW」が含まれる。T-007(88ea0fd)由来の既存構成で、T-015実装(f881005〜2d5f3dc)による変更ではない。隠密のスコープ再定義文書(`docs/ecad2-t015-scope-redefinition-options-onmitsu.md` 9-13行)は両者とも「固定6種」と表記しており、この食い違いには触れていない。家老の検証観点2「ORa/ORbの見た目が区別できる」は部品選択リスト上では検証不能（該当要素が存在しないため）。
+1. **部品選択リストの固定種とツールバー固定種の不一致**: ツールバーには「OR a接点配置(Shift+F5)」「OR b接点配置(Shift+F6)」ボタンがあるが、部品選択リスト(`PartPaletteViewModel`が読み込む`BasicPartTemplates.All()`)には ORa/ORb が定義されておらず、代わりに「セレクトSW」が含まれる。T-007(88ea0fd)由来の既存構成で、T-015実装(f881005〜2d5f3dc)による変更ではない。隠密のスコープ再定義文書(`docs/archive/ecad2-t015-scope-redefinition-options-onmitsu.md` 9-13行)は両者とも「固定6種」と表記しており、この食い違いには触れていない。家老の検証観点2「ORa/ORbの見た目が区別できる」は部品選択リスト上では検証不能（該当要素が存在しないため）。
 2. **要素配置時に機器表(`DeviceTableGrid`)へデバイス名が反映されない**: `PlaceElementAtSelectedCell`(`MainWindowViewModel.cs`、T-026由来コミット934247e)は`sheet.Elements.Add`と`MarkDirty()`のみ行い、`Document.Devices.ByName`への登録や`DeviceTable.Refresh()`を呼んでいない。プロパティパネル経由でデバイス名を編集した場合(`SelectedElementDeviceName`のsetter)のみ機器表に反映される。部品選択リスト・ツールバー直接配置のどちらでも同一の欠陥で、T-015固有ではない。
 
 ## スクリーンショット

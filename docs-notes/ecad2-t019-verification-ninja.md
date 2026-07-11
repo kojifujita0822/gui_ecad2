@@ -1,8 +1,8 @@
 # T-019 実機検証記録（ドキュメント管理：新規/開く/保存）
 
 忍者による実機検証。対象コミット: 715e0e6〜4ba546a。
-静的レビュー: `docs/ecad2-t019-review-onmitsu.md`（隠密、指摘3件CONFIRMED/CONFIRMED軽微/PLAUSIBLE→格上げ、4ba546aで対応済み）。
-実装プラン: `docs/ecad2-t019-implementation-plan-samurai.md`。
+静的レビュー: `docs/archive/ecad2-t019-review-onmitsu.md`（隠密、指摘3件CONFIRMED/CONFIRMED軽微/PLAUSIBLE→格上げ、4ba546aで対応済み）。
+実装プラン: `docs/archive/ecad2-t019-implementation-plan-samurai.md`。
 
 ## 検証環境
 
