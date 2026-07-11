@@ -17,6 +17,7 @@
         <converters:InverseBooleanConverter x:Key="InverseBool"/>
         <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
+        <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
         <converters:PartEntryToGlyphGeometryConverter x:Key="PartEntryToGlyph"/>
 
@@ -453,7 +454,7 @@
                                   IsReadOnly="True" HeadersVisibility="Column" GridLinesVisibility="Horizontal">
                             <DataGrid.Columns>
                                 <DataGridTextColumn Header="機器名" Binding="{Binding Name}"/>
-                                <DataGridTextColumn Header="種別" Binding="{Binding Class}"/>
+                                <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}"/>
                                 <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
                             </DataGrid.Columns>
                         </DataGrid>

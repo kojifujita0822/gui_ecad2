@@ -814,7 +814,10 @@ public sealed class DiagramRenderer
         r.DrawLine(new(x4, y), new(x4, y + rh), s);
     }
 
-    private static string DeviceClassLabel(DeviceClass c) => c switch
+    /// <summary>DeviceClass→日本語表示名。PDF出力(機器表BOM)と画面表示(機器表「種別」列、T-053)の
+    /// 双方から参照する単一の文言定義(表記統一、殿裁定2026-07-10)。App層のDeviceClassToTextConverterが
+    /// 参照するためpublic化(T-053、文言をApp層へコピーせず単一箇所で保守する方式を採用)。</summary>
+    public static string DeviceClassLabel(DeviceClass c) => c switch
     {
         DeviceClass.Relay        => "リレー",
         DeviceClass.PushButton   => "押しボタン",
