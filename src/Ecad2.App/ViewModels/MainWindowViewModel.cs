@@ -1795,6 +1795,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             () => UndoManager.CanRedo);
     }
 
+    /// <summary>T-051往復3周目(隠密再々レビューPLAUSIBLE、docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md):
+    /// ApplyUndoRedoSnapshotでのSelectedCell復元専用のRowクランプ。AddRowCommand等が課す
+    /// FinishRowCountChangeと同じ意味論(Row>=Grid.Rowsなら末尾行へ)だが、StatusMessageクリア等の
+    /// 副作用は複製しない(Undo/Redoはそれらを巻き戻さず現状維持、殿裁定)。Columnは対象外
+    /// (Grid.Columnsを変更するコマンドが現状存在しないため、設計書§0.2)。</summary>
+    private static GridPos? ClampSelectedCellToSheetRows(GridPos? cell, Sheet? sheet)
+        => cell is GridPos pos && sheet is Sheet s && pos.Row >= s.Grid.Rows
+            ? pos with { Row = s.Grid.Rows - 1 }
+            : cell;
+
     /// <summary>Undo/Redoで復元したDocumentを反映する(T-051)。新規/開く専用のReplaceDocumentとは
     /// 意味論が異なる(SelectedCell/Tool状態/StatusMessageは巻き戻さず現状維持、殿裁定2026-07-11=
     /// シート構成のみ復元)ため、ReplaceDocumentを流用せず専用メソッドとする。Undo/Redo自体も
@@ -1819,7 +1829,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         // シート数が変化しうるため、CurrentSheetIndexを新しい範囲へクランプする。
         int clampedIndex = Math.Clamp(_currentSheetIndex, 0, Math.Max(0, restored.Sheets.Count - 1));
         SetCurrentSheetIndexCore(clampedIndex);
-        SelectedCell = oldSelectedCell;
+        // 復元先シート(復元後CurrentSheet、CurrentSheetIndexクランプ確定後の値)のGrid.Rowsを
+        // 基準にクランプする(T-055増分3のRowクランプ意味論と同型、設計書§0.3)。
+        SelectedCell = ClampSelectedCellToSheetRows(oldSelectedCell, CurrentSheet);
         NotifyCurrentSheetChanged();
         // T-051バグ修正#2: AddCommand/DeleteCommand/RenameCommand等の既存コマンド群が律儀に発火
         // させているSelectedSheet変更通知(T-050で確立済みの不変条件)をUndo/Redoでも発火させ、

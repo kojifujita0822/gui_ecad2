@@ -285,4 +285,92 @@ public class UndoRedoCommandsTests : ViewModelTestBase
 
         Assert.Null(vm.SelectedCell);
     }
+
+    // ---- T-051往復3周目: SelectedCell復元時のGrid.Rows範囲クランプ欠如の修正
+    // (隠密再々レビューPLAUSIBLE、docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md) ----
+
+    /// <summary>【RED証明の中核・境界値D3】Undo実行でGrid.Rowsが縮小する場合、SelectedCellが
+    /// 新しい範囲内へクランプされること(大幅超過)。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WhenRowFarExceedsRestoredGridRows_ClampsToLastRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        for (int i = 0; i < 5; i++) vm.AddRowCommand.Execute(null);
+        vm.SelectedCell = new GridPos(14, 2);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(9, 2), vm.SelectedCell);
+    }
+
+    /// <summary>【RED証明・境界値D2】ちょうど1行超過のケースでもクランプされること。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WhenRowExceedsRestoredGridRowsByOne_ClampsToLastRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.AddRowCommand.Execute(null);
+        vm.SelectedCell = new GridPos(10, 2);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(9, 2), vm.SelectedCell);
+    }
+
+    /// <summary>T-selclamp-3: 範囲内の最終行ちょうどの場合はクランプされず値を維持すること
+    /// (境界のすぐ内側、退行防止確認)。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WhenRowIsLastValidRow_PreservesSelectedCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = new GridPos(9, 2);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(9, 2), vm.SelectedCell);
+    }
+
+    /// <summary>T-selclamp-4: 対称性点検(Redo方向)。クランプ後の値がRedo実行でも維持されること
+    /// (Redo後の復元先シートはRows拡張後に戻るため、クランプは発生しない)。</summary>
+    [Fact]
+    public void RedoCommand_Execute_AfterClamp_PreservesSelectedCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        for (int i = 0; i < 5; i++) vm.AddRowCommand.Execute(null);
+        vm.SelectedCell = new GridPos(14, 2);
+        vm.UndoCommand.Execute(null);
+
+        vm.RedoCommand.Execute(null);
+
+        Assert.Equal(new GridPos(9, 2), vm.SelectedCell);
+    }
+
+    /// <summary>【RED証明の中核・複合ケース】CurrentSheetIndexのクランプとGrid.Rowsのクランプが
+    /// 同時に発生する場合、Rowクランプの基準は「クランプ後に確定した新しいCurrentSheet」であること。</summary>
+    [Fact]
+    public void UndoCommand_Execute_WithSheetIndexClampAndRowClamp_UsesRestoredSheetGridRows()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false));
+        for (int i = 0; i < 5; i++) vm.AddRowCommand.Execute(null);
+        vm.SelectedCell = new GridPos(14, 4);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(1, vm.CurrentSheetIndex);
+        Assert.Equal(new GridPos(9, 4), vm.SelectedCell);
+    }
 }
