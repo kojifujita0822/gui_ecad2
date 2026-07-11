@@ -1374,6 +1374,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// UpdateSheetSettingsCommandは現状の拒否のまま、本コマンド限定の適用)。</summary>
     public ICommand DeleteRowAtCommand { get; }
 
+    /// <summary>直前の操作を取り消す(T-051、MVP対象範囲=シート追加/削除のみ)。履歴が無ければ無効化
+    /// (IsEnabledはCommandManager.RequerySuggested経由で自動連動、既存コマンドと同じ流儀)。</summary>
+    public ICommand UndoCommand { get; }
+
+    /// <summary>Undoで取り消した操作をやり直す(T-051)。履歴が無ければ無効化。</summary>
+    public ICommand RedoCommand { get; }
+
     /// <summary>左パレット（シートナビゲーション）の子ViewModel。</summary>
     public SheetNavigationViewModel SheetNavigation { get; }
 
@@ -1385,6 +1392,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>下部出力パネル（DesignRuleCheck結果表示）の子ViewModel。</summary>
     public OutputPanelViewModel OutputPanel { get; }
+
+    /// <summary>Undo/Redo基盤(T-051)。MVP対象範囲はSheetNavigationViewModelのシート追加/削除のみ
+    /// (設計出典: docs/ecad2-t051-implementation-plan-samurai.md)。</summary>
+    public UndoManager UndoManager { get; } = new();
 
     /// <summary>
     /// 現在使用可能な自作パーツライブラリ。PartPalette.Library(T-015隠密レビュー指摘#2で
@@ -1735,5 +1746,43 @@ public sealed class MainWindowViewModel : ViewModelBase
             FinishRowCountChange(sheet);
         },
         param => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows && param is int);
+
+        // T-051: Undo/Redo基盤(案C、殿裁定)。MVP対象範囲はSheetNavigationViewModelのシート追加/削除のみ
+        // (RecordSnapshotの呼び出しはSheetNavigationViewModel.AddCommand/DeleteCommand側で行う)。
+        UndoCommand = new RelayCommand(
+            () =>
+            {
+                if (UndoManager.Undo(Document) is not LadderDocument restored) return;
+                ApplyUndoRedoSnapshot(restored);
+            },
+            () => UndoManager.CanUndo);
+
+        RedoCommand = new RelayCommand(
+            () =>
+            {
+                if (UndoManager.Redo(Document) is not LadderDocument restored) return;
+                ApplyUndoRedoSnapshot(restored);
+            },
+            () => UndoManager.CanRedo);
+    }
+
+    /// <summary>Undo/Redoで復元したDocumentを反映する(T-051)。新規/開く専用のReplaceDocumentとは
+    /// 意味論が異なる(SelectedCell/Tool状態/StatusMessageは巻き戻さず現状維持、殿裁定2026-07-11=
+    /// シート構成のみ復元)ため、ReplaceDocumentを流用せず専用メソッドとする。Undo/Redo自体も
+    /// 「変更」の一種として扱いMarkDirtyする(戻した内容が未保存である事実は変わらないため、殿裁定)。</summary>
+    private void ApplyUndoRedoSnapshot(LadderDocument restored)
+    {
+        var oldDocument = Document;
+        Document = restored;
+        OnPropertyChanged(nameof(Document), oldDocument);
+        SheetNavigation.ResetSheets();
+        // シート数が変化しうるため、CurrentSheetIndexを新しい範囲へクランプする。
+        int clampedIndex = Math.Clamp(_currentSheetIndex, 0, Math.Max(0, restored.Sheets.Count - 1));
+        SetCurrentSheetIndexCore(clampedIndex);
+        NotifyCurrentSheetChanged();
+        // Undo/Redoが「シート0枚⇔1枚以上」の境界を跨ぐ可能性がある(最後の1枚のAdd/Deleteを取り消す場合)。
+        NotifyHasProjectChanged();
+        DeviceTable.Rebind(restored.Devices);
+        MarkDirty();
     }
 }

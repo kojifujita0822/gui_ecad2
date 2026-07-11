@@ -921,6 +921,15 @@ public partial class MainWindow : Window
                 NewButton_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-051: メニュー/ツールバーのInputGestureText表示(Ctrl+Z)と整合させる。
+                _viewModel.UndoCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
+                _viewModel.RedoCommand.Execute(null);
+                e.Handled = true;
+                break;
             case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
                 // T-055増分1: 末尾行を1行追加する(ツールバー「行を追加」ボタンと同一コマンド)。
                 _viewModel.AddRowCommand.Execute(null);

@@ -118,8 +118,8 @@
                 <MenuItem Header="終了(_X)"/>
             </MenuItem>
             <MenuItem Header="編集(_E)">
-                <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z"/>
-                <MenuItem Header="やり直し(_R)" InputGestureText="Ctrl+Y"/>
+                <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z" Command="{Binding UndoCommand}"/>
+                <MenuItem Header="やり直し(_R)" InputGestureText="Ctrl+Y" Command="{Binding RedoCommand}"/>
                 <Separator/>
                 <MenuItem Header="切り取り(_T)" InputGestureText="Ctrl+X"/>
                 <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C"/>
@@ -164,14 +164,14 @@
                 </Button>
                 <Separator/>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)"
-                        AutomationProperties.Name="元に戻す (Ctrl+Z)">
+                        AutomationProperties.Name="元に戻す (Ctrl+Z)" Command="{Binding UndoCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Z"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)"
-                        AutomationProperties.Name="やり直し (Ctrl+Y)">
+                        AutomationProperties.Name="やり直し (Ctrl+Y)" Command="{Binding RedoCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Y"/>

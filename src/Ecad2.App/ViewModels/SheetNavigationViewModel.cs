@@ -107,6 +107,8 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 Grid = new GridSpec { Rows = 10, Columns = 20 },
                 MainCircuit = isMainCircuit,
             };
+            // T-051: Undo基盤(MVP対象範囲=シート追加/削除)。実行直前にスナップショットを記録する。
+            _owner.UndoManager.RecordSnapshot(_owner.Document);
             _owner.Document.Sheets.Add(sheet);
             Sheets.Add(sheet);
             _owner.MarkDirty();
@@ -145,6 +147,8 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             {
                 if (SelectedSheet is not Sheet sheet) return;
                 int index = Sheets.IndexOf(sheet);
+                // T-051: Undo基盤(MVP対象範囲=シート追加/削除)。実行直前にスナップショットを記録する。
+                _owner.UndoManager.RecordSnapshot(_owner.Document);
                 _owner.Document.Sheets.RemoveAt(index);
                 Sheets.RemoveAt(index);
                 // T-050往復2周目(隠密CONFIRMED二重発火の解消): 公開セッタではなくSetCurrentSheetIndexCore。
