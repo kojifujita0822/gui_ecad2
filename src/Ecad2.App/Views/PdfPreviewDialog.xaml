@@ -1,0 +1,38 @@
+<Window x:Class="Ecad2.App.Views.PdfPreviewDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Ecad2.App.Views"
+        Title="PDF プレビュー" Height="700" Width="900"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ツールバー行: ページ移動・ズーム操作 -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="8,4" VerticalAlignment="Center">
+            <Button x:Name="PrevBtn" Content="◀" Width="36" Click="OnPrev"/>
+            <TextBlock x:Name="PageLabel" VerticalAlignment="Center" MinWidth="90" TextAlignment="Center" Margin="4,0"/>
+            <Button x:Name="NextBtn" Content="▶" Width="36" Click="OnNext"/>
+            <Border Width="1" Height="20" Margin="12,0" Background="Gray"/>
+            <Button x:Name="ZoomOutBtn" Content="－" Width="36" Click="OnZoomOut"/>
+            <TextBlock x:Name="ZoomLabel" VerticalAlignment="Center" MinWidth="52" TextAlignment="Center" Margin="4,0"/>
+            <Button x:Name="ZoomInBtn" Content="＋" Width="36" Click="OnZoomIn"/>
+            <Button Content="等倍" Padding="8,4" Click="OnFitWidth" Margin="8,0,0,0"/>
+        </StackPanel>
+
+        <!-- キャンバス領域 -->
+        <ScrollViewer Grid.Row="1" Background="#FF6E6E6E"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <local:PdfPreviewCanvas x:Name="PreviewCanvas" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20"/>
+        </ScrollViewer>
+
+        <!-- ボタン行 -->
+        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12">
+            <Button Content="PDF出力" Width="90" IsDefault="True" Click="ExportButton_Click"/>
+            <Button Content="閉じる" Width="70" IsCancel="True" Margin="8,0,0,0"/>
+        </StackPanel>
+    </Grid>
+</Window>

@@ -277,6 +277,23 @@ public partial class MainWindow : Window
         SaveDocumentAs();
     }
 
+    // PDF出力(T-060): 回路番号採番+クロスリファレンス構築の後、プレビューダイアログを開く
+    // (GuiEcadのOnMenuPreviewPdfと同型2段階UI、殿裁定2026-07-12=プレビュー機能を今回実装)。
+    // 保存ダイアログ経由の実際のエクスポートはPdfPreviewDialog側(PDF出力ボタン)が担う。
+    private void PdfExportMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_viewModel.HasProject) return;
+        CommitDeviceNameEdit();
+        CommitDeviceTableEdit();
+
+        Ecad2.Simulation.CircuitNumberer.Number(_viewModel.Document);
+        var xref = Ecad2.Simulation.CrossReferenceBuilder.Build(_viewModel.Document, _viewModel.PartLibrary);
+
+        var dialog = new Views.PdfPreviewDialog(_viewModel.Document, _viewModel.PartLibrary, xref,
+            _viewModel.Document.Settings.EnableBorder) { Owner = this };
+        dialog.ShowDialog();
+    }
+
     // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する(隠密調査
     // docs/ecad2-guiecad-code-survey-onmitsu.md T-024節推奨)。修正(往復2周目、忍者実機検出):
     // 開く側と同じ欠陥(ex.Messageの生の技術的文面をそのまま表示)が無いよう、一般向け日本語文面

@@ -114,7 +114,7 @@
                 <MenuItem Header="上書き保存(_S)" InputGestureText="Ctrl+S" Click="SaveButton_Click" IsEnabled="{Binding HasProject}"/>
                 <MenuItem Header="名前を付けて保存(_A)..." Click="SaveAsMenuItem_Click" IsEnabled="{Binding HasProject}"/>
                 <Separator/>
-                <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P"/>
+                <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P" Click="PdfExportMenuItem_Click" IsEnabled="{Binding HasProject}"/>
                 <Separator/>
                 <MenuItem Header="終了(_X)"/>
             </MenuItem>
@@ -185,7 +185,8 @@
                 </Button>
                 <Separator/>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)"
-                        AutomationProperties.Name="PDF出力 (Ctrl+P)">
+                        AutomationProperties.Name="PDF出力 (Ctrl+P)" Click="PdfExportMenuItem_Click"
+                        IsEnabled="{Binding HasProject}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+P"/>
