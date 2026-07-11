@@ -77,6 +77,14 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot))
             RedrawCanvas();
 
+        // T-056: グリッド表示切替。LadderCanvasはカスタムFrameworkElementでDraw()呼び出しが
+        // 描画トリガーのため、ShowGridの値をViewへ反映した上で明示的に再描画する。
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsGridVisible))
+        {
+            LadderCanvasHost.ShowGrid = _viewModel.IsGridVisible;
+            RedrawCanvas();
+        }
+
         // T-041増分7隠密レビュー所見A対応: ドラッグ中に外部要因(Delete・シート切替・ドキュメント
         // 差し替え、いずれもSelectedConnector等のsetterを経由する)でForceCancelDrag*IfAnyが発火し
         // IsDragging*がfalseへ変わった場合、View側のキャプチャ・一時フラグも追従してリセットする。
@@ -928,6 +936,11 @@ public partial class MainWindow : Window
                 break;
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
                 _viewModel.RedoCommand.Execute(null);
+                e.Handled = true;
+                break;
+            case Key.G when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-056: メニューのInputGestureText表示(Ctrl+G)と整合させる。
+                _viewModel.IsGridVisible = !_viewModel.IsGridVisible;
                 e.Handled = true;
                 break;
             case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):

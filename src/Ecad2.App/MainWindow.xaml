@@ -127,7 +127,7 @@
                 <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V"/>
             </MenuItem>
             <MenuItem Header="表示(_V)">
-                <MenuItem Header="グリッド表示(_G)"/>
+                <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>
             </MenuItem>
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>

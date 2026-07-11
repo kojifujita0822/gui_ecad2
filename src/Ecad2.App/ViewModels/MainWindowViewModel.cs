@@ -67,6 +67,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _canvasScale, Math.Clamp(value, 0.25, 4.0));
     }
 
+    private bool _isGridVisible = true;
+
+    /// <summary>作図ガイドのグリッド線を画面表示するか(T-056)。既定=表示(殿裁定2026-07-11、
+    /// T-030以来の常時表示運用を踏襲)。「表示」メニューのグリッド表示項目・Ctrl+Gでトグルする。
+    /// 非永続(殿裁定2026-07-11)のためアプリ再起動で既定値へ戻る。</summary>
+    public bool IsGridVisible
+    {
+        get => _isGridVisible;
+        set => SetProperty(ref _isGridVisible, value);
+    }
+
     /// <summary>
     /// 開いているドキュメント全体（複数シートを保持）。起動直後は空(Sheets=0、HasProject=false=
     /// 濃紺スタート、殿裁定2026-07-05)。新規/開く(T-019)ではReplaceDocumentで丸ごと差し替える。
