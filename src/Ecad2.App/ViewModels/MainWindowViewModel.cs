@@ -1350,6 +1350,36 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 最終行に要素(広義5種、殿裁定)が存在する場合は削除を拒否しStatusMessageへ警告を出す。</summary>
     public ICommand DeleteRowCommand { get; }
 
+    /// <summary>指定行の行コメント(T-080)を取得する。エディタの初期表示に使う。</summary>
+    public string GetRungComment(int row)
+        => CurrentSheet?.RungComments.FirstOrDefault(rc => rc.Row == row)?.Text ?? "";
+
+    /// <summary>行コメント(T-080)を設定する。空文字列は削除扱い(殿裁定2026-07-12、GuiEcadの
+    /// 空エントリ残留癖は踏襲しない)。値が実際に変化した場合のみMarkDirty()する(T-065/T-066往復の
+    /// 教訓、同値ガード規約)。</summary>
+    public void SetRungComment(int row, string text)
+    {
+        if (CurrentSheet is not Sheet sheet) return;
+        string trimmed = text.Trim();
+        var existing = sheet.RungComments.FirstOrDefault(rc => rc.Row == row);
+        string oldText = existing?.Text ?? "";
+        if (oldText == trimmed) return;
+
+        if (trimmed.Length == 0)
+        {
+            if (existing is not null) sheet.RungComments.Remove(existing);
+        }
+        else if (existing is not null)
+        {
+            existing.Text = trimmed;
+        }
+        else
+        {
+            sheet.RungComments.Add(new RungComment { Row = row, Text = trimmed });
+        }
+        MarkDirty();
+    }
+
     /// <summary>指定行に要素(広義5種: ElementInstance/VerticalConnector/WireBreak/GroupFrame/
     /// RungComment、殿裁定2026-07-10)が存在するかを判定する(T-055増分1、削除拒否の判定に使う)。
     /// internalはIVT経由のテスト用。</summary>

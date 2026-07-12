@@ -202,6 +202,31 @@ public sealed class LadderCanvas : FrameworkElement
     }
 
     /// <summary>
+    /// クリック位置(ローカルDIP座標)が行コメント記入領域(右母線の右側)にあるか判定し、該当すれば
+    /// 行番号を返す(T-080)。GuiEcad原本のヒット領域(xMm > 右母線位置、かつ行が描画範囲内)を踏襲する。
+    /// </summary>
+    internal int? HitTestRungCommentRow(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        var geo = _renderer.Geometry;
+        if (xMm <= _renderer.RightBusX(sheet.Grid.Columns)) return null;
+
+        int row = geo.RowAt(yMm);
+        if (row < 0 || row >= DiagramRenderer.TotalRows(sheet)) return null;
+        return row;
+    }
+
+    /// <summary>行コメントエディタのアンカー位置をローカルDIP座標で返す(T-080)。X座標は
+    /// DrawRungCommentsの描画位置(右母線+2mm)と同じ基準、Y座標は行の中心(YRow)。</summary>
+    internal Point RungCommentAnchorDip(int row, Sheet sheet)
+    {
+        var geo = _renderer.Geometry;
+        double xMm = _renderer.RightBusX(sheet.Grid.Columns) + 2.0;
+        double yMm = geo.YRow(row);
+        return new Point(xMm * MmToDip, yMm * MmToDip);
+    }
+
+    /// <summary>
     /// クリック位置(ローカルDIP座標)に十分近い縦コネクタを探す(T-041増分1)。列境界からのmm距離が
     /// 許容誤差以内、かつ行範囲(TopRow〜BottomRow、許容誤差ぶんの余裕含む)内であることを両方
     /// 確認する。同時に複数該当する場合は<see cref="Sheet.Connectors"/>の先頭を優先する

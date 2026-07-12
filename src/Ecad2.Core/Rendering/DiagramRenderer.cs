@@ -102,7 +102,9 @@ public sealed class DiagramRenderer
         return Math.Max(1, (EffectiveTotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
     }
     private double LeftBusX => X(0) - BusPad;
-    private double RightBusX(int columns) => X(columns) + BusPad;
+    /// <summary>右母線のX座標(mm)。App層のヒットテスト(T-080行コメント記入領域判定)からも
+    /// 参照するためpublic化する(DrawRungCommentsの描画位置=RightBusX+2mmと同じ基準)。</summary>
+    public double RightBusX(int columns) => X(columns) + BusPad;
 
     // 用紙サイズ（縦固定）。A3 は A4 の長辺・短辺を単純に拡大した 297×420mm。
     private double PageW => _opt.PaperSize == PaperSize.A3 ? 297.0 : 210.0;

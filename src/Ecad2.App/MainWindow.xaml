@@ -665,5 +665,18 @@
                         KeyboardNavigation.IsTabStop="False"/>
             </StackPanel>
         </Border>
+
+        <!-- T-080: 行コメント編集用インラインTextBoxオーバーレイ(ElementPlacementBarと同型の
+             同一Window内オーバーレイ設計、位置決めもPositionPlacementBarと同型のTranslatePoint方式を
+             流用)。GuiEcad原本踏襲: 右母線右側ダブルクリックで開き、Enter/Tab確定・Esc取消・
+             フォーカスロストは確定扱い。文字数上限20は殿裁定。 -->
+        <Border x:Name="RungCommentEditor" Grid.Row="2" Background="White" BorderBrush="Gray"
+                BorderThickness="1" Padding="2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Visibility="Collapsed" Panel.ZIndex="100">
+            <TextBox x:Name="RungCommentBox" Width="140" MaxLength="20"
+                     AutomationProperties.Name="行コメント"
+                     PreviewKeyDown="RungCommentBox_PreviewKeyDown"
+                     LostKeyboardFocus="RungCommentBox_LostKeyboardFocus"/>
+        </Border>
     </Grid>
 </Window>

@@ -483,4 +483,88 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Contains(nameof(vm.SelectedElementDeviceName), raised);
         Assert.Contains(nameof(vm.HasSelectedElement), raised);
     }
+
+    /// <summary>T-080: SetRungCommentが新規コメントを追加しMarkDirty()すること。</summary>
+    [Fact]
+    public void SetRungComment_NewText_AddsEntryAndMarksDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        ResetDirtyViaSave(vm);
+
+        vm.SetRungComment(3, "テストコメント");
+
+        Assert.Equal("テストコメント", vm.GetRungComment(3));
+        Assert.True(vm.IsDirty);
+    }
+
+    /// <summary>T-080: 前後で空白をTrimして保存すること。</summary>
+    [Fact]
+    public void SetRungComment_TrimsWhitespace()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.SetRungComment(0, "  余白付き  ");
+
+        Assert.Equal("余白付き", vm.GetRungComment(0));
+    }
+
+    /// <summary>T-080殿裁定: 空文字列で確定した場合、RungCommentエントリを残さない(削除扱い)。
+    /// GuiEcadの空エントリ残留癖は踏襲しない。</summary>
+    [Fact]
+    public void SetRungComment_EmptyText_RemovesEntry()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SetRungComment(2, "いったん記入");
+
+        vm.SetRungComment(2, "");
+
+        Assert.Equal("", vm.GetRungComment(2));
+        Assert.Empty(vm.CurrentSheet!.RungComments);
+    }
+
+    /// <summary>T-080殿裁定: 元々空の行を空のまま確定(取消相当)した場合もエントリを作らない。</summary>
+    [Fact]
+    public void SetRungComment_EmptyOnEmptyRow_DoesNotCreateEntryOrMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        ResetDirtyViaSave(vm);
+
+        vm.SetRungComment(5, "");
+
+        Assert.Empty(vm.CurrentSheet!.RungComments);
+        Assert.False(vm.IsDirty);
+    }
+
+    /// <summary>T-080: 既存コメントを同じテキストで確定してもMarkDirty()しない(同値ガード規約、
+    /// T-065/T-066往復の教訓)。</summary>
+    [Fact]
+    public void SetRungComment_SameText_DoesNotMarkDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SetRungComment(1, "既存コメント");
+        ResetDirtyViaSave(vm);
+
+        vm.SetRungComment(1, "既存コメント");
+
+        Assert.False(vm.IsDirty);
+    }
+
+    /// <summary>T-080: 既存コメントのテキストを変更できること。</summary>
+    [Fact]
+    public void SetRungComment_ExistingRow_UpdatesText()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SetRungComment(4, "旧テキスト");
+
+        vm.SetRungComment(4, "新テキスト");
+
+        Assert.Equal("新テキスト", vm.GetRungComment(4));
+        Assert.Single(vm.CurrentSheet!.RungComments);
+    }
 }

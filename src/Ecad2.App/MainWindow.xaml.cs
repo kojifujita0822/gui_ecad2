@@ -577,6 +577,15 @@ public partial class MainWindow : Window
 
         var position = e.GetPosition(LadderCanvasHost);
 
+        // T-080: 行コメント記入(右母線右側のダブルクリック)。ツールモードを問わず優先判定する
+        // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。
+        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
+            && LadderCanvasHost.HitTestRungCommentRow(position, rcSheet) is int rcRow)
+        {
+            OpenRungCommentEditor(rcRow, rcSheet);
+            return;
+        }
+
         // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
         // (配置モード中のクリックは常に要素配置目的のため対象外とする)。ヒットすればSelectedCellは
         // 使わず(セル単位の概念に載らないため)排他的に切り替える。
@@ -719,6 +728,13 @@ public partial class MainWindow : Window
         // メイン作業域Grid/OutputPanelAreaのIsEnabledバインドで別途一括無効化しており(単一の真実源
         // =IsPlacementBarVisible)、キーボード・マウス両経路が同じフラグから連動する。
         if (_viewModel.IsPlacementBarVisible) return;
+
+        // T-080: 行コメントエディタ編集中はグローバルショートカット(F5等)を無効化する
+        // (ElementPlacementBar表示中と同じ設計方針)。Enter/Tab/EscapeはRungCommentBox自身の
+        // PreviewKeyDown(RungCommentBox_PreviewKeyDown)が処理するため、本ハンドラより先に
+        // 到達させる必要がある(本ハンドラはTunnelingでRungCommentBoxより先に発火するため、
+        // ここで早期returnしないとEscape等が意図せず消費されてしまう)。
+        if (_rungCommentEditingRow is not null) return;
 
         if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.Shift)
         {
@@ -1622,6 +1638,85 @@ public partial class MainWindow : Window
         double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
 
         ElementPlacementBar.Margin = new Thickness(x, y, 0, 0);
+    }
+
+    // T-080: 行コメント編集中の行番号。エディタが閉じている間はnull。
+    private int? _rungCommentEditingRow;
+
+    // 行コメントエディタを開く(右母線右側ダブルクリック)。既存コメントがあれば読み込む。
+    private void OpenRungCommentEditor(int row, Ecad2.Model.Sheet sheet)
+    {
+        _rungCommentEditingRow = row;
+        RungCommentBox.Text = _viewModel.GetRungComment(row);
+        RungCommentEditor.Visibility = Visibility.Visible;
+        PositionRungCommentEditor(row, sheet);
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            RungCommentBox.Focus();
+            RungCommentBox.SelectAll();
+        }), DispatcherPriority.Loaded);
+    }
+
+    // 行コメントエディタの位置決め(T-080)。PositionPlacementBarと同型のTranslatePoint方式
+    // (RootLayoutGrid座標系への変換・MainWorkAreaGrid基準の画面端クランプ)を流用する。
+    private void PositionRungCommentEditor(int row, Ecad2.Model.Sheet sheet)
+    {
+        var inputPoint = LadderCanvasHost.RungCommentAnchorDip(row, sheet);
+        var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
+        var workAreaOrigin = MainWorkAreaGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
+
+        RungCommentEditor.Margin = new Thickness(0);
+        RungCommentEditor.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Size barSize = RungCommentEditor.DesiredSize;
+
+        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + MainWorkAreaGrid.ActualWidth - barSize.Width);
+        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + MainWorkAreaGrid.ActualHeight - barSize.Height);
+        double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
+        double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
+
+        RungCommentEditor.Margin = new Thickness(x, y, 0, 0);
+    }
+
+    // 確定(Enter/Tab/フォーカスロスト、GuiEcad踏襲)。SetRungCommentは値未変更なら
+    // MarkDirty()しない(同値ガード規約)ため、無変更のまま確定しても無害。
+    private void CommitRungCommentEditor()
+    {
+        if (_rungCommentEditingRow is not int row) return;
+        _viewModel.SetRungComment(row, RungCommentBox.Text);
+        CloseRungCommentEditor();
+        RedrawCanvas();
+    }
+
+    private void CancelRungCommentEditor() => CloseRungCommentEditor();
+
+    private void CloseRungCommentEditor()
+    {
+        _rungCommentEditingRow = null;
+        RungCommentEditor.Visibility = Visibility.Collapsed;
+        FocusCanvas();
+    }
+
+    // Enter/Tab=確定、Escape=取消(GuiEcad踏襲)。
+    private void RungCommentBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter || e.Key == Key.Tab)
+        {
+            CommitRungCommentEditor();
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            CancelRungCommentEditor();
+            e.Handled = true;
+        }
+    }
+
+    // フォーカスロスト=確定扱い(キャンセルではない、GuiEcad踏襲)。CommitRungCommentEditor内の
+    // CloseRungCommentEditorがFocusCanvas()経由で再度LostKeyboardFocusを誘発しうるが、
+    // _rungCommentEditingRowを先にnull化しているため多重確定にはならない。
+    private void RungCommentBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (_rungCommentEditingRow is not null) CommitRungCommentEditor();
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は
