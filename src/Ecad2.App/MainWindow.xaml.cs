@@ -401,7 +401,10 @@ public partial class MainWindow : Window
         // 判定をDown側へ移設する。ツールモードを問わず優先判定する点は従来仕様のまま維持する
         // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。判定条件自体はShouldOpenRungCommentEditor
         // (テスト容易性のため純粋関数として抽出、隠密テスト設計・家老裁定3)へ委ねる。
-        if (_viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
+        // 隠密再レビュー要注意2対応: e.ClickCount==2を先に評価し、通常クリック(ClickCount=1)では
+        // HitTestRungCommentRow(内部でDiagramRenderer.TotalRowsのO(n)走査を伴う)を呼ばない
+        // 短絡評価を復す(旧Up側実装の&&短絡と同じ挙動)。
+        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
             && ShouldOpenRungCommentEditor(e.ClickCount, LadderCanvasHost.HitTestRungCommentRow(position, rcSheet)) is int rcRow)
         {
             OpenRungCommentEditor(rcRow, rcSheet);
