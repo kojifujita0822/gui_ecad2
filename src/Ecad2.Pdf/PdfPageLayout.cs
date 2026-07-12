@@ -36,12 +36,14 @@ public static class PdfPageLayout
         foreach (var sheet in document.Sheets)
         {
             int pageCount = enableBorder ? dr.RenderPageCount(sheet) : 1;
-            // T-080 DoD(6): 縮小フィットはenableBorder=true(用紙固定)時のみ意味を持つ。
-            // enableBorder=false(可変ページ)はそもそも必要幅ぶんページが広がるため縮小不要。
-            double scale = enableBorder ? dr.CalcPageScale(sheet) : 1.0;
             for (int p = 0; p < pageCount; p++)
             {
                 physical++;
+                // T-080 DoD(6): 縮小フィットはenableBorder=true(用紙固定)時のみ意味を持つ。
+                // enableBorder=false(可変ページ)はそもそも必要幅ぶんページが広がるため縮小不要。
+                // 縮小率はシート単位でなくページ(行範囲)単位で計算する(T-080往復1周目指摘C:
+                // シート単位の一括計算では、行コメントの無いページまで一律に縮小されてしまう)。
+                double scale = enableBorder ? dr.CalcPageScale(sheet, p * dr.RowsPerPage, dr.RowsPerPage) : 1.0;
                 pages.Add(new PdfPage(PdfPageKind.Sheet, sheet, p * dr.RowsPerPage, physical, totalPages, 0, scale));
             }
         }

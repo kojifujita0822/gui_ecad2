@@ -133,6 +133,30 @@ public class PdfExporterTests : IDisposable
         Assert.True(sheetPage.Scale < 1.0);
     }
 
+    /// <summary>T-080往復1周目指摘Cの回帰テスト: 縮小率はシート単位でなくページ(行範囲)単位で
+    /// 計算する。40行シート(A4縦・RowsPerPage=28で2ページ分割)の1ページ目にのみ長い行コメントが
+    /// ある場合、1ページ目だけが縮小され、コメントの無い2ページ目は等倍のまま(修正前はシート単位の
+    /// 一括計算で、無関係な2ページ目まで一律に縮小されていた)。</summary>
+    [Fact]
+    public void PdfPageLayout_行コメントの無いページは縮小しない()
+    {
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 40, Columns = 20 } };
+        sheet.RungComments.Add(new RungComment { Row = 0, Text = new string('あ', 20) });
+        var doc = new LadderDocument();
+        doc.Sheets.Add(sheet);
+        var lib = CreateLibrary();
+
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { IncludeTracingImages = false });
+        CircuitNumberer.Number(doc);
+        var xref = CrossReferenceBuilder.Build(doc, lib);
+        var pages = PdfPageLayout.Build(doc, dr, xref, enableBorder: true);
+
+        var sheetPages = pages.Where(p => p.Kind == PdfPageKind.Sheet).ToList();
+        Assert.Equal(2, sheetPages.Count);
+        Assert.True(sheetPages[0].Scale < 1.0);
+        Assert.Equal(1.0, sheetPages[1].Scale);
+    }
+
     /// <summary>T-080 DoD(6)検証観点(2): 行コメント無しの既存シートは縮小がかからない
     /// (Scale=1.0、従来と同じ見た目)。</summary>
     [Fact]

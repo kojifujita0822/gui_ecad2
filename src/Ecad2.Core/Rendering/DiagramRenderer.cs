@@ -87,6 +87,35 @@ public sealed class DiagramRenderer
         return (int)Math.Ceiling((maxYmm - _opt.MarginMm) / Cell);
     }
 
+    /// <summary>主回路（Sheet.MainCircuit）シートで、ページの行範囲[rowStart, rowEnd)に掛かる
+    /// 自由直線・接続点・枠の mm 実座標の最大X。<see cref="MainCircuitVirtualRows"/>のX版
+    /// (T-080往復1周目指摘D)。主回路シートは右母線が描画されず(グリッド列数による右端の縛りが
+    /// 元々無い)、mm実座標の内容がグリッド幅を超えて広がりうるため、縮小フィット判定
+    /// (RequiredContentWidthForScale)がこれを考慮する。行範囲はページ分割と整合させ、当該ページに
+    /// 描画されない内容を縮小率へ影響させない(同指摘Cと同じ理)。</summary>
+    private double MainCircuitContentMaxX(Sheet sheet, int rowStart, int rowEnd)
+    {
+        double bandTop = _opt.MarginMm + rowStart * Cell;
+        double bandBot = _opt.MarginMm + (double)rowEnd * Cell;
+        double maxXmm = 0;
+        foreach (var fl in sheet.FreeLines)
+            if (Math.Max(fl.Y1Mm, fl.Y2Mm) >= bandTop && Math.Min(fl.Y1Mm, fl.Y2Mm) <= bandBot)
+                maxXmm = Math.Max(maxXmm, Math.Max(fl.X1Mm, fl.X2Mm));
+        foreach (var d in sheet.ConnectionDots)
+            if (d.YMm >= bandTop && d.YMm <= bandBot)
+                maxXmm = Math.Max(maxXmm, d.XMm);
+        foreach (var f in sheet.Frames)
+        {
+            double fy = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - Cell * 0.4);
+            double fh = f.VisualHeightMm ?? f.Height * Cell;
+            if (fy + fh < bandTop || fy > bandBot) continue;
+            double fx = f.VisualXMm ?? X(f.TopLeft.Column);
+            double fw = f.VisualWidthMm ?? f.Width * Cell;
+            maxXmm = Math.Max(maxXmm, fx + fw);
+        }
+        return maxXmm;
+    }
+
     /// <summary>シートが実際に描画する総行数。主回路シートは <see cref="MainCircuitVirtualRows"/> も加味する。</summary>
     private int EffectiveTotalRows(Sheet sheet)
     {
@@ -109,6 +138,19 @@ public sealed class DiagramRenderer
     // 用紙サイズ（縦固定）。A3 は A4 の長辺・短辺を単純に拡大した 297×420mm。
     private double PageW => _opt.PaperSize == PaperSize.A3 ? 297.0 : 210.0;
     private double PageH => _opt.PaperSize == PaperSize.A3 ? 420.0 : 297.0;
+
+    /// <summary>枠あり出力の図面枠(外枠線)の用紙端からの余白(mm)。DrawBorderの描画位置と
+    /// CalcPageScale(縮小フィット判定・縮小の固定点)で共有する(T-080往復1周目指摘A:
+    /// 判定基準が用紙物理端(PageW)のままだと、縮小の有無に関わらず行コメントが枠の外側に描かれる)。</summary>
+    public const double BorderMarginMm = 5.0;
+
+    /// <summary>行コメントの右母線からのXオフセット(mm)。DrawRungCommentsの描画位置と
+    /// App層の編集ボックス位置決め(LadderCanvas.RungCommentAnchorDip)で共有する(T-080)。</summary>
+    public const double RungCommentXOffsetMm = 2.0;
+
+    /// <summary>行コメントのフォントサイズ(mm)。描画(DrawRungComments、VAlign.Bottom=アンカーYが
+    /// 文字下端で文字は上方向へ展開)と編集ボックスのY位置補正(T-080往復1周目指摘E)で共有する。</summary>
+    public const double RungCommentFontSizeMm = 3.0;
 
     private const double TitleCompanyRowH = 6.0;                              // 社名欄の高さ (mm)
     private const double TitleDetailRowsH = 14.0;                             // 図面名称/図番/ページ行＋顧客等行の高さ (mm)
@@ -138,14 +180,19 @@ public sealed class DiagramRenderer
     // 用のRequiredContentWidthとは異なり、行コメントが無い場合はMarginMm分の右余白を含めない
     // (母線より右は「何も描画されない空白」であり、そこが用紙外にはみ出しても実害が無いため、
     // 縮小要否の判定に含めるべきではない。検証観点(2)=行コメント無しでは不要な縮小をかけない)。
-    private double RequiredContentWidthForScale(Sheet sheet)
+    // 行範囲[rowStart, rowEnd)はページ分割の窓と同じ(T-080往復1周目指摘C: 当該ページに描画されない
+    // 行の行コメントを縮小率へ影響させない)。主回路シートは自由直線・接続点・枠のmm実座標の
+    // 広がりも考慮する(同指摘D)。
+    private double RequiredContentWidthForScale(Sheet sheet, int rowStart, int rowEnd)
     {
         double maxRungLen = sheet.RungComments
-            .Where(rc => !string.IsNullOrEmpty(rc.Text))
+            .Where(rc => !string.IsNullOrEmpty(rc.Text) && rc.Row >= rowStart && rc.Row < rowEnd)
             .Select(rc => (double)rc.Text.Length)
             .DefaultIfEmpty(0).Max();
-        if (maxRungLen == 0) return RightBusX(sheet.Grid.Columns);
-        return RightBusX(sheet.Grid.Columns) + 2.0 + maxRungLen * 3.3;
+        double width = RightBusX(sheet.Grid.Columns);
+        if (maxRungLen > 0) width += RungCommentXOffsetMm + maxRungLen * 3.3;
+        if (sheet.MainCircuit) width = Math.Max(width, MainCircuitContentMaxX(sheet, rowStart, rowEnd));
+        return width;
     }
 
     /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき用紙サイズ（RenderOptions.PaperSize）固定。</summary>
@@ -166,14 +213,21 @@ public sealed class DiagramRenderer
         return new Size2D(w, diagramH + tableH + revH + titleH);
     }
 
-    /// <summary>enableBorder=true時、ページ内容(グリッド全幅+行コメント域)が用紙の印字可能幅
-    /// (PageW)を超える場合の縮小率を計算する(1.0=縮小不要、T-080 DoD(6)、殿裁定=縮小フィット)。
-    /// 等倍が上限(拡大はしない)。行コメントが無い・短い等で必要幅が用紙内に収まる場合は
-    /// 1.0を返す(不要な縮小をかけない、検証観点(2))。</summary>
-    public double CalcPageScale(Sheet sheet)
+    /// <summary>enableBorder=true時、ページ内容(グリッド全幅+行コメント域、主回路シートは自由直線
+    /// 等のmm実座標内容も含む)が図面枠(外枠線、用紙端からBorderMarginMm内側)の幅を超える場合の
+    /// 縮小率を計算する(1.0=縮小不要、T-080 DoD(6)、殿裁定=縮小フィット)。判定・縮小とも用紙物理端
+    /// (PageW)ではなく図面枠が基準(T-080往復1周目指摘A)。縮小の固定点は図面枠左上(BorderMarginMm)
+    /// で、Render側の変換式 x' = BorderMarginMm*(1-scale) + scale*x と対になり、縮小後の内容右端が
+    /// 図面枠右端(PageW - BorderMarginMm)ちょうどに収まる(同指摘B)。行範囲(pageRowStart/
+    /// pageRowCount)はページ分割と同じ窓でページごとに計算する(同指摘C、複数ページは
+    /// PdfPageLayout.Buildがページ単位に渡す。既定値は全行=単一ページ用)。等倍が上限(拡大はしない)。
+    /// 必要幅が図面枠内に収まる場合は1.0を返す(不要な縮小をかけない、検証観点(2))。</summary>
+    public double CalcPageScale(Sheet sheet, int pageRowStart = 0, int pageRowCount = int.MaxValue)
     {
-        double neededWidth = RequiredContentWidthForScale(sheet);
-        return neededWidth <= PageW ? 1.0 : PageW / neededWidth;
+        int rowEnd = pageRowCount == int.MaxValue ? int.MaxValue : pageRowStart + pageRowCount;
+        double neededWidth = RequiredContentWidthForScale(sheet, pageRowStart, rowEnd);
+        if (neededWidth <= PageW - BorderMarginMm) return 1.0;
+        return (PageW - 2 * BorderMarginMm) / (neededWidth - BorderMarginMm);
     }
 
     /// <summary>
@@ -218,11 +272,15 @@ public sealed class DiagramRenderer
         _rowBase = rowStart;   // 以降の YRow はページ内ローカル座標になる
         bool InWindow(int row) => row >= rowStart && row < rowEnd;
 
-        // T-080 DoD(6)(殿裁定=縮小フィット): グリッド全幅+行コメント域が用紙の印字可能幅を
-        // 超える場合のみ、内容(グリッド本体〜行コメント)全体を一様スケールする。表題欄・改定欄・
-        // 外枠は絶対座標のまま(スケール対象外、用紙の右下固定配置・外周を保つ)。
+        // T-080 DoD(6)(殿裁定=縮小フィット): グリッド全幅+行コメント域が図面枠の幅を超える場合
+        // のみ、内容(グリッド本体〜行コメント)全体を図面枠左上(BorderMarginMm)を固定点として一様
+        // スケールする(T-080往復1周目指摘B: 原点(0,0)基準では左上余白まで比例して縮み、内容が用紙
+        // 左上へ偏る+右端が図面枠内へ戻らない)。x' = BorderMarginMm*(1-scale) + scale*x
+        // (CalcPageScaleの縮小率導出と対の式)。表題欄・改定欄・外枠は絶対座標のまま
+        // (スケール対象外、用紙の右下固定配置・外周を保つ)。
         bool scaled = pageScale != 1.0;
-        if (scaled) r.PushTransform(0, 0, pageScale);
+        if (scaled)
+            r.PushTransform(BorderMarginMm * (1 - pageScale), BorderMarginMm * (1 - pageScale), pageScale);
 
         DrawImages(r, sheet, rowStart, rowEnd);   // 背面固定：他の描画要素より先に描く
         if (_opt.ShowGrid) DrawGrid(r, columns, localRows);
@@ -1015,8 +1073,8 @@ public sealed class DiagramRenderer
     private void DrawRungComments(IRenderer r, Sheet sheet, int columns, int rowStart, int rowEnd)
     {
         if (sheet.RungComments.Count == 0) return;
-        double x = RightBusX(columns) + 2.0;
-        var style = _theme.Text(TextRole.DeviceName) with { HAlign = HAlign.Left, FontSizeMm = 3.0 };
+        double x = RightBusX(columns) + RungCommentXOffsetMm;
+        var style = _theme.Text(TextRole.DeviceName) with { HAlign = HAlign.Left, FontSizeMm = RungCommentFontSizeMm };
         foreach (var rc in sheet.RungComments)
             if (!string.IsNullOrEmpty(rc.Text) && rc.Row >= rowStart && rc.Row < rowEnd)
                 r.DrawText(rc.Text, new(x, YRow(rc.Row)), style);
@@ -1095,12 +1153,13 @@ public sealed class DiagramRenderer
         r.DrawText(value, new(x + pad, y + h * 0.65), dataStyle);
     }
 
-    // 用紙縦の図面枠（外枠線）を描画する。
+    // 用紙縦の図面枠（外枠線）を描画する。用紙端からの余白は BorderMarginMm
+    // (CalcPageScale の縮小フィット判定と共有、T-080往復1周目指摘A)。
     private void DrawBorder(IRenderer r)
     {
-        const double margin = 5.0;   // 用紙端からの余白
         var thick = _theme.Get(StrokeRole.BusRail) with { Width = 0.5 };
-        r.DrawRectangle(new(margin, margin, PageW - margin * 2, PageH - margin * 2), thick);
+        r.DrawRectangle(new(BorderMarginMm, BorderMarginMm,
+            PageW - BorderMarginMm * 2, PageH - BorderMarginMm * 2), thick);
     }
 
     // 改定欄（表題欄の上）を描画する。最新エントリが上に来るよう逆順表示。
