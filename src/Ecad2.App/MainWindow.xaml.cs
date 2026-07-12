@@ -392,8 +392,22 @@ public partial class MainWindow : Window
     // 処理=セル選択/縦コネクタ選択切替へ素通しされる)。
     private void LadderCanvasHost_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
         var position = e.GetPosition(LadderCanvasHost);
+
+        // T-080往復2周目(a)修正: WPFの既知の仕様(MouseButtonEventArgs.ClickCountはMouseUp側では
+        // 常に1に固定され、MouseDown側でのみ2以上に到達する)により、往復1周目まではUp側で
+        // e.ClickCount==2を判定していたため物理ダブルクリックでも条件成立しなかった(忍者実測で
+        // 両クリックともClickCount=1固定・着弾位置はヒット領域内を確認、T-080往復2周目実測)。
+        // 判定をDown側へ移設する。ツールモードを問わず優先判定する点は従来仕様のまま維持する
+        // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。
+        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
+            && LadderCanvasHost.HitTestRungCommentRow(position, rcSheet) is int rcRow)
+        {
+            OpenRungCommentEditor(rcRow, rcSheet);
+            return;
+        }
+
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
 
         // T-041増分7隠密レビュー所見C対応: CaptureMouse()の戻り値を確認する。何らかの理由(既に
         // 別要素がキャプチャ中等)で失敗した場合、ViewModel側で開始してしまったドラッグ状態を
@@ -597,14 +611,9 @@ public partial class MainWindow : Window
 
         var position = e.GetPosition(LadderCanvasHost);
 
-        // T-080: 行コメント記入(右母線右側のダブルクリック)。ツールモードを問わず優先判定する
-        // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。
-        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
-            && LadderCanvasHost.HitTestRungCommentRow(position, rcSheet) is int rcRow)
-        {
-            OpenRungCommentEditor(rcRow, rcSheet);
-            return;
-        }
+        // T-080往復2周目(a)修正: 行コメント記入のダブルクリック判定はDown側
+        // (LadderCanvasHost_PreviewMouseLeftButtonDown)へ移設した(理由は同メソッドのコメント参照、
+        // Up側のe.ClickCountは常に1でありここでの判定は成立しない既知のWPF仕様のため)。
 
         // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
         // (配置モード中のクリックは常に要素配置目的のため対象外とする)。ヒットすればSelectedCellは
