@@ -956,6 +956,19 @@ public partial class MainWindow : Window
                 _viewModel.ToggleSelectedEndpoint();
                 e.Handled = true;
                 break;
+            case Key.F2 when noModifier && IsCanvasFocused()
+                    && _viewModel.SelectedCell is { } commentCell
+                    && _viewModel.CurrentSheet is Ecad2.Model.Sheet commentSheet:
+                // T-080往復1周目・追加I(殿裁定): 選択セルの行の行コメントエディタをキーボードで
+                // 開く等価経路(キーボードファースト原則。GuiEcad原本にも「コメント編集」キー割当が
+                // 存在した、T-081調査)。対象条件はダブルクリック経路(HitTestRungCommentRow)と
+                // 揃える: 主回路シートは対象外(指摘G)・行は描画範囲内のみ。矢印キー・Deleteと同じく
+                // キャンバスフォーカス時のみ有効(選択セルに対する操作のため)。
+                if (!commentSheet.MainCircuit && commentCell.Row >= 0
+                    && commentCell.Row < Ecad2.Rendering.DiagramRenderer.TotalRows(commentSheet))
+                    OpenRungCommentEditor(commentCell.Row, commentSheet);
+                e.Handled = true;
+                break;
             case Key.Delete when noModifier && IsCanvasFocused():
                 // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
@@ -1643,12 +1656,14 @@ public partial class MainWindow : Window
     // T-080: 行コメント編集中の行番号。エディタが閉じている間はnull。
     private int? _rungCommentEditingRow;
 
-    // 行コメントエディタを開く(右母線右側ダブルクリック)。既存コメントがあれば読み込む。
+    // 行コメントエディタを開く(右母線右側ダブルクリック、またはF2キー=往復1周目追加I)。
+    // 既存コメントがあれば読み込む。表示状態はIsRungCommentEditorVisible(往復1周目指摘F)への
+    // バインドで反映し、MainContentAreaのIsEnabledと連動させる(配置バーと同じ仕組み)。
     private void OpenRungCommentEditor(int row, Ecad2.Model.Sheet sheet)
     {
         _rungCommentEditingRow = row;
         RungCommentBox.Text = _viewModel.GetRungComment(row);
-        RungCommentEditor.Visibility = Visibility.Visible;
+        _viewModel.IsRungCommentEditorVisible = true;
         PositionRungCommentEditor(row, sheet);
         Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -1679,21 +1694,26 @@ public partial class MainWindow : Window
 
     // 確定(Enter/Tab/フォーカスロスト、GuiEcad踏襲)。SetRungCommentは値未変更なら
     // MarkDirty()しない(同値ガード規約)ため、無変更のまま確定しても無害。
-    private void CommitRungCommentEditor()
+    private void CommitRungCommentEditor(bool restoreFocus)
     {
         if (_rungCommentEditingRow is not int row) return;
         _viewModel.SetRungComment(row, RungCommentBox.Text);
-        CloseRungCommentEditor();
+        CloseRungCommentEditor(restoreFocus);
         RedrawCanvas();
     }
 
-    private void CancelRungCommentEditor() => CloseRungCommentEditor();
+    private void CancelRungCommentEditor() => CloseRungCommentEditor(restoreFocus: true);
 
-    private void CloseRungCommentEditor()
+    // restoreFocus=false: フォーカスロスト確定経路(往復1周目指摘H)。無条件のFocusCanvas()は
+    // Keyboard.Focus()経由で直前のフォーカス保持者にLostKeyboardFocusを同期再発火させる再入機構
+    // (下記Escapeハンドラの既存コメントで実証済み)を持ち、ユーザーがマウスで移した先から
+    // フォーカスを奪い返してしまうため、キーボード経路(Enter/Tab/Esc)のみキャンバスへ復帰する
+    // (DeviceNameBox_LostKeyboardFocusがFocusCanvas()を呼ばないのと同じ非対称の解消)。
+    private void CloseRungCommentEditor(bool restoreFocus)
     {
         _rungCommentEditingRow = null;
-        RungCommentEditor.Visibility = Visibility.Collapsed;
-        FocusCanvas();
+        _viewModel.IsRungCommentEditorVisible = false;
+        if (restoreFocus) FocusCanvas();
     }
 
     // Enter/Tab=確定、Escape=取消(GuiEcad踏襲)。
@@ -1701,7 +1721,7 @@ public partial class MainWindow : Window
     {
         if (e.Key == Key.Enter || e.Key == Key.Tab)
         {
-            CommitRungCommentEditor();
+            CommitRungCommentEditor(restoreFocus: true);
             e.Handled = true;
         }
         else if (e.Key == Key.Escape)
@@ -1712,11 +1732,12 @@ public partial class MainWindow : Window
     }
 
     // フォーカスロスト=確定扱い(キャンセルではない、GuiEcad踏襲)。CommitRungCommentEditor内の
-    // CloseRungCommentEditorがFocusCanvas()経由で再度LostKeyboardFocusを誘発しうるが、
-    // _rungCommentEditingRowを先にnull化しているため多重確定にはならない。
+    // CloseRungCommentEditorがフォーカス遷移を誘発しうるが、_rungCommentEditingRowを先に
+    // null化しているため多重確定にはならない。restoreFocus=false: フォーカスの行き先はユーザーの
+    // 操作(クリック先等)に委ね、キャンバスへ奪い返さない(往復1周目指摘H)。
     private void RungCommentBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
-        if (_rungCommentEditingRow is not null) CommitRungCommentEditor();
+        if (_rungCommentEditingRow is not null) CommitRungCommentEditor(restoreFocus: false);
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は

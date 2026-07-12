@@ -55,8 +55,33 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool IsPlacementBarVisible
     {
         get => _isPlacementBarVisible;
-        set => SetProperty(ref _isPlacementBarVisible, value);
+        set
+        {
+            if (SetProperty(ref _isPlacementBarVisible, value))
+                OnPropertyChanged(nameof(IsMainContentEnabled));
+        }
     }
+
+    private bool _isRungCommentEditorVisible;
+
+    /// <summary>T-080往復1周目指摘F: 行コメントエディタの表示状態(IsPlacementBarVisibleと同じ
+    /// 「ViewModel単一の真実源」パターン)。表示中はIsMainContentEnabled経由でメインコンテンツを
+    /// 無効化し、マウス経由の素通し(編集中にメニュー「新規」等が即実行される)を塞ぐ。キーボード
+    /// 経路はWindow_PreviewKeyDown冒頭のガード(_rungCommentEditingRow)が対で塞ぐ。</summary>
+    public bool IsRungCommentEditorVisible
+    {
+        get => _isRungCommentEditorVisible;
+        set
+        {
+            if (SetProperty(ref _isRungCommentEditorVisible, value))
+                OnPropertyChanged(nameof(IsMainContentEnabled));
+        }
+    }
+
+    /// <summary>メインコンテンツ(メニュー・ツールバー・メイン作業域・出力パネル)が操作可能か
+    /// (MainWindow.xaml MainContentAreaのIsEnabledバインド先)。配置バー(T-033)・行コメント
+    /// エディタ(T-080往復1周目指摘F)のどちらかが表示中はfalse(現行モーダル同等の使用感)。</summary>
+    public bool IsMainContentEnabled => !IsPlacementBarVisible && !IsRungCommentEditorVisible;
 
     private double _canvasScale = 1.0;
 

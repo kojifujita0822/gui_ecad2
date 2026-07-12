@@ -97,7 +97,7 @@
              細分化のため、ラッパー外にあるStatusBarArea(Grid.Row="4"、RootLayoutGrid基準)の値には
              影響しない。 -->
         <Grid x:Name="MainContentArea" Grid.Row="0" Grid.RowSpan="4"
-              IsEnabled="{Binding IsPlacementBarVisible, Converter={StaticResource InverseBool}}">
+              IsEnabled="{Binding IsMainContentEnabled}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -668,11 +668,15 @@
 
         <!-- T-080: 行コメント編集用インラインTextBoxオーバーレイ(ElementPlacementBarと同型の
              同一Window内オーバーレイ設計、位置決めもPositionPlacementBarと同型のTranslatePoint方式を
-             流用)。GuiEcad原本踏襲: 右母線右側ダブルクリックで開き、Enter/Tab確定・Esc取消・
-             フォーカスロストは確定扱い。文字数上限20は殿裁定。 -->
+             流用)。GuiEcad原本踏襲: 右母線右側ダブルクリックで開き(F2キーの等価経路あり、殿裁定・
+             往復1周目追加I)、Enter/Tab確定・Esc取消・フォーカスロストは確定扱い。文字数上限20は殿裁定。
+             表示状態はIsRungCommentEditorVisible(ViewModel単一の真実源、往復1周目指摘F)へバインドし、
+             配置バーと同様にMainContentAreaのIsEnabled(IsMainContentEnabled)と連動させることで、
+             編集中のキーボード(Window_PreviewKeyDown冒頭ガード)・マウスの両経路を同時に無効化する。 -->
         <Border x:Name="RungCommentEditor" Grid.Row="2" Background="White" BorderBrush="Gray"
                 BorderThickness="1" Padding="2" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Visibility="Collapsed" Panel.ZIndex="100">
+                Visibility="{Binding IsRungCommentEditorVisible, Converter={StaticResource BoolToVisibility}}"
+                Panel.ZIndex="100">
             <TextBox x:Name="RungCommentBox" Width="140" MaxLength="20"
                      AutomationProperties.Name="行コメント"
                      PreviewKeyDown="RungCommentBox_PreviewKeyDown"

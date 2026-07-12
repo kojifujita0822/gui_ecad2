@@ -207,6 +207,12 @@ public sealed class LadderCanvas : FrameworkElement
     /// </summary>
     internal int? HitTestRungCommentRow(Point localPositionDip, Sheet sheet)
     {
+        // 主回路シートは右母線を描画しない=行コメントの対象外のため、ヒットさせない
+        // (T-080往復1周目指摘G: RightBusXはMainCircuit非依存の機械的な列数計算のため、無条件だと
+        // 右母線相当の座標帯より右のダブルクリックが、ツールモードを問わず最優先の本判定に
+        // 吸い込まれてしまう)。
+        if (sheet.MainCircuit) return null;
+
         (double xMm, double yMm) = ToMm(localPositionDip);
         var geo = _renderer.Geometry;
         if (xMm <= _renderer.RightBusX(sheet.Grid.Columns)) return null;
@@ -217,12 +223,16 @@ public sealed class LadderCanvas : FrameworkElement
     }
 
     /// <summary>行コメントエディタのアンカー位置をローカルDIP座標で返す(T-080)。X座標は
-    /// DrawRungCommentsの描画位置(右母線+2mm)と同じ基準、Y座標は行の中心(YRow)。</summary>
+    /// DrawRungCommentsの描画位置(右母線+RungCommentXOffsetMm)と同じ基準。Y座標は、描画側が
+    /// VAlign.Bottom(アンカー=文字下端、文字は行中心YRowから上方向へ展開)のため、行中心から
+    /// フォント高さ相当(RungCommentFontSizeMm)を差し引いた文字上端相当とする(T-080往復1周目指摘E:
+    /// 行中心のままだと、VerticalAlignment=Topで下方向へ展開する編集ボックスが実描画位置より
+    /// 1行分弱下にずれて表示される)。</summary>
     internal Point RungCommentAnchorDip(int row, Sheet sheet)
     {
         var geo = _renderer.Geometry;
-        double xMm = _renderer.RightBusX(sheet.Grid.Columns) + 2.0;
-        double yMm = geo.YRow(row);
+        double xMm = _renderer.RightBusX(sheet.Grid.Columns) + DiagramRenderer.RungCommentXOffsetMm;
+        double yMm = geo.YRow(row) - DiagramRenderer.RungCommentFontSizeMm;
         return new Point(xMm * MmToDip, yMm * MmToDip);
     }
 
