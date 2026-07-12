@@ -396,9 +396,17 @@
                         <Button x:Name="SheetSettingsButton" Content="設定" Margin="4,0,0,0"
                                 ToolTip="シート設定(行数・母線名)" Click="SheetSettingsButton_Click"/>
                     </StackPanel>
+                    <!-- T-082: ドラッグ&ドロップ並び替え(殿裁定「案A」=標準フィードバック)。
+                         AllowDrop+Preview系マウスイベント+DragOver/Dropはコードビハインドで処理する
+                         (WPFのListBoxに標準並び替え機能は無く明示実装、Explore調査で確認済み)。 -->
                     <ListBox x:Name="SheetNavList" ItemsSource="{Binding SheetNavigation.Sheets}"
                              SelectedItem="{Binding SheetNavigation.SelectedSheet}"
-                             DisplayMemberPath="Name" BorderThickness="0"/>
+                             DisplayMemberPath="Name" BorderThickness="0" AllowDrop="True"
+                             PreviewMouseLeftButtonDown="SheetNavList_PreviewMouseLeftButtonDown"
+                             PreviewMouseMove="SheetNavList_PreviewMouseMove"
+                             DragOver="SheetNavList_DragOver"
+                             DragLeave="SheetNavList_DragLeave"
+                             Drop="SheetNavList_Drop"/>
                 </DockPanel>
             </Border>
 

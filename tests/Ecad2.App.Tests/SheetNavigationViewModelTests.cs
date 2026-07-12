@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Windows.Threading;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
@@ -301,5 +302,175 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
             Assert.Null(result);
         else
             Assert.Same(current, result);
+    }
+
+    // --- T-082: シート並び替え(MoveSheetCommand) ---
+
+    private static Sheet AddSheet(MainWindowViewModel vm, int pageNumber, string name)
+    {
+        var sheet = new Sheet { PageNumber = pageNumber, Name = name, Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        vm.Document.Sheets.Add(sheet);
+        return sheet;
+    }
+
+    [Fact]
+    public void MoveSheetCommand_CanExecute_FalseWhenOnlyOneSheet()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        Assert.False(vm.SheetNavigation.MoveSheetCommand.CanExecute((0, 0)));
+    }
+
+    [Fact]
+    public void MoveSheetCommand_CanExecute_FalseWhenFromIndexAtStartMovingBeforeStart()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        // 先頭シート(index=0)をさらに上(toIndex=-1)へ動かそうとする端の境界。
+        Assert.False(vm.SheetNavigation.MoveSheetCommand.CanExecute((0, -1)));
+    }
+
+    [Fact]
+    public void MoveSheetCommand_CanExecute_FalseWhenFromIndexAtEndMovingPastEnd()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        // 末尾シート(index=1)をさらに下(toIndex=2、範囲外)へ動かそうとする端の境界。
+        Assert.False(vm.SheetNavigation.MoveSheetCommand.CanExecute((1, 2)));
+    }
+
+    [Fact]
+    public void MoveSheetCommand_CanExecute_FalseWhenFromEqualsToIndex()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        Assert.False(vm.SheetNavigation.MoveSheetCommand.CanExecute((1, 1)));
+    }
+
+    [Fact]
+    public void MoveSheetCommand_MovesSheetInDocumentAndMirror()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.Document.Sheets[0];
+        var sheet2 = AddSheet(vm, 2, "シート2");
+        var sheet3 = AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+
+        // 末尾(シート3、index=2)を先頭へ移動。
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 0));
+
+        Assert.Equal(new[] { sheet3, sheet1, sheet2 }, vm.Document.Sheets);
+        Assert.Equal(new[] { sheet3, sheet1, sheet2 }, vm.SheetNavigation.Sheets);
+    }
+
+    [Fact]
+    public void MoveSheetCommand_RenumbersPageNumberSequentially()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 0));
+
+        Assert.Equal(new[] { 1, 2, 3 }, vm.Document.Sheets.Select(s => s.PageNumber));
+    }
+
+    [Fact]
+    public void MoveSheetCommand_MarksDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void MoveSheetCommand_WhenMovingSelectedSheet_CurrentSheetIndexFollows()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.Document.Sheets[0];
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0; // シート1(移動対象)を選択中
+
+        // 選択中のシート1(index=0)を末尾へ移動。
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 2));
+
+        Assert.Equal(2, vm.CurrentSheetIndex);
+        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet);
+    }
+
+    [Fact]
+    public void MoveSheetCommand_WhenMovingOtherSheet_SelectedSheetStaysSame()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.Document.Sheets[0];
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0; // シート1を選択中(移動対象ではない)
+
+        // 選択中でないシート2・シート3(index 1, 2)を入れ替える。
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 1));
+
+        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet);
+        Assert.Equal(0, vm.CurrentSheetIndex);
+    }
+
+    /// <summary>
+    /// T-082(殿裁定): シート並び替えはUndo対象外(T-051 MVP現行方針、改名・行数変更等と同様)。
+    /// RecordSnapshotを呼ばないため、実行後もUndoスタックは空(UndoCommandが不可能)のままとなる。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_DoesNotRecordUndoSnapshot()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.False(vm.UndoCommand.CanExecute(null));
+    }
+
+    /// <summary>DoD検証観点(保存/読込往復): 並び替え後の順序がGcadSerializer往復で保持される。</summary>
+    [Fact]
+    public void MoveSheetCommand_OrderIsPreservedAcrossSaveAndLoad()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+
+        // 末尾(シート3)を先頭へ移動。
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 0));
+
+        string json = Ecad2.Persistence.GcadSerializer.Serialize(vm.Document);
+        var restored = Ecad2.Persistence.GcadSerializer.Deserialize(json);
+
+        Assert.Equal(new[] { "シート3", "シート1", "シート2" }, restored.Sheets.Select(s => s.Name));
+        Assert.Equal(new[] { 1, 2, 3 }, restored.Sheets.Select(s => s.PageNumber));
     }
 }

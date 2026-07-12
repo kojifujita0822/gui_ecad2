@@ -76,6 +76,7 @@ public sealed class SheetNavigationViewModel : ViewModelBase
     public ICommand AddCommand { get; }
     public ICommand DeleteCommand { get; }
     public ICommand RenameCommand { get; }
+    public ICommand MoveSheetCommand { get; }
 
     public SheetNavigationViewModel(MainWindowViewModel owner, IDispatcherService dispatcher)
     {
@@ -198,5 +199,42 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 System.Windows.Threading.DispatcherPriority.ContextIdle,
                 () => RefreshSelectedSheet(sheet));
         });
+
+        // T-082: シート並び替え(ドラッグ&ドロップ・Alt+上下キー共通の実行経路、殿裁定)。
+        // パラメータは(int fromIndex, int toIndex)。Undo対象外(殿裁定=T-051 MVP現行方針どおり、
+        // 改名・行数変更等と同じくシート追加/削除以外はUndo対象外)のためRecordSnapshotは呼ばない。
+        MoveSheetCommand = new RelayCommand(
+            param =>
+            {
+                if (param is not ValueTuple<int, int> args) return;
+                var (fromIndex, toIndex) = args;
+                if (!CanMoveSheet(fromIndex, toIndex)) return;
+
+                Sheet? selectedSheetBeforeMove = SelectedSheet;
+                Sheet movingSheet = Sheets[fromIndex];
+
+                _owner.Document.Sheets.RemoveAt(fromIndex);
+                _owner.Document.Sheets.Insert(toIndex, movingSheet);
+                Sheets.RemoveAt(fromIndex);
+                Sheets.Insert(toIndex, movingSheet);
+
+                // PageNumber再採番(DoD5): 並び替え後の表示順=1始まりの連番で振り直す。
+                for (int i = 0; i < Sheets.Count; i++) Sheets[i].PageNumber = i + 1;
+
+                _owner.MarkDirty();
+
+                // 移動前に選択中だったシートの実体を追跡し、新しい添字へCurrentSheetIndexを追従させる
+                // (移動対象が選択中でなくても、他シートの並び替えで添字がずれることがあるため)。
+                int newIndex = selectedSheetBeforeMove is null ? -1 : Sheets.IndexOf(selectedSheetBeforeMove);
+                if (newIndex >= 0) _owner.SetCurrentSheetIndexCore(newIndex);
+            },
+            param => param is ValueTuple<int, int> args ? CanMoveSheet(args.Item1, args.Item2) : Sheets.Count > 1);
     }
+
+    /// <summary>T-082: シート並び替えの実行可否(端での移動・シート1枚時のガード)。</summary>
+    private bool CanMoveSheet(int fromIndex, int toIndex)
+        => Sheets.Count > 1
+            && fromIndex >= 0 && fromIndex < Sheets.Count
+            && toIndex >= 0 && toIndex < Sheets.Count
+            && fromIndex != toIndex;
 }

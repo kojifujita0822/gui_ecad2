@@ -53,6 +53,14 @@ public partial class MainWindow : Window
     private bool _connectionDotDragStarted;
     private bool _connectionDotDragConsumedByEscape;
 
+    // T-082: シートナビゲーション(SheetNavList)のドラッグ&ドロップ並び替え用状態。キャンバス要素の
+    // ドラッグ(マウスキャプチャ方式)とは対象が異なりWPFネイティブDragDrop APIを使う(Explore調査で
+    // 既存流用パターン無しと確認済み)。
+    private Point _sheetDragStartPoint;
+    private Ecad2.Model.Sheet? _sheetDragSource;
+    private ListBoxItem? _sheetDragSourceContainer;
+    private Adorner? _sheetReorderAdorner;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -931,6 +939,16 @@ public partial class MainWindow : Window
                     TryPlaceWireBreak();
                 e.Handled = true;
                 break;
+            case Key.System when Keyboard.Modifiers == ModifierKeys.Alt
+                    && (e.SystemKey == Key.Up || e.SystemKey == Key.Down)
+                    && IsSheetNavFocused():
+                // T-082(殿裁定「Alt+上下」): シートナビゲーションパネル(SheetNavList)にフォーカスが
+                // ある間、選択中のシートを上下へ並び替える。F10と同型(上記コメント参照)でAlt併用キーは
+                // WM_SYSKEYDOWN経由となりe.KeyがKey.Systemになりe.SystemKeyに実キーが入るWPF既知仕様
+                // のため、この分岐が必要(実機検証要、忍者確認予定)。
+                MoveCurrentSheet(e.SystemKey == Key.Up ? -1 : 1);
+                e.Handled = true;
+                break;
             case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
                 // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
                 // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
@@ -1107,6 +1125,19 @@ public partial class MainWindow : Window
     }
 
     private bool IsCanvasFocused() => IsWithin(LadderCanvasHost, Keyboard.FocusedElement as DependencyObject);
+
+    // T-082: Alt+上下キーがシートナビゲーション(SheetNavList)宛かを見る判定(IsCanvasFocusedと対)。
+    private bool IsSheetNavFocused() => IsWithin(SheetNavList, Keyboard.FocusedElement as DependencyObject);
+
+    // T-082: 選択中のシートを上(delta=-1)/下(delta=+1)へ1つ並び替える(Alt+上下キー共通経路)。
+    // 端(先頭/末尾)ではMoveSheetCommandのCanExecuteがfalseとなり何もしない(no-op)。
+    private void MoveCurrentSheet(int delta)
+    {
+        int fromIndex = _viewModel.CurrentSheetIndex;
+        var command = _viewModel.SheetNavigation.MoveSheetCommand;
+        var param = (fromIndex, fromIndex + delta);
+        if (command.CanExecute(param)) command.Execute(param);
+    }
 
     private void MoveSelectedCell(Key key)
     {
@@ -1878,5 +1909,119 @@ public partial class MainWindow : Window
             element = VisualTreeHelper.GetParent(element);
         }
         return false;
+    }
+
+    // T-082: シートナビゲーション(SheetNavList)のドラッグ&ドロップ並び替え(殿裁定「案A」=標準
+    // フィードバック=ドラッグ中カーソル変化+ドロップ位置に挿入線+ドラッグ元アイテム半透明化)。
+    // ListBoxアイテムの並び替えという性質上、既存のキャンバス要素ドラッグ(マウスキャプチャ方式)とは
+    // 対象が異なるため、WPFネイティブDragDrop APIで新規実装する(Explore調査で既存流用パターン
+    // 無しと確認済み)。カーソル変化はDragDropEffects.Moveに対するWPF既定カーソルに委ねる
+    // (GiveFeedbackを未フックでもUseDefaultCursors既定trueで自動表示される)。
+    private void SheetNavList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _sheetDragStartPoint = e.GetPosition(null);
+        var container = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        _sheetDragSourceContainer = container;
+        _sheetDragSource = container?.DataContext as Ecad2.Model.Sheet;
+    }
+
+    private void SheetNavList_PreviewMouseMove(object sender, MouseEventArgs e)
+    {
+        if (_sheetDragSource is null || e.LeftButton != MouseButtonState.Pressed) return;
+        Point current = e.GetPosition(null);
+        if (Math.Abs(current.X - _sheetDragStartPoint.X) < DragStartThresholdDip
+            && Math.Abs(current.Y - _sheetDragStartPoint.Y) < DragStartThresholdDip)
+            return;
+
+        var sheet = _sheetDragSource;
+        var container = _sheetDragSourceContainer;
+        _sheetDragSource = null;
+        _sheetDragSourceContainer = null;
+        if (sheet is null) return;
+
+        if (container is not null) container.Opacity = 0.4;
+        DragDrop.DoDragDrop(SheetNavList, sheet, DragDropEffects.Move);
+        if (container is not null) container.Opacity = 1.0;
+        RemoveSheetReorderAdorner();
+    }
+
+    private void SheetNavList_DragOver(object sender, DragEventArgs e)
+    {
+        if (!e.Data.GetDataPresent(typeof(Ecad2.Model.Sheet)))
+        {
+            e.Effects = DragDropEffects.None;
+            return;
+        }
+        e.Effects = DragDropEffects.Move;
+
+        var container = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        if (container is null)
+        {
+            RemoveSheetReorderAdorner();
+            return;
+        }
+        bool insertAfter = e.GetPosition(container).Y > container.ActualHeight / 2;
+        ShowSheetReorderAdorner(container, insertAfter);
+        e.Handled = true;
+    }
+
+    private void SheetNavList_DragLeave(object sender, DragEventArgs e) => RemoveSheetReorderAdorner();
+
+    private void SheetNavList_Drop(object sender, DragEventArgs e)
+    {
+        RemoveSheetReorderAdorner();
+        if (e.Data.GetData(typeof(Ecad2.Model.Sheet)) is not Ecad2.Model.Sheet droppedSheet) return;
+
+        var sheets = _viewModel.SheetNavigation.Sheets;
+        int fromIndex = sheets.IndexOf(droppedSheet);
+        if (fromIndex < 0) return;
+
+        var container = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
+        int toIndex;
+        if (container?.DataContext is Ecad2.Model.Sheet targetSheet)
+        {
+            int targetIndex = sheets.IndexOf(targetSheet);
+            bool insertAfter = e.GetPosition(container).Y > container.ActualHeight / 2;
+            toIndex = insertAfter ? targetIndex + 1 : targetIndex;
+            // fromIndexを除去した後の座標系に合わせて補正する(除去で後続要素が1つ前へ詰まるため)。
+            if (fromIndex < toIndex) toIndex--;
+        }
+        else
+        {
+            // リスト空白部分(末尾余白)へのドロップは末尾へ移動する。
+            toIndex = sheets.Count - 1;
+        }
+        toIndex = Math.Clamp(toIndex, 0, sheets.Count - 1);
+
+        var command = _viewModel.SheetNavigation.MoveSheetCommand;
+        var param = (fromIndex, toIndex);
+        if (command.CanExecute(param)) command.Execute(param);
+    }
+
+    private void ShowSheetReorderAdorner(FrameworkElement container, bool insertAfter)
+    {
+        RemoveSheetReorderAdorner();
+        var layer = AdornerLayer.GetAdornerLayer(container);
+        if (layer is null) return;
+        _sheetReorderAdorner = new Views.SheetReorderInsertionAdorner(container, insertAfter);
+        layer.Add(_sheetReorderAdorner);
+    }
+
+    private void RemoveSheetReorderAdorner()
+    {
+        if (_sheetReorderAdorner is null) return;
+        var layer = AdornerLayer.GetAdornerLayer(_sheetReorderAdorner.AdornedElement);
+        layer?.Remove(_sheetReorderAdorner);
+        _sheetReorderAdorner = null;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current) where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T target) return target;
+            current = VisualTreeHelper.GetParent(current);
+        }
+        return null;
     }
 }
