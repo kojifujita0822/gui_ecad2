@@ -41,7 +41,8 @@ public static class PdfExporter
                     dr.Render(renderer, page.Sheet!, library, xref: null, info: info,
                               pageNumber: page.PageNumber, totalPages: page.TotalPages, enableBorder: enableBorder,
                               pageRowStart: page.PageRowStart,
-                              pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue);
+                              pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue,
+                              pageScale: page.Scale);
                     surface.EndPage();
                     break;
                 case PdfPageKind.CrossRef:

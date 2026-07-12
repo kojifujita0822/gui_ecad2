@@ -119,6 +119,35 @@ public sealed class DiagramRenderer
     private double RevisionBlockH(DocumentInfo info)
         => info.Revisions.Count == 0 ? 0 : RevHdrH + info.Revisions.Count * RevRowH;
 
+    // グリッド全幅+行コメント域(右母線の右側、実際に記入されている最大文字数から算出)の
+    // 必要幅(mm)。PageSize(enableBorder=false、可変ページ)専用。行コメントが無くても
+    // MarginMm分の右余白を確保する(既存仕様、T-060以前から変更なし)。
+    private double RequiredContentWidth(Sheet sheet)
+    {
+        // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
+        // テキスト幅は概算（行コメントのフォント 3.0mm・全角想定で 1 文字 ≒ 3.3mm）。
+        double maxRungLen = sheet.RungComments
+            .Where(rc => !string.IsNullOrEmpty(rc.Text))
+            .Select(rc => (double)rc.Text.Length)
+            .DefaultIfEmpty(0).Max();
+        double rightExtra = maxRungLen > 0 ? 2.0 + maxRungLen * 3.3 + _opt.MarginMm : _opt.MarginMm;
+        return RightBusX(sheet.Grid.Columns) + rightExtra;
+    }
+
+    // 縮小フィット判定(CalcPageScale、T-080 DoD(6))専用の必要幅(mm)。PageSize(enableBorder=false)
+    // 用のRequiredContentWidthとは異なり、行コメントが無い場合はMarginMm分の右余白を含めない
+    // (母線より右は「何も描画されない空白」であり、そこが用紙外にはみ出しても実害が無いため、
+    // 縮小要否の判定に含めるべきではない。検証観点(2)=行コメント無しでは不要な縮小をかけない)。
+    private double RequiredContentWidthForScale(Sheet sheet)
+    {
+        double maxRungLen = sheet.RungComments
+            .Where(rc => !string.IsNullOrEmpty(rc.Text))
+            .Select(rc => (double)rc.Text.Length)
+            .DefaultIfEmpty(0).Max();
+        if (maxRungLen == 0) return RightBusX(sheet.Grid.Columns);
+        return RightBusX(sheet.Grid.Columns) + 2.0 + maxRungLen * 3.3;
+    }
+
     /// <summary>描画に必要なページサイズ(mm)。enableBorder=true のとき用紙サイズ（RenderOptions.PaperSize）固定。</summary>
     public Size2D PageSize(Sheet sheet, CrossReference? xref = null, DocumentInfo? info = null,
                            bool enableBorder = false)
@@ -129,19 +158,22 @@ public sealed class DiagramRenderer
         // Grid.Rowsより極端に小さくなり、空の行へのヒットテストが届かないバグがあった
         // (T-026 OR入力実機検証で発覚、忍者報告のCanvasHeight異常値から判明)。
         int maxRow = TotalRows(sheet) - 1;
-        // 行コメント（右母線の右側）が長いとページ右にはみ出すため、その分の幅を確保する。
-        // テキスト幅は概算（行コメントのフォント 3.0mm・全角想定で 1 文字 ≒ 3.3mm）。
-        double maxRungLen = sheet.RungComments
-            .Where(rc => !string.IsNullOrEmpty(rc.Text))
-            .Select(rc => (double)rc.Text.Length)
-            .DefaultIfEmpty(0).Max();
-        double rightExtra = maxRungLen > 0 ? 2.0 + maxRungLen * 3.3 + _opt.MarginMm : _opt.MarginMm;
-        double w = RightBusX(sheet.Grid.Columns) + rightExtra;
+        double w = RequiredContentWidth(sheet);
         double diagramH = _opt.MarginMm + (maxRow + 1) * Cell + _opt.MarginMm;
         double tableH = xref is not null ? CalcTableHeight(xref) : 0.0;
         double revH = info is not null ? RevisionBlockH(info) : 0.0;
         double titleH = info is not null ? TitleBlockH : 0.0;
         return new Size2D(w, diagramH + tableH + revH + titleH);
+    }
+
+    /// <summary>enableBorder=true時、ページ内容(グリッド全幅+行コメント域)が用紙の印字可能幅
+    /// (PageW)を超える場合の縮小率を計算する(1.0=縮小不要、T-080 DoD(6)、殿裁定=縮小フィット)。
+    /// 等倍が上限(拡大はしない)。行コメントが無い・短い等で必要幅が用紙内に収まる場合は
+    /// 1.0を返す(不要な縮小をかけない、検証観点(2))。</summary>
+    public double CalcPageScale(Sheet sheet)
+    {
+        double neededWidth = RequiredContentWidthForScale(sheet);
+        return neededWidth <= PageW ? 1.0 : PageW / neededWidth;
     }
 
     /// <summary>
@@ -153,7 +185,8 @@ public sealed class DiagramRenderer
     public void Render(IRenderer r, Sheet sheet, PartLibrary? library = null, SimState? sim = null,
                        CrossReference? xref = null, DocumentInfo? info = null,
                        int pageNumber = 1, int totalPages = 1, bool enableBorder = false,
-                       int pageRowStart = 0, int pageRowCount = int.MaxValue)
+                       int pageRowStart = 0, int pageRowCount = int.MaxValue,
+                       double pageScale = 1.0)
     {
         _lib = library;
         var netlist = NetlistBuilder.Build(sheet, library);
@@ -185,6 +218,12 @@ public sealed class DiagramRenderer
         _rowBase = rowStart;   // 以降の YRow はページ内ローカル座標になる
         bool InWindow(int row) => row >= rowStart && row < rowEnd;
 
+        // T-080 DoD(6)(殿裁定=縮小フィット): グリッド全幅+行コメント域が用紙の印字可能幅を
+        // 超える場合のみ、内容(グリッド本体〜行コメント)全体を一様スケールする。表題欄・改定欄・
+        // 外枠は絶対座標のまま(スケール対象外、用紙の右下固定配置・外周を保つ)。
+        bool scaled = pageScale != 1.0;
+        if (scaled) r.PushTransform(0, 0, pageScale);
+
         DrawImages(r, sheet, rowStart, rowEnd);   // 背面固定：他の描画要素より先に描く
         if (_opt.ShowGrid) DrawGrid(r, columns, localRows);
 
@@ -204,6 +243,8 @@ public sealed class DiagramRenderer
         foreach (var e in sheet.Elements)
             if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs);
         DrawRungComments(r, sheet, columns, rowStart, rowEnd);
+
+        if (scaled) r.PopTransform();
 
         // 表題欄・改定欄: 枠ありは A4 右下に固定配置、枠なしは従来どおり内容の下に置く。
         if (info is not null)

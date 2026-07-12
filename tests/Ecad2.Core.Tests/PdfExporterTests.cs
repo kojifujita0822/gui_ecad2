@@ -107,4 +107,47 @@ public class PdfExporterTests : IDisposable
         Assert.Equal(pdf.PageCount, pages.Count);
         Assert.All(pages, p => Assert.Equal(pages.Count, p.TotalPages));
     }
+
+    /// <summary>T-080 DoD(6)回帰テスト: 20文字の行コメントを含むシートでもPDF生成自体は
+    /// 例外なく完了し(縮小適用によるPushTransform/PopTransformの不整合が無いこと)、
+    /// PdfPageLayout.Buildが計算するSheetページのScaleが縮小(<1.0)になっていること。</summary>
+    [Fact]
+    public void Export_20文字行コメント付きシート_例外なく出力しScaleが縮小になる()
+    {
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.RungComments.Add(new RungComment { Row = 0, Text = new string('あ', 20) });
+        var doc = new LadderDocument();
+        doc.Sheets.Add(sheet);
+        var lib = CreateLibrary();
+        string path = Path.Combine(_tempDir, "long-comment.pdf");
+
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { IncludeTracingImages = false });
+        CircuitNumberer.Number(doc);
+        var xref = CrossReferenceBuilder.Build(doc, lib);
+        var pages = PdfPageLayout.Build(doc, dr, xref, enableBorder: true);
+
+        PdfExporter.Export(doc, lib, path);
+
+        Assert.True(File.Exists(path));
+        var sheetPage = Assert.Single(pages.Where(p => p.Kind == PdfPageKind.Sheet));
+        Assert.True(sheetPage.Scale < 1.0);
+    }
+
+    /// <summary>T-080 DoD(6)検証観点(2): 行コメント無しの既存シートは縮小がかからない
+    /// (Scale=1.0、従来と同じ見た目)。</summary>
+    [Fact]
+    public void Export_行コメント無し_Scaleは等倍のまま()
+    {
+        var doc = new LadderDocument();
+        doc.Sheets.Add(new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } });
+        var lib = CreateLibrary();
+
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { IncludeTracingImages = false });
+        CircuitNumberer.Number(doc);
+        var xref = CrossReferenceBuilder.Build(doc, lib);
+        var pages = PdfPageLayout.Build(doc, dr, xref, enableBorder: true);
+
+        var sheetPage = Assert.Single(pages.Where(p => p.Kind == PdfPageKind.Sheet));
+        Assert.Equal(1.0, sheetPage.Scale);
+    }
 }

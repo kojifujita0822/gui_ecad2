@@ -7,9 +7,12 @@ namespace Ecad2.Pdf;
 /// <summary>PDF出力の1物理ページの種別(T-060)。</summary>
 public enum PdfPageKind { Sheet, CrossRef, Bom }
 
-/// <summary>PDF出力の1物理ページのメタ情報(T-060)。<see cref="PdfPageLayout.Build"/>が構築する。</summary>
+/// <summary>PDF出力の1物理ページのメタ情報(T-060)。<see cref="PdfPageLayout.Build"/>が構築する。
+/// <paramref name="Scale"/>はSheetページの縮小率(T-080 DoD(6)、殿裁定=縮小フィット、
+/// enableBorder=false時・CrossRef/BOMページは常に1.0)。</summary>
 public sealed record PdfPage(
-    PdfPageKind Kind, Sheet? Sheet, int PageRowStart, int PageNumber, int TotalPages, int CrPageIndex);
+    PdfPageKind Kind, Sheet? Sheet, int PageRowStart, int PageNumber, int TotalPages, int CrPageIndex,
+    double Scale = 1.0);
 
 /// <summary>
 /// PDF出力のページ構成(シート走査・枠ありページ分割・クロスリファレンス/BOM有無判定)を
@@ -33,10 +36,13 @@ public static class PdfPageLayout
         foreach (var sheet in document.Sheets)
         {
             int pageCount = enableBorder ? dr.RenderPageCount(sheet) : 1;
+            // T-080 DoD(6): 縮小フィットはenableBorder=true(用紙固定)時のみ意味を持つ。
+            // enableBorder=false(可変ページ)はそもそも必要幅ぶんページが広がるため縮小不要。
+            double scale = enableBorder ? dr.CalcPageScale(sheet) : 1.0;
             for (int p = 0; p < pageCount; p++)
             {
                 physical++;
-                pages.Add(new PdfPage(PdfPageKind.Sheet, sheet, p * dr.RowsPerPage, physical, totalPages, 0));
+                pages.Add(new PdfPage(PdfPageKind.Sheet, sheet, p * dr.RowsPerPage, physical, totalPages, 0, scale));
             }
         }
         for (int cp = 0; cp < crPages; cp++)

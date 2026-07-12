@@ -80,10 +80,15 @@ public partial class PdfPreviewDialog : Window
             switch (page.Kind)
             {
                 case PdfPageKind.Sheet:
+                    // page.Scale(T-080 DoD(6)、印刷時の縮小フィット)はPdfExporterと同じ
+                    // PdfPageLayoutが計算するため、プレビューと実出力で常に一致する(WYSIWYG)。
+                    // 上記の表示用scale(ダイアログ幅フィット)とは独立したレイヤーで、両方が
+                    // 掛け合わさって最終的な画面表示サイズになる。
                     _dr.Render(renderer, page.Sheet!, _library, sim: null, xref: null, info: _document.Info,
                                pageNumber: page.PageNumber, totalPages: page.TotalPages,
                                enableBorder: _enableBorder, pageRowStart: page.PageRowStart,
-                               pageRowCount: _enableBorder ? _dr.RowsPerPage : int.MaxValue);
+                               pageRowCount: _enableBorder ? _dr.RowsPerPage : int.MaxValue,
+                               pageScale: page.Scale);
                     break;
                 case PdfPageKind.CrossRef:
                     _dr.RenderCrossRefPage(renderer, _xref, page.CrPageIndex);
