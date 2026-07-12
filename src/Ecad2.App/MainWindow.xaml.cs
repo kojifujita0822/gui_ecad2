@@ -626,9 +626,10 @@ public partial class MainWindow : Window
         // 下記へ素通りすると、659行目の`SelectedCell = ToGridPos(position)`が(SelectedCellのsetterは
         // 無条件でSelectedConnector等をクリアする既存仕様のため)選択中の配線プリミティブを巻き添えで
         // クリアしてしまう。ClickCountを問わずヒット領域そのもので判定する(Down側のダブルクリック
-        // トリガー判定とは独立)。
+        // トリガー判定とは独立)。判定条件自体はShouldSkipSelectionForRungCommentAreaClickへ
+        // 抽出する(テスト容易性、隠密テスト設計・ShouldOpenRungCommentEditorと同型)。
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet rcGuardSheet
-            && LadderCanvasHost.HitTestRungCommentRow(position, rcGuardSheet) is not null)
+            && ShouldSkipSelectionForRungCommentAreaClick(LadderCanvasHost.HitTestRungCommentRow(position, rcGuardSheet)))
         {
             return;
         }
@@ -1728,6 +1729,16 @@ public partial class MainWindow : Window
     internal static int? ShouldOpenRungCommentEditor(int clickCount, int? hitTestRow)
         => clickCount == 2 ? hitTestRow : null;
 
+    // T-080追加往復(課題2)修正: 行コメント領域内へのクリックで選択状態(SelectedCell代入による
+    // SelectedConnector/SelectedWireBreak/SelectedFreeLine/SelectedConnectionDotの巻き添えクリア)を
+    // 変更すべきでないかを判定する純粋関数として抽出(隠密テスト設計
+    // docs/ecad2-t080-issue2-3-root-cause-onmitsu.md、ShouldOpenRungCommentEditorと同型)。
+    // hitTestRowが非nullならヒット領域内(=グリッドセルの概念に載らない帯)であり、ClickCountを
+    // 問わず選択状態を変更しない。4種の配線プリミティブいずれについても、この1つの判定を
+    // 呼び出し側で早期returnとして使うため対称に保護される(個別の特別扱いをしない設計)。
+    internal static bool ShouldSkipSelectionForRungCommentAreaClick(int? hitTestRow)
+        => hitTestRow is not null;
+
     // 行コメントエディタを開く(右母線右側ダブルクリック、またはF2キー=往復1周目追加I)。
     // 既存コメントがあれば読み込む。表示状態はIsRungCommentEditorVisible(往復1周目指摘F)への
     // バインドで反映し、MainContentAreaのIsEnabledと連動させる(配置バーと同じ仕組み)。
@@ -1767,12 +1778,23 @@ public partial class MainWindow : Window
         RungCommentEditor.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = RungCommentEditor.DesiredSize;
 
-        double maxX = Math.Max(canvasAreaOrigin.X, canvasAreaOrigin.X + CanvasArea.ActualWidth - barSize.Width);
-        double maxY = Math.Max(canvasAreaOrigin.Y, canvasAreaOrigin.Y + CanvasArea.ActualHeight - barSize.Height);
-        double x = Math.Clamp(topLeft.X, canvasAreaOrigin.X, maxX);
-        double y = Math.Clamp(topLeft.Y, canvasAreaOrigin.Y, maxY);
+        Point clamped = ClampToViewport(topLeft, canvasAreaOrigin, CanvasArea.ActualWidth, CanvasArea.ActualHeight, barSize);
 
-        RungCommentEditor.Margin = new Thickness(x, y, 0, 0);
+        RungCommentEditor.Margin = new Thickness(clamped.X, clamped.Y, 0, 0);
+    }
+
+    // T-080追加往復(課題3)修正: 画面端クランプの計算式自体を純粋関数として抽出(隠密テスト設計
+    // docs/ecad2-t080-issue2-3-root-cause-onmitsu.md「部分的に単体テスト化できる範囲」)。
+    // ActualWidth/TranslatePoint等のレイアウト依存値の取得そのものは単体テスト化できない
+    // (実ウィンドウのレイアウトパスが必要)ため、それらを呼び出し元で解決した後の「純粋な範囲制限
+    // 計算」のみを切り出す。topLeftがviewport外(左右上下いずれか)ならviewport内へ収める。
+    internal static Point ClampToViewport(Point topLeft, Point viewportOrigin, double viewportWidth, double viewportHeight, Size barSize)
+    {
+        double maxX = Math.Max(viewportOrigin.X, viewportOrigin.X + viewportWidth - barSize.Width);
+        double maxY = Math.Max(viewportOrigin.Y, viewportOrigin.Y + viewportHeight - barSize.Height);
+        double x = Math.Clamp(topLeft.X, viewportOrigin.X, maxX);
+        double y = Math.Clamp(topLeft.Y, viewportOrigin.Y, maxY);
+        return new Point(x, y);
     }
 
     // 確定(Enter/Tab/フォーカスロスト、GuiEcad踏襲)。SetRungCommentは値未変更なら
