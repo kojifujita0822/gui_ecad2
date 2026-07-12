@@ -333,9 +333,10 @@ public sealed class LadderCanvas : FrameworkElement
     /// 既存のprivate ToMmをView外部(MainWindow.xaml.cs)へ公開する薄いラッパー。</summary>
     internal (double XMm, double YMm) ToMmPoint(Point localPositionDip) => ToMm(localPositionDip);
 
-    /// <summary>T-080往復2周目 診断ログ用の一時公開ラッパー(家老采配、ToMmPointと同型)。
-    /// private _renderer.RightBusXをMainWindow.xaml.cs側のログ出力から参照できるようにする。
-    /// 原因確定後、本メソッドと呼び出し元のログ注入コードは侍が除去する。</summary>
+    /// <summary>右母線のX座標(mm)。private _renderer.RightBusXをView外部へ公開する薄いラッパー
+    /// (ToMmPointと同型)。診断ログ用に導入したが(T-080往復2周目)、診断ログ除去後もテスト容易性
+    /// (RungCommentHitTestTestsがHitTestRungCommentRowのヒット境界を検証するために使用)のため
+    /// 存置する。</summary>
     internal double RightBusXMm(int columns) => _renderer.RightBusX(columns);
 
     /// <summary>

@@ -537,26 +537,6 @@ public partial class MainWindow : Window
 
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
-        // T-080往復2周目 診断ログ(家老采配、殿実機NG2件の原因確定用、一時実装)。ドラッグ早期return等
-        // で本メソッドの後半に到達しない場合でも、ClickCount到達値とヒット判定結果を必ず記録する。
-        {
-            var diagSheet = _viewModel.CurrentSheet;
-            var diagPos = e.GetPosition(LadderCanvasHost);
-            var diagMm = LadderCanvasHost.ToMmPoint(diagPos);
-            double? diagRightBusX = diagSheet is Ecad2.Model.Sheet diagSheetForBusX
-                ? LadderCanvasHost.RightBusXMm(diagSheetForBusX.Grid.Columns)
-                : (double?)null;
-            int? diagHitRow = diagSheet is Ecad2.Model.Sheet diagSheetForHit
-                ? LadderCanvasHost.HitTestRungCommentRow(diagPos, diagSheetForHit)
-                : (int?)null;
-            DiagLog($"event=LadderCanvasHost_PreviewMouseLeftButtonUp ClickCount={e.ClickCount} " +
-                $"posDip=({diagPos.X:F2},{diagPos.Y:F2}) posMm=({diagMm.XMm:F2},{diagMm.YMm:F2}) " +
-                $"MainCircuit={(diagSheet is null ? "null" : diagSheet.MainCircuit.ToString())} " +
-                $"RightBusX={(diagRightBusX.HasValue ? diagRightBusX.Value.ToString("F2") : "null")} " +
-                $"HitTestRungCommentRow={(diagHitRow.HasValue ? diagHitRow.Value.ToString() : "null")} " +
-                $"IsRungCommentEditorVisible={_viewModel.IsRungCommentEditorVisible}");
-        }
-
         // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDragging*=falseだが
         // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
@@ -1704,22 +1684,6 @@ public partial class MainWindow : Window
     // T-080: 行コメント編集中の行番号。エディタが閉じている間はnull。
     private int? _rungCommentEditingRow;
 
-    // T-080往復2周目 診断ログ(家老采配、殿実機NG2件の原因確定用、一時実装)。ninja.md「診断ログ連携」節
-    // (T-038標準形)に従い%TEMP%\ecad2-diag.logへ追記式で記録する。原因確定後、侍が本メソッドと
-    // 全呼び出し箇所を除去する(TraceLog.csの常設トレースとは別物・別ファイル)。
-    private static void DiagLog(string line)
-    {
-        try
-        {
-            string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
-            System.IO.File.AppendAllText(path, $"[{DateTime.Now:O}] {line}\n");
-        }
-        catch
-        {
-            // ベストエフォート(診断ログの失敗が本来の処理を道連れにしてはならない、TraceLog.cs踏襲)。
-        }
-    }
-
     // T-080往復2周目(a)修正: 行コメントダブルクリックを開くべきかの判定を純粋関数として抽出
     // (隠密テスト設計docs/ecad2-t080-doubleclick-root-cause-onmitsu.md不明点3、家老裁定3=
     // MouseButtonEventArgs.ClickCountのsetアクセサがinternalで直接構築できないテスト容易性の
@@ -1744,7 +1708,6 @@ public partial class MainWindow : Window
     // バインドで反映し、MainContentAreaのIsEnabledと連動させる(配置バーと同じ仕組み)。
     private void OpenRungCommentEditor(int row, Ecad2.Model.Sheet sheet)
     {
-        DiagLog($"event=OpenRungCommentEditor row={row} sheet={sheet.Name} MainCircuit={sheet.MainCircuit}");
         _rungCommentEditingRow = row;
         RungCommentBox.Text = _viewModel.GetRungComment(row);
         _viewModel.IsRungCommentEditorVisible = true;
@@ -1801,7 +1764,6 @@ public partial class MainWindow : Window
     // MarkDirty()しない(同値ガード規約)ため、無変更のまま確定しても無害。
     private void CommitRungCommentEditor(bool restoreFocus)
     {
-        DiagLog($"event=CommitRungCommentEditor restoreFocus={restoreFocus} _rungCommentEditingRow={(_rungCommentEditingRow.HasValue ? _rungCommentEditingRow.Value.ToString() : "null")}");
         if (_rungCommentEditingRow is not int row) return;
         _viewModel.SetRungComment(row, RungCommentBox.Text);
         CloseRungCommentEditor(restoreFocus);
@@ -1817,7 +1779,6 @@ public partial class MainWindow : Window
     // (DeviceNameBox_LostKeyboardFocusがFocusCanvas()を呼ばないのと同じ非対称の解消)。
     private void CloseRungCommentEditor(bool restoreFocus)
     {
-        DiagLog($"event=CloseRungCommentEditor restoreFocus={restoreFocus} _rungCommentEditingRow={(_rungCommentEditingRow.HasValue ? _rungCommentEditingRow.Value.ToString() : "null")}");
         _rungCommentEditingRow = null;
         _viewModel.IsRungCommentEditorVisible = false;
         if (restoreFocus) FocusCanvas();
@@ -1844,13 +1805,6 @@ public partial class MainWindow : Window
     // 操作(クリック先等)に委ね、キャンバスへ奪い返さない(往復1周目指摘H)。
     private void RungCommentBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
-        string diagNewFocus = e.NewFocus switch
-        {
-            null => "null",
-            FrameworkElement { Name.Length: > 0 } fe => $"{fe.GetType().Name}({fe.Name})",
-            var other => other.GetType().Name,
-        };
-        DiagLog($"event=RungCommentBox_LostKeyboardFocus NewFocus={diagNewFocus} _rungCommentEditingRow={(_rungCommentEditingRow.HasValue ? _rungCommentEditingRow.Value.ToString() : "null")}");
         if (_rungCommentEditingRow is not null) CommitRungCommentEditor(restoreFocus: false);
     }
 
