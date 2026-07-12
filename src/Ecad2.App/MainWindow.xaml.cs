@@ -618,6 +618,20 @@ public partial class MainWindow : Window
         // T-080往復2周目(a)修正: 行コメント記入のダブルクリック判定はDown側
         // (LadderCanvasHost_PreviewMouseLeftButtonDown)へ移設した(理由は同メソッドのコメント参照、
         // Up側のe.ClickCountは常に1でありここでの判定は成立しない既知のWPF仕様のため)。
+        //
+        // T-080往復2周目 追加修正(課題2、忍者実機NG=docs-notes/ecad2-t080-ninja-final-verification.md
+        // 観点4): 行コメント記入領域(右母線右側)はグリッドセルの概念に載らない帯のため、ここへの
+        // クリックはセル選択・配線プリミティブ選択・要素配置のいずれの対象にもしない。ダブルクリックの
+        // 1発目(ClickCount==1、Down側のe.ClickCount==2判定はまだ成立しない段階)がこの早期return無しに
+        // 下記へ素通りすると、659行目の`SelectedCell = ToGridPos(position)`が(SelectedCellのsetterは
+        // 無条件でSelectedConnector等をクリアする既存仕様のため)選択中の配線プリミティブを巻き添えで
+        // クリアしてしまう。ClickCountを問わずヒット領域そのもので判定する(Down側のダブルクリック
+        // トリガー判定とは独立)。
+        if (_viewModel.CurrentSheet is Ecad2.Model.Sheet rcGuardSheet
+            && LadderCanvasHost.HitTestRungCommentRow(position, rcGuardSheet) is not null)
+        {
+            return;
+        }
 
         // T-041増分1: 配線プリミティブ(縦コネクタ)の選択は、選択モード中のクリックのみで試みる
         // (配置モード中のクリックは常に要素配置目的のため対象外とする)。ヒットすればSelectedCellは
@@ -1732,21 +1746,31 @@ public partial class MainWindow : Window
     }
 
     // 行コメントエディタの位置決め(T-080)。PositionPlacementBarと同型のTranslatePoint方式
-    // (RootLayoutGrid座標系への変換・MainWorkAreaGrid基準の画面端クランプ)を流用する。
+    // (RootLayoutGrid座標系への変換)を流用するが、画面端クランプの基準はCanvasArea(ScrollViewer)の
+    // 可視ビューポートとする。
+    //
+    // T-080往復2周目 追加修正(課題3、忍者実機NG=docs-notes/ecad2-t080-ninja-final-verification.md
+    // 範囲外検出節): 旧実装はMainWorkAreaGrid(左パレット+キャンバス+右パネル機器表の全体)基準で
+    // クランプしていた。対象行が水平/垂直スクロール範囲外(左端表示のまま右母線側の行コメントを開く等)
+    // だとTranslatePointの返す値がCanvasAreaの可視領域を大きく超え、クランプが常時発動して
+    // MainWorkAreaGrid右端(=機器表パネルの真下、画面外扱いで実質不可視)に固定表示されてしまっていた。
+    // PositionPlacementBarは常に可視セルクリックからしか呼ばれないためこの問題が顕在化しなかった
+    // (同じロジックの潜在バグだが範囲外、本修正では触れない)。クランプ基準をCanvasArea自身の
+    // ActualWidth/ActualHeightへ変更し、対象が可視範囲外でもキャンバスの可視領域内に留めて表示する。
     private void PositionRungCommentEditor(int row, Ecad2.Model.Sheet sheet)
     {
         var inputPoint = LadderCanvasHost.RungCommentAnchorDip(row, sheet);
         var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
-        var workAreaOrigin = MainWorkAreaGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
+        var canvasAreaOrigin = CanvasArea.TranslatePoint(new Point(0, 0), RootLayoutGrid);
 
         RungCommentEditor.Margin = new Thickness(0);
         RungCommentEditor.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = RungCommentEditor.DesiredSize;
 
-        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + MainWorkAreaGrid.ActualWidth - barSize.Width);
-        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + MainWorkAreaGrid.ActualHeight - barSize.Height);
-        double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
-        double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
+        double maxX = Math.Max(canvasAreaOrigin.X, canvasAreaOrigin.X + CanvasArea.ActualWidth - barSize.Width);
+        double maxY = Math.Max(canvasAreaOrigin.Y, canvasAreaOrigin.Y + CanvasArea.ActualHeight - barSize.Height);
+        double x = Math.Clamp(topLeft.X, canvasAreaOrigin.X, maxX);
+        double y = Math.Clamp(topLeft.Y, canvasAreaOrigin.Y, maxY);
 
         RungCommentEditor.Margin = new Thickness(x, y, 0, 0);
     }
