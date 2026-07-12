@@ -924,3 +924,36 @@ SelectedElementKindDisplay/SelectedElementDeviceNameの4プロパティ通知）
 **隠密再レビュー＝クリーン確定**（配置位置の経路網羅性・横展開確認・RED証明の妥当性いずれも確認）。
 **忍者実機確認＝全観点OK**（詳細=`docs-notes/ecad2-t079-verify-ninja.md`）。build exit0・
 test exit0（Core.Tests 71件・App.Tests 428件、全合格）。
+
+### T-060 PDF出力機能のUI結線 — 完全Done（2026-07-12）
+
+**起票=P-046（隠密、T-055調査時の範囲外気づき）を殿裁定でタスク化**。`Ecad2.Pdf`層
+（T-007でGuiEcadから移植済み）は存在するが、ツールバー・メニューの「PDF出力」ボタンに
+Click/Commandハンドラが結線されておらず、押下しても何も起きない。
+**結線調査を隠密2へ采配（2026-07-11）→出力破損2回検知により§5離脱・調査中断**。引き継ぎ=
+`docs-notes/handover-onmitsu2-t060.md`。**調査途中の重要判明**：P-001「PdfExporterが1ページで
+打ち切られる」はT-002 PoC限定の簡易実装の話で、本実装Core層`DiagramRenderer`は最初から複数ページ
+設計＝**P-001の懸念は現行アーキテクチャに当てはまらず実質解消済み**。
+**調査完了（2026-07-11、新・隠密2が引き継ぎ再開し完遂、`docs/ecad2-t060-pdf-ui-wiring-survey-onmitsu2.md`）**：
+Core層（CrossReferenceBuilder/DeviceTable/EnableBorder/PaperSize）はGuiEcadと全文一致の移植済みで
+追加実装不要。App層に新規実装4点=(1)PDFエクスポートのオーケストレーション (2)保存ダイアログ
+(3)メニュー/ツールバーCommand結線 (4)プレビュー機能（WPF新規設計要）。
+**殿裁定（2026-07-12、プレビュー提示で選択）**：(1)出力範囲＝全シート常に（GuiEcad踏襲）
+(2)プレビュー機能＝今回実装（2段階UI、規模大承知の裁定） (3)枠切替＝UIなし・常に枠あり。
+**実装完了（2026-07-12、侍、増分1〜3、コミット364cb0f・923ee29）**：PdfExporter.Export新設
+（全シート走査+枠ページ分割+CrossRef+BOM、単体テスト3件）、PdfPreviewCanvas/PdfPreviewDialog新設
+（GuiEcadのBuildPageList・ページ送り・ズーム移植）、メニュー/ツールバー結線（2段階UI）。
+**隠密静的レビュー（2026-07-12、11経路調査+9件verify、`docs/ecad2-t060-pdf-export-review-onmitsu.md`）**：
+要修正・重大5件（全CONFIRMED）＝A(プレビューと実出力の総ページ数不一致=WYSIWYG違反)、
+B(Ctrl+P未結線)、C(Enter既定動作が原本の「安全な閉じる」から「出力実行」へ反転)、
+D(ズームが絶対サイズ化しA3がはみ出す)、E(生のex.Message表示の再発)。要判断F(直接出力経路の不在)
+→P-059起票→**殿裁定=プレビュー経由1本のみで問題ない（追認）**。経過観察G〜L・REFUTED1件。
+**侍が修正（コミット44d1250、往復1周目）**：A=PdfPageLayout.Build新設でページ構成を1箇所に集約
+（経過観察Hのロジック重複も解消、xref二重計算は経過観察のまま残存）、B=Key.P case追加、
+C=既定ボタンを「閉じる」へ、D=ダイアログ幅相対フィット+SizeChanged追従+「幅に合わせる」改称、
+E=固定日本語文面へ統一。回帰テスト追加（totalPages=実PDF物理ページ数一致）。
+**隠密再レビュー＝クリーン確定**（build/test再実行含む、Core75/App428全合格）。
+**忍者実機確認＝DoD8点全てOK（2026-07-12、`docs-notes/ecad2-t060-verify-ninja.md`）**：
+重点のプレビュー総ページ数とPyMuPDF実測の実PDF物理ページ数・表題欄印字が完全一致、A3収まり・
+リサイズ追従、ロック中ファイル上書きで日本語固定文面のみ、Enter/Esc安全クローズ、いずれも確認。
+初回表示ちらつき（隠密申し送り）は実機で明確な違和感観測されず（瞬間事象ゆえ断定不可、記録のみ）。
