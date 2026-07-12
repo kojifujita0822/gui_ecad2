@@ -333,6 +333,11 @@ public sealed class LadderCanvas : FrameworkElement
     /// 既存のprivate ToMmをView外部(MainWindow.xaml.cs)へ公開する薄いラッパー。</summary>
     internal (double XMm, double YMm) ToMmPoint(Point localPositionDip) => ToMm(localPositionDip);
 
+    /// <summary>T-080往復2周目 診断ログ用の一時公開ラッパー(家老采配、ToMmPointと同型)。
+    /// private _renderer.RightBusXをMainWindow.xaml.cs側のログ出力から参照できるようにする。
+    /// 原因確定後、本メソッドと呼び出し元のログ注入コードは侍が除去する。</summary>
+    internal double RightBusXMm(int columns) => _renderer.RightBusX(columns);
+
     /// <summary>
     /// クリック位置(ローカルDIP座標)に十分近い自由線を探す(T-041増分5)。点と線分の距離計算
     /// (PoC=poc/t041-freeline-hittest-poc/Program.cs)を移植。<see cref="HitTestConnector"/>の
