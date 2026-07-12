@@ -51,6 +51,17 @@
 掟どおり差し戻し→**殿裁定（2026-07-12）＝案A:並び替え時にDRC結果を破棄し「DRC結果が削除されました。
 DRC再実行してください。」と表示**（クリアすべき診断が存在した場合のみ、表示先はStatusMessage既定）。
 派生=P-066（シート削除時のPageNumber非再採番、採番規約の非対称）をproposed.mdへ起票。
+**往復2周目再レビュー（2026-07-12、`docs/ecad2-t082-sheet-reorder-review2-onmitsu.md`）**：
+修正2・3は正しく機能。**修正1が本質未解決（CONFIRMED、code-review2系統独立検出+隠密裏取り）**——
+ガード`newSelectedIndex != oldSelectedIndex`が「添字変化」基準のため、**移動対象自体が選択中シート
+（=自分が開いているシートを動かす、最も基本的な使い方）の場合に常時発火**しSelectedCell・記入中
+ドラフト消失が再発。既存テストは「移動対象≠選択中シート」の1パターンのみで検出漏れ（569件全合格の陰）。
+隠密の修正案方向性=「indexは変わるがCurrentSheetの実体は不変」ケース用に、クロスカット処理
+（SelectedCellクリア）を伴わない値更新経路を設ける（RenameCommandの精神の拡張）。
+**往復2周超過ゆえ3周目は殿裁可待ち（2026-07-12セッション終了時点の上申事項）**。裁可後の采配は
+バグ修正往復案件の制度どおり「隠密テスト設計（「移動対象=選択中シート」ケース必須）→侍実装」の
+分離+RED証明で。派生=P-067（DeleteCommandのDRC破棄フック欠如）起票。経過観察の新規数点
+（Alt+上下キーリピートのBeginInvoke蓄積・StatusMessage無条件上書き等）はレビュー書参照。
 **侍の着手時調査所見（2026-07-12）**：シート一覧の実体はListBox（SheetNavList、フラット表示）、
 WPFネイティブDragDrop APIは使用実績皆無で新規導入、キーバインドはWindow_PreviewKeyDownのswitch文
 （Alt+上下はKey.System/e.SystemKey分岐の同型対応が要る可能性）、GcadSerializerはリスト順そのまま
