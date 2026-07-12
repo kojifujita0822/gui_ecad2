@@ -992,6 +992,12 @@ public partial class MainWindow : Window
                 OpenButton_Click(sender, e);
                 e.Handled = true;
                 break;
+            case Key.P when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-060隠密静的レビュー指摘B対応: メニュー/ツールバーのInputGestureText表示
+                // (Ctrl+P)と整合させる(キーボードファースト方針、CLAUDE.md)。
+                PdfExportMenuItem_Click(sender, e);
+                e.Handled = true;
+                break;
             case Key.N when Keyboard.Modifiers == ModifierKeys.Control:
                 NewButton_Click(sender, e);
                 e.Handled = true;

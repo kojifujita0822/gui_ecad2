@@ -1,5 +1,6 @@
 using System.Windows;
 using Ecad2.Model;
+using Ecad2.Pdf;
 using Ecad2.Rendering;
 using Ecad2.Simulation;
 
@@ -7,23 +8,21 @@ namespace Ecad2.App.Views;
 
 /// <summary>
 /// PDF出力のプレビューダイアログ(T-060)。GuiEcad(<c>PdfPreviewDialog.xaml.cs</c>)の
-/// ページ構成ロジック(<c>BuildPageList</c>)・ページ送り・ズーム操作をそのまま移植し、
-/// 描画基盤のみWPF(<see cref="PdfPreviewCanvas"/>、DrawingVisualベース)へ置き換えた。
-/// 出力範囲は常に全シート・枠は常にあり(殿裁定2026-07-12、切替UIは設けない)。
+/// ページ送り・ズーム操作をそのまま移植し、描画基盤のみWPF(<see cref="PdfPreviewCanvas"/>、
+/// DrawingVisualベース)へ置き換えた。ページ構成(シート走査・枠ありページ分割・CrossRef/BOM
+/// 有無判定)は<see cref="PdfPageLayout"/>を<see cref="PdfExporter"/>と共有し、表題欄の総ページ数
+/// (pageNumber/totalPages)がプレビューと実出力とで一致することを保証する(T-060隠密静的レビュー
+/// 指摘A対応、往復1周目)。出力範囲は常に全シート・枠は常にあり(殿裁定2026-07-12、切替UIは
+/// 設けない)。
 /// </summary>
 public partial class PdfPreviewDialog : Window
 {
-    private enum PageKind { Sheet, CrossRef, Bom }
-
-    private sealed record PreviewPage(
-        PageKind Kind, Sheet? Sheet, int PageRowStart, int PageNumber, int TotalPages, int CrPageIndex);
-
     private readonly LadderDocument _document;
     private readonly PartLibrary? _library;
     private readonly CrossReference _xref;
     private readonly bool _enableBorder;
     private readonly DiagramRenderer _dr;
-    private readonly List<PreviewPage> _pages = new();
+    private readonly IReadOnlyList<PdfPage> _pages;
 
     private int _currentIndex;
     private double _zoom = 1.0;
@@ -36,46 +35,17 @@ public partial class PdfPreviewDialog : Window
         _enableBorder = enableBorder;
         _dr = new DiagramRenderer(DrawingTheme.Default,
             new RenderOptions { PaperSize = document.Settings.PaperSize, IncludeTracingImages = false });
+        _pages = PdfPageLayout.Build(document, _dr, xref, enableBorder);
 
         InitializeComponent();
-        BuildPageList();
         UpdateUI();
     }
 
-    private void BuildPageList()
+    private Size2D GetPageSize(PdfPage page) => page.Kind switch
     {
-        int sheetPages = _enableBorder ? _document.Sheets.Sum(_dr.RenderPageCount) : _document.Sheets.Count;
-        int crPages = _dr.CrossRefPageCount(_xref);
-        bool hasBom = _document.Devices.ByName.Count > 0 && _document.Sheets.Count > 0;
-        int totalPages = sheetPages + crPages + (hasBom ? 1 : 0);
-
-        int physical = 0;
-        foreach (var sheet in _document.Sheets)
-        {
-            int pages = _enableBorder ? _dr.RenderPageCount(sheet) : 1;
-            for (int p = 0; p < pages; p++)
-            {
-                physical++;
-                _pages.Add(new PreviewPage(PageKind.Sheet, sheet, p * _dr.RowsPerPage, physical, totalPages, 0));
-            }
-        }
-        for (int cp = 0; cp < crPages; cp++)
-        {
-            physical++;
-            _pages.Add(new PreviewPage(PageKind.CrossRef, null, 0, physical, totalPages, cp));
-        }
-        if (hasBom)
-        {
-            physical++;
-            _pages.Add(new PreviewPage(PageKind.Bom, null, 0, physical, totalPages, 0));
-        }
-    }
-
-    private Size2D GetPageSize(PreviewPage page) => page.Kind switch
-    {
-        PageKind.Sheet => _dr.PageSize(page.Sheet!, xref: null, info: _document.Info, enableBorder: _enableBorder),
-        PageKind.CrossRef => _dr.CrossRefPageSize(),
-        PageKind.Bom => _dr.BomPageSize(_document.Sheets[^1].Grid.Columns, _document.Devices.ByName.Count),
+        PdfPageKind.Sheet => _dr.PageSize(page.Sheet!, xref: null, info: _document.Info, enableBorder: _enableBorder),
+        PdfPageKind.CrossRef => _dr.CrossRefPageSize(),
+        PdfPageKind.Bom => _dr.BomPageSize(_document.Sheets[^1].Grid.Columns, _document.Devices.ByName.Count),
         _ => _dr.CrossRefPageSize(),
     };
 
@@ -92,30 +62,40 @@ public partial class PdfPreviewDialog : Window
         RefreshCanvas();
     }
 
+    // T-060隠密静的レビュー指摘D対応: GuiEcad原本と同じ「ダイアログ幅に対する相対フィット」で
+    // scaleを算出する(zoom=1.0のとき常にScrollViewerの表示幅いっぱいに収まる)。ecad2は
+    // WpfRenderer側でmm→DIP変換(PdfPreviewCanvas.MmToDip)を行うため、GuiEcad原本の
+    // scale = zoom*(availW-40)/pageWidthMm をそのままDIP変換後の値に換算し直す必要がある。
     private void RefreshCanvas()
     {
         if (_pages.Count == 0) return;
         var page = _pages[_currentIndex];
         var size = GetPageSize(page);
-        PreviewCanvas.DrawPage(size, _zoom, renderer =>
+
+        double availW = Math.Max(Scroll.ActualWidth, 400);
+        double scale = _zoom * (availW - 40) / (size.Width * PdfPreviewCanvas.MmToDip);
+
+        PreviewCanvas.DrawPage(size, scale, renderer =>
         {
             switch (page.Kind)
             {
-                case PageKind.Sheet:
+                case PdfPageKind.Sheet:
                     _dr.Render(renderer, page.Sheet!, _library, sim: null, xref: null, info: _document.Info,
                                pageNumber: page.PageNumber, totalPages: page.TotalPages,
                                enableBorder: _enableBorder, pageRowStart: page.PageRowStart,
                                pageRowCount: _enableBorder ? _dr.RowsPerPage : int.MaxValue);
                     break;
-                case PageKind.CrossRef:
+                case PdfPageKind.CrossRef:
                     _dr.RenderCrossRefPage(renderer, _xref, page.CrPageIndex);
                     break;
-                case PageKind.Bom:
+                case PdfPageKind.Bom:
                     _dr.RenderBomPage(renderer, _document.Devices, _document.Sheets[^1].Grid.Columns);
                     break;
             }
         });
     }
+
+    private void OnScrollSizeChanged(object sender, SizeChangedEventArgs e) => RefreshCanvas();
 
     private void OnPrev(object sender, RoutedEventArgs e)
     {
@@ -150,8 +130,8 @@ public partial class PdfPreviewDialog : Window
     }
 
     // PDF出力ボタン: 保存ダイアログは既存パターン(SaveAsMenuItem_Click等)を踏襲。
-    // エラー表示はUI/UX分岐ではなく技術確認事項のため既存のMessageBoxパターンで足りると判断
-    // (家老采配2026-07-12でスコープ内と明記)。
+    // エラー表示はTrySaveToFile/OpenButton_Click(T-024隠密調査推奨、忍者実機検出で2度確立済み)と
+    // 同型パターンへ統一する(T-060隠密静的レビュー指摘E対応、ex.Messageの生の技術文面は出さない)。
     private void ExportButton_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new Microsoft.Win32.SaveFileDialog
@@ -164,12 +144,14 @@ public partial class PdfPreviewDialog : Window
 
         try
         {
-            Ecad2.Pdf.PdfExporter.Export(_document, _library, dialog.FileName);
+            PdfExporter.Export(_document, _library, dialog.FileName);
             DialogResult = true;
         }
-        catch (Exception ex)
+        catch (Exception)
         {
-            MessageBox.Show(this, $"PDF出力に失敗しました。\n{ex.Message}", "エラー", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show(this,
+                $"PDFを出力できませんでした。出力先の権限やディスクの空き容量、ファイルが他のアプリで開かれていないかご確認ください。\n{dialog.FileName}",
+                "PDF出力エラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 }

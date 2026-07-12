@@ -1,6 +1,8 @@
 using Ecad2.Model;
 using Ecad2.Pdf;
 using Ecad2.Persistence;
+using Ecad2.Rendering;
+using Ecad2.Simulation;
 using PdfSharp.Pdf.IO;
 
 namespace Ecad2.Core.Tests;
@@ -75,5 +77,34 @@ public class PdfExporterTests : IDisposable
 
         using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
         Assert.Equal(3, pdf.PageCount);
+    }
+
+    /// <summary>T-060隠密静的レビュー指摘A回帰テスト: PdfExporter.Export(実出力)と
+    /// PdfPageLayout.Build(プレビューが参照する構成)が同じ総ページ数を導出すること
+    /// (修正前は独立2実装で、CrossRef/BOMページの加算漏れにより表題欄の総ページ数
+    /// (pageNumber/totalPages)がプレビューと実出力とで食い違っていた=WYSIWYG違反)。</summary>
+    [Fact]
+    public void PdfPageLayout_TotalPagesは実出力の物理ページ数と一致する()
+    {
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(new ElementInstance { PartId = BasicPartTemplates.ContactNOId, Pos = new GridPos(0, 0), DeviceName = "X001" });
+        sheet.Elements.Add(new ElementInstance { PartId = BasicPartTemplates.CoilId, Pos = new GridPos(0, 5), DeviceName = "Y001" });
+        var doc = new LadderDocument();
+        doc.Sheets.Add(sheet);
+        doc.Devices.ByName["X001"] = new Device { Name = "X001", Class = DeviceClass.PushButton };
+        doc.Devices.ByName["Y001"] = new Device { Name = "Y001", Class = DeviceClass.Relay };
+        var lib = CreateLibrary();
+
+        CircuitNumberer.Number(doc);
+        var xref = CrossReferenceBuilder.Build(doc, lib);
+        var dr = new DiagramRenderer(DrawingTheme.Default, new RenderOptions { IncludeTracingImages = false });
+        var pages = PdfPageLayout.Build(doc, dr, xref, enableBorder: true);
+
+        string path = Path.Combine(_tempDir, "wysiwyg.pdf");
+        PdfExporter.Export(doc, lib, path);
+        using var pdf = PdfReader.Open(path, PdfDocumentOpenMode.Import);
+
+        Assert.Equal(pdf.PageCount, pages.Count);
+        Assert.All(pages, p => Assert.Equal(pages.Count, p.TotalPages));
     }
 }

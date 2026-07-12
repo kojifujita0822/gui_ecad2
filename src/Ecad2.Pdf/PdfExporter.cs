@@ -25,47 +25,37 @@ public static class PdfExporter
             new RenderOptions { PaperSize = document.Settings.PaperSize, IncludeTracingImages = false });
         using var surface = new PdfRenderSurface(path);
 
-        // 物理ページ総数(枠あり時はRowsPerPage行ごとに複数ページへ分割、主回路シートはmmベースの
-        // 内容の広がりも加味する=RenderPageCount)。
-        int totalPages = enableBorder
-            ? document.Sheets.Sum(dr.RenderPageCount)
-            : document.Sheets.Count;
-
-        int physical = 0;
-        foreach (var sheet in document.Sheets)
-        {
-            // クロスリファレンス表はシート図面には描かず、専用ページに分ける。
-            int pages = enableBorder ? dr.RenderPageCount(sheet) : 1;
-            for (int p = 0; p < pages; p++)
-            {
-                physical++;
-                var renderer = surface.BeginPage(dr.PageSize(sheet, null, info, enableBorder));
-                dr.Render(renderer, sheet, library, xref: null, info: info,
-                          pageNumber: physical, totalPages: totalPages, enableBorder: enableBorder,
-                          pageRowStart: p * dr.RowsPerPage,
-                          pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue);
-                surface.EndPage();
-            }
-        }
-
-        // クロスリファレンス一覧表を専用ページ(A4縦)として追加する。1ページに収まらない場合は
-        // 複数ページへ分割する。
-        int crPages = dr.CrossRefPageCount(xref);
-        for (int cp = 0; cp < crPages; cp++)
-        {
-            var crRenderer = surface.BeginPage(dr.CrossRefPageSize());
-            dr.RenderCrossRefPage(crRenderer, xref, cp);
-            surface.EndPage();
-        }
-
-        // 機器表が1件以上あるときBOM専用ページを最後に追加する。
+        // ページ構成(シート走査・枠ありページ分割・CrossRef/BOM有無判定)はPdfPageLayoutへ集約
+        // (T-060隠密静的レビュー指摘A、往復1周目)。プレビューダイアログ(PdfPreviewDialog)も同じ
+        // ヘルパーを参照するため、表題欄に印字される総ページ数(pageNumber/totalPages)が
+        // プレビューと実出力とで常に一致する。
+        var pages = PdfPageLayout.Build(document, dr, xref, enableBorder);
         var devices = document.Devices;
-        if (devices.ByName.Count > 0 && document.Sheets.Count > 0)
+
+        foreach (var page in pages)
         {
-            int lastColumns = document.Sheets[^1].Grid.Columns;
-            var bomRenderer = surface.BeginPage(dr.BomPageSize(lastColumns, devices.ByName.Count));
-            dr.RenderBomPage(bomRenderer, devices, lastColumns);
-            surface.EndPage();
+            switch (page.Kind)
+            {
+                case PdfPageKind.Sheet:
+                    var renderer = surface.BeginPage(dr.PageSize(page.Sheet!, null, info, enableBorder));
+                    dr.Render(renderer, page.Sheet!, library, xref: null, info: info,
+                              pageNumber: page.PageNumber, totalPages: page.TotalPages, enableBorder: enableBorder,
+                              pageRowStart: page.PageRowStart,
+                              pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue);
+                    surface.EndPage();
+                    break;
+                case PdfPageKind.CrossRef:
+                    var crRenderer = surface.BeginPage(dr.CrossRefPageSize());
+                    dr.RenderCrossRefPage(crRenderer, xref, page.CrPageIndex);
+                    surface.EndPage();
+                    break;
+                case PdfPageKind.Bom:
+                    int lastColumns = document.Sheets[^1].Grid.Columns;
+                    var bomRenderer = surface.BeginPage(dr.BomPageSize(lastColumns, devices.ByName.Count));
+                    dr.RenderBomPage(bomRenderer, devices, lastColumns);
+                    surface.EndPage();
+                    break;
+            }
         }
     }
 }

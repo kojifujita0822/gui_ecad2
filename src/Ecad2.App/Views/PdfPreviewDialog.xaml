@@ -20,19 +20,21 @@
             <Button x:Name="ZoomOutBtn" Content="－" Width="36" Click="OnZoomOut"/>
             <TextBlock x:Name="ZoomLabel" VerticalAlignment="Center" MinWidth="52" TextAlignment="Center" Margin="4,0"/>
             <Button x:Name="ZoomInBtn" Content="＋" Width="36" Click="OnZoomIn"/>
-            <Button Content="等倍" Padding="8,4" Click="OnFitWidth" Margin="8,0,0,0"/>
+            <Button Content="幅に合わせる" Padding="8,4" Click="OnFitWidth" Margin="8,0,0,0"/>
         </StackPanel>
 
         <!-- キャンバス領域 -->
-        <ScrollViewer Grid.Row="1" Background="#FF6E6E6E"
-                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="Scroll" Grid.Row="1" Background="#FF6E6E6E"
+                      HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                      SizeChanged="OnScrollSizeChanged">
             <local:PdfPreviewCanvas x:Name="PreviewCanvas" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="20"/>
         </ScrollViewer>
 
-        <!-- ボタン行 -->
+        <!-- ボタン行: EnterはGuiEcad原本(DefaultButton="Close")同様に安全な「閉じる」へ既定する
+             (T-060隠密静的レビュー指摘C対応、PDF出力はクリック/Tab+Spaceでのみ実行)。 -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="12">
-            <Button Content="PDF出力" Width="90" IsDefault="True" Click="ExportButton_Click"/>
-            <Button Content="閉じる" Width="70" IsCancel="True" Margin="8,0,0,0"/>
+            <Button Content="PDF出力" Width="90" Click="ExportButton_Click"/>
+            <Button Content="閉じる" Width="70" IsDefault="True" IsCancel="True" Margin="8,0,0,0"/>
         </StackPanel>
     </Grid>
 </Window>

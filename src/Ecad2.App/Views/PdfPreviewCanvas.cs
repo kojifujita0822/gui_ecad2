@@ -16,8 +16,9 @@ namespace Ecad2.App.Views;
 /// </summary>
 public sealed class PdfPreviewCanvas : FrameworkElement
 {
-    // WpfRenderer内部のK(mm→DIP)と同じ換算率(LadderCanvasと同一定数)。
-    private const double MmToDip = 96.0 / 25.4;
+    // WpfRenderer内部のK(mm→DIP)と同じ換算率(LadderCanvasと同一定数)。呼び出し元(PdfPreviewDialog)が
+    // ダイアログ幅に対する相対フィットscaleを計算する際にも参照する(T-060隠密静的レビュー指摘D対応)。
+    public const double MmToDip = 96.0 / 25.4;
 
     private readonly VisualCollection _children;
 
@@ -27,20 +28,22 @@ public sealed class PdfPreviewCanvas : FrameworkElement
     protected override Visual GetVisualChild(int index) => _children[index];
 
     /// <summary>ページ内容を描画する。<paramref name="pageSizeMm"/>はDiagramRendererが返す
-    /// ページ寸法(mm)、<paramref name="zoom"/>は表示倍率(1.0=等倍)。<paramref name="render"/>は
-    /// 実際にDiagramRenderer.Render/RenderCrossRefPage/RenderBomPageのいずれかを呼ぶデリゲート。</summary>
-    public void DrawPage(Size2D pageSizeMm, double zoom, Action<IRenderer> render)
+    /// ページ寸法(mm)、<paramref name="scale"/>はmm→DIP変換後にさらに掛ける最終スケール
+    /// (呼び出し元がダイアログ幅に対する相対フィットで計算する、GuiEcad原本のzoom*(availW-40)/pageWidthMm
+    /// と同じ意味、T-060隠密静的レビュー指摘D対応)。<paramref name="render"/>は実際に
+    /// DiagramRenderer.Render/RenderCrossRefPage/RenderBomPageのいずれかを呼ぶデリゲート。</summary>
+    public void DrawPage(Size2D pageSizeMm, double scale, Action<IRenderer> render)
     {
         _children.Clear();
 
-        double widthDip = pageSizeMm.Width * MmToDip * zoom;
-        double heightDip = pageSizeMm.Height * MmToDip * zoom;
+        double widthDip = pageSizeMm.Width * MmToDip * scale;
+        double heightDip = pageSizeMm.Height * MmToDip * scale;
 
         var visual = new DrawingVisual();
         using (DrawingContext dc = visual.RenderOpen())
         {
             dc.DrawRectangle(Brushes.White, null, new Rect(0, 0, widthDip, heightDip));
-            dc.PushTransform(new ScaleTransform(zoom, zoom));
+            dc.PushTransform(new ScaleTransform(scale, scale));
             var renderer = new WpfRenderer(dc);
             render(renderer);
             dc.Pop();
