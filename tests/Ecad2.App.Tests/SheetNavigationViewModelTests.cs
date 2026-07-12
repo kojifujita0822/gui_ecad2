@@ -473,4 +473,143 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         Assert.Equal(new[] { "シート3", "シート1", "シート2" }, restored.Sheets.Select(s => s.Name));
         Assert.Equal(new[] { 1, 2, 3 }, restored.Sheets.Select(s => s.PageNumber));
     }
+
+    // --- T-082往復1周目(隠密レビュー指摘): 修正1(所見L型再発)・修正3(通知欠落)の回帰テスト ---
+
+    /// <summary>
+    /// 隠密レビュー指摘・要修正1のRED先行証明用回帰テスト。無関係な2シートの入替では選択中シートの
+    /// 添字(index)は変化しない。旧実装は`newIndex(選択中シートの新添字)>=0`という条件だけで
+    /// 無条件に`SetCurrentSheetIndexCore`を呼んでおり、これは値変化の有無に関わらず常時
+    /// `SelectedCell = null`を実行する(T-041由来の既存仕様)ため、選択中セルが理由なく消えていた。
+    /// `RenameCommand`が既に対処済みの「所見L」型パターンの再発(同ファイル189-197行のコメント参照)。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_WhenMovingUnrelatedSheets_DoesNotClearSelectedCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0; // シート1を選択中(移動対象ではない)
+        vm.SelectedCell = new GridPos(0, 0);
+
+        // 選択中でないシート2・シート3(index 1, 2)を入れ替える。シート1のindexは0のまま不変。
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 1));
+
+        Assert.NotNull(vm.SelectedCell);
+    }
+
+    /// <summary>
+    /// テストカバレッジ穴埋め(a): 4枚以上のシートで、移動対象でない選択中シートの添字が間接的に
+    /// ずれる(=実際にindexが変化する)ケースでは、従来どおりCurrentSheetIndexが正しく追従することを
+    /// 検証する(修正1のガードが「変化した時は呼ぶ」を正しく残していることの確認)。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_WhenUnrelatedMoveShiftsSelectedSheetIndex_CurrentSheetIndexFollows()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        var sheet3 = AddSheet(vm, 3, "シート3");
+        AddSheet(vm, 4, "シート4");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 2; // シート3(index=2)を選択中
+
+        // シート1(index=0)を末尾(index=3)へ移動。シート2,3,4が1つずつ前へ詰まる
+        // (結果: [シート2, シート3, シート4, シート1])。シート3の新添字は1。
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 3));
+
+        Assert.Equal(1, vm.CurrentSheetIndex);
+        Assert.Same(sheet3, vm.SheetNavigation.SelectedSheet);
+    }
+
+    /// <summary>
+    /// 隠密レビュー指摘・要修正3のRED先行証明用回帰テスト。旧実装はMoveSheetCommand内で
+    /// SelectedSheetのPropertyChangedを一度も発火しない。Add/Delete/Renameは全て
+    /// (BeginInvoke経由または同期で)発火させる既定規約を持つ。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_RaisesSelectedSheetPropertyChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        bool selectedSheetChanged = false;
+        vm.SheetNavigation.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(vm.SheetNavigation.SelectedSheet)) selectedSheetChanged = true;
+        };
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.True(selectedSheetChanged);
+    }
+
+    /// <summary>増分A補遺と同型: MoveSheetCommandのSelectedSheet同期もContextIdle優先度で
+    /// ディスパッチされることを検証する(Add/Renameと同一の遅延方式を採用したことの確認)。</summary>
+    [Fact]
+    public void MoveSheetCommand_DispatchesSelectionSyncWithContextIdlePriority()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.Equal(DispatcherPriority.ContextIdle, Dispatcher.LastPriority);
+    }
+
+    // --- テストカバレッジ穴埋め: 下限そのもの/上限そのものの実行結果検証 ---
+
+    [Fact]
+    public void MoveSheetCommand_MovesFirstSheetDownByOne()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.Document.Sheets[0];
+        var sheet2 = AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.Equal(new[] { sheet2, sheet1 }, vm.Document.Sheets);
+    }
+
+    [Fact]
+    public void MoveSheetCommand_MovesLastSheetUpByOne()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.Document.Sheets[0];
+        var sheet2 = AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((1, 0));
+
+        Assert.Equal(new[] { sheet2, sheet1 }, vm.Document.Sheets);
+    }
+
+    // --- テストカバレッジ穴埋め(c): ドラッグ&ドロップのtoIndex算出ロジック(純粋関数抽出) ---
+
+    /// <summary>
+    /// `MainWindow.CalculateSheetDropIndex`(ドロップ位置からtoIndexを算出する純粋関数、隠密レビュー
+    /// 指摘=既存のShouldOpenRungCommentEditor等のstatic抽出パターンに倣いテスト容易性のため分離)の
+    /// 境界値検証。fromIndexを除去した後の座標系に合わせた補正(除去で後続要素が1つ前へ詰まる)が
+    /// 正しいかを検証する。
+    /// </summary>
+    [Theory]
+    [InlineData(0, 2, false, 1)] // 先頭を、末尾寄りシートの上半分(直前)へ→除去後座標系で1つ前倒し
+    [InlineData(0, 2, true, 2)]  // 先頭を、末尾寄りシートの下半分(直後)へ→除去後座標系で1つ前倒し
+    [InlineData(3, 0, true, 1)]  // 末尾を、先頭シートの下半分(直後)へ→fromIndexより後ろなので補正なし
+    [InlineData(3, 0, false, 0)] // 末尾を、先頭シートの上半分(直前)へ→補正なし
+    public void CalculateSheetDropIndex_ComputesCorrectInsertionIndex(
+        int fromIndex, int targetIndex, bool insertAfter, int expectedToIndex)
+    {
+        int toIndex = MainWindow.CalculateSheetDropIndex(fromIndex, targetIndex, insertAfter);
+
+        Assert.Equal(expectedToIndex, toIndex);
+    }
 }

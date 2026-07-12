@@ -1982,9 +1982,7 @@ public partial class MainWindow : Window
         {
             int targetIndex = sheets.IndexOf(targetSheet);
             bool insertAfter = e.GetPosition(container).Y > container.ActualHeight / 2;
-            toIndex = insertAfter ? targetIndex + 1 : targetIndex;
-            // fromIndexを除去した後の座標系に合わせて補正する(除去で後続要素が1つ前へ詰まるため)。
-            if (fromIndex < toIndex) toIndex--;
+            toIndex = CalculateSheetDropIndex(fromIndex, targetIndex, insertAfter);
         }
         else
         {
@@ -1996,6 +1994,21 @@ public partial class MainWindow : Window
         var command = _viewModel.SheetNavigation.MoveSheetCommand;
         var param = (fromIndex, toIndex);
         if (command.CanExecute(param)) command.Execute(param);
+    }
+
+    /// <summary>
+    /// T-082往復1周目(隠密レビュー指摘・テストカバレッジ穴埋め4): ドロップ位置(ドロップ先アイテムの
+    /// 現添字targetIndex・その下半分にドロップしたかinsertAfter)からtoIndexを算出する純粋関数。
+    /// 既存のShouldOpenRungCommentEditor等のstatic抽出パターンに倣い、D&Dで最もバグを生みやすい
+    /// 座標系補正ロジックを直接テスト可能にする(SheetNavList_Dropのprivateインスタンスメソッド内
+    /// 直書きでは単体テストできなかった)。fromIndexを除去した後の座標系に合わせて補正する
+    /// (除去で後続要素が1つ前へ詰まるため)。
+    /// </summary>
+    internal static int CalculateSheetDropIndex(int fromIndex, int targetIndex, bool insertAfter)
+    {
+        int toIndex = insertAfter ? targetIndex + 1 : targetIndex;
+        if (fromIndex < toIndex) toIndex--;
+        return toIndex;
     }
 
     private void ShowSheetReorderAdorner(FrameworkElement container, bool insertAfter)
