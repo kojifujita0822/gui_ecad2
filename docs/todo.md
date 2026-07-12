@@ -38,6 +38,13 @@
 (4)保存/読込で順序保持 (5)PageNumber再採番（SheetNavigationViewModel） (6)単体テスト+build/test
 全合格。検証観点=端（先頭/末尾）での移動・シート1枚時・ドラッグ視覚フィードバック・保存読込往復。
 ドラッグの視覚表現等のUI/UX分岐は実装前に殿へ【MUST】。参考仕様書=`docs/spec/guiecad-spec-sheet-document.md`。
+**殿裁定（2026-07-12、実装着手後の分岐確認）＝ドラッグ視覚表現は案A標準フィードバック採用**：
+ドラッグ中カーソル変化+ドロップ位置に挿入線表示+ドラッグ元アイテム半透明化（AdornerLayer活用。
+簡易フィードバック案Bは不採用）。
+**侍の着手時調査所見（2026-07-12）**：シート一覧の実体はListBox（SheetNavList、フラット表示）、
+WPFネイティブDragDrop APIは使用実績皆無で新規導入、キーバインドはWindow_PreviewKeyDownのswitch文
+（Alt+上下はKey.System/e.SystemKey分岐の同型対応が要る可能性）、GcadSerializerはリスト順そのまま
+JSON化ゆえ順序変更のみで保存/読込に自動追従、PageNumber再採番ロジックは新規実装要。
 
 ### T-080 行コメント機能（右母線の右側、GuiEcad踏襲） — **完全Done（2026-07-12、往復3周+殿実機確認）**
 
