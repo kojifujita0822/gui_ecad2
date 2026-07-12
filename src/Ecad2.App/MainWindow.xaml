@@ -576,6 +576,13 @@
                 <TextBlock Text="{Binding CanvasScale, StringFormat='ズーム: {0:P0}'}"/>
             </StatusBarItem>
             <Separator/>
+            <!-- T-080殿直命(仕上げ確認): 行コメントエディタ表示中の操作案内。IsRungCommentEditorVisible
+                 連動(HasSelectedLinePrimitiveと同型のVisibilityパターン)。閉じれば非表示に戻り、
+                 元の表示(StatusMessage等)を上書きしない。 -->
+            <StatusBarItem Visibility="{Binding IsRungCommentEditorVisible, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="行コメント編集中: Enterで確定・Escで取消"/>
+            </StatusBarItem>
+            <Separator Visibility="{Binding IsRungCommentEditorVisible, Converter={StaticResource BoolToVisibility}}"/>
             <StatusBarItem>
                 <TextBlock Text="{Binding StatusMessage}" Foreground="DarkRed"/>
             </StatusBarItem>
