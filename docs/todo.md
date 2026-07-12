@@ -62,6 +62,12 @@ DRC再実行してください。」と表示**（クリアすべき診断が存
 バグ修正往復案件の制度どおり「隠密テスト設計（「移動対象=選択中シート」ケース必須）→侍実装」の
 分離+RED証明で。派生=P-067（DeleteCommandのDRC破棄フック欠如）起票。経過観察の新規数点
 （Alt+上下キーリピートのBeginInvoke蓄積・StatusMessage無条件上書き等）はレビュー書参照。
+**往復3周目（2026-07-13、殿裁可）＝完全決着**：隠密テスト設計書（`docs/ecad2-t082-fix1-test-design-onmitsu.md`、
+核=「実体不変の原則」）→侍実装（043bc1f）＝`SetCurrentSheetIndexWithoutCrossCut`新設、
+MoveSheetCommandは常時この経路使用。RED証明=修正前9件FAIL実測（設計書予告どおりP3のみ現行PASS）→
+修正後578件全合格。**隠密事後レビュー（`docs/ecad2-t082-fix1-review3-onmitsu.md`）＝指摘なし、
+所見L型根治確認、忍者実機へ進めてよいと判定**。派生=P-068（PropertyChanged通知名の[CallerMemberName]
+誤爆、既存欠陥の同型再発）・P-069（Alt+下連続操作時の選択ハイライト理論的懸念、忍者実機観察項目）を起票。
 **侍の着手時調査所見（2026-07-12）**：シート一覧の実体はListBox（SheetNavList、フラット表示）、
 WPFネイティブDragDrop APIは使用実績皆無で新規導入、キーバインドはWindow_PreviewKeyDownのswitch文
 （Alt+上下はKey.System/e.SystemKey分岐の同型対応が要る可能性）、GcadSerializerはリスト順そのまま
