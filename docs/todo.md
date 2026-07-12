@@ -40,7 +40,8 @@
 ドラッグの視覚表現等のUI/UX分岐は実装前に殿へ【MUST】。参考仕様書=`docs/spec/guiecad-spec-sheet-document.md`。
 **殿裁定（2026-07-12、実装着手後の分岐確認）＝ドラッグ視覚表現は案A標準フィードバック採用**：
 ドラッグ中カーソル変化+ドロップ位置に挿入線表示+ドラッグ元アイテム半透明化（AdornerLayer活用。
-簡易フィードバック案Bは不採用）。
+簡易フィードバック案Bは不採用）。なお**GX Works3にはシートの概念自体が無い**（殿直接教示
+2026-07-12、侍経由）——本件に「GX Works3踏襲」の参照先は存在しない。
 **侍の着手時調査所見（2026-07-12）**：シート一覧の実体はListBox（SheetNavList、フラット表示）、
 WPFネイティブDragDrop APIは使用実績皆無で新規導入、キーバインドはWindow_PreviewKeyDownのswitch文
 （Alt+上下はKey.System/e.SystemKey分岐の同型対応が要る可能性）、GcadSerializerはリスト順そのまま
