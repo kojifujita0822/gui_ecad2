@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows.Threading;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
+using Ecad2.Simulation;
 
 namespace Ecad2.App.Tests;
 
@@ -560,6 +561,48 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
 
         Assert.Equal(DispatcherPriority.ContextIdle, Dispatcher.LastPriority);
+    }
+
+    // --- T-082往復2周目(殿裁定「案A」): 修正2、DRC結果破棄+ステータスバー案内 ---
+
+    /// <summary>
+    /// 殿裁定「案A」のRED先行証明用回帰テスト。並び替えでモデル順序(PageNumber)が変わった以上、
+    /// 旧文書に紐づくDRC結果は破棄する(ReplaceDocument/Undo-Redoと同じ既存規約)。クリアすべき
+    /// 診断が存在する場合のみステータスバーへ殿指定文言を表示する。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_WhenDiagnosticsExist_ClearsResultsAndShowsStatusMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.OutputPanel.Diagnostics.Add(new Diagnostic(
+            DiagnosticSeverity.Warning, "DRC-XREF-001", "CR1", "テスト診断",
+            new[] { new CircuitRef(1, 1) }));
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.Empty(vm.OutputPanel.Diagnostics);
+        Assert.Equal("DRC結果が削除されました。DRC再実行してください。", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// 殿裁定「案A」の付帯条件: 何も消えていないのに「削除されました」と表示するのは偽になるため、
+    /// クリアすべき診断が元から存在しない場合はStatusMessageを上書きしない。
+    /// </summary>
+    [Fact]
+    public void MoveSheetCommand_WhenNoDiagnostics_DoesNotOverwriteStatusMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.StatusMessage = "既存の案内";
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.Equal("既存の案内", vm.StatusMessage);
     }
 
     // --- テストカバレッジ穴埋め: 下限そのもの/上限そのものの実行結果検証 ---

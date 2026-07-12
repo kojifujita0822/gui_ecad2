@@ -224,6 +224,18 @@ public sealed class SheetNavigationViewModel : ViewModelBase
 
                 _owner.MarkDirty();
 
+                // 往復2周目修正2(殿裁定「案A」): 並び替えでモデル順序(PageNumber)が変わった以上、
+                // 旧文書に紐づくDRC結果は破棄する(ReplaceDocument/Undo-Redoと同じ既存規約、
+                // MainWindowViewModel.cs:1752,1940参照)。CanMoveSheetのガードを通過した時点で
+                // fromIndex!=toIndexが確定しているため、ここに到達すれば必ずモデル順序は変化している。
+                // クリアすべき診断が存在する場合のみ実行し、ステータスバーへ案内する(殿指定文言。
+                // 診断が元から空なら何も消えていないため「削除されました」は出さない)。
+                if (_owner.OutputPanel.Diagnostics.Count > 0)
+                {
+                    _owner.OutputPanel.ClearResults();
+                    _owner.StatusMessage = "DRC結果が削除されました。DRC再実行してください。";
+                }
+
                 // 往復1周目修正1(隠密レビューCONFIRMED、「所見L」型再発): 移動前に選択中だった
                 // シートの実体を追跡し、その添字が実際に変化した場合のみSetCurrentSheetIndexCoreを
                 // 呼ぶ。SetCurrentSheetIndexCoreは値変化の有無に関わらず常時SelectedCell=nullを
