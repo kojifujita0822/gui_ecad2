@@ -399,9 +399,10 @@ public partial class MainWindow : Window
         // e.ClickCount==2を判定していたため物理ダブルクリックでも条件成立しなかった(忍者実測で
         // 両クリックともClickCount=1固定・着弾位置はヒット領域内を確認、T-080往復2周目実測)。
         // 判定をDown側へ移設する。ツールモードを問わず優先判定する点は従来仕様のまま維持する
-        // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。
-        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
-            && LadderCanvasHost.HitTestRungCommentRow(position, rcSheet) is int rcRow)
+        // (GuiEcad踏襲、殿裁定=ダブルクリックトリガー)。判定条件自体はShouldOpenRungCommentEditor
+        // (テスト容易性のため純粋関数として抽出、隠密テスト設計・家老裁定3)へ委ねる。
+        if (_viewModel.CurrentSheet is Ecad2.Model.Sheet rcSheet
+            && ShouldOpenRungCommentEditor(e.ClickCount, LadderCanvasHost.HitTestRungCommentRow(position, rcSheet)) is int rcRow)
         {
             OpenRungCommentEditor(rcRow, rcSheet);
             return;
@@ -1700,6 +1701,15 @@ public partial class MainWindow : Window
             // ベストエフォート(診断ログの失敗が本来の処理を道連れにしてはならない、TraceLog.cs踏襲)。
         }
     }
+
+    // T-080往復2周目(a)修正: 行コメントダブルクリックを開くべきかの判定を純粋関数として抽出
+    // (隠密テスト設計docs/ecad2-t080-doubleclick-root-cause-onmitsu.md不明点3、家老裁定3=
+    // MouseButtonEventArgs.ClickCountのsetアクセサがinternalで直接構築できないテスト容易性の
+    // 制約を回避する最小限の工夫)。clickCount==2の等値判定は現行のまま維持する(トリプルクリック
+    // 以降は開かない、家老裁定1=殿へ報告済み)。hitTestRowはLadderCanvas.HitTestRungCommentRow
+    // (ヒット領域内外・主回路シートガードを内包)の結果をそのまま受け取る。
+    internal static int? ShouldOpenRungCommentEditor(int clickCount, int? hitTestRow)
+        => clickCount == 2 ? hitTestRow : null;
 
     // 行コメントエディタを開く(右母線右側ダブルクリック、またはF2キー=往復1周目追加I)。
     // 既存コメントがあれば読み込む。表示状態はIsRungCommentEditorVisible(往復1周目指摘F)への
