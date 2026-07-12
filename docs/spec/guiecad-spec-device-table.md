@@ -6,12 +6,11 @@ T-081（殿直接指示、2026-07-12起票、隠密2指名）体系。GuiEcad原
 
 対応するecad2側仕様書：`docs/spec/ecad2-spec-device-table.md`
 
-**【重要・気づき】** 本調査で参照した`ecad2-spec-device-table.md`は「T-066（BOM編集）＝Approved・
-未着手」と記載するが、`src/Ecad2.App`の現物コード（`MainWindow.xaml.cs:193-204`、
-`MainWindow.xaml:465`）およびgit log（`da55395`等）は**型式列編集機能が実装・クローズ済み**である
-ことを示しており齟齬がある。本調査ではこの齟齬をそのまま比較材料として扱い、事実（現物コード）を
-優先して4節・8節に反映した。ecad2側仕様書自体の改変は本タスクのスコープ外のため行っていない。
-別途家老へ報告する。
+**【追記・解消済み】** 当初調査時点で参照した`ecad2-spec-device-table.md`は「T-066（BOM編集）＝
+Approved・未着手」と記載しており現物コードと齟齬があったが、家老の采配を受け隠密2が
+`ecad2-spec-device-table.md`本体（6節・不明点）を現状（T-066完全Done、型式列のみ編集可能、
+同値ガード付き`MarkDirty()`）に合わせ更新済み（2026-07-12）。以下4節・8節の記述はこの現状を
+前提に整理している。
 
 ---
 
@@ -147,7 +146,7 @@ ecad2仕様書1節の`ResolveDeviceClass`にある「`PartPalette.Entries`ベー
 | Deviceの削除 | 削除ロジックなし、残存し続ける | 参照0件で自動削除 |
 | 機器名改名の反映範囲 | 要素の`DeviceName`のみ、`Devices.ByName`キー移行なし | 要素と`Devices.ByName`キーの両方を移行 |
 | 機器一覧の常設画面表示 | 単一文字列ListView、要素走査から都度構築 | 3列DataGrid、ViewModelスナップショット |
-| BOM列の編集可否 | 型式・メーカー・数量の3列編集可 | 型式(Model)のみ編集可（**現物コードで確認、仕様書記載と齟齬あり**） |
+| BOM列の編集可否 | 型式・メーカー・数量の3列編集可 | 型式(Model)のみ編集可（T-066完全Done、メーカー・数量は編集UIなし） |
 | BOM表PDF出力の到達可能性 | 到達可能（結線済み） | 到達不能設計（仕様書0節） |
 | 種別ラベルの画面/PDF統一性 | 画面用/PDF用が別実装・別粒度 | 統一設計（T-053裁定） |
 | BOM編集内容のUndo対象性 | `MarkDirty()`のみ、対象外 | 同左（`MainWindow.xaml.cs:203`も`MarkDirty()`のみ、一致点） |

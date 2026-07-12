@@ -111,6 +111,7 @@ GCADファイル形式：`GcadSerializer`が`SchemaVersion`（`CurrentSchemaVers
 | シート名ダブルクリックで改名ダイアログ直起動 | `MainPage.Sheets.cs:169-170` | ecad2に対応なし |
 | BOM（部品表）エディタ（全シート横断） | `MainPage.Dialogs.cs:250-` | ecad2はT-066でBOM編集（型式のみ）を別途実装済み |
 | シート設定ダイアログでの列数編集（2〜20） | `MainPage.Dialogs.cs:166-172` | ecad2の`SheetSettingsDialog`に列数編集項目なし |
+| シートツリーのドラッグ並び替え | `MainPage.xaml:464-469`（`NavTree`定義） | 殿実機確認（2026-07-12）で「ドラッグでシート順が動く」ことを確認済み。ただしコード上`CanDragItems`/`CanReorderItems`/`DragItemsCompleted`等の明示設定・ハンドラは一切存在しない（本調査でも`MainPage.xaml`・`MainPage.Sheets.cs`双方をgrepし該当なしと確認）——WinUI3 `TreeView`の既定挙動のみで並び替え操作自体は動いている可能性が高い。**しかしモデル同期処理（`DragItemsCompleted`等）が見当たらず、`RebuildNavTree()`が呼ばれる操作（追加/削除/改名/シート設定確定等）のたびに`Document.Sheets`の実際の順序で再構築される**ため、ドラッグ後に画面上で並びが変わって見えても保存・再表示で元の`Document.Sheets`順に戻る「見た目のみ」の疑いがある（静的読解による推測、実機での保存→再読込往復までは未検証）。ecad2側は**T-082としてモデル同期込みの並び替えを新規実装予定**（本調査時点では未着手） |
 
 ### (2) ecad2のみにある機能
 
