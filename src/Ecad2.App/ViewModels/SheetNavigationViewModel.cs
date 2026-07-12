@@ -211,7 +211,6 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 if (!CanMoveSheet(fromIndex, toIndex)) return;
 
                 Sheet? selectedSheetBeforeMove = SelectedSheet;
-                int oldSelectedIndex = _owner.CurrentSheetIndex;
                 Sheet movingSheet = Sheets[fromIndex];
 
                 _owner.Document.Sheets.RemoveAt(fromIndex);
@@ -236,15 +235,17 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                     _owner.StatusMessage = "DRC結果が削除されました。DRC再実行してください。";
                 }
 
-                // 往復1周目修正1(隠密レビューCONFIRMED、「所見L」型再発): 移動前に選択中だった
-                // シートの実体を追跡し、その添字が実際に変化した場合のみSetCurrentSheetIndexCoreを
-                // 呼ぶ。SetCurrentSheetIndexCoreは値変化の有無に関わらず常時SelectedCell=nullを
-                // 実行する(T-041由来の既存仕様)ため、無関係シート同士の入替(選択中シートのindexが
-                // 不変)で毎回無条件に呼ぶと、選択中セル・記入中ドラフトが理由なく消える
-                // (RenameCommandが既に対処済みの同型パターン、189-197行のコメント参照)。
+                // 往復3周目修正1再修正(隠密review2「実体不変の原則」、docs/ecad2-t082-fix1-test-
+                // design-onmitsu.md): MoveSheetCommand内では選択中シートの実体(オブジェクト参照)は
+                // 常に不変(削除・追加ではなく位置入替のみ)——移動対象が選択中シート自身であっても、
+                // 他のシートであっても、「今開いているシート」という実体は変わらない。よって
+                // クロスカット処理(SelectedCellクリア等)を伴うSetCurrentSheetIndexCoreを呼ぶ必要は
+                // 一度も無い。添字(表示上の位置)だけをクロスカット無しで追従させる
+                // (往復1周目の修正1は「添字変化」を判定基準にしており、移動対象=選択中シート自身の
+                // 最頻出ケースで必ずSetCurrentSheetIndexCoreを呼んでしまう対症療法に留まっていた)。
                 int newSelectedIndex = selectedSheetBeforeMove is null ? -1 : Sheets.IndexOf(selectedSheetBeforeMove);
-                if (newSelectedIndex >= 0 && newSelectedIndex != oldSelectedIndex)
-                    _owner.SetCurrentSheetIndexCore(newSelectedIndex);
+                if (newSelectedIndex >= 0)
+                    _owner.SetCurrentSheetIndexWithoutCrossCut(newSelectedIndex);
 
                 // 往復1周目修正3(隠密レビューCONFIRMED): Add/Delete/Renameの既存規約に合わせ、
                 // SelectedSheetの変更通知を明示発火する。RemoveAt+Insertでコンテナが再構築される

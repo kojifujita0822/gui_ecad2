@@ -412,12 +412,14 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         AddSheet(vm, 3, "シート3");
         vm.SheetNavigation.ResetSheets();
         vm.CurrentSheetIndex = 0; // シート1(移動対象)を選択中
+        vm.SelectedCell = new GridPos(0, 0); // 往復3周目(テスト設計書6.1): 保持と同時アサート化
 
         // 選択中のシート1(index=0)を末尾へ移動。
         vm.SheetNavigation.MoveSheetCommand.Execute((0, 2));
 
         Assert.Equal(2, vm.CurrentSheetIndex);
         Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet);
+        Assert.NotNull(vm.SelectedCell);
     }
 
     [Fact]
@@ -516,6 +518,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         AddSheet(vm, 4, "シート4");
         vm.SheetNavigation.ResetSheets();
         vm.CurrentSheetIndex = 2; // シート3(index=2)を選択中
+        vm.SelectedCell = new GridPos(0, 0); // 往復3周目(テスト設計書6.3): 保持と同時アサート化
 
         // シート1(index=0)を末尾(index=3)へ移動。シート2,3,4が1つずつ前へ詰まる
         // (結果: [シート2, シート3, シート4, シート1])。シート3の新添字は1。
@@ -523,6 +526,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         Assert.Equal(1, vm.CurrentSheetIndex);
         Assert.Same(sheet3, vm.SheetNavigation.SelectedSheet);
+        Assert.NotNull(vm.SelectedCell);
     }
 
     /// <summary>
@@ -654,5 +658,102 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         int toIndex = MainWindow.CalculateSheetDropIndex(fromIndex, targetIndex, insertAfter);
 
         Assert.Equal(expectedToIndex, toIndex);
+    }
+
+    // --- T-082往復3周目(隠密テスト設計書、docs/ecad2-t082-fix1-test-design-onmitsu.md):
+    //     修正1再修正「実体不変の原則」——移動対象が選択中シート自身でも、SelectedCell・記入中
+    //     ドラフトは一切クリアされてはならない。CurrentSheetIndex追従と保持を1本のテストで両立検証。
+
+    /// <summary>設計書6.1(P1、Theory境界値網羅、必須)。移動対象=選択中シート自身のケースで、
+    /// SelectedCell保持とCurrentSheetIndex追従を同一テスト内で両立検証する。</summary>
+    [Theory]
+    [InlineData(2, 0, 1, 1)] // 先頭→末尾(下移動・隣接・端の両方を兼ねる最小ケース)
+    [InlineData(2, 1, 0, 0)] // 末尾→先頭(上移動・隣接・端)
+    [InlineData(4, 0, 3, 3)] // 先頭→末尾(下移動・端・最大距離)
+    [InlineData(4, 3, 0, 0)] // 末尾→先頭(上移動・端・最大距離)
+    [InlineData(4, 1, 2, 2)] // 中間シートの隣接下移動(端でも最大距離でもない代表点)
+    [InlineData(4, 2, 1, 1)] // 中間シートの隣接上移動
+    public void MoveSheetCommand_P1_WhenMovingSelectedSheetItself_PreservesSelectedCellAndFollowsIndex(
+        int sheetCount, int fromIndex, int toIndex, int expectedNewIndex)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        for (int i = 1; i < sheetCount; i++) AddSheet(vm, i + 1, $"シート{i + 1}");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = fromIndex;
+        vm.SelectedCell = new GridPos(0, 0);
+        var movingSheet = vm.Document.Sheets[fromIndex];
+
+        vm.SheetNavigation.MoveSheetCommand.Execute((fromIndex, toIndex));
+
+        Assert.NotNull(vm.SelectedCell);
+        Assert.Equal(expectedNewIndex, vm.CurrentSheetIndex);
+        Assert.Same(movingSheet, vm.SheetNavigation.SelectedSheet);
+    }
+
+    /// <summary>設計書6.2(P1、記入中ドラフト保持、代表1件)。選択中シート自身の移動で、
+    /// 記入中の縦コネクタドラフトが破棄されないことを検証する。</summary>
+    [Fact]
+    public void MoveSheetCommand_P1_WhenMovingSelectedSheetItself_PreservesConnectorDraft()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = new GridPos(0, 0);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);
+
+        // 選択中のシート1(index=0、記入中ドラフト保持)自身を末尾へ移動。
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 1));
+
+        Assert.Equal(ToolMode.PlaceConnector, vm.Tool.Mode);
+        Assert.NotNull(vm.ConnectorDraftPreview);
+    }
+
+    /// <summary>設計書6.3(P2、間接シフト、最小3枚構成)。選択中でないシートの移動によって
+    /// 選択中シートの添字が間接的にシフトするケースでも、SelectedCell保持・CurrentSheetIndex追従・
+    /// SelectedSheet実体維持の3点が同時に成立することを検証する。</summary>
+    [Fact]
+    public void MoveSheetCommand_P2_ThreeSheets_IndirectShift_PreservesSelectedCellAndFollowsIndex()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet2 = AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1; // シート2(index=1)を選択中
+        vm.SelectedCell = new GridPos(0, 0);
+
+        // シート1(index=0)を末尾(index=2)へ移動([シート2, シート3, シート1])。シート2の新添字は0。
+        vm.SheetNavigation.MoveSheetCommand.Execute((0, 2));
+
+        Assert.NotNull(vm.SelectedCell);
+        Assert.Equal(0, vm.CurrentSheetIndex);
+        Assert.Same(sheet2, vm.SheetNavigation.SelectedSheet);
+    }
+
+    /// <summary>設計書6.4(P3、添字不変、任意の穴埋め)。対称性点検表の空欄(P3×記入中ドラフト)を
+    /// 埋める。選択中でない2シートの入替(選択中シートの添字も不変)で、記入中の縦コネクタドラフトが
+    /// 破棄されないことを検証する。</summary>
+    [Fact]
+    public void MoveSheetCommand_P3_WhenMovingUnrelatedSheets_PreservesConnectorDraft()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0; // シート1を選択中(移動対象ではない、添字も不変)
+        vm.SelectedCell = new GridPos(0, 0);
+        vm.BeginConnectorDraft();
+        vm.MoveConnectorDraftRow(1);
+
+        // 選択中でないシート2・シート3(index 1, 2)を入れ替える。シート1のindexは0のまま不変。
+        vm.SheetNavigation.MoveSheetCommand.Execute((2, 1));
+
+        Assert.Equal(ToolMode.PlaceConnector, vm.Tool.Mode);
+        Assert.NotNull(vm.ConnectorDraftPreview);
     }
 }

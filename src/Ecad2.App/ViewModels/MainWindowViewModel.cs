@@ -196,6 +196,17 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedCell = null;
     }
 
+    /// <summary>
+    /// T-082往復3周目(隠密review2提案「実体不変の原則」): CurrentSheetの実体(オブジェクト参照)は
+    /// 変わらないが表示上の添字だけが変化するケース(MoveSheetCommandでのシート並び替え=削除・追加
+    /// ではなく位置入替のみ)専用の経路。<see cref="SetCurrentSheetIndexCore"/>と異なり、クロスカット
+    /// 処理(CurrentSheet依存プロパティの再通知・SelectedCellクリア)を一切行わない——実体が不変で
+    /// ある以上これらのクリア処理は不要かつ有害で、選択中セル・記入中ドラフトを理由なく破棄する
+    /// 「所見L」型再発(往復1〜2周目で対症療法に留まっていた欠陥、docs/ecad2-t082-sheet-reorder-
+    /// review2-onmitsu.md)の根本原因だった。
+    /// </summary>
+    internal void SetCurrentSheetIndexWithoutCrossCut(int value) => SetProperty(ref _currentSheetIndex, value);
+
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。
     /// Document.Sheets.Count==0(起動直後の濃紺スタート、殿裁定2026-07-05)の間はnull。</summary>
     public Sheet? CurrentSheet
