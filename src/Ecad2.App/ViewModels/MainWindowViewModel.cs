@@ -1243,6 +1243,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         => CancelDrag(ref _draggingImage,
             image => { image.XMm = _dragImageOrigXMm; image.YMm = _dragImageOrigYMm; });
 
+    /// <summary>選択中の画像を矢印キー1回分(Shift無し)平行移動する(T-064、隠密静的調査
+    /// `docs/ecad2-t064-arrow-key-investigation-onmitsu.md`により原因特定、殿裁定2026-07-13で
+    /// 実装。他の選択可能状態(SelectedConnector/SelectedWireBreak/SelectedFreeLine/
+    /// SelectedConnectionDot)と同じMoveSelected*パターン)。maxXMm/maxYMmはページ境界(呼び出し元が
+    /// sheet.Grid.Columns/Rows×CellMmを計算して渡す)。境界クランプはUpdateDragImageと同じ式
+    /// (0〜max-Width/Height)を用いて画像操作全体で整合させる。実際に動けた場合のみMarkDirty()する。
+    /// </summary>
+    public bool MoveSelectedImage(double deltaXMm, double deltaYMm, double maxXMm, double maxYMm)
+    {
+        if (SelectedImage is not ImageInsert image) return false;
+        double newX = Math.Clamp(image.XMm + deltaXMm, 0, Math.Max(0, maxXMm - image.WidthMm));
+        double newY = Math.Clamp(image.YMm + deltaYMm, 0, Math.Max(0, maxYMm - image.HeightMm));
+        if (newX == image.XMm && newY == image.YMm) return false;
+        image.XMm = newX;
+        image.YMm = newY;
+        MarkDirty();
+        return true;
+    }
+
     // T-064: 画像のリサイズ(ドラッグハンドル、殿裁定=数値入力のみのGuiEcad踏襲は不採用)の一時状態。
     // ドラッグ中のハンドルの対角コーナーを固定点(アンカー)とし、幅・高さを独立して変更する。
     private ImageInsert? _resizingImage;

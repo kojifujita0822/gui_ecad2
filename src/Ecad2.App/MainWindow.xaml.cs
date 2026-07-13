@@ -1307,6 +1307,12 @@ public partial class MainWindow : Window
                 else if (_viewModel.SelectedConnectionDot is not null)
                     // T-041増分7横展開: 選択中の接続点を平行移動する(点系・mm実座標系、本体移動のみ)。
                     MoveSelectedConnectionDotByKey(e.Key);
+                else if (_viewModel.SelectedImage is not null)
+                    // T-064矢印キー画像平行移動(隠密静的調査により原因特定、殿裁定2026-07-13):
+                    // 従来この分岐が無く既定のMoveSelectedCellへフォールスルーし、画像選択解除+
+                    // 無関係セル選択という副作用が発生していた(横展開漏れ)。他のSelected*と同じ
+                    // 位置(SelectedCellへのフォールスルー直前)に追加し、対称性を回復する。
+                    MoveSelectedImageByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -1625,6 +1631,26 @@ public partial class MainWindow : Window
             Key.Down => _viewModel.MoveSelectedConnectionDot(0, step, maxXMm, maxYMm),
             Key.Left => _viewModel.MoveSelectedConnectionDot(-step, 0, maxXMm, maxYMm),
             Key.Right => _viewModel.MoveSelectedConnectionDot(step, 0, maxXMm, maxYMm),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
+    }
+
+    // T-064矢印キー画像平行移動(隠密静的調査により原因特定、殿裁定2026-07-13): 選択中の画像を
+    // 矢印キー1回分(Shift無し)平行移動する(mm実座標系、1ステップ=CellMm、
+    // MoveSelectedConnectionDotByKeyと同じ設計)。
+    private void MoveSelectedImageByKey(Key key)
+    {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
+        double step = LadderCanvasHost.CellMm;
+        double maxXMm = sheet.Grid.Columns * step;
+        double maxYMm = sheet.Grid.Rows * step;
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedImage(0, -step, maxXMm, maxYMm),
+            Key.Down => _viewModel.MoveSelectedImage(0, step, maxXMm, maxYMm),
+            Key.Left => _viewModel.MoveSelectedImage(-step, 0, maxXMm, maxYMm),
+            Key.Right => _viewModel.MoveSelectedImage(step, 0, maxXMm, maxYMm),
             _ => false,
         };
         if (moved) RedrawCanvas();

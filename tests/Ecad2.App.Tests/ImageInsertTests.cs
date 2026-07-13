@@ -555,4 +555,69 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Null(vm.SelectedImage);
         Assert.False(vm.HasSelectedImage);
     }
+
+    // --- T-064矢印キー画像平行移動(隠密静的調査`docs/ecad2-t064-arrow-key-investigation-onmitsu.md`
+    //     により原因特定、殿裁定2026-07-13): MoveSelectedImage(キーボード等価操作)の回帰テスト。
+    //     ConnectionDotDragTests.MoveSelectedConnectionDot_*と対称に揃える。 ---
+
+    [Fact]
+    public void MoveSelectedImage_ShiftsPositionAndMarksDirty()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 20, y: 30, w: 30, h: 15);
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        bool moved = vm.MoveSelectedImage(5, -3, maxXMm: 1000, maxYMm: 1000);
+
+        Assert.True(moved);
+        Assert.Equal(25, image.XMm);
+        Assert.Equal(27, image.YMm);
+        Assert.True(vm.IsDirty);
+    }
+
+    [Fact]
+    public void MoveSelectedImage_WithoutSelection_DoesNothing()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        Assert.False(vm.MoveSelectedImage(5, 0, maxXMm: 1000, maxYMm: 1000));
+        Assert.False(vm.IsDirty);
+    }
+
+    /// <summary>UpdateDragImageと同じ境界式(0〜max-Width/Height)でクランプされることを検証する。</summary>
+    [Fact]
+    public void MoveSelectedImage_ClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 10, y: 20, w: 30, h: 15);   // 右端=40
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        bool moved = vm.MoveSelectedImage(100, 0, maxXMm: 50, maxYMm: 1000);
+
+        Assert.True(moved);
+        Assert.Equal(20, image.XMm);   // 50 - WidthMm(30)
+        Assert.True(vm.IsDirty);
+    }
+
+    /// <summary>既に境界に達している状態でさらに外側へ動かそうとしても変化なし・IsDirtyも立たない
+    /// こと(MoveSelectedConnectionDotと同じ「変化なしならfalse」ガード)。</summary>
+    [Fact]
+    public void MoveSelectedImage_AlreadyAtBoundary_DoesNothing()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 20, y: 20, w: 30, h: 15);   // 右端=50=maxXMm、既に境界
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        bool moved = vm.MoveSelectedImage(10, 0, maxXMm: 50, maxYMm: 1000);
+
+        Assert.False(moved);
+        Assert.False(vm.IsDirty);
+    }
 }
