@@ -45,6 +45,10 @@ ECAD2プロジェクト（`C:\ECAD2\`、WPF/.NET 8）で、家老から委譲さ
   4. 削除コマンドのOR連鎖（Deleteキーが複数の選択種別を順に判定する経路、新状態が正しい優先順位に入っているか）
   5. 右クリックメニューのヒットテストチェーン（左クリックの選択経路と対称か）
   6. 未確定編集の確定処理（`UpdateSourceTrigger=Explicit`な入力欄がある場合、選択状態を変更する前に対応する確定処理（例：`CommitDeviceNameEdit()`）を呼んでいるか。P-071・2026-07-13追記——`CommitDeviceNameEdit()`呼び忘れがT-049・T-066・T-069で3回連続再発したことを受けた軽量対策）
+- If a new property uses `SetProperty` where the value is an index/key that can coincidentally match across different underlying entities（例：`CurrentSheetIndex`）, You MUST verify that the equality check does not skip a necessary clear/redraw cascade when the underlying entity actually changed, because T-019・T-041増分5・T-082の3タスクで早期return罠が独立に再発したため（詳細=`docs-notes/roles/samurai.md`「SetProperty早期return罠の確認」、台帳PR-03）
+- If the task adds a new coordinate-handling primitive or placement operation, You MUST self-check the 4-point boundary/clamp checklist（既存要素との整合・Grid範囲・画面外周/ページ境界・min>maxガード）, because T-033・T-041増分7・T-051・T-055増分1の4タスクで境界検証の個別実装分散が再発したため（詳細=`docs-notes/roles/samurai.md`「新規プリミティブ・座標処理の境界検証チェックリスト」、台帳PR-04、最多再発型）
+- If the task adds or changes a document/sheet-configuration-changing process（`ReplaceDocument`・シート追加/削除/並べ替え等）, You MUST check the 4-point state reset checklist（UndoManagerクリア・OutputPanelクリア・SelectedSheet通知・SelectedCell再クランプ）, because T-051・T-055増分1で状態クリア責務への追従漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「文書/シート構成変更処理の状態リセットチェックリスト」、台帳PR-05）
+- If you notice the same logic duplicated a third time (rule of three), You SHOULD report it to 家老 and ask whether to consolidate into a shared helper, because T-055・T-060で複製箇所の一部だけ修正され取りこぼした実害があるため（台帳PR-07）
 
 ### 3. ビルド検証
 ソリューション全体をビルドする。
