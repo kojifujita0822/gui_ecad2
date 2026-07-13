@@ -53,6 +53,14 @@ public partial class MainWindow : Window
     private bool _connectionDotDragStarted;
     private bool _connectionDotDragConsumedByEscape;
 
+    // T-064: 画像のドラッグ(移動)・リサイズ(ハンドル)のしきい値判定用状態(他ドラッグ系と同型)。
+    private Point _imageDragPressPositionDip;
+    private bool _imageDragStarted;
+    private bool _imageDragConsumedByEscape;
+    private Point _imageResizePressPositionDip;
+    private bool _imageResizeStarted;
+    private bool _imageResizeConsumedByEscape;
+
     // T-082: シートナビゲーション(SheetNavList)のドラッグ&ドロップ並び替え用状態。キャンバス要素の
     // ドラッグ(マウスキャプチャ方式)とは対象が異なりWPFネイティブDragDrop APIを使う(Explore調査で
     // 既存流用パターン無しと確認済み)。
@@ -82,7 +90,9 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedWireBreak)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedFreeLine)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.FreeLineDraftPreview)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedImage)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ImageInsertDraftPreview))
             RedrawCanvas();
 
         // T-056: グリッド表示切替。LadderCanvasはカスタムFrameworkElementでDraw()呼び出しが
@@ -122,6 +132,18 @@ public partial class MainWindow : Window
             _connectionDotDragStarted = false;
             _connectionDotDragConsumedByEscape = false;
         }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingImage) && !_viewModel.IsDraggingImage)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _imageDragStarted = false;
+            _imageDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsResizingImage) && !_viewModel.IsResizingImage)
+        {
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _imageResizeStarted = false;
+            _imageResizeConsumedByEscape = false;
+        }
     }
 
     // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullになる。
@@ -132,7 +154,8 @@ public partial class MainWindow : Window
         if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sheet)
             LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
                 _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
-                _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot);
+                _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
+                _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview);
         else
             LadderCanvasHost.Clear();
     }
@@ -244,6 +267,50 @@ public partial class MainWindow : Window
     }
 
     private const string GcadFileFilter = "GCADファイル (*.gcad)|*.gcad";
+    // T-064(殿裁定=jpg等も追加、WPF BitmapImage標準機能で対応可): bmp/png/jpg/jpeg/gif。
+    private const string ImageFileFilter = "画像ファイル (*.bmp;*.png;*.jpg;*.jpeg;*.gif)|*.bmp;*.png;*.jpg;*.jpeg;*.gif";
+
+    // T-064(殿裁定): 挿入トリガー=メニューのみ。ファイル選択完了後、配置待機モード(2段階操作、
+    // 既存の記入中ドラフトと同型の操作感、殿裁定「案A」)へ入る。実ピクセルサイズをmm換算し、
+    // 長辺120mm超ならアスペクト比を維持して縮小する(GuiEcad踏襲)。開始位置はメニュー操作直後の
+    // ため暫定的にページ左上(0,0)を起点とし、以降のホバー追従で確定前に調整する。
+    private void InsertImageMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet) return;
+        var dialog = new Microsoft.Win32.OpenFileDialog { Filter = ImageFileFilter };
+        if (dialog.ShowDialog(this) != true) return;
+
+        var (widthMm, heightMm) = CalculateInitialImageSizeMm(dialog.FileName);
+        _viewModel.BeginImageInsertDraft(dialog.FileName, widthMm, heightMm, 0, 0);
+        _viewModel.StatusMessage = "マウスで配置位置を決め、クリックで確定(Escで取消)";
+    }
+
+    // T-064: 画像の実ピクセルサイズをmm換算し、長辺が120mm超ならアスペクト比を維持して縮小する
+    // (GuiEcad踏襲)。DPI情報が取得できない場合(0以下)は96DPI(WPF既定)を仮定する。
+    private static (double WidthMm, double HeightMm) CalculateInitialImageSizeMm(string filePath)
+    {
+        const double MaxLongSideMm = 120.0;
+        const double MmPerInch = 25.4;
+        var bitmap = new BitmapImage();
+        bitmap.BeginInit();
+        bitmap.CacheOption = BitmapCacheOption.OnLoad;
+        bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
+        bitmap.EndInit();
+
+        double dpiX = bitmap.DpiX > 0 ? bitmap.DpiX : 96.0;
+        double dpiY = bitmap.DpiY > 0 ? bitmap.DpiY : 96.0;
+        double widthMm = bitmap.PixelWidth / dpiX * MmPerInch;
+        double heightMm = bitmap.PixelHeight / dpiY * MmPerInch;
+
+        double longSide = Math.Max(widthMm, heightMm);
+        if (longSide > MaxLongSideMm)
+        {
+            double scale = MaxLongSideMm / longSide;
+            widthMm *= scale;
+            heightMm *= scale;
+        }
+        return (widthMm, heightMm);
+    }
 
     // 上書き保存(T-019)。ファイルダイアログ表示はView側の責務、実際の保存(GcadSerializer呼び出し)
     // はViewModelのSaveToFileへ委譲する。パス未確定(新規作成後の初回保存)は名前を付けて保存へ
@@ -419,6 +486,19 @@ public partial class MainWindow : Window
             return;
         }
 
+        // T-064(殿裁定「案A」): 画像挿入の配置待機モード中のクリックは確定操作。Tool.Mode!=Selectの
+        // 早期return(直後)より前で扱う必要がある(でないとPlaceImage中は常に無視されてしまう)。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceImage)
+        {
+            if (_viewModel.ConfirmImageInsertDraft())
+            {
+                _viewModel.StatusMessage = "";
+                RedrawCanvas();
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
 
         // T-041増分7隠密レビュー所見C対応: CaptureMouse()の戻り値を確認する。何らかの理由(既に
@@ -480,6 +560,35 @@ public partial class MainWindow : Window
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragConnectionDot(); return; }
             _connectionDotDragPressPositionDip = position;
             _connectionDotDragStarted = false;
+            return;
+        }
+
+        // T-064: 選択中の画像のリサイズハンドル(4隅)を押下したらリサイズを開始する(ドラッグ移動
+        // より判定を先にする、ハンドルは画像本体の矩形の隅に重なるため)。
+        if (_viewModel.SelectedImage is Ecad2.Model.ImageInsert resizeImg
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet imgHandleSheet
+            && LadderCanvasHost.HitTestImageResizeHandle(position, resizeImg) is ViewModels.ImageResizeHandle handle)
+        {
+            var (rxMm, ryMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.BeginResizeImage(resizeImg, handle, rxMm, ryMm,
+                imgHandleSheet.Grid.Columns * LadderCanvasHost.CellMm, imgHandleSheet.Grid.Rows * LadderCanvasHost.CellMm);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelResizeImage(); return; }
+            _imageResizePressPositionDip = position;
+            _imageResizeStarted = false;
+            return;
+        }
+
+        // T-064: 選択中の画像本体を押下したらドラッグ(移動)を開始する。
+        if (_viewModel.SelectedImage is Ecad2.Model.ImageInsert dragImg
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet imgDragSheet
+            && LadderCanvasHost.HitTestImage(position, imgDragSheet) == dragImg)
+        {
+            var (dxMm, dyMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.BeginDragImage(dragImg, dxMm, dyMm,
+                imgDragSheet.Grid.Columns * LadderCanvasHost.CellMm, imgDragSheet.Grid.Rows * LadderCanvasHost.CellMm);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragImage(); return; }
+            _imageDragPressPositionDip = position;
+            _imageDragStarted = false;
         }
     }
 
@@ -487,6 +596,19 @@ public partial class MainWindow : Window
     // 無視する(poc/t041-drag-poc/DragCanvas.csと同じ設計)。
     private void LadderCanvasHost_PreviewMouseMove(object sender, MouseEventArgs e)
     {
+        // T-064(殿裁定「案A」): 画像挿入の配置待機モード(記入中ドラフトと同型)はマウスキャプチャ
+        // 無しでホバー追従する(ボタンを押さず移動、クリックで確定)。他のドラッグ系はキャプチャ中
+        // のみ処理する既存方針と異なるため、キャプチャ判定より前で扱う。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceImage && _viewModel.CurrentSheet is Ecad2.Model.Sheet imgSheet)
+        {
+            var hoverPos = e.GetPosition(LadderCanvasHost);
+            var (hoverXMm, hoverYMm) = LadderCanvasHost.ToMmPoint(hoverPos);
+            _viewModel.UpdateImageInsertDraftPosition(hoverXMm, hoverYMm,
+                imgSheet.Grid.Columns * LadderCanvasHost.CellMm, imgSheet.Grid.Rows * LadderCanvasHost.CellMm);
+            RedrawCanvas();
+            return;
+        }
+
         if (!LadderCanvasHost.IsMouseCaptured) return;
         var position = e.GetPosition(LadderCanvasHost);
 
@@ -540,6 +662,32 @@ public partial class MainWindow : Window
             var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
             _viewModel.UpdateDragConnectionDot(xMm, yMm);
             RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsDraggingImage)
+        {
+            if (!_imageDragStarted)
+            {
+                if ((position - _imageDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _imageDragStarted = true;
+            }
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.UpdateDragImage(xMm, yMm);
+            RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsResizingImage)
+        {
+            if (!_imageResizeStarted)
+            {
+                if ((position - _imageResizePressPositionDip).Length < DragStartThresholdDip) return;
+                _imageResizeStarted = true;
+            }
+            var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.UpdateResizeImage(xMm, yMm);
+            RedrawCanvas();
         }
     }
 
@@ -550,13 +698,15 @@ public partial class MainWindow : Window
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
         if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
-            || _connectionDotDragConsumedByEscape)
+            || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
             _wireBreakDragConsumedByEscape = false;
             _freeLineDragConsumedByEscape = false;
             _connectionDotDragConsumedByEscape = false;
+            _imageDragConsumedByEscape = false;
+            _imageResizeConsumedByEscape = false;
             return;
         }
 
@@ -597,6 +747,22 @@ public partial class MainWindow : Window
             _viewModel.ConfirmDragConnectionDot();
             LadderCanvasHost.ReleaseMouseCapture();
             _connectionDotDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingImage)
+        {
+            _viewModel.ConfirmDragImage();
+            LadderCanvasHost.ReleaseMouseCapture();
+            _imageDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsResizingImage)
+        {
+            _viewModel.ConfirmResizeImage();
+            LadderCanvasHost.ReleaseMouseCapture();
+            _imageResizeStarted = false;
             RedrawCanvas();
             return;
         }
@@ -655,6 +821,13 @@ public partial class MainWindow : Window
             {
                 _viewModel.SelectedCell = null;
                 _viewModel.SelectedConnectionDot = dot;
+                return;
+            }
+            // T-064: 画像の選択(GuiEcad同様、背面固定描画のため他要素より判定優先度が最後)。
+            if (LadderCanvasHost.HitTestImage(position, sheet) is Ecad2.Model.ImageInsert img)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedImage = img;
                 return;
             }
         }
@@ -792,10 +965,24 @@ public partial class MainWindow : Window
             _connectionDotDragStarted = false;
             RedrawCanvas();
         }
+        if (_viewModel.IsDraggingImage)
+        {
+            _viewModel.CancelDragImage();
+            _imageDragStarted = false;
+            RedrawCanvas();
+        }
+        if (_viewModel.IsResizingImage)
+        {
+            _viewModel.CancelResizeImage();
+            _imageResizeStarted = false;
+            RedrawCanvas();
+        }
         _connectorDragConsumedByEscape = false;
         _wireBreakDragConsumedByEscape = false;
         _freeLineDragConsumedByEscape = false;
         _connectionDotDragConsumedByEscape = false;
+        _imageDragConsumedByEscape = false;
+        _imageResizeConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -892,6 +1079,26 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 }
+                if (_viewModel.IsDraggingImage)
+                {
+                    _viewModel.CancelDragImage();
+                    _imageDragStarted = false;
+                    _imageDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsResizingImage)
+                {
+                    _viewModel.CancelResizeImage();
+                    _imageResizeStarted = false;
+                    _imageResizeConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // T-036追加修正(殿裁定=Esc入力破棄、隠密レビュー指摘=Esc層消費): デバイス名編集中の
                 // Escは表示復元(UpdateTarget())+フォーカス復帰のみの独立した1層として消費し、
                 // 下記の層2/3/4処理(選択解除等)へは落とさない(T-021「1回のEscは1層だけ」の原則に
@@ -930,6 +1137,11 @@ public partial class MainWindow : Window
                 {
                     // 層2''(T-041増分5): 自由線記入中 → 取消して選択モードへ戻す。何も生成しない。
                     _viewModel.CancelFreeLineDraft();
+                }
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceImage)
+                {
+                    // 層2'''(T-064): 画像挿入の配置待機中 → 取消して選択モードへ戻す。何も生成しない。
+                    _viewModel.CancelImageInsertDraft();
                 }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
                     || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
@@ -1086,7 +1298,7 @@ public partial class MainWindow : Window
                 // 統合)。クリック時点でいずれも排他的にしか選択されない設計だが、優先順位を明記しておく。
                 if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
                     || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
-                    || _viewModel.DeleteSelectedConnectionDot())
+                    || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage())
                     RedrawCanvas();
                 e.Handled = true;
                 break;
@@ -1183,7 +1395,7 @@ public partial class MainWindow : Window
         CommitDeviceNameEdit();
         if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
             || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
-            || _viewModel.DeleteSelectedConnectionDot())
+            || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage())
             RedrawCanvas();
     }
 

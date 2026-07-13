@@ -279,6 +279,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             // T-041増分5: 自由線・接続点(主回路シート)も同様に扱う。
             SelectedFreeLine = null;
             SelectedConnectionDot = null;
+            // T-064: 画像も同様に扱う。
+            SelectedImage = null;
             // T-041増分2隠密レビュー指摘(観点3 CONFIRMED、所見E=増分1所見Aの反復): 記入中
             // (_connectorDraft)はSelectedCellとは別枠の状態だったため、CurrentSheetIndexの
             // シート切替経由でSelectedCellがクリアされてもTool/_connectorDraftが残留し、
@@ -289,6 +291,10 @@ public sealed class MainWindowViewModel : ViewModelBase
             ClearConnectorDraftIfAny();
             // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同型でクリアする。
             ClearFreeLineDraftIfAny();
+            // T-064: 画像挿入の記入中状態(_imageInsertDraft)も同型でクリアする(シート切替等の外部
+            // 要因での残留防止)。CancelImageInsertDraftは「記入中でなければ何もしない」構造のため
+            // ClearConnectorDraftIfAny等と同様にそのまま呼べる。
+            CancelImageInsertDraft();
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -296,6 +302,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasSelectedElement));
                 OnPropertyChanged(nameof(SelectedElementKindDisplay));
                 OnPropertyChanged(nameof(SelectedElementDeviceName));
+                OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
     }
@@ -1044,6 +1051,287 @@ public sealed class MainWindowViewModel : ViewModelBase
         MarkDirty();
         return true;
     }
+
+    private ImageInsert? _selectedImage;
+
+    /// <summary>
+    /// 現在選択中の画像(T-064: グリッド非依存の自由配置要素、SelectedFreeLine等と同型の排他制御——
+    /// SelectedCellのsetterが常時クリアする)。単一選択のみ。
+    /// </summary>
+    public ImageInsert? SelectedImage
+    {
+        get => _selectedImage;
+        set
+        {
+            ForceCancelDragImageIfAny();
+            ForceCancelResizeImageIfAny();
+            SetProperty(ref _selectedImage, value);
+            OnPropertyChanged(nameof(HasSelectedImage));
+            OnPropertyChanged(nameof(HasNoPropertySelection));
+        }
+    }
+
+    /// <summary>右パネル下段のプロパティ表示切替に使う(選択中の画像があるか)。</summary>
+    public bool HasSelectedImage => SelectedImage is not null;
+
+    /// <summary>右パネルのプロパティ領域で「要素を選択してください」プレースホルダを表示するか
+    /// (T-064: 画像選択の追加に伴い、要素・画像いずれも無選択の場合のみプレースホルダを表示する)。</summary>
+    public bool HasNoPropertySelection => !HasSelectedElement && !HasSelectedImage;
+
+    /// <summary>SelectedImageのトレース用下絵トグル(T-064、プロパティパネルのCheckBox用)。殿裁定
+    /// (画像操作は全てUndo対象、他要素との非対称は許容)によりRecordSnapshotを実行直前に呼ぶ。</summary>
+    public bool SelectedImageIsTracingOnly
+    {
+        get => SelectedImage?.IsTracingOnly ?? false;
+        set
+        {
+            if (SelectedImage is not ImageInsert image || image.IsTracingOnly == value) return;
+            UndoManager.RecordSnapshot(Document);
+            image.IsTracingOnly = value;
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedImageIsTracingOnly));
+        }
+    }
+
+    /// <summary>SelectedImageを削除する(T-064、案A=DeleteSelectedFreeLineと同型)。殿裁定により
+    /// 画像操作はUndo対象(他要素との非対称は許容)のため、削除直前にRecordSnapshotを呼ぶ。
+    /// 戻り値は実際に削除したか。</summary>
+    public bool DeleteSelectedImage()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedImage is not ImageInsert image || !sheet.Images.Contains(image))
+            return false;
+        UndoManager.RecordSnapshot(Document);
+        sheet.Images.Remove(image);
+        MarkDirty();
+        SelectedImage = null;
+        return true;
+    }
+
+    // T-064: 画像挿入(メニュー→ファイル選択→キャンバス上で配置待機、殿裁定「案A」=2段階操作)の
+    // 作業中データ。ファイルパス・初期サイズ(View側で計算済み、長辺120mm上限・アスペクト比維持)は
+    // 固定、現在位置(mm実座標)はマウスホバーに追従して更新される(記入中ドラフトの一種だが、
+    // キーボードではなくマウス位置を直接受け取る点が_connectorDraft/_freeLineDraftと異なる)。
+    private (string FilePath, double WidthMm, double HeightMm, double XMm, double YMm)? _imageInsertDraft;
+
+    /// <summary>記入中の画像挿入のプレビュー形状(LadderCanvasの半透明描画用)。記入中でなければnull。</summary>
+    public ImageInsert? ImageInsertDraftPreview
+    {
+        get
+        {
+            if (_imageInsertDraft is not { } d) return null;
+            return new ImageInsert { FilePath = d.FilePath, XMm = d.XMm, YMm = d.YMm, WidthMm = d.WidthMm, HeightMm = d.HeightMm };
+        }
+    }
+
+    /// <summary>画像挿入メニュー選択・ファイル選択完了後、配置待機モードを開始する(T-064、殿裁定
+    /// 「案A」)。widthMm/heightMmはView側で計算済みの初期サイズ(長辺120mm上限、アスペクト比維持)。
+    /// xMm/yMmは開始時点のマウス位置(mm実座標、View側が変換して渡す)。</summary>
+    public void BeginImageInsertDraft(string filePath, double widthMm, double heightMm, double xMm, double yMm)
+    {
+        _imageInsertDraft = (filePath, widthMm, heightMm, xMm, yMm);
+        Tool = new ToolState(ToolMode.PlaceImage);
+        OnPropertyChanged(nameof(ImageInsertDraftPreview));
+    }
+
+    /// <summary>記入中の画像挿入位置をマウスホバーに追従させる(T-064)。ページ境界(0〜maxXMm/maxYMm、
+    /// 呼び出し元がsheet.Grid.Columns/Rows×CellMmを計算して渡す)へクランプする。</summary>
+    public void UpdateImageInsertDraftPosition(double xMm, double yMm, double maxXMm, double maxYMm)
+    {
+        if (_imageInsertDraft is not { } d) return;
+        double clampedX = Math.Clamp(xMm, 0, Math.Max(0, maxXMm - d.WidthMm));
+        double clampedY = Math.Clamp(yMm, 0, Math.Max(0, maxYMm - d.HeightMm));
+        _imageInsertDraft = d with { XMm = clampedX, YMm = clampedY };
+        OnPropertyChanged(nameof(ImageInsertDraftPreview));
+    }
+
+    /// <summary>記入中の画像挿入を確定する(クリック、T-064)。殿裁定により画像操作はUndo対象のため
+    /// RecordSnapshotを実行直前に呼ぶ。確定後は挿入した画像を選択状態にする(GuiEcad同様)。
+    /// 戻り値は実際に確定したか。</summary>
+    public bool ConfirmImageInsertDraft()
+    {
+        if (_imageInsertDraft is not { } d || CurrentSheet is not Sheet sheet) return false;
+        UndoManager.RecordSnapshot(Document);
+        var image = new ImageInsert { FilePath = d.FilePath, XMm = d.XMm, YMm = d.YMm, WidthMm = d.WidthMm, HeightMm = d.HeightMm };
+        sheet.Images.Add(image);
+        MarkDirty();
+        CancelImageInsertDraft();
+        SelectedImage = image;
+        return true;
+    }
+
+    /// <summary>記入中の画像挿入を取消す(Esc、T-064)。何も生成せず選択モードへ戻す。</summary>
+    public void CancelImageInsertDraft()
+    {
+        if (_imageInsertDraft is null) return;
+        _imageInsertDraft = null;
+        Tool = ToolState.SelectDefault;
+        OnPropertyChanged(nameof(ImageInsertDraftPreview));
+    }
+
+    // T-064: 画像のドラッグ移動(本体移動のみ、リサイズは別途BeginResizeImage系)。ConnectionDotと
+    // 同型(相対差分方式)だが、Width/HeightがあるためFreeLine同様「画像がページ境界からはみ出さない」
+    // 制約で境界クランプする。
+    private ImageInsert? _draggingImage;
+    private double _dragImageOrigXMm, _dragImageOrigYMm;
+    private double _dragImageStartXMm, _dragImageStartYMm;
+    private double _dragImageMaxXMm, _dragImageMaxYMm;
+
+    /// <summary>画像をドラッグ中か。</summary>
+    public bool IsDraggingImage => _draggingImage is not null;
+
+    /// <summary>ドラッグ中の画像を外部要因により強制的にキャンセルする(ForceCancelDragConnectionDot
+    /// IfAnyと同型)。</summary>
+    private void ForceCancelDragImageIfAny()
+        => ForceCancelIfAny(
+            () => _draggingImage is not null,
+            CancelDragImage,
+            () => OnPropertyChanged(nameof(IsDraggingImage)));
+
+    /// <summary>画像のドラッグ(本体移動)を開始する(T-064)。startXMm/startYMmはドラッグ開始時の
+    /// マウス位置(mm実座標)。maxXMm/maxYMmはページ境界(呼び出し元がsheet.Grid.Columns/Rows×CellMm
+    /// を計算して渡す)。</summary>
+    public void BeginDragImage(ImageInsert image, double startXMm, double startYMm, double maxXMm, double maxYMm)
+    {
+        _draggingImage = image;
+        _dragImageOrigXMm = image.XMm;
+        _dragImageOrigYMm = image.YMm;
+        _dragImageStartXMm = startXMm;
+        _dragImageStartYMm = startYMm;
+        _dragImageMaxXMm = maxXMm;
+        _dragImageMaxYMm = maxYMm;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて画像の位置を更新する(T-064)。画像がページ
+    /// 境界からはみ出さないよう(0〜max-Width/Height)クランプする。</summary>
+    public void UpdateDragImage(double currentXMm, double currentYMm)
+    {
+        if (_draggingImage is not ImageInsert image) return;
+        double newX = Math.Clamp(_dragImageOrigXMm + (currentXMm - _dragImageStartXMm), 0, Math.Max(0, _dragImageMaxXMm - image.WidthMm));
+        double newY = Math.Clamp(_dragImageOrigYMm + (currentYMm - _dragImageStartYMm), 0, Math.Max(0, _dragImageMaxYMm - image.HeightMm));
+        image.XMm = newX;
+        image.YMm = newY;
+    }
+
+    /// <summary>画像のドラッグを確定する(T-064)。殿裁定により画像操作はUndo対象のため、開始時から
+    /// 実際に値が変化していれば、一旦開始時位置へ戻してRecordSnapshotを呼んでから確定値へ戻す
+    /// (RecordSnapshotは「操作実行の直前」の状態を記録する契約のため、確定後の値をそのまま記録すると
+    /// Undoしても変化前の状態に戻らなくなる)。</summary>
+    public void ConfirmDragImage()
+    {
+        if (_draggingImage is not ImageInsert image) { _draggingImage = null; return; }
+        if (image.XMm != _dragImageOrigXMm || image.YMm != _dragImageOrigYMm)
+        {
+            double confirmedX = image.XMm, confirmedY = image.YMm;
+            image.XMm = _dragImageOrigXMm;
+            image.YMm = _dragImageOrigYMm;
+            UndoManager.RecordSnapshot(Document);
+            image.XMm = confirmedX;
+            image.YMm = confirmedY;
+            MarkDirty();
+        }
+        _draggingImage = null;
+    }
+
+    /// <summary>画像のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-064)。</summary>
+    public void CancelDragImage()
+        => CancelDrag(ref _draggingImage,
+            image => { image.XMm = _dragImageOrigXMm; image.YMm = _dragImageOrigYMm; });
+
+    // T-064: 画像のリサイズ(ドラッグハンドル、殿裁定=数値入力のみのGuiEcad踏襲は不採用)の一時状態。
+    // ドラッグ中のハンドルの対角コーナーを固定点(アンカー)とし、幅・高さを独立して変更する。
+    private ImageInsert? _resizingImage;
+    private ImageResizeHandle _resizingImageHandle;
+    private double _resizeImageAnchorXMm, _resizeImageAnchorYMm;
+    private double _resizeImageOrigXMm, _resizeImageOrigYMm, _resizeImageOrigWidthMm, _resizeImageOrigHeightMm;
+    private double _resizeImageMaxXMm, _resizeImageMaxYMm;
+
+    private const double ImageMinSizeMm = 5.0;
+
+    /// <summary>画像をリサイズ中か。</summary>
+    public bool IsResizingImage => _resizingImage is not null;
+
+    /// <summary>リサイズ中の画像を外部要因により強制的にキャンセルする。</summary>
+    private void ForceCancelResizeImageIfAny()
+        => ForceCancelIfAny(
+            () => _resizingImage is not null,
+            CancelResizeImage,
+            () => OnPropertyChanged(nameof(IsResizingImage)));
+
+    /// <summary>画像のリサイズを開始する(T-064、ドラッグハンドル方式、殿裁定)。handleは掴んだ隅、
+    /// startXMm/startYMmはドラッグ開始時のマウス位置(mm実座標、未使用だが他Begin*との対称性のため
+    /// 引数に残す)。maxXMm/maxYMmはページ境界。</summary>
+    public void BeginResizeImage(ImageInsert image, ImageResizeHandle handle, double startXMm, double startYMm, double maxXMm, double maxYMm)
+    {
+        _resizingImage = image;
+        _resizingImageHandle = handle;
+        _resizeImageOrigXMm = image.XMm;
+        _resizeImageOrigYMm = image.YMm;
+        _resizeImageOrigWidthMm = image.WidthMm;
+        _resizeImageOrigHeightMm = image.HeightMm;
+        _resizeImageMaxXMm = maxXMm;
+        _resizeImageMaxYMm = maxYMm;
+        // 掴んだ隅の対角(固定点)を計算する。
+        (_resizeImageAnchorXMm, _resizeImageAnchorYMm) = handle switch
+        {
+            ImageResizeHandle.TopLeft => (image.XMm + image.WidthMm, image.YMm + image.HeightMm),
+            ImageResizeHandle.TopRight => (image.XMm, image.YMm + image.HeightMm),
+            ImageResizeHandle.BottomLeft => (image.XMm + image.WidthMm, image.YMm),
+            ImageResizeHandle.BottomRight => (image.XMm, image.YMm),
+            _ => (image.XMm, image.YMm),
+        };
+    }
+
+    /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて画像のサイズを更新する(T-064)。固定点
+    /// (対角コーナー)からドラッグ中の隅までの距離を新しい幅・高さとする。最小サイズ(ImageMinSizeMm)
+    /// を下回らないようクランプし、ページ境界(0〜maxXMm/maxYMm)もはみ出さないようクランプする。
+    /// 最小サイズ制約を先に適用してから座標を導出することで、アンカー位置が常に固定されるようにする。</summary>
+    public void UpdateResizeImage(double currentXMm, double currentYMm)
+    {
+        if (_resizingImage is not ImageInsert image) return;
+        double clampedCurrentX = Math.Clamp(currentXMm, 0, _resizeImageMaxXMm);
+        double clampedCurrentY = Math.Clamp(currentYMm, 0, _resizeImageMaxYMm);
+
+        double rawWidth = clampedCurrentX - _resizeImageAnchorXMm;
+        double rawHeight = clampedCurrentY - _resizeImageAnchorYMm;
+        double width = Math.Max(ImageMinSizeMm, Math.Abs(rawWidth));
+        double height = Math.Max(ImageMinSizeMm, Math.Abs(rawHeight));
+        double signedWidth = rawWidth < 0 ? -width : width;
+        double signedHeight = rawHeight < 0 ? -height : height;
+
+        image.XMm = Math.Min(_resizeImageAnchorXMm, _resizeImageAnchorXMm + signedWidth);
+        image.YMm = Math.Min(_resizeImageAnchorYMm, _resizeImageAnchorYMm + signedHeight);
+        image.WidthMm = width;
+        image.HeightMm = height;
+    }
+
+    /// <summary>画像のリサイズを確定する(T-064)。殿裁定により画像操作はUndo対象のため、開始時から
+    /// 実際に値が変化していれば、一旦開始時のサイズへ戻してRecordSnapshotを呼んでから確定値へ戻す
+    /// (ConfirmDragImageと同じ理由)。</summary>
+    public void ConfirmResizeImage()
+    {
+        if (_resizingImage is not ImageInsert image) { _resizingImage = null; return; }
+        bool changed = image.XMm != _resizeImageOrigXMm || image.YMm != _resizeImageOrigYMm
+            || image.WidthMm != _resizeImageOrigWidthMm || image.HeightMm != _resizeImageOrigHeightMm;
+        if (changed)
+        {
+            double confirmedX = image.XMm, confirmedY = image.YMm, confirmedWidth = image.WidthMm, confirmedHeight = image.HeightMm;
+            image.XMm = _resizeImageOrigXMm; image.YMm = _resizeImageOrigYMm;
+            image.WidthMm = _resizeImageOrigWidthMm; image.HeightMm = _resizeImageOrigHeightMm;
+            UndoManager.RecordSnapshot(Document);
+            image.XMm = confirmedX; image.YMm = confirmedY;
+            image.WidthMm = confirmedWidth; image.HeightMm = confirmedHeight;
+            MarkDirty();
+        }
+        _resizingImage = null;
+    }
+
+    /// <summary>画像のリサイズをキャンセルし、開始時のサイズへ復元する(Esc、T-064)。</summary>
+    public void CancelResizeImage()
+        => CancelDrag(ref _resizingImage, image =>
+        {
+            image.XMm = _resizeImageOrigXMm; image.YMm = _resizeImageOrigYMm;
+            image.WidthMm = _resizeImageOrigWidthMm; image.HeightMm = _resizeImageOrigHeightMm;
+        });
 
     // T-041増分2: 縦コネクタ手動記入(sF9)の作業中データ。AnchorRowは記入開始行(固定)、CurrentRowは
     // 矢印キーで動く終点行。TopRow/BottomRowはこの2つのMin/Maxとして都度導出する(`ecad2-t041-key-flow

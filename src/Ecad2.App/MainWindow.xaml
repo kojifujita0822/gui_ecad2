@@ -130,6 +130,8 @@
             </MenuItem>
             <MenuItem Header="図面(_D)">
                 <MenuItem Header="ドキュメント情報(_I)" Click="DocumentInfoMenuItem_Click" IsEnabled="{Binding HasProject}"/>
+                <!-- T-064(殿裁定): 挿入トリガー=メニューのみ(ツールバーボタン新設なし)。 -->
+                <MenuItem Header="画像挿入(_M)..." Click="InsertImageMenuItem_Click" IsEnabled="{Binding HasProject}"/>
             </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>
@@ -486,12 +488,19 @@
                         <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
                             <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
                             <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
-                                       Visibility="{Binding HasSelectedElement, Converter={StaticResource InverseBoolToVisibility}}"/>
+                                       Visibility="{Binding HasNoPropertySelection, Converter={StaticResource BoolToVisibility}}"/>
                             <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
                                 <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}"/>
                                 <TextBlock Text="デバイス名:" Margin="0,8,0,2"/>
                                 <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
                                          LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
+                            </StackPanel>
+                            <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
+                                 ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
+                            <StackPanel Margin="4" Visibility="{Binding HasSelectedImage, Converter={StaticResource BoolToVisibility}}">
+                                <TextBlock Text="画像" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="Gray"/>
+                                <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}"/>
                             </StackPanel>
                         </DockPanel>
                         <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">

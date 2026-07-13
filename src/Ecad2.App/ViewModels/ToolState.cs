@@ -9,7 +9,7 @@ namespace Ecad2.App.ViewModels;
 /// 集約し、この状態は MainWindowViewModel が公開する１つのプロパティとして扱う（code-behindや
 /// 複数箇所に散らばせない）。
 /// </summary>
-public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak }
+public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak, PlaceImage }
 
 /// <summary>現在の配置ツール状態。Kind/PartId/Orient/IsOr は Mode==PlaceElement のときのみ意味を持つ。</summary>
 public readonly record struct ToolState(
@@ -21,3 +21,6 @@ public readonly record struct ToolState(
 {
     public static ToolState SelectDefault => new(ToolMode.Select);
 }
+
+/// <summary>T-064: 画像のリサイズハンドル種別(4隅、対角コーナーを固定点として扱う)。</summary>
+public enum ImageResizeHandle { TopLeft, TopRight, BottomLeft, BottomRight }

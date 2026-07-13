@@ -103,6 +103,22 @@ public sealed class LadderCanvas : FrameworkElement
     // 選択中の接続点のハイライトマーク(T-041増分5、SelectedWireBreakBrushと同型)。
     private static readonly Brush SelectedConnectionDotBrush = Brushes.OrangeRed;
 
+    // 選択中の画像のハイライト枠+リサイズハンドル(T-064、SelectedConnectorPen等と同色)。
+    private static readonly Pen SelectedImagePen = new(Brushes.OrangeRed, 2.0);
+    private const double ImageResizeHandleSizeDip = 8.0;
+
+    // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。確定済み画像との
+    // 区別のため半透明の塗り+破線枠にする(ConnectorDraftPen等と同系統の表現)。
+    private static readonly Brush ImageDraftFillBrush = CreateImageDraftFillBrush();
+    private static readonly Pen ImageDraftPen = CreateDraftPen();
+
+    private static Brush CreateImageDraftFillBrush()
+    {
+        var brush = new SolidColorBrush(Colors.DodgerBlue) { Opacity = 0.25 };
+        brush.Freeze();
+        return brush;
+    }
+
     // 直近のDraw()呼び出し内容(T-023)。LadderCanvasAutomationPeer/SymbolAutomationPeerが
     // Draw()の呼び出しタイミングと無関係にいつでも参照できるよう、キャンバス自身の状態として保持する
     // (Drawはビュー外部(MainWindow)から都度呼ばれる素通しメソッドのため、他に保持場所が無い)。
@@ -118,7 +134,8 @@ public sealed class LadderCanvas : FrameworkElement
     public void Draw(Sheet sheet, PartLibrary? library = null, GridPos? selectedCell = null,
         VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null,
         WireBreak? selectedWireBreak = null, FreeLine? selectedFreeLine = null,
-        FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null)
+        FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null,
+        ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -192,6 +209,25 @@ public sealed class LadderCanvas : FrameworkElement
                 double y = dot.YMm * MmToDip;
                 double r = _renderer.Geometry.CellMm * 0.15 * MmToDip;
                 dc.DrawEllipse(SelectedConnectionDotBrush, null, new Point(x, y), r, r);
+            }
+
+            // 選択中の画像のハイライト枠+4隅リサイズハンドル(T-064、殿裁定=ドラッグハンドル新設)。
+            if (selectedImage is { } img)
+            {
+                var rect = ImageRectDip(img);
+                dc.DrawRectangle(null, SelectedImagePen, rect);
+                foreach (var corner in new[] { rect.TopLeft, rect.TopRight, rect.BottomLeft, rect.BottomRight })
+                    dc.DrawRectangle(Brushes.White, SelectedImagePen,
+                        new Rect(corner.X - ImageResizeHandleSizeDip / 2, corner.Y - ImageResizeHandleSizeDip / 2,
+                            ImageResizeHandleSizeDip, ImageResizeHandleSizeDip));
+            }
+
+            // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。半透明の塗り+
+            // 破線枠で配置枠を示す(実画像内容の描画は行わない、シンプルさ優先)。
+            if (imageInsertDraft is { } draftImg)
+            {
+                var rect = ImageRectDip(draftImg);
+                dc.DrawRectangle(ImageDraftFillBrush, ImageDraftPen, rect);
             }
         }
         _children.Add(visual);
@@ -386,6 +422,43 @@ public sealed class LadderCanvas : FrameworkElement
         return best;
     }
 
+    /// <summary>クリック位置(ローカルDIP座標)にヒットする画像を探す(T-064)。GuiEcad同様「背面固定
+    /// 描画のため他要素より判定優先度が最後」の設計方針(呼び出し元で他ヒットテストの後に呼ぶ想定)。
+    /// 矩形内ヒット(面積を持つため許容誤差は不要)。後から挿入された画像ほど手前に見える想定で
+    /// 配列末尾から探す(nearest-winsではなく最前面優先)。</summary>
+    internal ImageInsert? HitTestImage(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        for (int i = sheet.Images.Count - 1; i >= 0; i--)
+        {
+            var img = sheet.Images[i];
+            if (xMm >= img.XMm && xMm <= img.XMm + img.WidthMm && yMm >= img.YMm && yMm <= img.YMm + img.HeightMm)
+                return img;
+        }
+        return null;
+    }
+
+    /// <summary>選択中の画像のリサイズハンドル(4隅)上にクリック位置があるか判定する(T-064、
+    /// ドラッグハンドル方式、殿裁定)。ヒットすれば掴んだ隅を返す。</summary>
+    internal Ecad2.App.ViewModels.ImageResizeHandle? HitTestImageResizeHandle(Point localPositionDip, ImageInsert image)
+    {
+        var rect = ImageRectDip(image);
+        double half = ImageResizeHandleSizeDip / 2 + 2.0; // ハンドル本体+若干の許容誤差
+        (Point Corner, Ecad2.App.ViewModels.ImageResizeHandle Handle)[] handles =
+        {
+            (rect.TopLeft, Ecad2.App.ViewModels.ImageResizeHandle.TopLeft),
+            (rect.TopRight, Ecad2.App.ViewModels.ImageResizeHandle.TopRight),
+            (rect.BottomLeft, Ecad2.App.ViewModels.ImageResizeHandle.BottomLeft),
+            (rect.BottomRight, Ecad2.App.ViewModels.ImageResizeHandle.BottomRight),
+        };
+        foreach (var (corner, handle) in handles)
+        {
+            if (Math.Abs(localPositionDip.X - corner.X) <= half && Math.Abs(localPositionDip.Y - corner.Y) <= half)
+                return handle;
+        }
+        return null;
+    }
+
     /// <summary>点(px,py)と線分((x1,y1)-(x2,y2))の距離(mm)。PoC(poc/t041-freeline-hittest-poc)で
     /// 検証済みのロジックをそのまま移植。</summary>
     private static double DistancePointToSegment(double px, double py, double x1, double y1, double x2, double y2)
@@ -414,6 +487,10 @@ public sealed class LadderCanvas : FrameworkElement
     /// <summary>FreeLineの始点/終点をローカルDIP座標へ変換する(T-041増分5)。</summary>
     private static Point FreeLineEndpointDip(FreeLine line, bool start)
         => start ? new Point(line.X1Mm * MmToDip, line.Y1Mm * MmToDip) : new Point(line.X2Mm * MmToDip, line.Y2Mm * MmToDip);
+
+    /// <summary>ImageInsertの矩形(mm実座標)をローカルDIP座標へ変換する(T-064)。</summary>
+    private static Rect ImageRectDip(ImageInsert image)
+        => new(image.XMm * MmToDip, image.YMm * MmToDip, image.WidthMm * MmToDip, image.HeightMm * MmToDip);
 
     /// <summary>描画内容を消去する(T-019: Document.Sheets.Count==0の空状態で使う。
     /// 前回シートの残像を残さない)。</summary>
