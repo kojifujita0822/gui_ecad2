@@ -511,4 +511,28 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Equal(88, image.WidthMm);   // 境界100まで(88=100-12)
         Assert.Equal(88, image.HeightMm);
     }
+
+    // --- T-064追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13):
+    //     ReplaceDocumentが画像挿入ドラフトをクリアしていなかった横展開漏れの回帰テスト。
+    //     ConnectorDraftTests/FreeLineDraftTestsの同型テスト(ReplaceDocument_Clears*Draft_OnNewDocument)
+    //     と対称に揃える。 ---
+
+    /// <summary>画像挿入配置待機中(Tool.Mode=PlaceImage)に確定・キャンセルせず新規/開くを実行すると、
+    /// 旧実装は_imageInsertDraftが残留しHasAnyDraftが真のまま残った(右クリック無反応の原因)。加えて
+    /// ImageInsertDraftPreviewは旧文書座標系のImageInsertを返し続け、新文書上に幽霊プレビューが
+    /// 表示される(RedrawCanvasがTool.Mode非依存で無条件描画するため)。</summary>
+    [Fact]
+    public void ReplaceDocument_ClearsImageInsertDraft_OnNewDocument()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 40, heightMm: 20, xMm: 10, yMm: 10);
+        Assert.True(vm.HasAnyDraft);
+
+        vm.NewDocument();
+
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.Null(vm.ImageInsertDraftPreview);
+        Assert.False(vm.HasAnyDraft);
+    }
 }

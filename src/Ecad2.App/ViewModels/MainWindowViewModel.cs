@@ -2085,6 +2085,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         ClearConnectorDraftIfAny();
         // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同様。
         ClearFreeLineDraftIfAny();
+        // T-064追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像挿入の記入中状態
+        // (_imageInsertDraft)も同様に、旧文書の情報を持ち越さないようクリアする必要があった
+        // (横展開漏れ、ClearConnectorDraftIfAny/ClearFreeLineDraftIfAnyのみ呼ばれ本項が欠落)。
+        // 未クリアのままだとHasAnyDraftが真のまま残留し直後の右クリックが無反応になるほか、
+        // ImageInsertDraftPreview(RedrawCanvasがTool.Mode非依存で無条件描画)が旧文書座標系の
+        // ImageInsertを返し続け、新文書上に幽霊プレビューが表示される(コード読解で確認、
+        // CancelImageInsertDraft()呼び出し1箇所で両症状とも解消する)。
+        CancelImageInsertDraft();
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);
