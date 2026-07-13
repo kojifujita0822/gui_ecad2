@@ -493,6 +493,38 @@
                 </views:LadderCanvas>
             </ScrollViewer>
 
+            <!-- T-070(殿裁定(1)=上部バー、GuiEcad踏襲): 検索・置換オーバーレイ。Ctrl-Fでトグル表示。
+                 作図エリア(Grid.Column="2")の上部に重ねる、ElementPlacementBarと同型の同一Window内
+                 オーバーレイ設計。検索対象は機器名完全一致のみ(殿裁定(2))。 -->
+            <Border x:Name="FindBar" Grid.Column="2" Background="White" BorderBrush="Gray"
+                    BorderThickness="1" Padding="6" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                    Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
+                    Panel.ZIndex="100">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="検索:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                    <TextBox x:Name="FindQueryBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
+                             AutomationProperties.Name="検索"
+                             Text="{Binding Find.Query, UpdateSourceTrigger=PropertyChanged}"
+                             PreviewKeyDown="FindQueryBox_PreviewKeyDown"/>
+                    <TextBlock Text="{Binding Find.StatusText}" VerticalAlignment="Center" Width="60" Margin="0,0,4,0"/>
+                    <Button Content="前" Width="32" VerticalAlignment="Center" Margin="0,0,2,0"
+                            AutomationProperties.Name="前へ" Command="{Binding Find.PrevCommand}"/>
+                    <Button Content="次" Width="32" VerticalAlignment="Center" Margin="0,0,8,0"
+                            AutomationProperties.Name="次へ" Command="{Binding Find.NextCommand}"/>
+                    <Separator/>
+                    <TextBlock Text="置換後:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                    <TextBox x:Name="FindReplaceBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
+                             AutomationProperties.Name="置換後"
+                             Text="{Binding Find.ReplaceWith, UpdateSourceTrigger=PropertyChanged}"/>
+                    <Button Content="置換" Width="48" VerticalAlignment="Center" Margin="0,0,4,0"
+                            AutomationProperties.Name="置換" Command="{Binding Find.ReplaceOneCommand}"/>
+                    <Button Content="全置換" Width="56" VerticalAlignment="Center" Margin="0,0,8,0"
+                            AutomationProperties.Name="全置換" Command="{Binding Find.ReplaceAllCommand}"/>
+                    <Button Content="閉じる" Width="56" VerticalAlignment="Center"
+                            AutomationProperties.Name="検索バーを閉じる" Click="FindCloseButton_Click"/>
+                </StackPanel>
+            </Border>
+
             <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
 
             <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
@@ -580,10 +612,34 @@
              (T-059、既定160・MinHeight=80はMainContentArea.RowDefinitions側で指定)。 -->
         <DockPanel x:Name="OutputPanelArea" Grid.Row="4">
             <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
-                <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"/>
+                <Grid>
+                    <!-- T-070(DoD(3)7項目目「検索結果パネル」): FindBar表示中は検索結果、非表示中は
+                         DRC結果を表示する自動連動(UI/UX論点でないため実装設計として侍裁量、GuiEcad
+                         はタブ切替UIだがecad2は簡略化)。 -->
+                    <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"
+                               Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"/>
+                    <TextBlock Text="検索結果" FontWeight="Bold" Margin="4,2"
+                               Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"/>
+                </Grid>
             </Border>
+            <DataGrid x:Name="FindResultsGrid" ItemsSource="{Binding Find.Matches}"
+                      Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
+                      AutoGenerateColumns="False" IsReadOnly="True"
+                      HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                <DataGrid.RowStyle>
+                    <Style TargetType="DataGridRow">
+                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
+                    </Style>
+                </DataGrid.RowStyle>
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="シート" Binding="{Binding SheetName}" Width="100"/>
+                    <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="100"/>
+                    <DataGridTextColumn Header="該当箇所" Binding="{Binding Location}" Width="*"/>
+                </DataGrid.Columns>
+            </DataGrid>
             <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
                       SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
+                      Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"
                       AutoGenerateColumns="False" IsReadOnly="True"
                       HeadersVisibility="Column" GridLinesVisibility="Horizontal">
                 <DataGrid.RowStyle>

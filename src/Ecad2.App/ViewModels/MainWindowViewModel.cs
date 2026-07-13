@@ -1748,6 +1748,27 @@ public sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
+    /// <summary>指定要素のDeviceNameだけを置換する(T-070、殿裁定=GuiEcad同様1件のみリネーム、
+    /// 機器名としての一意性は保証しない設計)。DeviceRenamer.Renameは同名一致の全要素を巻き込む
+    /// ため使わず、SelectedElementDeviceNameセッターと同型の単発変更+機器表整合処理(新名が
+    /// 未登録なら登録、旧名が他の要素から参照されなくなれば除去)を行う。Undo対象のため呼び出し
+    /// 前にUndoManager.RecordSnapshotを済ませておくこと(検索・置換バーFindViewModel専用)。</summary>
+    public void ReplaceOneDeviceName(ElementInstance element, string newName)
+    {
+        string oldName = element.DeviceName ?? "";
+        string trimmedNewName = newName.Trim();
+        if (oldName == trimmedNewName) return;
+
+        element.DeviceName = trimmedNewName.Length > 0 ? trimmedNewName : null;
+        if (trimmedNewName.Length > 0 && !Document.Devices.ByName.ContainsKey(trimmedNewName))
+            Document.Devices.ByName[trimmedNewName] = new Device { Name = trimmedNewName, Class = ResolveDeviceClass(element) };
+        if (oldName.Length > 0) RemoveDeviceIfUnreferenced(oldName);
+
+        MarkDirty();
+        NotifySelectedElementChanged();
+        DeviceTable.Refresh();
+    }
+
     /// <summary>指定デバイス名が、Document.Sheets全体のどの要素からも参照されなくなっていれば
     /// Document.Devices.ByNameから該当エントリを除去する(T-055増分3往復1周目、隠密レビュー指摘c=
     /// SelectedElementDeviceNameセッター・DeleteSelectedElement・CleanupRemovedDeviceNamesの
@@ -1908,6 +1929,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>下部出力パネル（DesignRuleCheck結果表示）の子ViewModel。</summary>
     public OutputPanelViewModel OutputPanel { get; }
+
+    /// <summary>作図エリア上部の検索・置換バー(T-070)の子ViewModel。</summary>
+    public FindViewModel Find { get; }
 
     /// <summary>Undo/Redo基盤(T-051)。MVP対象範囲はSheetNavigationViewModelのシート追加/削除のみ
     /// (設計出典: docs/ecad2-t051-implementation-plan-samurai.md)。</summary>
@@ -2280,6 +2304,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         PartLibrary = PartPalette.Library;
         DeviceTable = new DeviceTableViewModel(Document.Devices);
         OutputPanel = new OutputPanelViewModel(this);
+        Find = new FindViewModel(this);
 
         // T-055増分1: 末尾行の追加・削除。CanExecuteはボタンのIsEnabled連動用、Execute内部の
         // ガードはキーボードショートカット等CanExecuteを経由しない呼び出しに対する安全弁

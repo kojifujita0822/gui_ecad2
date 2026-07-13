@@ -456,6 +456,24 @@ public partial class MainWindow : Window
         }
     }
 
+    // T-070: 検索バーを閉じる(閉じるボタン)。FindViewModel.IsVisibleのsetterがQueryをクリアする。
+    private void FindCloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.Find.IsVisible = false;
+        FocusCanvas();
+    }
+
+    // T-070: 検索ボックス内のEnter(次へ、GuiEcad踏襲)。Escは親のWindow_PreviewKeyDown(Tunnelingで
+    // 本ハンドラより先に発火)がFindBar表示中の最優先層として処理するため、ここでは扱わない。
+    private void FindQueryBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter)
+        {
+            if (_viewModel.Find.NextCommand.CanExecute(null)) _viewModel.Find.NextCommand.Execute(null);
+            e.Handled = true;
+        }
+    }
+
     // 新規作成(T-019)。未保存の変更(IsDirty)があれば確認を挟む(殿裁定2026-07-05)。
     private void NewButton_Click(object sender, RoutedEventArgs e)
     {
@@ -1236,6 +1254,18 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.Escape:
+                // T-070: 検索バー表示中のEscapeは最優先でバーを閉じる。本ハンドラはTunnelingで
+                // FindQueryBox(専用のFindQueryBox_PreviewKeyDown)より先に発火するため、ここで
+                // 処理しないとFindBar内のEsc取消が到達不能になる(IsPlacementBarVisible等と異なり
+                // FindBarは非モーダル=グローバルショートカット全体は無効化しないため、Escapeの
+                // 奪い合いのみここで個別に解消する)。
+                if (_viewModel.Find.IsVisible)
+                {
+                    _viewModel.Find.IsVisible = false;
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // T-041増分7: ドラッグ中(マウスキャプチャ中)のEscは掴んだ位置への復元のみを行う
                 // 独立した最優先の層とする(記入中モードと同じ「1回のEscは1層だけ」の原則、下記の
                 // 層2/3/4処理へは落とさない)。poc/t041-drag-poc/DragCanvas.csと同じ設計。
@@ -1586,6 +1616,12 @@ public partial class MainWindow : Window
             case Key.G when Keyboard.Modifiers == ModifierKeys.Control:
                 // T-056: メニューのInputGestureText表示(Ctrl+G)と整合させる。
                 _viewModel.IsGridVisible = !_viewModel.IsGridVisible;
+                e.Handled = true;
+                break;
+            case Key.F when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-070(殿裁定(1)): 検索・置換バーのトグル表示(GuiEcad ToggleFindBar踏襲)。
+                _viewModel.Find.IsVisible = !_viewModel.Find.IsVisible;
+                if (_viewModel.Find.IsVisible) FindQueryBox.Focus();
                 e.Handled = true;
                 break;
             case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
@@ -2143,6 +2179,13 @@ public partial class MainWindow : Window
     {
         if (sender is DataGridRow { Item: Ecad2.Simulation.Diagnostic diagnostic })
             _viewModel.OutputPanel.JumpToDiagnostic(diagnostic);
+    }
+
+    // T-070: 検索結果パネルの行クリック(OutputGridRow_Clickedと同型)。
+    private void FindResultsGridRow_Clicked(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is DataGridRow { Item: ViewModels.FindMatch match })
+            _viewModel.Find.JumpToMatch(match);
     }
 
     // 選択中セル(SelectedCell)へ要素を配置する(T-026段階4新配置フロー)。未選択・空き行チェック→
