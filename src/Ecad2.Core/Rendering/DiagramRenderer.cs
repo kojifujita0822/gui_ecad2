@@ -946,7 +946,7 @@ public sealed class DiagramRenderer
             ? PartResolver.ComponentKind(e, _lib)
             : e.Kind;
 
-        // T-061(殿裁定③=LDmicro式「通電=赤/非通電=グレー」): energizedが非nullならテストモード中。
+        // T-061(殿裁定(3)=LDmicro式「通電=赤/非通電=グレー」): energizedが非nullならテストモード中。
         // デバイス名を持つ要素(=命令として評価される記号)のみ対象、無印の配線・枠等は対象外。
         bool testMode = energized is not null;
         bool on = testMode && e.DeviceName is not null

@@ -53,7 +53,7 @@
             <Setter Property="Margin" Value="0,1,0,0"/>
         </Style>
 
-        <!-- T-061(殿裁定④=ツールバーToggleButton+背景色変化、GuiEcad踏襲): ButtonとToggleButtonは
+        <!-- T-061(殿裁定(4)=ツールバーToggleButton+背景色変化、GuiEcad踏襲): ButtonとToggleButtonは
              ButtonBaseの兄弟クラスでBasedOnによる型混在継承ができないため、ToolBarButtonStyleと
              同じ寸法・無効化表現を独立定義し、IsChecked時の背景色変化のみ追加する。 -->
         <Style x:Key="TestModeToolBarButtonStyle" TargetType="ToggleButton">
@@ -230,9 +230,9 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <!-- T-061(殿裁定②④): テストモード切替。上位enum(AppMode)一元管理、ツールバー
+                <!-- T-061(殿裁定(2)(4)): テストモード切替。上位enum(AppMode)一元管理、ツールバー
                      ToggleButton+背景色変化(GuiEcad踏襲)。キーボードショートカットは新規割当なし
-                     (殿裁定①=F5表示矛盾はメニューのInputGestureText除去のみで解消)。 -->
+                     (殿裁定(1)=F5表示矛盾はメニューのInputGestureText除去のみで解消)。 -->
                 <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード"
                               AutomationProperties.Name="テストモード"
                               IsChecked="{Binding IsTestMode}"
@@ -617,8 +617,8 @@
              ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
              本実装向け機能に依存するため将来タスク。 -->
         <StatusBar x:Name="StatusBarArea" Grid.Row="4">
-            <!-- T-061殿裁定⑦: モード表示。Tool.Modeと同じenumそのまま表示パターン(日本語化は
-                 T-053同様の別タスク扱い、既存流儀踏襲)。 -->
+            <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。Tool.Modeと同じ
+                 enumそのまま表示パターン(日本語化はT-053同様の別タスク扱い、既存流儀踏襲)。 -->
             <StatusBarItem>
                 <TextBlock Text="{Binding Mode, StringFormat='モード: {0}'}"/>
             </StatusBarItem>

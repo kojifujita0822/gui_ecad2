@@ -30,7 +30,7 @@ public sealed class DrawingTheme
     public static readonly Color Blue = new(255, 0, 80, 220);          // 接続検査: 接続済み
     public static readonly Color Powered = new(255, 230, 60, 0);       // テストモード: 通電/励磁
     public static readonly Color ManualForced = new(110, 0, 80, 220);  // テストモード: 接点手動強制（半透明青）
-    // T-061(殿裁定③=LDmicro式): 通電=赤(Powered、既存)/非通電=グレー。テストモード中のみ使う
+    // T-061(殿裁定(3)=LDmicro式): 通電=赤(Powered、既存)/非通電=グレー。テストモード中のみ使う
     // (作画モードでは従来どおりForegroundのまま、DiagramRenderer.DrawElement参照)。
     public static readonly Color NonEnergizedGray = new(255, 150, 150, 150);
 

@@ -4,7 +4,7 @@ using Ecad2.Persistence;
 namespace Ecad2.Core.Tests;
 
 /// <summary>
-/// 殿裁定(T-007)の要件①「既存.GCADファイルとの互換性は維持する」の検証。
+/// 殿裁定(T-007)の要件(1)「既存.GCADファイルとの互換性は維持する」の検証。
 /// gui_ecad(GuiEcad.App/Assets/Parts/thermal-relay-a.gcadpart)から採取した実サンプルJSONを
 /// そのまま埋め込み、Ecad2.Persistenceが同一スキーマで読み込めることを確認する。
 /// </summary>

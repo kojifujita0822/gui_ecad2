@@ -59,7 +59,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             _appMode = value;
             if (_appMode == AppMode.Test)
             {
-                // GuiEcad踏襲(殿裁定⑤=シートまたぎ状態保持方針): ON化のたびに全シート分の
+                // GuiEcad踏襲(殿裁定(5)=シートまたぎ状態保持方針): ON化のたびに全シート分の
                 // セッションをクリアして作り直す(ON中はシートをまたいでも保持、OFF→ON再遷移時は
                 // まっさらに戻る)。進行中の配置ドラフト(Tool)もGuiEcadの「ドラッグ/パン状態の破棄」
                 // に相当するため選択モードへ戻す。
@@ -77,7 +77,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    /// <summary>ツールバーToggleButton・メニューのIsCheckedバインド用(T-061、殿裁定④)。</summary>
+    /// <summary>ツールバーToggleButton・メニューのIsCheckedバインド用(T-061、殿裁定(4))。</summary>
     public bool IsTestMode
     {
         get => Mode == AppMode.Test;
