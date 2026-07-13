@@ -1585,8 +1585,12 @@ public partial class MainWindow : Window
                     RedrawCanvas();
                 e.Handled = true;
                 break;
-            case Key.Enter when noModifier && _viewModel.Mode == ViewModels.AppMode.Test
+            case Key.Enter when noModifier && IsCanvasFocused() && _viewModel.Mode == ViewModels.AppMode.Test
                     && !e.IsRepeat && _viewModel.SelectedCell is Ecad2.Model.GridPos testEnterPos:
+                // T-061修正A-3(隠密2周目レビュー指摘): 他の同種Enterケース(F2/Delete/Enter配置確定)は
+                // 全てIsCanvasFocused()を条件に含むが本ケースだけ欠けていたため、DeviceNameBox編集中の
+                // Enterを本ケースが先に消費しCommitDeviceNameEditへ到達できなかった(Tunnelingイベントの
+                // 到達順序上、Window側が先にe.Handled=trueにすると子のDeviceNameBoxへ伝播しない)。
                 // T-061修正(A-1確認事項1、殿裁定新規結線): テストモード中、選択セル上の要素への
                 // Enter押下をマウス左クリック相当として扱う(TestModePressをマウスハンドラと共用)。
                 // モーメンタリ解除はWindow_PreviewKeyUpでEnterキーアップ時に行う。e.IsRepeatで
