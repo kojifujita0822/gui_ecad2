@@ -87,5 +87,8 @@
 | P-078 | 隠密（T-069往復4周目再レビュー2026-07-13、CONFIRMED・severity中） | 修正2（右クリック作業起点保護）の副作用で、メニュー表示中はプロパティパネル・選択ハイライトが正規化前の旧選択のままとなり、メニュー項目名とパネル表示が一時的に食い違う見た目になる。項目実行後は正しく反映されるため深刻ではない | T-069範囲内（意図的トレードオフの副作用） | 不明（見た目のみの問題、修正するなら表示更新のタイミング調整） | pending（**殿裁定2026-07-13：現状のままクローズ、経過観察**） |
 | P-079 | 隠密（T-069往復4周目再レビュー2026-07-13、PLAUSIBLE） | テスト設計書の検証観点2の3件が全て未実装（View層依存でユニットテスト不可、設計書の事前承認あり手続き上は妥当）。ただし1件（`DeleteExecuted`、実行系退行検知）は既存パターン（`RightClickElementSelection_OnAnyOccupiedCell_DeletesCorrectElement`等）と同じ手法で実装可能だった疑いが残り、他2件と一律「テスト不可」扱いとしたことに一貫性を欠く面がある | T-069範囲内（テスト実装の裁量判断） | 小（1件追加実装の要否確認） | pending（**殿裁定2026-07-13：現状のまま容認、追加実装は求めない**） |
 | P-080 | 隠密（T-064追加往復再レビュー2026-07-13、Altitude・構造的） | 3種ドラフト全クリアの一元化ヘルパー`CancelResidualDraftForToolSwitch()`（T-069往復4周目で新設済み）が`ReplaceDocument`では再利用されず個別列挙が継続、今回の`SelectedImage`クリア漏れ修正もさらに1行追加する形で対応。クリア責務が`SelectedCell`setter・`ReplaceDocument`・`CancelResidualDraftForToolSwitch`の3箇所に分散したまま残り、将来4種目のドラフトが追加されれば同型のクリア漏れが再発しうる構造 | T-064範囲外（構造的、隠密自身が「往復5周目以降の判断事項」と評価） | 中（`ReplaceDocument`と`SelectedCell`setter双方を単一のクリア入口へ統一する設計変更） | pending |
+| P-081 | 隠密（T-061 3周目静的レビュー2026-07-14、code-review併用） | 機器表「型式」列がCanEditDiagram未ガードのままテストモード中も編集可能——A-2/A-3/A-5で対処した機器名編集欄・画像挿入メニューと同種のガード漏れの疑い | T-061範囲外（3周目レビューの気づき） | 小 | pending |
+| P-082 | 隠密（同上、code-review併用） | 配置系ボタン群のIsEnabled複製構造、Style既定値化の改善余地あり（緊急性低） | T-061範囲外 | 小 | pending |
+| P-083 | 隠密（同上、code-review併用） | `noModifier && IsCanvasFocused()`のswitch-case when条件が11箇所で文字列複製されており、今回のバグ（A-3、1588行目の欠落）自体がこの複製構造に起因。共有bool変数化で同種見落としを構造的に防げる提案（PR-07 rule of three類似、断定はせず「疑いあり」） | T-061範囲外（構造的懸念） | 小〜中 | pending |
 
 <!-- 判断: pending（承認待ち） / approved → 移送先 T-ID / rejected -->
