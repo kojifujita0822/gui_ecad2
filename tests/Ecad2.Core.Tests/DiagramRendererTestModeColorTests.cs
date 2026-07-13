@@ -20,9 +20,17 @@ namespace Ecad2.Core.Tests;
 /// </summary>
 public class DiagramRendererTestModeColorTests
 {
+    // T-061修正(隠密指摘、家老経由確認2026-07-13): MainCircuit=falseだとDrawRungWiresが自動配線
+    // (母線間の配線)を描画し、その配線色はPoweredNets(floodL∪floodR、両母線から到達可能な全ネット)
+    // 判定で常にPowered色になる(単独要素配置は必ず母線に直結するため)。Assert.Contains(Powered, ...)
+    // は配線由来のPoweredと要素記号由来のPoweredを区別できず、要素自体が実際にはグレーのまま
+    // (=旧実装のB群バグ)でも配線色混入によって偽陽性でPASSしてしまっていた(隠密の静的読解で発覚、
+    // 実測でも6件中4件が旧実装で偶然PASSすると確認)。MainCircuit=trueにしてDrawRails/DrawBusLabels/
+    // DrawRungWiresを全てスキップさせ、DrawElement(要素記号)由来の色のみが記録されるようにする
+    // (NetlistBuilder/EvaluatorはMainCircuitを一切参照しないため評価結果への影響はない)。
     private static Sheet MakeSingleElementSheet(ElementKind kind, string deviceName)
     {
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
         sheet.Elements.Add(new ElementInstance { Kind = kind, Pos = new GridPos(0, 5), DeviceName = deviceName });
         return sheet;
     }
@@ -99,7 +107,12 @@ public class DiagramRendererTestModeColorTests
     [Fact]
     public void Render_TestModeForcedContactNC_UsesNonEnergizedGray()
     {
-        // B-3再発防止(NC反転の対): 手動強制ON(Inputs=true)にするとNCは開路(非導通)=グレーになるべき。
+        // 正しい動作の確認(検出力なし、隠密指摘・家老経由確認2026-07-13): 手動強制ON(Inputs=true)なら
+        // NCは開路(非導通)=グレーになるべき。ただし旧実装(energized[DeviceName]のみ参照、接点は
+        // energizedに登録されないため常にfalse)でも「非導通」という同じ結論に偶然一致するため、
+        // このケース単体は旧実装のB-3バグを検出できない(RED先行証明で実測確認済み、旧実装でもPASS)。
+        // 検出力はUnforcedContactNC(Inputs未設定→旧実装は誤ってグレー、正しくは赤)側が担う。
+        // このテストは反転の対称性(ON/OFF両方向)を正しい実装が満たすことの確認として残す。
         var sheet = MakeSingleElementSheet(ElementKind.ContactNC, "X002");
         var renderer = new ColorRecordingRenderer();
         var sim = new SimState();
@@ -130,7 +143,7 @@ public class DiagramRendererTestModeColorTests
     {
         // B-2再発防止: 限時タイマ接点はコイル励磁「かつ」経過時間>=設定時間で初めて導通する。
         // コイル励磁直後(経過時間未達)は非導通(グレー)のままであるべき。
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
         var timerCoil = new ElementInstance { Kind = ElementKind.Timer, Pos = new GridPos(0, 0), DeviceName = "T001" };
         timerCoil.Params[ParamKeys.Setpoint] = "5";
         var timerContact = new ElementInstance { Kind = ElementKind.TimerContactNO, Pos = new GridPos(1, 0), DeviceName = "T001" };
@@ -148,8 +161,13 @@ public class DiagramRendererTestModeColorTests
     [Fact]
     public void Render_TestModeTimerContactNOAfterTimeout_UsesPoweredColor()
     {
-        // B-2再発防止(対): 経過時間が設定値に達すれば導通(赤)になるべき。
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        // 正しい動作の確認(検出力なし、隠密指摘・家老経由確認2026-07-13): 経過時間が設定値に達すれば
+        // 導通(赤)になるべき。ただしこのケース(コイル励磁中+経過時間超過)は、旧実装(DeviceName一致の
+        // energized[DeviceName]のみ参照、限時判定なし)でも「コイルは励磁中でTimerContactNOも同じ
+        // DeviceNameを共有する」ため偶然Poweredに一致してしまい、旧実装のB-2バグを検出できない
+        // (RED先行証明で実測確認済み、旧実装でもPASS)。検出力はBeforeTimeout(経過時間未達→旧実装は
+        // 誤って赤、正しくはグレー)側が担う。このテストは限時判定の対称性(達成/未達両方)の確認として残す。
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
         var timerCoil = new ElementInstance { Kind = ElementKind.Timer, Pos = new GridPos(0, 0), DeviceName = "T001" };
         timerCoil.Params[ParamKeys.Setpoint] = "5";
         var timerContact = new ElementInstance { Kind = ElementKind.TimerContactNO, Pos = new GridPos(1, 0), DeviceName = "T001" };
