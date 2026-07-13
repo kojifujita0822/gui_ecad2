@@ -4,14 +4,7 @@ ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
 
 ## 現況（最重要）
 
-- **[ecad2-stack-decision-brief.md](ecad2-stack-decision-brief.md)** — 技術スタック決定ブリーフ。現時点の到達点はここ。**未確定・殿の裁定待ち**（WPF本命・Qt対抗・Avaloniaクロス保険）。
-
-## 各family調査（決定ブリーフの元資料）
-
-- [ecad2-keyboard-requirements.md](ecad2-keyboard-requirements.md) — キーボード要件（忍者）
-- [ecad2-framework-survey-onmitsu.md](ecad2-framework-survey-onmitsu.md) — .NET系調査（隠密）
-- [ecad2-stack-web-crossplatform.md](ecad2-stack-web-crossplatform.md) — Web＆クロスプラットフォーム系調査（忍者）
-- [ecad2-stack-native-lightweight.md](ecad2-stack-native-lightweight.md) — ネイティブ/軽量系調査（侍）
+- **[ecad2-stack-decision-brief.md](ecad2-stack-decision-brief.md)** — 技術スタック決定ブリーフ。**WPFに正式確定（2026-07-03、殿裁定）**。各family調査（決定ブリーフの元資料）はタスク完了済みにつき`docs/archive/`収蔵。
 
 ## UI/UX作成の参考資料（殿指示2026-07-09で恒久保存）
 
@@ -22,7 +15,7 @@ ecad2 の計画ドキュメント一覧。読む順序の目安は上から。
 
 ## アーカイブ
 
-- `docs/archive/` — 完了・取り止め済みタスクの調査書・レビュー書置き場（T-076、2026-07-11整理。docs/直下は進行中タスクの調査書のみに縮小）。
+- `docs/archive/` — 完了・取り止め済みタスクの調査書・レビュー書置き場（T-076、2026-07-11整理／2026-07-13再整理で30件追加移送。docs/直下は進行中タスクの調査書＋恒久保存資料のみに縮小）。
 
 ## 運用
 
