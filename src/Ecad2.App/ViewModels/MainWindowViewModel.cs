@@ -2080,6 +2080,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         // T-041増分5: 自由線・接続点も同様に旧文書の参照を持ち越さない。
         SelectedFreeLine = null;
         SelectedConnectionDot = null;
+        // T-064再追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像選択(SelectedImage)も
+        // 同様に旧文書の実体を持ち越さない。SelectedImage=nullはSelectedCellのsetter内にしか
+        // 無く、上の_selectedCellは直接代入(setterバイパス)のため自動クリアが効かない
+        // (SelectedConnector等と同じ理由、ここだけ横展開漏れしていた)。
+        SelectedImage = null;
         // T-041増分2隠密レビュー指摘(観点3 CONFIRMED): 記入中(_connectorDraft)も同様に、直接代入
         // (_selectedCell)経由ではSelectedCellのsetterの自動クリアが効かないため、ここでも明示する。
         ClearConnectorDraftIfAny();

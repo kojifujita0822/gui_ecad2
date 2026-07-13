@@ -535,4 +535,24 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Null(vm.ImageInsertDraftPreview);
         Assert.False(vm.HasAnyDraft);
     }
+
+    /// <summary>T-064再追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像選択中に確定・
+    /// キャンセルせず新規/開くを実行すると、旧実装はSelectedConnector等と異なりSelectedImageだけ
+    /// クリアが漏れており、_selectedImageが旧Documentの実体を保持したまま残留していた
+    /// (プロパティパネルに実体消失後の画像プロパティが表示・編集可能なまま残る恐れ)。</summary>
+    [Fact]
+    public void ReplaceDocument_ClearsSelectedImage_OnNewDocument()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage();
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+        Assert.True(vm.HasSelectedImage);
+
+        vm.NewDocument();
+
+        Assert.Null(vm.SelectedImage);
+        Assert.False(vm.HasSelectedImage);
+    }
 }
