@@ -2161,19 +2161,23 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>要素からDeviceClassを解決する(T-045 P-020対応)。PartResolver.ComponentKindは
     /// CreatesComponent=false(自作パーツRole=NonSimulated等)の場合に例外を投げるため、事前に
-    /// ガードしOtherへフォールバックする。セレクトSWはRole=ContactNO(電気的にはa接点と同一、
-    /// T-037往復2周目の既知制約)のためComponentKind経由では区別できない。T-045増分B修正
+    /// ガードしOtherへフォールバックする。T-045増分B修正
     /// (隠密レビューCONFIRMED、ecad2-t045-increment-b-review-onmitsu.md): 固定Id完全一致判定は
     /// Explorerコピー由来のId再採番(PartFolderStore.cs:94-110、T-035)に耐性が無く誤分類する
     /// ため廃止し、PartEntryToGlyphGeometryConverter.cs:53-63と同型のCategory/Role/IsOrEligible
     /// 判定へ置換する(element.PartIdでPartPalette.Entriesを動的検索、Idの新旧に依存しない)。
     /// Category==""(基本図形フォルダ直下)をゲートにするのは、自作パーツ(Category="自作")が
-    /// Role=ContactNO・IsOrEligible=falseを偶然持つ場合の誤判定を防ぐため
-    /// (ecad2-t045-increment-b-fix-test-design-onmitsu.md 分類D)。</summary>
+    /// 同じRole/IsOrEligibleの組を偶然持つ場合の誤判定を防ぐため
+    /// (ecad2-t045-increment-b-fix-test-design-onmitsu.md 分類D)。
+    /// T-061 A-1構造対処: セレクトSWは以前Role=ContactNOで区別できなかった(T-037往復2周目の既知
+    /// 制約)ため本分岐で個別に判定していたが、専用Role(PartRole.SelectSwitch)追加によりRole条件
+    /// をそちらへ書き換える(docs/ecad2-t061-a1-select-switch-design-onmitsu.md 2-2節、横展開必須)。
+    /// 本来はComponentKind経由(MapToDeviceClass)でも正しく解決されるようになるが、分岐自体の削除は
+    /// 範囲拡大回避のため見送り、条件値の書き換えのみに留める(同節、家老裁定=最小修正)。</summary>
     private DeviceClass ResolveDeviceClass(ElementInstance element)
     {
         var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == element.PartId);
-        if (entry is { Category: "", Definition.Role: PartRole.ContactNO, Definition.IsOrEligible: false })
+        if (entry is { Category: "", Definition.Role: PartRole.SelectSwitch, Definition.IsOrEligible: false })
             return DeviceClass.SelectSwitch;
 
         return PartResolver.CreatesComponent(element, PartLibrary)

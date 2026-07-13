@@ -88,6 +88,17 @@ public sealed class PartFolderStore
                 try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
             }
 
+            // T-061 A-1構造対処: 旧版JSON(PartRole.SelectSwitch追加より前)はセレクトSWがRole=
+            // ContactNOのまま保存されている。固定Id(SelectSwitchId)のときだけRole=SelectSwitchへ
+            // 補正する(上記IsOrEligible補正と同型パターン、T-037踏襲)。ユーザーが意図的に他のRole
+            // へ変更していた場合は尊重し上書きしない(ContactNOのままの場合のみ対象、
+            // docs/ecad2-t061-a1-select-switch-design-onmitsu.md 3-2節)。
+            if (def.Id == BasicPartTemplates.SelectSwitchId && def.Role == PartRole.ContactNO)
+            {
+                def.Role = PartRole.SelectSwitch;
+                try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
+            }
+
             // 隠密レビュー指摘: Idがnull/空文字列(壊れた/旧形式ファイル)の場合、HashSet.Addは
             // 最初の1件を「非重複」として通してしまい無効なIdのまま放置される
             // (後続のDictionary登録でArgumentNullException等の恐れ)。無条件で再採番扱いにする。

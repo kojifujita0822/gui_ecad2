@@ -198,6 +198,131 @@ public class PartFolderStoreTests
         }
     }
 
+    // ===== T-061 A-1構造対処: セレクトSWのRole(ContactNO->SelectSwitch)マイグレーション回帰テスト =====
+    // (docs/ecad2-t061-a1-select-switch-design-onmitsu.md 3-5節、Enumerate_LegacySelectSwitchJson
+    // WithoutIsOrEligible_StaysFalseと同じ固定Id・同じ手法)
+
+    [Fact]
+    public void Enumerate_LegacySelectSwitchJsonWithContactNORole_BackfillsToSelectSwitchRoleAndSaves()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // PartRole.SelectSwitch追加(A-1構造対処)より前に生成された旧版JSONを再現
+            // (固定Id=SelectSwitchId、role="contactNO")。
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.SelectSwitchId}}","name":"セレクトSW","role":"contactNO"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.Equal(PartRole.SelectSwitch, result.Entries.Single().Definition.Role);
+
+            var reloaded = PartLibrarySerializer.LoadOne(path);
+            Assert.Equal(PartRole.SelectSwitch, reloaded.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_SelectSwitchAlreadyMigrated_NoChangeIdempotent()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 既に補正済み(role="selectSwitch")のファイルを再実行しても変化しないこと(冪等性)。
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.SelectSwitchId}}","name":"セレクトSW","role":"selectSwitch"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.Equal(PartRole.SelectSwitch, result.Entries.Single().Definition.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_UserCustomizedSelectSwitchRole_NotOverwritten()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // ユーザーが意図的に別Role(ContactNC)へ変更済みのセレクトSW.gcadpartは、
+            // ContactNOのままの場合のみ対象とするマイグレーション条件から外れ上書きされない。
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.SelectSwitchId}}","name":"セレクトSW","role":"contactNC"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.Equal(PartRole.ContactNC, result.Entries.Single().Definition.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_OtherBasicPartWithContactNORole_NotAffected()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 固定Id=ContactNOId(通常のa接点)は対象外(Id不一致)でRole=ContactNOのまま変化しない
+            // (誤爆防止、IsOrEligible固定Id補正の対象がContactNOId/ContactNCIdの2件限定である
+            // ことの再混入防止テストと同型)。
+            string path = Path.Combine(tempDir, "a接点.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.ContactNOId}}","name":"a接点","role":"contactNO"}""");
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.Equal(PartRole.ContactNO, result.Entries.Single().Definition.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_LegacySelectSwitchJsonReadOnly_BackfillsInMemoryWithoutThrowing()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, $$"""{"id":"{{BasicPartTemplates.SelectSwitchId}}","name":"セレクトSW","role":"contactNO"}""");
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+
+            var store = new PartFolderStore(tempDir);
+            PartEnumerationResult result;
+            try
+            {
+                result = store.Enumerate();
+            }
+            finally
+            {
+                File.SetAttributes(path, FileAttributes.Normal);
+            }
+
+            // 書き戻し失敗(読み取り専用)でも例外は外へ伝播せず、メモリ上は補正済みで継続する。
+            Assert.Equal(PartRole.SelectSwitch, result.Entries.Single().Definition.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
     [Fact]
     public void Enumerate_LegacyContactJsonReadOnly_BackfillsInMemoryWithoutThrowing()
     {

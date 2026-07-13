@@ -59,6 +59,9 @@ public static class PartResolver
             PartRole.TimerInstantContactNC => ElementKind.TimerInstantContactNC,
             PartRole.ThermalOverload => ElementKind.ThermalOverload,
             PartRole.EmergencyStop => ElementKind.EmergencyStop,
+            // T-061 A-1構造対処: SelectSwitchロールをElementKind.SelectSwitchへマッピングし、
+            // Evaluator.IsConducting/NetlistBuilderのノッチ判定を到達可能にする。
+            PartRole.SelectSwitch => ElementKind.SelectSwitch,
             _ => throw new InvalidOperationException(
                 $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };

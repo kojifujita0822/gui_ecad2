@@ -10,6 +10,11 @@ public enum PartRole
     // 劣化するため、専用Roleとして追加する（着手前調査 docs/ecad2-t071-part-addition-design-onmitsu2.md 2節）。
     TimerContactNO, TimerContactNC, TimerInstantContactNO, TimerInstantContactNC,
     ThermalOverload, EmergencyStop,
+    // T-061 A-1構造対処: セレクトSWは配置経路でRole=ContactNOとして生成されていたためElementKind.
+    // SelectSwitchへのマッピング経路が存在せず、電気的導通判定(Evaluator.IsConducting)のノッチ専用
+    // 分岐がデッドコード化していた(docs/ecad2-t061-a1-select-switch-design-onmitsu.md 1節)。専用Role
+    // を追加しマッピングを完成させる。
+    SelectSwitch,
 }
 
 /// <summary>

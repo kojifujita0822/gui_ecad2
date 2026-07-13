@@ -277,12 +277,15 @@ public class MainWindowViewModelTests : ViewModelTestBase
 
         // B: セレクトSW・再採番Id相当(T-035Explorerコピー後、基本図形フォルダ直下、RED対象)。
         // Role/IsOrEligible/PortsはSelectSwitchと同一、Idのみ異なる。
+        // T-061 A-1構造対処(家老裁定): Role=SelectSwitchが新仕様下の正しい表現。Idは意図的に
+        // 再採番値のまま据え置く(検証意図=Id固定ではなくデータフィールドで分類できること、は
+        // Role値をこちらへ揃えても保たれる)。
         yield return new object[]
         {
             "reassigned-select-switch-guid",
             new PartDefinition
             {
-                Id = "reassigned-select-switch-guid", Name = "セレクトSW", Role = PartRole.ContactNO,
+                Id = "reassigned-select-switch-guid", Name = "セレクトSW", Role = PartRole.SelectSwitch,
                 IsOrEligible = false, Ports = new() { new PortDef("L", 0, 0), new PortDef("R", 0, 1) },
             },
             false, // 基本図形フォルダ直下(Category=="")

@@ -154,7 +154,11 @@ public static class BasicPartTemplates
         Name = "セレクトSW",
         WidthCells = 1,
         HeightCells = 1,
-        Role = PartRole.ContactNO,
+        // T-061 A-1構造対処: 旧Role=ContactNOは「電気的にはa接点と同一」という当初設計だったが、
+        // ノッチ位置による排他導通判定(Evaluator.IsConducting)にElementKind.SelectSwitch専用分岐が
+        // 到達できなくなっていた。専用Roleへ変更しマッピングを完成させる
+        // (docs/ecad2-t061-a1-select-switch-design-onmitsu.md 2-1節)。
+        Role = PartRole.SelectSwitch,
         Ports = TwoPorts(),
         Primitives =
         {
