@@ -781,4 +781,87 @@ public class MainWindowViewModelTests : ViewModelTestBase
 
         Assert.False(vm.HasAnyDraft);
     }
+
+    // --- T-069往復4周目(隠密テスト設計書、docs/ecad2-t069-fix4-test-design-onmitsu.md):
+    //     検証観点1「ツールバーボタンのドラフトクリア漏れ」——ActivateBuiltinTool/
+    //     ActivateOpenPartSelection(MainWindow.xaml.cs)の本体ロジック(CancelResidualDraftForToolSwitch
+    //     呼び出し+Tool代入)をここで模擬し、記入中ドラフト3種いずれからでもクリアされることを検証する。
+
+    /// <summary>状態遷移表・無効域(バグ域)3行: PlaceConnector/PlaceLine/PlaceImageいずれの記入中でも、
+    /// ツールバーボタン相当の操作でドラフトが確実にクリアされ、実体(Connectors/FreeLines/Images)も
+    /// 生成されずに終わること。T-064で画像挿入ドラフトだけ横展開漏れが起きた前例と同型の見落としを
+    /// 防ぐため3種とも対称に確認する(隠密テスト設計書)。</summary>
+    [Theory]
+    [InlineData("Connector")]
+    [InlineData("FreeLine")]
+    [InlineData("Image")]
+    public void ToolbarButtonEquivalent_ClearsResidualDraft_BeforeSwitchingMode(string draftKind)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(2, 3);
+
+        switch (draftKind)
+        {
+            case "Connector":
+                vm.BeginConnectorDraft();
+                break;
+            case "FreeLine":
+                vm.CurrentSheet!.MainCircuit = true;
+                vm.BeginFreeLineDraft(horizontal: true, startXMm: 10, startYMm: 10, stepMm: 9.0);
+                break;
+            case "Image":
+                vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 5, yMm: 5);
+                break;
+        }
+        Assert.True(vm.HasAnyDraft);
+
+        // ツールバーボタン相当の操作(ActivateBuiltinToolの本体ロジック)。
+        vm.CancelResidualDraftForToolSwitch();
+        vm.Tool = new ToolState(ToolMode.PlaceElement, PartId: "contact-no");
+
+        Assert.False(vm.HasAnyDraft);
+        Assert.Equal(ToolMode.PlaceElement, vm.Tool.Mode);
+        Assert.Null(vm.ConnectorDraftPreview);
+        Assert.Null(vm.FreeLineDraftPreview);
+        Assert.Null(vm.ImageInsertDraftPreview);
+        Assert.Empty(vm.CurrentSheet!.Connectors);
+        Assert.Empty(vm.CurrentSheet!.FreeLines);
+        Assert.Empty(vm.CurrentSheet!.Images);
+    }
+
+    /// <summary>状態遷移表・有効域(対照ケース): ドラフトを持たない状態からの遷移は従来どおり
+    /// 影響を受けないこと(回帰確認)。</summary>
+    [Fact]
+    public void ToolbarButtonEquivalent_WithoutDraft_SwitchesModeNormally()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.CancelResidualDraftForToolSwitch();
+        vm.Tool = new ToolState(ToolMode.PlaceElement, PartId: "contact-no");
+
+        Assert.False(vm.HasAnyDraft);
+        Assert.Equal(ToolMode.PlaceElement, vm.Tool.Mode);
+    }
+
+    /// <summary>状態遷移表・最終行(ペア構成の対称性): ActivateOpenPartSelection側の入口でも同じく
+    /// ドラフトがクリアされること(隠密テスト設計書「少なくとも1組は両方の入口で確認する」)。</summary>
+    [Fact]
+    public void OpenPartSelectionEquivalent_ClearsResidualConnectorDraft_BeforeSwitchingMode()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(2, 3);
+        vm.BeginConnectorDraft();
+        Assert.True(vm.HasAnyDraft);
+
+        // ツールバーボタン相当の操作(ActivateOpenPartSelectionの本体ロジック)。
+        vm.CancelResidualDraftForToolSwitch();
+        vm.Tool = new ToolState(ToolMode.PlaceElement);
+
+        Assert.False(vm.HasAnyDraft);
+        Assert.Equal(ToolMode.PlaceElement, vm.Tool.Mode);
+        Assert.Empty(vm.CurrentSheet!.Connectors);
+    }
 }

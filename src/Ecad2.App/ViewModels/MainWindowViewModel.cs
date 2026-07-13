@@ -1473,6 +1473,19 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// PlaceElement(連続配置、T-021分岐A)等まで一律ブロックする過剰な副作用があった。</summary>
     public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null;
 
+    /// <summary>T-069往復4周目修正1(隠密テスト設計書、殿裁可済み): ツールバーのツール切替ボタン
+    /// (部品配置・自作パーツ選択)は、記入中ドラフト(縦コネクタ/自由線/画像挿入)を保持したまま
+    /// Tool.Modeを上書きしていたため、HasAnyDraftが意図せず真のまま残留する不具合があった
+    /// (Escapeキーの各層と対称性が崩れていた)。両ボタンの共通入口として、Escapeと同じ
+    /// Cancel*Draftを全て呼ぶ。各Cancel*Draftは記入中でなければ何もしないガードを持つため、
+    /// 現在のTool.Modeを問わず無条件に呼んでよい。</summary>
+    public void CancelResidualDraftForToolSwitch()
+    {
+        CancelConnectorDraft();
+        CancelFreeLineDraft();
+        CancelImageInsertDraft();
+    }
+
     /// <summary>記入中の自由線のプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
     public FreeLine? FreeLineDraftPreview
     {

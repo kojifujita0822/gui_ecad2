@@ -882,13 +882,15 @@ public partial class MainWindow : Window
             CommitDeviceNameEdit();
             // T-069往復3周目修正1(隠密レビュー指摘「表示と実行の整合原則」): HitTestElementは
             // CellWidth>1要素の非アンカーセルでも占有範囲内なら検出する(区間交差判定)が、
-            // SelectedElement等のSelectedCellベース経路は単純位置一致(el.Pos==pos)のまま。
-            // クリック位置(pos)をそのままSelectedCellへ入れると、非アンカーセルで検出した要素と
-            // 「実行側(削除・機器名変更)が解決する要素」が食い違い、メニューは出るのに操作が黙って
-            // 失敗する連鎖バグを生む(往復2周目で発覚)。検出した要素のアンカー位置(hitElement.Pos)へ
-            // 正規化することで両者を一致させる(案B=局所正規化、SelectedElementゲッター自体は
-            // 変更しない=左クリック等の既存挙動に影響を与えない)。
-            _viewModel.SelectedCell = hitElement.Pos;
+            // SelectedElement等のSelectedCellベース経路は単純位置一致(el.Pos==pos)のまま。実行側
+            // (削除・機器名変更)が解決する要素をヒット要素と一致させるには、検出した要素のアンカー
+            // 位置(hitElement.Pos)へSelectedCellを正規化する必要がある(案B=局所正規化)。
+            // T-069往復4周目修正2(隠密再レビュー指摘、殿裁可済み): ただし、この正規化をメニュー
+            // 表示の時点(ここ)で即座に行うと、連続配置中(SelectedCell=作業起点P0)に無関係な要素を
+            // 確認するだけで右クリックしただけでもP0が書き換わってしまい、メニューをキャンセルして
+            // 戻っても作業起点を失う(実害大)。正規化はBuildElementContextMenuItems内の各メニュー
+            // 項目のClickハンドラへ遅延させ、キャンセル時はSelectedCellを元のまま維持しつつ、項目を
+            // 実際に実行する時点でのみ正規化する(表示と実行の整合原則は維持、破壊はしない)。
             BuildElementContextMenuItems(menu, hitElement.Pos, sheet);
         }
         else if (rowInRange && LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
@@ -950,15 +952,23 @@ public partial class MainWindow : Window
     // 自動フォーカス(新規インライン入力ボックスは不採用)。コメント編集はT-080で完成済みのRungComment
     // 編集UI(OpenRungCommentEditor)をF2キーと同じ対象条件(主回路シート対象外・描画範囲内の行のみ)で
     // 呼ぶだけ(新規UI設計不要、家老裏取り訂正2026-07-13)。
+    // T-069往復4周目修正2(隠密再レビュー指摘、殿裁可済み): posへのSelectedCell正規化は、呼び出し元の
+    // メニュー表示時点ではなく、ここの各項目Clickハンドラ内(実行直前)で行う。メニュー表示だけで
+    // 作業起点(連続配置中のSelectedCell)を破壊しないため。
     private void BuildElementContextMenuItems(ContextMenu menu, Ecad2.Model.GridPos pos, Ecad2.Model.Sheet sheet)
     {
         var deleteItem = new MenuItem { Header = "削除" };
-        deleteItem.Click += DeleteMenuItem_Click;
+        deleteItem.Click += (s, e) =>
+        {
+            _viewModel.SelectedCell = pos;
+            DeleteMenuItem_Click(s, e);
+        };
         menu.Items.Add(deleteItem);
 
         var renameItem = new MenuItem { Header = "機器名変更" };
         renameItem.Click += (_, _) =>
         {
+            _viewModel.SelectedCell = pos;
             DeviceNameBox.Focus();
             DeviceNameBox.SelectAll();
         };
@@ -967,7 +977,11 @@ public partial class MainWindow : Window
         if (!sheet.MainCircuit && pos.Row >= 0 && pos.Row < Ecad2.Rendering.DiagramRenderer.TotalRows(sheet))
         {
             var commentItem = new MenuItem { Header = "コメント編集" };
-            commentItem.Click += (_, _) => OpenRungCommentEditor(pos.Row, sheet);
+            commentItem.Click += (_, _) =>
+            {
+                _viewModel.SelectedCell = pos;
+                OpenRungCommentEditor(pos.Row, sheet);
+            };
             menu.Items.Add(commentItem);
         }
     }
@@ -1652,6 +1666,10 @@ public partial class MainWindow : Window
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(pe => pe.Category == "" && pe.Definition.Name == partName);
         if (entry is null) return;
 
+        // T-069往復4周目修正1(隠密テスト設計書、殿裁可済み): 記入中ドラフトを保持したままTool.Mode
+        // を上書きするとHasAnyDraftが意図せず真のまま残留する(Escapeとの対称性が崩れていた)。
+        // 切替前に必ずクリアする。
+        _viewModel.CancelResidualDraftForToolSwitch();
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, PartId: entry.Definition.Id, IsOr: isOr);
         _viewModel.StatusMessage = $"配置ツール: {partName}{(isOr ? "(OR)" : "")} - キャンバスをクリックして配置位置を指定してください";
     }
@@ -1886,6 +1904,9 @@ public partial class MainWindow : Window
     // マウス/キーボード分離は上記2ボタンと同じ理由(増分vi、懸念4解消)。
     private void ActivateOpenPartSelection()
     {
+        // T-069往復4周目修正1(隠密テスト設計書、殿裁可済み): ActivateBuiltinToolと同じ理由で
+        // 切替前に記入中ドラフトを必ずクリアする。
+        _viewModel.CancelResidualDraftForToolSwitch();
         _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement);
     }
 
