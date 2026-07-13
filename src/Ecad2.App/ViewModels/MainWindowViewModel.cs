@@ -1291,18 +1291,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// (対角コーナー)からドラッグ中の隅までの距離を新しい幅・高さとする。
     /// T-064往復1周目修正1(隠密レビュー最重要指摘、4系統独立検出): 旧実装はページ境界クランプ→
     /// 最小サイズ適用の順で、最小サイズ確保がページ境界を再び破りうる不具合があった(アンカーが
-    /// 境界近くの状態で対角ハンドルを大きく逆方向へ動かすと画像が境界外へはみ出す)。掴んだハンドル
-    /// (<see cref="_resizingImageHandle"/>)によってアンカーから見て動く方向(伸びる向き)が一意に
-    /// 決まる性質を使い、<see cref="ClampResizeTarget"/>で「最小サイズ制約」と「ページ境界制約」を
-    /// 同時に満たす範囲へ1軸ずつクランプすることで両立させる。</summary>
+    /// 境界近くの状態で対角ハンドルを大きく逆方向へ動かすと画像が境界外へはみ出す)ため、
+    /// <see cref="ClampResizeTarget"/>で「最小サイズ制約」と「ページ境界制約」を同時に満たす範囲へ
+    /// 1軸ずつクランプする方式へ改めた。
+    /// T-064往復2周目修正2(隠密再レビュー指摘、殿裁定=退行として復活): 上記改修時、伸びる方向
+    /// (growsPositive)を掴んだハンドル種別のみで固定してしまい、ハンドルをアンカーの反対側へ大きく
+    /// ドラッグした際に軸が反転してマウスへ追従する旧来の挙動が失われていた。掴んだハンドル種別
+    /// (defaultGrowsRight/Down)を「反転が起きない通常時の伸びる方向」として渡し、
+    /// <see cref="ClampResizeTarget"/>内でドラッグ位置基準の反転を優先しつつ、反転先で最小サイズを
+    /// 確保できない異常ケース(アンカーが境界近く)ではハンドル本来の方向へフォールバックすることで、
+    /// 反転追従とページ境界クランプ・最小サイズ確保の両立を実現する。</summary>
     public void UpdateResizeImage(double currentXMm, double currentYMm)
     {
         if (_resizingImage is not ImageInsert image) return;
 
-        bool growsRight = _resizingImageHandle is ImageResizeHandle.TopRight or ImageResizeHandle.BottomRight;
-        bool growsDown = _resizingImageHandle is ImageResizeHandle.BottomLeft or ImageResizeHandle.BottomRight;
-        double targetX = ClampResizeTarget(currentXMm, _resizeImageAnchorXMm, growsRight, _resizeImageMaxXMm);
-        double targetY = ClampResizeTarget(currentYMm, _resizeImageAnchorYMm, growsDown, _resizeImageMaxYMm);
+        bool defaultGrowsRight = _resizingImageHandle is ImageResizeHandle.TopRight or ImageResizeHandle.BottomRight;
+        bool defaultGrowsDown = _resizingImageHandle is ImageResizeHandle.BottomLeft or ImageResizeHandle.BottomRight;
+        double targetX = ClampResizeTarget(currentXMm, _resizeImageAnchorXMm, defaultGrowsRight, _resizeImageMaxXMm);
+        double targetY = ClampResizeTarget(currentYMm, _resizeImageAnchorYMm, defaultGrowsDown, _resizeImageMaxYMm);
 
         image.XMm = Math.Min(_resizeImageAnchorXMm, targetX);
         image.YMm = Math.Min(_resizeImageAnchorYMm, targetY);
@@ -1310,12 +1316,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         image.HeightMm = Math.Abs(targetY - _resizeImageAnchorYMm);
     }
 
-    /// <summary>T-064往復1周目修正1: リサイズ対象座標(アンカーから見てgrowsPositive方向にのみ動く
-    /// 1軸分)を、最小サイズ制約(ImageMinSizeMm)とページ境界制約(0〜maxMm)の両方を満たす範囲へ
-    /// クランプする。アンカー自体がページ境界に極めて近く最小サイズの余地が無い異常ケースでは、
-    /// ページ境界を優先する(安全側、min>maxでのMath.Clamp例外を避ける)。</summary>
-    private static double ClampResizeTarget(double currentMm, double anchorMm, bool growsPositive, double maxMm)
+    /// <summary>T-064往復1周目修正1・往復2周目修正2: リサイズ対象座標を、最小サイズ制約
+    /// (ImageMinSizeMm)とページ境界制約(0〜maxMm)の両方を満たす範囲へクランプする。伸びる方向は
+    /// まずドラッグ位置(currentMm)がアンカーのどちら側にあるかで判定する(反転追従)。ただし、その
+    /// 方向では最小サイズを確保できない場合(アンカーがページ境界に極めて近い異常ケース)は、掴んだ
+    /// ハンドル本来の伸びる方向(defaultGrowsPositive)へフォールバックし、往復1周目と同じ境界優先
+    /// クランプ(安全側、min>maxでのMath.Clamp例外を避ける)を適用する。</summary>
+    private static double ClampResizeTarget(double currentMm, double anchorMm, bool defaultGrowsPositive, double maxMm)
     {
+        bool growsPositive = currentMm >= anchorMm;
+        if (growsPositive && anchorMm + ImageMinSizeMm > maxMm) growsPositive = defaultGrowsPositive;
+        if (!growsPositive && anchorMm - ImageMinSizeMm < 0) growsPositive = defaultGrowsPositive;
+
         if (growsPositive)
         {
             double lowerBound = anchorMm + ImageMinSizeMm;

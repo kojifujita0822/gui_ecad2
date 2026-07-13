@@ -864,11 +864,17 @@ public partial class MainWindow : Window
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var position = e.GetPosition(LadderCanvasHost);
         var pos = LadderCanvasHost.ToGridPos(position);
-        if (pos.Row < 0 || pos.Row >= sheet.Grid.Rows) return;
+        bool rowInRange = pos.Row >= 0 && pos.Row < sheet.Grid.Rows;
+        // T-064往復2周目修正1(隠密再レビュー指摘): 画像はグリッド非依存の自由配置要素で、上部
+        // 余白帯(Y<MarginMm)等の行範囲外にも配置・リサイズできる。行範囲外ガードを画像ヒット
+        // テストより先に置くと、範囲外にある画像は右クリックメニューが一切出ず、行範囲チェックの
+        // 無い左クリックとの対称性が崩れる(修正5で意図した対称性回復が未達成だった)。画像がヒット
+        // しない場合のみ、従来どおり行範囲外で打ち切る。
+        if (!rowInRange && LadderCanvasHost.HitTestImage(position, sheet) is null) return;
 
         var menu = new ContextMenu();
 
-        if (_viewModel.HitTestElement(pos) is Ecad2.Model.ElementInstance hitElement)
+        if (rowInRange && _viewModel.HitTestElement(pos) is Ecad2.Model.ElementInstance hitElement)
         {
             // T-069往復2周目修正2(隠密レビュー指摘): DeviceNameBoxの未確定編集(UpdateSourceTrigger=
             // Explicit)を、選択切替でサイレント消失させないよう既存DeleteMenuItem_Clickと同じ規約で
@@ -885,7 +891,7 @@ public partial class MainWindow : Window
             _viewModel.SelectedCell = hitElement.Pos;
             BuildElementContextMenuItems(menu, hitElement.Pos, sheet);
         }
-        else if (LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
+        else if (rowInRange && LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
         {
             CommitDeviceNameEdit();
             _viewModel.SelectedCell = null;

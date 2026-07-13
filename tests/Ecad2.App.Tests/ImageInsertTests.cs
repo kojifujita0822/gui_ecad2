@@ -462,4 +462,53 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Empty(vm.CurrentSheet!.Images);      // 挿入したばかりの画像が削除される
         Assert.Single(vm.CurrentSheet!.Elements);   // 旧要素は残ったまま
     }
+
+    // --- T-064往復2周目(隠密再レビュー、docs/ecad2-t064-round1-review-onmitsu.md):
+    //     修正2(殿裁定=反転追従の復活、境界クランプとの両立)の回帰テスト ---
+
+    /// <summary>
+    /// 隠密再レビュー指摘・新規要確認2の具体例(手計算で確認)のRED先行証明用回帰テスト。
+    /// BottomRightハンドル(アンカー=左上、(10,20))を掴み、X方向だけアンカーを超えて左へ
+    /// ドラッグすると、旧来の挙動(往復1周目修正1で失われた)ではX軸が反転してマウス位置へ
+    /// 追従する。往復1周目のClampResizeTarget新設により伸びる方向がハンドル種別のみで固定され、
+    /// この反転追従が失われていた(殿裁定=退行として復活)。
+    /// </summary>
+    [Fact]
+    public void ResizeImage_DragPastAnchor_FlipsAxisAndFollowsMouse()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 10, y: 20, w: 30, h: 15);   // アンカー(左上、BottomRightハンドルの固定点)=(10,20)
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        vm.BeginResizeImage(image, ImageResizeHandle.BottomRight, startXMm: 40, startYMm: 35, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateResizeImage(currentXMm: 5, currentYMm: 25);   // X方向だけアンカー(10)を超えて左へ
+
+        Assert.Equal(5, image.XMm);     // X軸が反転しマウス位置(5)へ追従
+        Assert.Equal(5, image.WidthMm);
+        Assert.Equal(20, image.YMm);    // Y方向は反転せず元のまま(アンカー=20)
+        Assert.Equal(5, image.HeightMm);
+    }
+
+    /// <summary>反転追従とページ境界クランプ(往復1周目主題)の両立を検証する。TopLeftハンドル
+    /// (通常は左上方向へ伸びる想定)を、アンカー(右下固定点)を超えて大きく逆方向(右下)へドラッグ
+    /// しても、反転して伸びつつページ境界を超えないこと。</summary>
+    [Fact]
+    public void ResizeImage_DragPastAnchor_FlipsAxisButStillClampsToPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 2, y: 2, w: 10, h: 10);   // アンカー(右下、TopLeftハンドルの固定点)=(12,12)
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        vm.BeginResizeImage(image, ImageResizeHandle.TopLeft, startXMm: 2, startYMm: 2, maxXMm: 100, maxYMm: 100);
+        vm.UpdateResizeImage(currentXMm: 150, currentYMm: 150);   // アンカーを超えて大きく右下へ(反転)
+
+        Assert.Equal(12, image.XMm);       // アンカー(12)が左上として固定される(反転)
+        Assert.Equal(12, image.YMm);
+        Assert.Equal(88, image.WidthMm);   // 境界100まで(88=100-12)
+        Assert.Equal(88, image.HeightMm);
+    }
 }
