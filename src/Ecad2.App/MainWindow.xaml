@@ -53,6 +53,24 @@
             <Setter Property="Margin" Value="0,1,0,0"/>
         </Style>
 
+        <!-- T-061(殿裁定④=ツールバーToggleButton+背景色変化、GuiEcad踏襲): ButtonとToggleButtonは
+             ButtonBaseの兄弟クラスでBasedOnによる型混在継承ができないため、ToolBarButtonStyleと
+             同じ寸法・無効化表現を独立定義し、IsChecked時の背景色変化のみ追加する。 -->
+        <Style x:Key="TestModeToolBarButtonStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Margin" Value="1"/>
+            <Setter Property="Padding" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="{StaticResource TestModeActiveBrush}"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <!-- 2段目(配置系)専用スタイル(T-040、殿裁定=GX様式化の対象は2段目限定)。
              1段目(新規/開く/保存等)は上記ToolBarButtonStyle等のまま据え置く。 -->
         <Style x:Key="PlacementToolBarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolBarButtonStyle}">
@@ -138,7 +156,7 @@
             </MenuItem>
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>
-                <MenuItem Header="テストモード(_M)" InputGestureText="F5"/>
+                <MenuItem Header="テストモード(_M)" IsCheckable="True" IsChecked="{Binding IsTestMode, Mode=TwoWay}"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <MenuItem Header="バージョン情報(_A)" Click="AboutMenuItem_Click"/>
@@ -211,6 +229,30 @@
                         <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Shift+↓"/>
                     </StackPanel>
                 </Button>
+                <Separator/>
+                <!-- T-061(殿裁定②④): テストモード切替。上位enum(AppMode)一元管理、ツールバー
+                     ToggleButton+背景色変化(GuiEcad踏襲)。キーボードショートカットは新規割当なし
+                     (殿裁定①=F5表示矛盾はメニューのInputGestureText除去のみで解消)。 -->
+                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード"
+                              AutomationProperties.Name="テストモード"
+                              IsChecked="{Binding IsTestMode}"
+                              IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M4,3 L4,15 L14,9 Z"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="テスト"/>
+                    </StackPanel>
+                </ToggleButton>
+                <!-- T-061第五歩: 実時間タイマパネル(GuiEcad TimerPauseBtn踏襲)。テストモード中のみ
+                     有効化する(タイマ命令を使わない回路では無害、殿裁定=段階導入5段階を今回スコープに含める)。 -->
+                <ToggleButton x:Name="TimerPauseButton" Style="{StaticResource TestModeToolBarButtonStyle}"
+                              ToolTip="タイマ一時停止" AutomationProperties.Name="タイマ一時停止"
+                              Click="TimerPauseToggleButton_Click"
+                              IsEnabled="{Binding IsTestMode}">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M6,4 L6,14 M12,4 L12,14"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="一時停止"/>
+                    </StackPanel>
+                </ToggleButton>
             </ToolBar>
             <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
                 <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点)、Shift+F5=OR(ORa接点)/
@@ -575,6 +617,12 @@
              ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
              本実装向け機能に依存するため将来タスク。 -->
         <StatusBar x:Name="StatusBarArea" Grid.Row="4">
+            <!-- T-061殿裁定⑦: モード表示。Tool.Modeと同じenumそのまま表示パターン(日本語化は
+                 T-053同様の別タスク扱い、既存流儀踏襲)。 -->
+            <StatusBarItem>
+                <TextBlock Text="{Binding Mode, StringFormat='モード: {0}'}"/>
+            </StatusBarItem>
+            <Separator/>
             <StatusBarItem>
                 <TextBlock Text="{Binding Tool.Mode, StringFormat='ツール: {0}'}"/>
             </StatusBarItem>

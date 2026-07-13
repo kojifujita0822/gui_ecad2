@@ -46,6 +46,60 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </summary>
     public bool IsPartSelectionVisible => Tool.Mode == ToolMode.PlaceElement;
 
+    private AppMode _appMode = AppMode.Drawing;
+
+    /// <summary>作画/テストモードの上位区分(T-061、単一の真実源)。setterでモード遷移時の
+    /// 副作用(セッション管理・進行中ドラフトの破棄・DRC再評価)をまとめて行う。</summary>
+    public AppMode Mode
+    {
+        get => _appMode;
+        set
+        {
+            if (_appMode == value) return;
+            _appMode = value;
+            if (_appMode == AppMode.Test)
+            {
+                // GuiEcad踏襲(殿裁定⑤=シートまたぎ状態保持方針): ON化のたびに全シート分の
+                // セッションをクリアして作り直す(ON中はシートをまたいでも保持、OFF→ON再遷移時は
+                // まっさらに戻る)。進行中の配置ドラフト(Tool)もGuiEcadの「ドラッグ/パン状態の破棄」
+                // に相当するため選択モードへ戻す。
+                _testSessions.Clear();
+                Tool = ToolState.SelectDefault;
+                if (CurrentSheet is Sheet sheet) GetOrCreateTestSession(sheet).Evaluate();
+            }
+            else
+            {
+                _testSessions.Clear();
+            }
+            OnPropertyChanged(nameof(Mode));
+            OnPropertyChanged(nameof(IsTestMode));
+            OutputPanel.RunDrcCommand.Execute(null);
+        }
+    }
+
+    /// <summary>ツールバーToggleButton・メニューのIsCheckedバインド用(T-061、殿裁定④)。</summary>
+    public bool IsTestMode
+    {
+        get => Mode == AppMode.Test;
+        set => Mode = value ? AppMode.Test : AppMode.Drawing;
+    }
+
+    private readonly Dictionary<Sheet, TestSession> _testSessions = new();
+
+    /// <summary>現在シートのテストセッション(Mode==Testの間のみ非null、シート単位で遅延生成)。</summary>
+    public TestSession? CurrentTestSession
+        => Mode == AppMode.Test && CurrentSheet is Sheet sheet ? GetOrCreateTestSession(sheet) : null;
+
+    private TestSession GetOrCreateTestSession(Sheet sheet)
+    {
+        if (!_testSessions.TryGetValue(sheet, out var session))
+        {
+            session = new TestSession(sheet, PartLibrary);
+            _testSessions[sheet] = session;
+        }
+        return session;
+    }
+
     private bool _isPlacementBarVisible;
 
     /// <summary>T-033増分1: 配置後入力の非モーダルバー表示状態(単一の真実源、隠密レビュー指摘)。
@@ -1902,6 +1956,55 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (CurrentSheet is not Sheet sheet) return null;
         return sheet.Elements.FirstOrDefault(el =>
             el.Pos.Row == pos.Row && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1);
+    }
+
+    /// <summary>テストモード中のマウス押下処理(T-061第三歩、GuiEcad MainPage.Pointer.cs踏襲)。
+    /// 押しボタン(モーメンタリ)はONにしてデバイス名を返す(呼び出し元がマウスキャプチャし
+    /// MouseUp/LostMouseCaptureでTestModeReleaseを呼ぶため)。セレクトSW(ノッチ順送り)・その他機器
+    /// (保持型トグル)はその場で処理を完結しnullを返す。DeviceClass判定はT-045で確立済みの
+    /// ResolveDeviceClass(自作パーツのSelectSwitch特殊判定込み)を再利用する(rule of three回避)。
+    /// ヒットしない・デバイス名が無い要素・テストモード外はnull。</summary>
+    public string? TestModePress(GridPos pos)
+    {
+        if (CurrentTestSession is not TestSession session || CurrentSheet is not Sheet sheet
+            || HitTestElement(pos) is not ElementInstance element || element.DeviceName is not string device)
+            return null;
+
+        switch (ResolveDeviceClass(element))
+        {
+            case DeviceClass.PushButton:
+                session.SetInput(device, true);
+                return device;
+            case DeviceClass.SelectSwitch:
+                CycleSelectSwitch(session, sheet, device);
+                return null;
+            default:
+                session.ToggleInput(device);
+                return null;
+        }
+    }
+
+    /// <summary>押しボタンのモーメンタリ解除(T-061第三歩、MouseUp/LostMouseCaptureから呼ぶ)。</summary>
+    public void TestModeRelease(string device)
+    {
+        if (CurrentTestSession is TestSession session) session.SetInput(device, false);
+    }
+
+    /// <summary>セレクトSWのノッチ順送り(T-061第三歩、GuiEcad MainPage.xaml.cs CycleSelectSwitch
+    /// 全文移植)。同一デバイス名のSelectSwitch要素群が持つPosition値(重複除去・昇順)を巡回する。
+    /// 該当要素が無ければ(組込みSelectSwitchでない自作パーツ等)ToggleInputへフォールバックする
+    /// (GuiEcad同型の安全弁)。</summary>
+    private static void CycleSelectSwitch(TestSession session, Sheet sheet, string deviceName)
+    {
+        var positions = sheet.Elements
+            .Where(e => e.DeviceName == deviceName && e.Kind == ElementKind.SelectSwitch
+                     && e.Params.ContainsKey(ParamKeys.Position))
+            .Select(e => int.TryParse(e.Params[ParamKeys.Position], out int n) ? n : 0)
+            .Distinct().OrderBy(x => x).ToList();
+        if (positions.Count == 0) { session.ToggleInput(deviceName); return; }
+        int current = session.State.Positions.TryGetValue(deviceName, out var pos) ? pos : 0;
+        int idx = positions.IndexOf(current);
+        session.SetPosition(deviceName, positions[(idx + 1) % positions.Count]);
     }
 
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの

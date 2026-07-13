@@ -13,5 +13,8 @@
         <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#24325A"/>
         <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="White"/>
         <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#D2D2D2"/>
+        <!-- T-061: テストモードON中のツールバートグルボタン背景。Ecad2.Core.Rendering.DrawingTheme.Powered
+             (通電/励磁の意味色、RGB 230,60,0)と同一色を流用し、テストモード全体を象徴する色として一貫させる。 -->
+        <SolidColorBrush x:Key="TestModeActiveBrush" Color="#E63C00"/>
     </Application.Resources>
 </Application>

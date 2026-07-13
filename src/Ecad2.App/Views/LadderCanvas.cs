@@ -5,6 +5,7 @@ using System.Windows.Media;
 using Ecad2.Model;
 using Ecad2.Rendering;
 using Ecad2.Rendering.Wpf;
+using Ecad2.Simulation;
 
 namespace Ecad2.App.Views;
 
@@ -135,7 +136,8 @@ public sealed class LadderCanvas : FrameworkElement
         VerticalConnector? selectedConnector = null, VerticalConnector? connectorDraft = null,
         WireBreak? selectedWireBreak = null, FreeLine? selectedFreeLine = null,
         FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null,
-        ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null)
+        ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null,
+        SimState? sim = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -155,7 +157,8 @@ public sealed class LadderCanvas : FrameworkElement
             dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, widthDip, heightDip));
 
             var wpfRenderer = new WpfRenderer(dc);
-            _renderer.Render(wpfRenderer, sheet, library);
+            // T-061: sim(テストモード中のみ非null)を渡すと通電配線・励磁要素が通電色でハイライトされる。
+            _renderer.Render(wpfRenderer, sheet, library, sim);
 
             if (selectedCell is { } cell)
                 dc.DrawRectangle(null, SelectedCellPen, CellRectDip(cell));

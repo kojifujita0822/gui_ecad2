@@ -24,3 +24,11 @@ public readonly record struct ToolState(
 
 /// <summary>T-064: 画像のリサイズハンドル種別(4隅、対角コーナーを固定点として扱う)。</summary>
 public enum ImageResizeHandle { TopLeft, TopRight, BottomLeft, BottomRight }
+
+/// <summary>
+/// 作画モード/テストモードの上位区分(T-061)。GuiEcadは単純bool(_testMode)で実装しており
+/// ToolMode一元化以前の設計思想のまま。ecad2ではToolModeと同じ流儀(design-brief 状態管理
+/// 一元化方針、隠密設計調査所感)で最初からenumに集約し、MainWindowViewModelが公開する
+/// 1プロパティ(Mode)として扱う。
+/// </summary>
+public enum AppMode { Drawing, Test }

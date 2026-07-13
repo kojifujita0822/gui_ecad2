@@ -946,9 +946,14 @@ public sealed class DiagramRenderer
             ? PartResolver.ComponentKind(e, _lib)
             : e.Kind;
 
-        bool on = energized is not null && e.DeviceName is not null
-                  && energized.TryGetValue(e.DeviceName, out var v) && v;
+        // T-061(殿裁定③=LDmicro式「通電=赤/非通電=グレー」): energizedが非nullならテストモード中。
+        // デバイス名を持つ要素(=命令として評価される記号)のみ対象、無印の配線・枠等は対象外。
+        bool testMode = energized is not null;
+        bool on = testMode && e.DeviceName is not null
+                  && energized!.TryGetValue(e.DeviceName, out var v) && v;
         var stroke = on ? _theme.Get(StrokeRole.SymbolOutline) with { Color = DrawingTheme.Powered }
+                   : testMode && e.DeviceName is not null
+                        ? _theme.Get(StrokeRole.SymbolOutline) with { Color = DrawingTheme.NonEnergizedGray }
                         : _theme.Get(StrokeRole.SymbolOutline);
 
         // 組込み ContactNO/NC: 縦棒間を半透明青で塗る（手動強制の明示）

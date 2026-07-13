@@ -61,6 +61,18 @@ public partial class MainWindow : Window
     private bool _imageResizeStarted;
     private bool _imageResizeConsumedByEscape;
 
+    // T-061第三歩: テストモード中、押しボタンのモーメンタリ動作用に押下中のデバイス名を保持する
+    // (MouseUp/LostMouseCaptureでOFFに戻す、他ドラッグ系のView状態保持と同じ設計)。
+    private string? _testModePressedDevice;
+
+    // T-061第五歩: 実時間タイマパネル(GuiEcad StartRealtimeTimer/StopRealtimeTimer/OnRealtimeTick
+    // 踏襲)。DispatcherTimer/StopwatchともWPF標準機構のためView層に持たせる(VM層はUIタイマーに
+    // 依存させない既存方針)。
+    private DispatcherTimer? _realtimeTimer;
+    private readonly System.Diagnostics.Stopwatch _realtimeClock = new();
+    private long _lastTickMs;
+    private bool _timerPaused;
+
     // T-082: シートナビゲーション(SheetNavList)のドラッグ&ドロップ並び替え用状態。キャンバス要素の
     // ドラッグ(マウスキャプチャ方式)とは対象が異なりWPFネイティブDragDrop APIを使う(Explore調査で
     // 既存流用パターン無しと確認済み)。
@@ -92,8 +104,17 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.FreeLineDraftPreview)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedImage)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ImageInsertDraftPreview))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ImageInsertDraftPreview)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode))
             RedrawCanvas();
+
+        // T-061第五歩: モード遷移に合わせて実時間タイマを開始/停止する(GuiEcad
+        // 「_testMode ? StartRealtimeTimer() : StopRealtimeTimer()」踏襲)。
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode))
+        {
+            if (_viewModel.Mode == ViewModels.AppMode.Test) StartRealtimeTimer();
+            else StopRealtimeTimer();
+        }
 
         // T-056: グリッド表示切替。LadderCanvasはカスタムFrameworkElementでDraw()呼び出しが
         // 描画トリガーのため、ShowGridの値をViewへ反映した上で明示的に再描画する。
@@ -146,6 +167,54 @@ public partial class MainWindow : Window
         }
     }
 
+    // T-061第五歩: テストモード中、タイマ経過を実時間で進める(GuiEcad MainPage.xaml.cs全文移植)。
+    private void StartRealtimeTimer()
+    {
+        _timerPaused = false;
+        TimerPauseButton.IsChecked = false;
+        _realtimeClock.Restart();
+        _lastTickMs = 0;
+        _realtimeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        _realtimeTimer.Tick -= OnRealtimeTick;
+        _realtimeTimer.Tick += OnRealtimeTick;
+        _realtimeTimer.Start();
+    }
+
+    private void StopRealtimeTimer()
+    {
+        _realtimeTimer?.Stop();
+        _realtimeClock.Stop();
+    }
+
+    private void OnRealtimeTick(object? sender, EventArgs e)
+    {
+        if (_viewModel.Mode != ViewModels.AppMode.Test || _viewModel.CurrentTestSession is not Ecad2.Simulation.TestSession session)
+            return;
+        long now = _realtimeClock.ElapsedMilliseconds;
+        double dt = (now - _lastTickMs) / 1000.0;
+        _lastTickMs = now;
+        if (dt <= 0) return;
+        session.Tick(dt);
+        RedrawCanvas();
+    }
+
+    // 一時停止/再開: 実時間カウントを止める。再開時は経過の起点をリセットして時間飛びを防ぐ
+    // (GuiEcad OnTimerPauseToggle踏襲。Stopwatch自体は一時停止中も動き続け、再開時に_lastTickMsを
+    // その時点の経過時間へ合わせることで一時停止中の経過をdtに含めない)。
+    private void TimerPauseToggleButton_Click(object sender, RoutedEventArgs e)
+    {
+        _timerPaused = sender is System.Windows.Controls.Primitives.ToggleButton { IsChecked: true };
+        if (_timerPaused)
+        {
+            _realtimeTimer?.Stop();
+        }
+        else if (_viewModel.Mode == ViewModels.AppMode.Test)
+        {
+            _lastTickMs = _realtimeClock.ElapsedMilliseconds;
+            _realtimeTimer?.Start();
+        }
+    }
+
     // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullになる。
     // 前回シートの描画がキャンバスに残り続けないよう明示的にClearする(空状態=濃紺はT-020の
     // ScrollViewer背景切替が担うが、その上に前回図面が重なって見えるのを防ぐ)。
@@ -155,7 +224,7 @@ public partial class MainWindow : Window
             LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
                 _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
                 _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
-                _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview);
+                _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.CurrentTestSession?.State);
         else
             LadderCanvasHost.Clear();
     }
@@ -469,6 +538,26 @@ public partial class MainWindow : Window
     {
         var position = e.GetPosition(LadderCanvasHost);
 
+        // T-061第三歩: テストモード中は選択操作(行コメント編集・要素選択・ドラッグ等)を一切行わず、
+        // 押しボタン/トグル/セレクトSWの入力操作のみを行う(GuiEcad「進行中のドラッグ/パン状態の
+        // 破棄」に相当する分離、Modeのsetterで既にTool=SelectDefaultへ固定済み)。
+        if (_viewModel.Mode == ViewModels.AppMode.Test)
+        {
+            if (_viewModel.CurrentSheet is Ecad2.Model.Sheet testSheet)
+            {
+                var testPos = LadderCanvasHost.ToGridPos(position);
+                if (testPos.Row >= 0 && testPos.Row < testSheet.Grid.Rows
+                    && _viewModel.TestModePress(testPos) is string pressedDevice)
+                {
+                    _testModePressedDevice = pressedDevice;
+                    LadderCanvasHost.CaptureMouse();
+                }
+                RedrawCanvas();
+            }
+            e.Handled = true;
+            return;
+        }
+
         // T-080往復2周目(a)修正: WPFの既知の仕様(MouseButtonEventArgs.ClickCountはMouseUp側では
         // 常に1に固定され、MouseDown側でのみ2以上に到達する)により、往復1周目まではUp側で
         // e.ClickCount==2を判定していたため物理ダブルクリックでも条件成立しなかった(忍者実測で
@@ -693,6 +782,16 @@ public partial class MainWindow : Window
 
     private void LadderCanvasHost_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
+        // T-061第三歩: 押しボタンのモーメンタリ解除(押している間だけON)。
+        if (_testModePressedDevice is string releasedDevice)
+        {
+            _viewModel.TestModeRelease(releasedDevice);
+            _testModePressedDevice = null;
+            LadderCanvasHost.ReleaseMouseCapture();
+            RedrawCanvas();
+            return;
+        }
+
         // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDragging*=falseだが
         // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
@@ -860,6 +959,15 @@ public partial class MainWindow : Window
     // 実機確認が必要な範囲へ縮小する(HasSelectedElement化に伴うプロパティパネル切替の実挙動)。
     private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // T-061第四歩: テストモード中は作画モード用メニューと完全に切り替え、接点(ContactNO/NC)
+        // 限定の手動強制ON/OFFメニューのみを出す(GuiEcad ShowContactContextMenu踏襲)。
+        if (_viewModel.Mode == ViewModels.AppMode.Test)
+        {
+            ShowTestModeContextMenu(e.GetPosition(LadderCanvasHost));
+            e.Handled = true;
+            return;
+        }
+
         if (_viewModel.HasAnyDraft) return;
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var position = e.GetPosition(LadderCanvasHost);
@@ -946,6 +1054,41 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
+    // T-061第四歩: テストモード中の右クリックメニュー(接点ContactNO/NC限定、手動強制ON/OFF、
+    // GuiEcad ShowContactContextMenu踏襲)。接点以外・デバイス名なし・ヒットしない場合は何も
+    // 表示しない(GuiEcadもhit is null || DeviceName is null || Kind not in (NO,NC)で早期return)。
+    private void ShowTestModeContextMenu(Point position)
+    {
+        if (_viewModel.CurrentTestSession is not Ecad2.Simulation.TestSession session
+            || _viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
+        var pos = LadderCanvasHost.ToGridPos(position);
+        if (pos.Row < 0 || pos.Row >= sheet.Grid.Rows) return;
+        if (_viewModel.HitTestElement(pos) is not Ecad2.Model.ElementInstance hit || hit.DeviceName is not string dev)
+            return;
+        if (hit.Kind is not (Ecad2.Model.ElementKind.ContactNO or Ecad2.Model.ElementKind.ContactNC)) return;
+
+        bool isForced = session.State.Inputs.TryGetValue(dev, out var cur) && cur;
+
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem
+        {
+            Header = $"接点: {dev} [{(isForced ? "手動ON中" : "シミュレーション依存")}]",
+            IsEnabled = false,
+        });
+        menu.Items.Add(new Separator());
+
+        var forceOnItem = new MenuItem { Header = "手動でON(強制閉路)", IsEnabled = !isForced };
+        forceOnItem.Click += (_, _) => { session.SetInput(dev, true); RedrawCanvas(); };
+        menu.Items.Add(forceOnItem);
+
+        var releaseItem = new MenuItem { Header = "手動を解除(シミュレーション依存に戻す)", IsEnabled = isForced };
+        releaseItem.Click += (_, _) => { session.SetInput(dev, false); RedrawCanvas(); };
+        menu.Items.Add(releaseItem);
+
+        LadderCanvasHost.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
     // T-069: 要素上での右クリックメニュー項目(削除/機器名変更/コメント編集)。削除はDeleteMenuItem_Click
     // (T-063、要素/コネクタ/配線プリミティブ横断の既存ハンドラ)をそのまま流用する(選択状態は要素のみに
     // 絞られているため、DeleteSelectedElementだけがtrueを返す)。機器名変更は殿裁定どおりDeviceNameBoxへの
@@ -993,6 +1136,13 @@ public partial class MainWindow : Window
     // 各ガードが素通しし二重処理にはならない。
     private void LadderCanvasHost_LostMouseCapture(object sender, MouseEventArgs e)
     {
+        // T-061第三歩: 押しボタン押下中にキャプチャを失った場合もモーメンタリを確実にOFFへ戻す。
+        if (_testModePressedDevice is string lostDevice)
+        {
+            _viewModel.TestModeRelease(lostDevice);
+            _testModePressedDevice = null;
+            RedrawCanvas();
+        }
         if (_viewModel.IsDraggingConnector)
         {
             _viewModel.CancelDragConnector();
