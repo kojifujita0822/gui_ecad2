@@ -629,4 +629,156 @@ public class MainWindowViewModelTests : ViewModelTestBase
 
         Assert.Null(vm.HitTestElement(new GridPos(1, 2)));
     }
+
+    // --- T-069往復3周目(隠密テスト設計書、docs/ecad2-t069-fix2-test-design-onmitsu.md):
+    //     修正1「表示と実行の整合原則」——CellWidth>1要素の占有範囲内のどのセルで右クリックしても、
+    //     削除・機器名取得/設定が同一要素に正しく作用すること。右クリックハンドラの正規化ロジック
+    //     (HitTestElementで検出した要素のアンカー位置=hitElement.PosをSelectedCellへ設定する)を
+    //     ここでも模擬し、実行側(SelectedElementDeviceName/DeleteSelectedElement)の結果を検証する。
+
+    [Theory]
+    [InlineData(2, 0)] // CellWidth=2, アンカー
+    [InlineData(2, 1)] // CellWidth=2, 非アンカー(上限)
+    [InlineData(3, 0)] // CellWidth=3, アンカー
+    [InlineData(3, 1)] // CellWidth=3, 中間
+    [InlineData(3, 2)] // CellWidth=3, 非アンカー(上限)
+    public void RightClickElementSelection_OnAnyOccupiedCell_ResolvesDeviceNameToSameElement(int cellWidth, int columnOffset)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var element = new ElementInstance { Kind = ElementKind.Motor, Pos = new GridPos(0, 1), CellWidth = cellWidth, DeviceName = "M1" };
+        vm.CurrentSheet!.Elements.Add(element);
+        var clickedPos = new GridPos(0, 1 + columnOffset);
+
+        // 右クリックハンドラの正規化ロジック(MainWindow.xaml.cs)を模擬: HitTestElement→アンカー位置。
+        var hit = vm.HitTestElement(clickedPos);
+        Assert.NotNull(hit);
+        vm.SelectedCell = hit!.Pos;
+
+        Assert.Equal("M1", vm.SelectedElementDeviceName);
+
+        vm.SelectedElementDeviceName = "M2";
+        Assert.Equal("M2", element.DeviceName);
+    }
+
+    [Theory]
+    [InlineData(2, 0)]
+    [InlineData(2, 1)]
+    [InlineData(3, 0)]
+    [InlineData(3, 1)]
+    [InlineData(3, 2)]
+    public void RightClickElementSelection_OnAnyOccupiedCell_DeletesCorrectElement(int cellWidth, int columnOffset)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var element = new ElementInstance { Kind = ElementKind.Motor, Pos = new GridPos(0, 1), CellWidth = cellWidth, DeviceName = "M1" };
+        vm.CurrentSheet!.Elements.Add(element);
+        var clickedPos = new GridPos(0, 1 + columnOffset);
+
+        var hit = vm.HitTestElement(clickedPos);
+        vm.SelectedCell = hit!.Pos;
+
+        bool deleted = vm.DeleteSelectedElement();
+
+        Assert.True(deleted);
+        Assert.Empty(vm.CurrentSheet!.Elements);
+    }
+
+    // --- T-069往復3周目修正2: HasAnyDraft(記入中ドラフト保持判定、右クリックガードの絞り込み) ---
+
+    [Fact]
+    public void HasAnyDraft_InitiallyFalse()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        Assert.False(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterBeginConnectorDraft_True()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 0);
+
+        vm.BeginConnectorDraft();
+
+        Assert.True(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterCancelConnectorDraft_False()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 0);
+        vm.BeginConnectorDraft();
+
+        vm.CancelConnectorDraft();
+
+        Assert.False(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterBeginFreeLineDraft_True()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+
+        vm.BeginFreeLineDraft(horizontal: true, startXMm: 10, startYMm: 10, stepMm: 5);
+
+        Assert.True(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterCancelFreeLineDraft_False()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.MainCircuit = true;
+        vm.BeginFreeLineDraft(horizontal: true, startXMm: 10, startYMm: 10, stepMm: 5);
+
+        vm.CancelFreeLineDraft();
+
+        Assert.False(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterBeginImageInsertDraft_True()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 0, yMm: 0);
+
+        Assert.True(vm.HasAnyDraft);
+    }
+
+    [Fact]
+    public void HasAnyDraft_AfterCancelImageInsertDraft_False()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 0, yMm: 0);
+
+        vm.CancelImageInsertDraft();
+
+        Assert.False(vm.HasAnyDraft);
+    }
+
+    /// <summary>往復2周目で誤ってブロックされていた核心のケース(隠密テスト設計書3.2節)。
+    /// PlaceElement(部品配置準備中、T-021分岐Aの連続配置)は記入中ドラフトを一切持たない
+    /// 静的な状態であり、右クリックメニュー(削除・行操作等)は引き続き使えるべき。</summary>
+    [Fact]
+    public void HasAnyDraft_WhenPlaceElementModeWithoutDraft_False()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.Tool = new ToolState(ToolMode.PlaceElement, PartId: "contact-no");
+
+        Assert.False(vm.HasAnyDraft);
+    }
 }

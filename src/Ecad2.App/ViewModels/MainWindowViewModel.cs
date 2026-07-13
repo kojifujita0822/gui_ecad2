@@ -1433,6 +1433,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>記入中の自由線が水平方向かを返す(View側のキー判定用)。記入中でなければfalse。</summary>
     public bool IsFreeLineDraftHorizontal => _freeLineDraft?.IsHorizontal ?? false;
 
+    /// <summary>現在いずれかの記入中ドラフト(縦コネクタ・自由線・画像挿入)を実際に保持しているか
+    /// (T-069往復3周目修正2、隠密テスト設計書「Tool.Modeガード粒度」)。右クリック時の記入中
+    /// ドラフト保護ガードを、静的なツールモード(Tool.Mode!=Select全般)ではなく実際にドラフトを
+    /// 持つ状態のみへ絞り込むために使う。往復2周目のTool.Modeガードは、ドラフトを一切持たない
+    /// PlaceElement(連続配置、T-021分岐A)等まで一律ブロックする過剰な副作用があった。</summary>
+    public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null;
+
     /// <summary>記入中の自由線のプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
     public FreeLine? FreeLineDraftPreview
     {

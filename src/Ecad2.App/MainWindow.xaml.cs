@@ -845,16 +845,22 @@ public partial class MainWindow : Window
     // (要素→縦コネクタ→行、GroupFrame系は今回対象外のためT-067完了後に別途追加する)。要素・
     // 縦コネクタは器のみパターン(既存メソッド呼出のみ)、行操作は既存のまま変更なし。
     //
-    // T-069往復2周目(隠密レビュー指摘、修正3+4): 記入中(Tool.Mode!=Select、縦コネクタ/自由線
-    // ドラフト・部品配置モード等)は右クリック処理自体を行わない。SelectedCellのsetterは値変化の
-    // 有無に関わらず常時ClearConnectorDraftIfAny/ClearFreeLineDraftIfAnyを実行する「選択状態を
-    // クリアする唯一の入口」設計(T-041由来)のため、これを経由するだけでメニューを開いた時点
-    // (選ぶ前)に記入中ドラフトが警告なく破棄されてしまう(殿裁定=保護する方針)。副次効果として、
-    // 部品配置モード中はDeviceNameBoxがCollapsedでFocus()が効かず「機器名変更」が無反応だった
-    // 問題(修正3)もこのガードで併せて解消される。
+    // T-069往復2周目(隠密レビュー指摘、修正3+4): 記入中(縦コネクタ/自由線/画像挿入ドラフト)は
+    // 右クリック処理自体を行わない。SelectedCellのsetterは値変化の有無に関わらず常時
+    // ClearConnectorDraftIfAny/ClearFreeLineDraftIfAny等を実行する「選択状態をクリアする唯一の
+    // 入口」設計(T-041由来)のため、これを経由するだけでメニューを開いた時点(選ぶ前)に記入中
+    // ドラフトが警告なく破棄されてしまう(殿裁定=保護する方針)。
+    //
+    // T-069往復3周目修正2(隠密レビュー指摘): 往復2周目はTool.Mode!=Select全般でガードしていたが、
+    // これは記入中ドラフトを一切持たないPlaceElement(連続配置、T-021分岐A、常用ワークフロー)まで
+    // 一律ブロックする過剰な副作用があった。ガードをHasAnyDraft(実際にドラフトを保持しているか)へ
+    // 絞り込み、静的なツールモードでは右クリックメニュー(削除・機器名変更・行操作等)が引き続き
+    // 使えるようにする。部品配置モード中はDeviceNameBoxがCollapsedでFocus()が効かず「機器名変更」
+    // が無反応だった問題(往復2周目修正3)は、要素上での右クリック自体が到達可能になったことで
+    // 実機確認が必要な範囲へ縮小する(HasSelectedElement化に伴うプロパティパネル切替の実挙動)。
     private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
+        if (_viewModel.HasAnyDraft) return;
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var position = e.GetPosition(LadderCanvasHost);
         var pos = LadderCanvasHost.ToGridPos(position);
@@ -862,14 +868,22 @@ public partial class MainWindow : Window
 
         var menu = new ContextMenu();
 
-        if (_viewModel.HitTestElement(pos) is not null)
+        if (_viewModel.HitTestElement(pos) is Ecad2.Model.ElementInstance hitElement)
         {
             // T-069往復2周目修正2(隠密レビュー指摘): DeviceNameBoxの未確定編集(UpdateSourceTrigger=
             // Explicit)を、選択切替でサイレント消失させないよう既存DeleteMenuItem_Clickと同じ規約で
             // 確定してから選択状態を切り替える。
             CommitDeviceNameEdit();
-            _viewModel.SelectedCell = pos;
-            BuildElementContextMenuItems(menu, pos, sheet);
+            // T-069往復3周目修正1(隠密レビュー指摘「表示と実行の整合原則」): HitTestElementは
+            // CellWidth>1要素の非アンカーセルでも占有範囲内なら検出する(区間交差判定)が、
+            // SelectedElement等のSelectedCellベース経路は単純位置一致(el.Pos==pos)のまま。
+            // クリック位置(pos)をそのままSelectedCellへ入れると、非アンカーセルで検出した要素と
+            // 「実行側(削除・機器名変更)が解決する要素」が食い違い、メニューは出るのに操作が黙って
+            // 失敗する連鎖バグを生む(往復2周目で発覚)。検出した要素のアンカー位置(hitElement.Pos)へ
+            // 正規化することで両者を一致させる(案B=局所正規化、SelectedElementゲッター自体は
+            // 変更しない=左クリック等の既存挙動に影響を与えない)。
+            _viewModel.SelectedCell = hitElement.Pos;
+            BuildElementContextMenuItems(menu, hitElement.Pos, sheet);
         }
         else if (LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
         {
@@ -882,6 +896,11 @@ public partial class MainWindow : Window
         }
         else
         {
+            // T-069往復3周目修正3(隠密レビュー指摘): 行操作コマンド(InsertRowBeforeCommand/
+            // DeleteRowAtCommand)の実行内部でSelectedCellが行シフトされ、SelectedElementDeviceName
+            // のPropertyChangedが間接的に発火する経路がある。要素・縦コネクタ分岐と同じ規約
+            // (選択状態を動かす前に未確定編集を確定)へ揃える。
+            CommitDeviceNameEdit();
             menu.Items.Add(new MenuItem
             {
                 Header = $"行{pos.Row + 1}の前に行を挿入",
