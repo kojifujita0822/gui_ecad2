@@ -126,4 +126,197 @@ public class FindViewModelTests : ViewModelTestBase
         Assert.Equal("", vm.Find.Query);
         Assert.Empty(vm.Find.Matches);
     }
+
+    // ===== T-070往復2周目(隠密静的レビュー指摘A-1〜A-9、B-1〜B-3)の回帰テスト =====
+
+    [Fact]
+    public void ReplaceOneCommand_TestMode_CanExecuteIsFalse()
+    {
+        // A-1(最重要): テストモード中は「置換」ボタンが無効化されること(T-061「観察専用」原則)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X999";
+        Assert.True(vm.Find.ReplaceOneCommand.CanExecute(null));
+
+        vm.Mode = AppMode.Test;
+
+        Assert.False(vm.Find.ReplaceOneCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReplaceAllCommand_TestMode_CanExecuteIsFalse()
+    {
+        // A-1(最重要): テストモード中は「全置換」ボタンが無効化されること。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X999";
+        Assert.True(vm.Find.ReplaceAllCommand.CanExecute(null));
+
+        vm.Mode = AppMode.Test;
+
+        Assert.False(vm.Find.ReplaceAllCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReplaceOneCommand_PreservesExistingDeviceBomInfo_WhenOldNameNoLongerReferenced()
+    {
+        // A-2: 参照要素が1個のみの状態で置換すると、旧Deviceオブジェクトがそのまま新名へ移行され
+        // BOM情報(Model/Maker/Quantity)が保持されること(新規Deviceで作り直され消失しないこと)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.Document.Devices.ByName["X001"] = new Device { Name = "X001", Model = "MODEL-1", Maker = "MAKER-1", Quantity = 3 };
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X002";
+
+        vm.Find.ReplaceOneCommand.Execute(null);
+
+        Assert.True(vm.Document.Devices.ByName.TryGetValue("X002", out var newDevice));
+        Assert.Equal("MODEL-1", newDevice!.Model);
+        Assert.Equal("MAKER-1", newDevice.Maker);
+        Assert.Equal(3, newDevice.Quantity);
+        Assert.False(vm.Document.Devices.ByName.ContainsKey("X001"));
+    }
+
+    [Fact]
+    public void ReplaceOneCommand_CaseOnlyChange_DoesNotLeaveDuplicateDeviceEntry()
+    {
+        // A-3: "m1"->"M1"のような大文字小文字違いの置換で、機器表に2エントリ残らないこと
+        // (Ordinal比較のContainsKeyのままだと"m1"削除判定がOrdinalIgnoreCaseで誤って
+        // 「まだ参照あり」と見なし、旧キーが残留してしまっていた)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "m1"));
+        vm.Document.Devices.ByName["m1"] = new Device { Name = "m1", Model = "MODEL-1" };
+        vm.Find.Query = "m1";
+        vm.Find.ReplaceWith = "M1";
+
+        vm.Find.ReplaceOneCommand.Execute(null);
+
+        Assert.Single(vm.Document.Devices.ByName);
+        Assert.True(vm.Document.Devices.ByName.ContainsKey("M1"));
+    }
+
+    [Fact]
+    public void ReplaceAllCommand_NotifiesSelectedElementDeviceNameChanged()
+    {
+        // A-4: 選択中要素を全置換で改名しても、右パネルのDeviceNameBox表示(SelectedElementDeviceName)
+        // へ通知が飛ぶこと(ReplaceAllがDeviceRenamer.Renameを直接呼ぶだけで通知漏れしていた)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        var a = MakeContact(0, 0, "X001");
+        sheet.Elements.Add(a);
+        vm.SelectedCell = a.Pos;
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X999";
+
+        var raised = new List<string?>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName);
+
+        vm.Find.ReplaceAllCommand.Execute(null);
+
+        Assert.Contains(nameof(MainWindowViewModel.SelectedElementDeviceName), raised);
+    }
+
+    [Fact]
+    public void ReplaceOneCommand_NoOpReplace_DoesNotDiscardRedoHistory()
+    {
+        // A-5: 置換後欄に現在名と同じ文字列を入れて「置換」を押しても、実際には何も変わらない
+        // ため既存のRedo履歴を破棄しないこと。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.UndoCommand.Execute(null);
+        Assert.True(vm.RedoCommand.CanExecute(null));   // 前提: Redo可能状態
+
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X001";   // 現在名と同じ = no-op
+
+        vm.Find.ReplaceOneCommand.Execute(null);
+
+        Assert.True(vm.RedoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void ReplaceAllCommand_NoOpReplace_DoesNotDiscardRedoHistory()
+    {
+        // A-5: 全置換版も同様、from==toのno-op置換ではRedo履歴を破棄しないこと。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.UndoCommand.Execute(null);
+        Assert.True(vm.RedoCommand.CanExecute(null));
+
+        vm.Find.Query = "X001";
+        vm.Find.ReplaceWith = "X001";
+
+        vm.Find.ReplaceAllCommand.Execute(null);
+
+        Assert.True(vm.RedoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void IsVisible_SetFalse_ClearsReplaceWith()
+    {
+        // A-8: 閉じるとQueryだけでなくReplaceWithもクリアされ、残留した置換後文字列への
+        // 意図しない一括置換を防ぐこと。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.Find.IsVisible = true;
+        vm.Find.ReplaceWith = "X999";
+
+        vm.Find.IsVisible = false;
+
+        Assert.Equal("", vm.Find.ReplaceWith);
+    }
+
+    [Fact]
+    public void Undo_ClearsFindResults()
+    {
+        // B-1: Undo/RedoでDocumentが差し替わったら、古いSheet/ElementInstance参照を保持したままの
+        // 検索結果(Matches)が破棄されること(放置すると検索結果パネルの行クリックでJumpToが
+        // 無言returnする沈黙不整合が起きる)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.Find.Query = "X001";
+        Assert.NotEmpty(vm.Find.Matches);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Empty(vm.Find.Matches);
+    }
+
+    [Fact]
+    public void Query_MatchWhileConnectorDraftPending_DoesNotDiscardDraft()
+    {
+        // B-2: 縦コネクタ記入中にCtrl+Fで検索し既存機器名を入力しても、自動JumpToが記入中ドラフトを
+        // 無警告で破棄しないこと。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(2, 2, "X001"));
+        vm.SelectedCell = new GridPos(3, 5);
+        vm.BeginConnectorDraft();
+        Assert.NotNull(vm.ConnectorDraftPreview);
+
+        vm.Find.Query = "X001";
+
+        Assert.NotNull(vm.ConnectorDraftPreview);
+    }
 }

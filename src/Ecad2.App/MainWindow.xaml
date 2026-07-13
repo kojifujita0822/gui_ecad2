@@ -626,50 +626,57 @@
                                Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"/>
                 </Grid>
             </Border>
-            <DataGrid x:Name="FindResultsGrid" ItemsSource="{Binding Find.Matches}"
-                      Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
-                      AutoGenerateColumns="False" IsReadOnly="True"
-                      HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-                <DataGrid.RowStyle>
-                    <Style TargetType="DataGridRow">
-                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
-                    </Style>
-                </DataGrid.RowStyle>
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="シート" Binding="{Binding SheetName}" Width="100"/>
-                    <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="100"/>
-                    <DataGridTextColumn Header="該当箇所" Binding="{Binding Location}" Width="*"/>
-                </DataGrid.Columns>
-            </DataGrid>
-            <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
-                      SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
-                      Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"
-                      AutoGenerateColumns="False" IsReadOnly="True"
-                      HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-                <DataGrid.RowStyle>
-                    <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
-                         T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
-                    <Style TargetType="DataGridRow">
-                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
-                    </Style>
-                </DataGrid.RowStyle>
-                <DataGrid.Columns>
-                    <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
-                                        Width="60">
-                        <DataGridTextColumn.ElementStyle>
-                            <Style TargetType="TextBlock">
-                                <Setter Property="Foreground" Value="{Binding Severity, Converter={StaticResource SeverityToBrush}}"/>
-                                <Setter Property="FontWeight" Value="Bold"/>
-                            </Style>
-                        </DataGridTextColumn.ElementStyle>
-                    </DataGridTextColumn>
-                    <DataGridTextColumn Header="コード" Binding="{Binding Code}" Width="110"/>
-                    <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="80"/>
-                    <DataGridTextColumn Header="メッセージ" Binding="{Binding Message}" Width="*"/>
-                    <DataGridTextColumn Header="該当箇所" Binding="{Binding Locations, Converter={StaticResource LocationsToText}}"
-                                        Width="140"/>
-                </DataGrid.Columns>
-            </DataGrid>
+            <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
+                 受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり
+                 該当箇所列(Width="*")が正しく展開されず左寄せの狭い帯になっていた。Gridでラップし両方を
+                 重ねてVisibilityで切替える(上のTextBlock 2枚と同型のパターン)ことで、Gridの方が
+                 DockPanelのFill対象になり両DataGridとも正しくStar列展開を受けられるようにする。 -->
+            <Grid>
+                <DataGrid x:Name="FindResultsGrid" ItemsSource="{Binding Find.Matches}"
+                          Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                    <DataGrid.RowStyle>
+                        <Style TargetType="DataGridRow">
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="シート" Binding="{Binding SheetName}" Width="100"/>
+                        <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="100"/>
+                        <DataGridTextColumn Header="該当箇所" Binding="{Binding Location}" Width="*"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+                <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
+                          SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
+                          Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"
+                          AutoGenerateColumns="False" IsReadOnly="True"
+                          HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                    <DataGrid.RowStyle>
+                        <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
+                             T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
+                        <Style TargetType="DataGridRow">
+                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
+                        </Style>
+                    </DataGrid.RowStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
+                                            Width="60">
+                            <DataGridTextColumn.ElementStyle>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{Binding Severity, Converter={StaticResource SeverityToBrush}}"/>
+                                    <Setter Property="FontWeight" Value="Bold"/>
+                                </Style>
+                            </DataGridTextColumn.ElementStyle>
+                        </DataGridTextColumn>
+                        <DataGridTextColumn Header="コード" Binding="{Binding Code}" Width="110"/>
+                        <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="80"/>
+                        <DataGridTextColumn Header="メッセージ" Binding="{Binding Message}" Width="*"/>
+                        <DataGridTextColumn Header="該当箇所" Binding="{Binding Locations, Converter={StaticResource LocationsToText}}"
+                                            Width="140"/>
+                    </DataGrid.Columns>
+                </DataGrid>
+            </Grid>
         </DockPanel>
         </Grid>
 

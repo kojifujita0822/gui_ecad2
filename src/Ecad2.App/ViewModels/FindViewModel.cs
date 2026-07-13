@@ -30,8 +30,12 @@ public sealed class FindViewModel : ViewModelBase
         _owner = owner;
         NextCommand = new RelayCommand(Next, () => Matches.Count > 0);
         PrevCommand = new RelayCommand(Prev, () => Matches.Count > 0);
-        ReplaceOneCommand = new RelayCommand(ReplaceOne, () => CurrentMatch is not null && ReplaceWith.Trim().Length > 0);
-        ReplaceAllCommand = new RelayCommand(ReplaceAll, () => Matches.Count > 0 && ReplaceWith.Trim().Length > 0);
+        // T-070隠密レビュー指摘A-1(最重要): 置換系のみCanEditDiagram(T-061確立、テストモード中の
+        // 編集禁止統一ゲート)を条件に含める。検索・移動(Next/Prev)は観察の範疇として対象外(殿裁定)。
+        ReplaceOneCommand = new RelayCommand(ReplaceOne,
+            () => _owner.CanEditDiagram && CurrentMatch is not null && ReplaceWith.Trim().Length > 0);
+        ReplaceAllCommand = new RelayCommand(ReplaceAll,
+            () => _owner.CanEditDiagram && Matches.Count > 0 && ReplaceWith.Trim().Length > 0);
     }
 
     private bool _isVisible;
@@ -44,7 +48,14 @@ public sealed class FindViewModel : ViewModelBase
         set
         {
             if (!SetProperty(ref _isVisible, value)) return;
-            if (!value) Query = "";
+            if (!value)
+            {
+                Query = "";
+                // T-070隠密レビュー指摘A-8: ReplaceWithもQueryと同様に閉じたらクリアする(直上コメント
+                // 「再度開いたら毎回まっさらな状態から始める」契約に合わせる、残留した置換後文字列への
+                // 意図しない一括置換を防ぐ)。
+                ReplaceWith = "";
+            }
         }
     }
 
@@ -118,7 +129,11 @@ public sealed class FindViewModel : ViewModelBase
         // Matches自体は入れ替わっているため、StatusText/CurrentMatchは無条件で再通知する。
         OnPropertyChanged(nameof(StatusText));
         OnPropertyChanged(nameof(CurrentMatch));
-        if (CurrentMatch is { } m) JumpTo(m);
+        // T-070隠密レビュー指摘B-2: 記入中ドラフト(縦コネクタ・自由線・画像挿入)がある間は、検索入力の
+        // たびに走る自動JumpToがSelectedCellセッター経由で無警告にドラフトを破棄してしまう
+        // (Enterでの確定時は案内メッセージが出る設計と非対称)。ドラフト中はジャンプ自体を抑制して保護する
+        // (Matches/CurrentIndex自体は更新するため検索結果件数表示は正しいまま)。
+        if (CurrentMatch is { } m && !_owner.HasAnyDraft) JumpTo(m);
     }
 
     /// <summary>次の一致へ循環移動する((Index+1)%Count方式、GuiEcad踏襲=先頭↔末尾を跨いで循環)。</summary>
@@ -166,6 +181,10 @@ public sealed class FindViewModel : ViewModelBase
         if (CurrentMatch is not { } m) return;
         string newName = ReplaceWith.Trim();
         if (newName.Length == 0) return;
+        // T-070隠密レビュー指摘A-5: 実際に変化するかを判定する前にRecordSnapshotを呼ぶとno-op置換
+        // (現在名と同じ文字列を置換後欄に入力)でも無意味なスナップショットが積まれ、既存のRedo履歴が
+        // 消去される(MoveSelectedImage等の確立規約=値が実際に変化する場合のみRecordSnapshotに合わせる)。
+        if ((m.Element.DeviceName ?? "") == newName) return;
         _owner.UndoManager.RecordSnapshot(_owner.Document);
         _owner.ReplaceOneDeviceName(m.Element, newName);
         RunSearch();   // 置換後は一致集合が変わりうるため再検索
@@ -177,11 +196,23 @@ public sealed class FindViewModel : ViewModelBase
     {
         string from = Query.Trim();
         string to = ReplaceWith.Trim();
-        if (from.Length == 0 || to.Length == 0) return;
+        // T-070隠密レビュー指摘A-5: from==to(完全同一文字列)のno-op置換はDeviceRenamer.Rename内部でも
+        // 何も変えず即returnするため、その手前でRecordSnapshotを呼ぶと無意味なスナップショットになる。
+        if (from.Length == 0 || to.Length == 0 || from == to) return;
         _owner.UndoManager.RecordSnapshot(_owner.Document);
-        DeviceRenamer.Rename(_owner.Document, from, to);
-        _owner.MarkDirty();
-        _owner.DeviceTable.Refresh();
+        _owner.ReplaceAllDeviceName(from, to);
         RunSearch();
+    }
+
+    /// <summary>Undo/Redoによる Document 差し替え後、古い Sheet/ElementInstance 参照を保持したままの
+    /// 検索結果を破棄する(T-070隠密レビューB-1対応、MainWindowViewModel.ApplyUndoRedoSnapshotから呼ぶ)。
+    /// OutputPanel.ClearResultsと同型の単純クリアとし、JumpToは伴わない(Undo/RedoはSelectedCellを
+    /// 巻き戻さず現状維持する殿裁定の意味論を、再検索によるJumpToで壊さないため)。</summary>
+    public void ClearResults()
+    {
+        Matches = Array.Empty<FindMatch>();
+        CurrentIndex = -1;
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(CurrentMatch));
     }
 }

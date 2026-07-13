@@ -1793,10 +1793,56 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (oldName == trimmedNewName) return;
 
         element.DeviceName = trimmedNewName.Length > 0 ? trimmedNewName : null;
-        if (trimmedNewName.Length > 0 && !Document.Devices.ByName.ContainsKey(trimmedNewName))
-            Document.Devices.ByName[trimmedNewName] = new Device { Name = trimmedNewName, Class = ResolveDeviceClass(element) };
+        if (trimmedNewName.Length > 0) MigrateOrRegisterDevice(oldName, trimmedNewName, element);
         if (oldName.Length > 0) RemoveDeviceIfUnreferenced(oldName);
 
+        MarkDirty();
+        NotifySelectedElementChanged();
+        DeviceTable.Refresh();
+    }
+
+    /// <summary>新名を機器表(Document.Devices)へ登録する。T-070隠密レビュー指摘A-2/A-3対応:
+    /// 旧名がこの要素の変更後もう他のどの要素からも参照されなくなる場合は、既存Deviceオブジェクトを
+    /// そのまま新名へキー移行しBOM情報(Model/Maker/Quantity)を保持する(DeviceRenamer.Renameのキー
+    /// 移行と同型の意図だが、対象はDocument全体の一括リネームではなくこの1要素のみの変更後の参照状況)。
+    /// まだ他要素から旧名が参照されるか新名が既に登録済みの場合は、従来通り新規Deviceを作成する。
+    /// キー検索はDeviceRenamer.Rename/RemoveDeviceIfUnreferencedと同じくOrdinalIgnoreCaseで行う
+    /// (指摘A-3=既定のOrdinal比較のままだと大文字小文字違いの置換で重複エントリが残る不具合の修正)。
+    /// </summary>
+    private void MigrateOrRegisterDevice(string oldName, string newName, ElementInstance element)
+    {
+        var oldKey = oldName.Length > 0
+            ? Document.Devices.ByName.Keys.FirstOrDefault(k => string.Equals(k, oldName, StringComparison.OrdinalIgnoreCase))
+            : null;
+        // "m1"->"M1"のような大文字小文字違いの自己リネームでは、newNameの既存キー探索がoldKey自身に
+        // ヒットしてしまう(OrdinalIgnoreCase比較のため)。それは「別枠で既に登録済み」ではなく移行対象
+        // そのものなので、oldKeyと同一なら「既に登録済み」扱いにしない。
+        var existingNewKey = Document.Devices.ByName.Keys
+            .FirstOrDefault(k => string.Equals(k, newName, StringComparison.OrdinalIgnoreCase));
+        if (existingNewKey is not null && existingNewKey != oldKey) return;
+
+        // element自身は呼び出し元(ReplaceOneDeviceName)で既にDeviceName=newNameへ変更済みのため、
+        // 同一の判定(自己リネーム時)で誤って「まだ旧名を参照している」と自己ヒットしないよう除外する。
+        bool oldStillReferenced = oldName.Length > 0 && Document.Sheets.Any(s =>
+            s.Elements.Any(e => e != element && string.Equals(e.DeviceName, oldName, StringComparison.OrdinalIgnoreCase)));
+
+        if (oldKey is not null && !oldStillReferenced && Document.Devices.ByName.Remove(oldKey, out var device))
+        {
+            device.Name = newName;
+            Document.Devices.ByName[newName] = device;
+            return;
+        }
+
+        Document.Devices.ByName[newName] = new Device { Name = newName, Class = ResolveDeviceClass(element) };
+    }
+
+    /// <summary>一致する全要素を一括置換する(T-070、FindViewModel.ReplaceAll専用)。DeviceRenamer.Rename
+    /// をそのまま呼ぶだけでなく、SelectedElementDeviceNameセッター等と同様にプロパティパネルへの通知
+    /// (T-070隠密レビュー指摘A-4対応: ReplaceAllがNotifySelectedElementChangedを呼ばず選択中要素の
+    /// DeviceNameBox表示が内部データと食い違ったまま取り残される不具合の修正)を行う。</summary>
+    public void ReplaceAllDeviceName(string from, string to)
+    {
+        DeviceRenamer.Rename(Document, from, to);
         MarkDirty();
         NotifySelectedElementChanged();
         DeviceTable.Refresh();
@@ -2524,6 +2570,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         // シート構成が変わった以上、旧文書に紐づくDRC結果は破棄する。放置すると存在しないページ
         // 番号を指す診断が残留し、クリック時にJumpToが無言returnする「沈黙」不整合が再発する。
         OutputPanel.ClearResults();
+        // T-070隠密レビュー指摘B-1: 上記と同じ理由で、旧文書のSheet/ElementInstance参照を保持した
+        // ままの検索結果も破棄する(放置すると検索結果パネルの行クリックでJumpToが無言returnする
+        // 同型の沈黙不整合が起きる)。
+        Find.ClearResults();
         MarkDirty();
     }
 }

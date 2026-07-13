@@ -1254,7 +1254,21 @@ public partial class MainWindow : Window
         // 影響を受けない。マウス経路6系統(隠密レビュー指摘)はMainWindow.xamlのMenu/ToolBarTray/
         // メイン作業域Grid/OutputPanelAreaのIsEnabledバインドで別途一括無効化しており(単一の真実源
         // =IsPlacementBarVisible)、キーボード・マウス両経路が同じフラグから連動する。
-        if (_viewModel.IsPlacementBarVisible) return;
+        if (_viewModel.IsPlacementBarVisible)
+        {
+            // T-070隠密レビュー指摘A-7: 配置バーと検索バーが同時表示状態になりうる(検索バーは非
+            // モーダルのため配置バー表示自体をブロックしない)。本ガードがswitch文より前で早期return
+            // するため、下記EscapeケースのFindBar優先処理(コメント参照)に到達できず、検索バーの
+            // Escapeが配置バー消滅後まで機能しなかった。配置バー自身のEsc/Enterは別経路(IsCancel/
+            // IsDefault)で処理されるため本ガードの影響を受けず、ここで個別処理してもバッティングしない。
+            if (e.Key == Key.Escape && _viewModel.Find.IsVisible)
+            {
+                _viewModel.Find.IsVisible = false;
+                FocusCanvas();
+                e.Handled = true;
+            }
+            return;
+        }
 
         // T-080: 行コメントエディタ編集中はグローバルショートカット(F5等)を無効化する
         // (ElementPlacementBar表示中と同じ設計方針)。Enter/Tab/EscapeはRungCommentBox自身の
@@ -1413,38 +1427,41 @@ public partial class MainWindow : Window
                 FocusCanvas();
                 e.Handled = true;
                 break;
-            case Key.F5 when noModifier && _viewModel.CanEditDiagram:
+            // T-070隠密レビュー指摘A-6: 以下F5〜F10の配置ショートカットは他の同種ケース(F2/Delete/
+            // 矢印キー等)と異なりIsCanvasFocused()を持たず非対称だった。FindQueryBox等にフォーカスが
+            // ある状態でもF5等が素通しで成立し、意図せず要素が配置されてしまっていた。
+            case Key.F5 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("a接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F6 when noModifier && _viewModel.CanEditDiagram:
+            case Key.F6 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("b接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F5 when shift && _viewModel.CanEditDiagram:
+            case Key.F5 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("a接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F6 when shift && _viewModel.CanEditDiagram:
+            case Key.F6 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("b接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F7 when noModifier && _viewModel.CanEditDiagram:
+            case Key.F7 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("コイル", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F8 when noModifier && _viewModel.CanEditDiagram:
+            case Key.F8 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F9 when noModifier && _viewModel.CanEditDiagram:
+            case Key.F9 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 // T-041増分5: F9で自由線(横線)手動記入モードを開始する(主回路シート限定、
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A」)。制御回路シートでは
                 // 当面未使用(原案どおり、自動横配線があるため対応する手動記入は無い)。
                 TryBeginFreeLineDraft(horizontal: true);
                 e.Handled = true;
                 break;
-            case Key.F9 when shift && _viewModel.CanEditDiagram:
+            case Key.F9 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 // T-041増分2/5: sF9はシート種別で対象が切替わる(殿裁定「シート種別で自動切替」)。
                 // 制御回路シート→縦コネクタ手動記入、主回路シート→自由線(縦線)手動記入。
                 if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sf9Sheet && sf9Sheet.MainCircuit)
@@ -1453,7 +1470,7 @@ public partial class MainWindow : Window
                     TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
-            case Key.System when noModifier && e.SystemKey == Key.F10 && _viewModel.CanEditDiagram:
+            case Key.System when noModifier && IsCanvasFocused() && e.SystemKey == Key.F10 && _viewModel.CanEditDiagram:
                 // T-041増分3/5: F10もシート種別で対象が切替わる(制御回路→配線分断、主回路→接続点)。
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」。
                 // 忍者実機発見(F10無反応・メインメニューへフォーカス移動)への対処: F10はAlt併用
@@ -1676,7 +1693,13 @@ public partial class MainWindow : Window
             case Key.F when Keyboard.Modifiers == ModifierKeys.Control:
                 // T-070(殿裁定(1)): 検索・置換バーのトグル表示(GuiEcad ToggleFindBar踏襲)。
                 _viewModel.Find.IsVisible = !_viewModel.Find.IsVisible;
-                if (_viewModel.Find.IsVisible) FindQueryBox.Focus();
+                if (_viewModel.Find.IsVisible)
+                    FindQueryBox.Focus();
+                else
+                    // T-070隠密レビュー指摘B-3: 閉じるボタン・Escapeでの終了はFocusCanvas()を呼ぶが、
+                    // このCtrl+Fトグルオフ経路だけ欠けており、非表示化したFindQueryBoxにフォーカスが
+                    // 残留し以後のキャンバス操作(矢印キー等)が効かなくなる非対称があった。
+                    FocusCanvas();
                 e.Handled = true;
                 break;
             case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
