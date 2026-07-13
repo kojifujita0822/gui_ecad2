@@ -386,4 +386,80 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Equal(image.HeightMm, restoredImage.HeightMm);
         Assert.True(restoredImage.IsTracingOnly);
     }
+
+    // --- T-064往復1周目(隠密レビュー、docs/ecad2-t064-image-insert-review-onmitsu.md):
+    //     修正1(最重要)・修正4(実害大)の回帰テスト ---
+
+    /// <summary>
+    /// 隠密レビュー指摘・要修正1のRED先行証明用回帰テスト(指摘の具体例)。アンカーがページ境界
+    /// (X=2mm)近くにある状態でBottomRightハンドルを大きく逆方向(左上)へ動かすと、旧実装は
+    /// 最小サイズ制約(5mm)確保がページ境界クランプの後に効くため画像がXMm=-3等、境界外へ
+    /// はみ出していた。
+    /// </summary>
+    [Fact]
+    public void ResizeImage_BottomRightHandle_NearLeftBoundary_DoesNotExceedPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 2, y: 2, w: 30, h: 15);   // アンカー(左上、BottomRightハンドルの固定点)=(2,2)
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        vm.BeginResizeImage(image, ImageResizeHandle.BottomRight, startXMm: 32, startYMm: 17, maxXMm: 1000, maxYMm: 1000);
+        vm.UpdateResizeImage(currentXMm: -50, currentYMm: -50);   // アンカーを超えて大きく逆方向へ
+
+        Assert.True(image.XMm >= 0, $"XMm={image.XMm}が0未満(境界外)");
+        Assert.True(image.YMm >= 0, $"YMm={image.YMm}が0未満(境界外)");
+        Assert.True(image.WidthMm >= 5.0);
+        Assert.True(image.HeightMm >= 5.0);
+    }
+
+    /// <summary>上限側(ページ右下端近く)でも同様に境界外へはみ出さないことを検証する
+    /// (TopLeftハンドルを大きく右下方向へ動かす逆方向ケース)。</summary>
+    [Fact]
+    public void ResizeImage_TopLeftHandle_NearRightBoundary_DoesNotExceedPageBoundary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var image = MakeImage(x: 468, y: 483, w: 30, h: 15);   // 右下(アンカー)=(498,498)、境界=500
+        vm.CurrentSheet!.Images.Add(image);
+        vm.SelectedImage = image;
+
+        vm.BeginResizeImage(image, ImageResizeHandle.TopLeft, startXMm: 468, startYMm: 483, maxXMm: 500, maxYMm: 500);
+        vm.UpdateResizeImage(currentXMm: 600, currentYMm: 600);   // アンカーを超えて大きく逆方向へ
+
+        Assert.True(image.XMm + image.WidthMm <= 500, $"右端={image.XMm + image.WidthMm}が境界500超");
+        Assert.True(image.YMm + image.HeightMm <= 500, $"下端={image.YMm + image.HeightMm}が境界500超");
+        Assert.True(image.WidthMm >= 5.0);
+        Assert.True(image.HeightMm >= 5.0);
+    }
+
+    /// <summary>
+    /// 隠密レビュー指摘・要修正4(実害大)のRED先行証明用回帰テスト。既存要素を選択した状態のまま
+    /// 画像挿入を確定すると、旧実装はSelectedCellをnullにせずSelectedImageだけを設定していたため
+    /// 両方non-nullになり、Deleteキーが対象とするOR連鎖の先頭(DeleteSelectedElement)が誤って
+    /// 先にヒットし、挿入したばかりの画像ではなく旧選択要素が削除されていた。
+    /// </summary>
+    [Fact]
+    public void ConfirmImageInsertDraft_ClearsSelectedCell_SoDeleteTargetsNewImageNotOldElement()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var oldElement = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X1" };
+        vm.CurrentSheet!.Elements.Add(oldElement);
+        vm.SelectedCell = new GridPos(0, 0);   // 旧要素を選択中
+
+        vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 10, yMm: 10);
+        vm.ConfirmImageInsertDraft();
+
+        Assert.Null(vm.SelectedCell);
+        Assert.NotNull(vm.SelectedImage);
+
+        bool deleted = vm.DeleteSelectedElement() || vm.DeleteSelectedConnector() || vm.DeleteSelectedWireBreak()
+            || vm.DeleteSelectedFreeLine() || vm.DeleteSelectedConnectionDot() || vm.DeleteSelectedImage();
+
+        Assert.True(deleted);
+        Assert.Empty(vm.CurrentSheet!.Images);      // 挿入したばかりの画像が削除される
+        Assert.Single(vm.CurrentSheet!.Elements);   // 旧要素は残ったまま
+    }
 }

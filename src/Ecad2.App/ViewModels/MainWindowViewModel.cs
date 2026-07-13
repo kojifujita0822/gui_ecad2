@@ -1155,6 +1155,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         sheet.Images.Add(image);
         MarkDirty();
         CancelImageInsertDraft();
+        // T-064往復1周目修正4(隠密レビュー指摘、実害大): SelectedCellをnullにせずSelectedImageだけを
+        // 設定すると、既存要素選択(SelectedCell)を残したまま画像挿入した場合にHasSelectedElement/
+        // HasSelectedImageが両方trueになり、Deleteキーが対象とするOR連鎖の先頭(要素削除)を誤って
+        // 先にヒットさせる(挿入したばかりの画像ではなく旧選択要素が消える)。SelectedCell=null→
+        // SelectedImage=imageの順で呼び、排他選択を成立させる(縦コネクタ選択等の既存パターンと同順)。
+        SelectedCell = null;
         SelectedImage = image;
         return true;
     }
@@ -1282,26 +1288,41 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>ドラッグ中のマウス位置(mm実座標)に応じて画像のサイズを更新する(T-064)。固定点
-    /// (対角コーナー)からドラッグ中の隅までの距離を新しい幅・高さとする。最小サイズ(ImageMinSizeMm)
-    /// を下回らないようクランプし、ページ境界(0〜maxXMm/maxYMm)もはみ出さないようクランプする。
-    /// 最小サイズ制約を先に適用してから座標を導出することで、アンカー位置が常に固定されるようにする。</summary>
+    /// (対角コーナー)からドラッグ中の隅までの距離を新しい幅・高さとする。
+    /// T-064往復1周目修正1(隠密レビュー最重要指摘、4系統独立検出): 旧実装はページ境界クランプ→
+    /// 最小サイズ適用の順で、最小サイズ確保がページ境界を再び破りうる不具合があった(アンカーが
+    /// 境界近くの状態で対角ハンドルを大きく逆方向へ動かすと画像が境界外へはみ出す)。掴んだハンドル
+    /// (<see cref="_resizingImageHandle"/>)によってアンカーから見て動く方向(伸びる向き)が一意に
+    /// 決まる性質を使い、<see cref="ClampResizeTarget"/>で「最小サイズ制約」と「ページ境界制約」を
+    /// 同時に満たす範囲へ1軸ずつクランプすることで両立させる。</summary>
     public void UpdateResizeImage(double currentXMm, double currentYMm)
     {
         if (_resizingImage is not ImageInsert image) return;
-        double clampedCurrentX = Math.Clamp(currentXMm, 0, _resizeImageMaxXMm);
-        double clampedCurrentY = Math.Clamp(currentYMm, 0, _resizeImageMaxYMm);
 
-        double rawWidth = clampedCurrentX - _resizeImageAnchorXMm;
-        double rawHeight = clampedCurrentY - _resizeImageAnchorYMm;
-        double width = Math.Max(ImageMinSizeMm, Math.Abs(rawWidth));
-        double height = Math.Max(ImageMinSizeMm, Math.Abs(rawHeight));
-        double signedWidth = rawWidth < 0 ? -width : width;
-        double signedHeight = rawHeight < 0 ? -height : height;
+        bool growsRight = _resizingImageHandle is ImageResizeHandle.TopRight or ImageResizeHandle.BottomRight;
+        bool growsDown = _resizingImageHandle is ImageResizeHandle.BottomLeft or ImageResizeHandle.BottomRight;
+        double targetX = ClampResizeTarget(currentXMm, _resizeImageAnchorXMm, growsRight, _resizeImageMaxXMm);
+        double targetY = ClampResizeTarget(currentYMm, _resizeImageAnchorYMm, growsDown, _resizeImageMaxYMm);
 
-        image.XMm = Math.Min(_resizeImageAnchorXMm, _resizeImageAnchorXMm + signedWidth);
-        image.YMm = Math.Min(_resizeImageAnchorYMm, _resizeImageAnchorYMm + signedHeight);
-        image.WidthMm = width;
-        image.HeightMm = height;
+        image.XMm = Math.Min(_resizeImageAnchorXMm, targetX);
+        image.YMm = Math.Min(_resizeImageAnchorYMm, targetY);
+        image.WidthMm = Math.Abs(targetX - _resizeImageAnchorXMm);
+        image.HeightMm = Math.Abs(targetY - _resizeImageAnchorYMm);
+    }
+
+    /// <summary>T-064往復1周目修正1: リサイズ対象座標(アンカーから見てgrowsPositive方向にのみ動く
+    /// 1軸分)を、最小サイズ制約(ImageMinSizeMm)とページ境界制約(0〜maxMm)の両方を満たす範囲へ
+    /// クランプする。アンカー自体がページ境界に極めて近く最小サイズの余地が無い異常ケースでは、
+    /// ページ境界を優先する(安全側、min>maxでのMath.Clamp例外を避ける)。</summary>
+    private static double ClampResizeTarget(double currentMm, double anchorMm, bool growsPositive, double maxMm)
+    {
+        if (growsPositive)
+        {
+            double lowerBound = anchorMm + ImageMinSizeMm;
+            return lowerBound > maxMm ? maxMm : Math.Clamp(currentMm, lowerBound, maxMm);
+        }
+        double upperBound = anchorMm - ImageMinSizeMm;
+        return upperBound < 0 ? 0 : Math.Clamp(currentMm, 0, upperBound);
     }
 
     /// <summary>画像のリサイズを確定する(T-064)。殿裁定により画像操作はUndo対象のため、開始時から

@@ -894,6 +894,19 @@ public partial class MainWindow : Window
             deleteConnectorItem.Click += DeleteMenuItem_Click;
             menu.Items.Add(deleteConnectorItem);
         }
+        // T-064往復1周目修正5(隠密レビュー指摘): 右クリックのヒットテストチェーンにHitTestImageが
+        // 無く、左クリック(LadderCanvasHost_PreviewMouseLeftButtonUp)とは対称性が崩れていた
+        // (画像上で右クリックしても行操作メニューへフォールバックし削除できなかった)。GuiEcad同様
+        // 背面固定描画のため要素・縦コネクタより後、行操作より前の優先順位で判定する。
+        else if (LadderCanvasHost.HitTestImage(position, sheet) is Ecad2.Model.ImageInsert hitImage)
+        {
+            CommitDeviceNameEdit();
+            _viewModel.SelectedCell = null;
+            _viewModel.SelectedImage = hitImage;
+            var deleteImageItem = new MenuItem { Header = "削除" };
+            deleteImageItem.Click += DeleteMenuItem_Click;
+            menu.Items.Add(deleteImageItem);
+        }
         else
         {
             // T-069往復3周目修正3(隠密レビュー指摘): 行操作コマンド(InsertRowBeforeCommand/
@@ -1164,12 +1177,13 @@ public partial class MainWindow : Window
                 }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
                     || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
-                    || _viewModel.SelectedConnectionDot is not null)
+                    || _viewModel.SelectedConnectionDot is not null || _viewModel.SelectedImage is not null)
                 {
-                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3/5) → 選択解除のみ。
-                    // SelectedCellのsetterが値変化の有無に関わらず全ての配線プリミティブ選択も常に
-                    // クリアするため(隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、
-                    // 1行で足りる。
+                    // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3/5)・画像選択中(T-064往復
+                    // 1周目修正3、隠密レビュー指摘=条件リストにSelectedImageが漏れており画像単独
+                    // 選択時にEscで解除できなかった) → 選択解除のみ。SelectedCellのsetterが値変化の
+                    // 有無に関わらず全ての配線プリミティブ選択・SelectedImageも常にクリアするため
+                    // (隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、1行で足りる。
                     _viewModel.SelectedCell = null;
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
@@ -1253,6 +1267,14 @@ public partial class MainWindow : Window
                     AdjustConnectorDraft(e.Key, cellCenterStep: false);
                 else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine)
                     AdjustFreeLineDraft(e.Key);
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceImage)
+                {
+                    // T-064往復1周目修正2(隠密レビュー指摘): 配置待機中(殿裁定「案A」の2段階操作)は
+                    // ホバー追従で位置が決まるため矢印キーによる調整機能は無い。ここで無視しないと
+                    // else節のMoveSelectedCellへ落ち、SelectedCellのsetter経由で無条件の
+                    // CancelImageInsertDraftが発火し、記入中ドラフトが警告なく破棄されてしまう
+                    // (PlaceConnector/PlaceLineには専用分岐があるのに対称性が崩れていた)。
+                }
                 else if (_viewModel.SelectedConnector is not null)
                     // T-041増分7: 選択中の縦コネクタを平行移動する(キーボード等価操作、案X)。
                     MoveSelectedConnectorByKey(e.Key);
