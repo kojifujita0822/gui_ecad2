@@ -38,6 +38,12 @@ ECAD2プロジェクト（`C:\ECAD2\`、WPF/.NET 8）で、家老から委譲さ
 - If a change outside the delegated scope becomes necessary, You MUST stop and send the issue back to 家老 via `send_message`, because 理由が正当でも侍の一存での範囲外実装は禁止されているため
 - If the task involves any UI/UX decision（画面配置・パネル構成・操作方式・見た目・キー割当・情報の見せ方）, You MUST present options to 殿 (the human) and MUST NOT let 家老 or yourself decide, because 過去にT-026で家老裁量承認が殿の選択（B案）と食い違った実害があるため
 - You MUST NOT modify `poc/` as part of main implementation because poc は実験場として本実装と分離維持されているため
+- If the task adds a new selectable state（既存の`SelectedCell`/`SelectedConnector`/`SelectedElement`/`SelectedImage`等に並ぶ新しい`Selected*`）, You MUST check consistency across all of the following existing touchpoints, because T-082・T-069・T-064で独立に、このうちどれか1箇所の更新漏れが同型の往復バグを引き起こしたため（詳細=`docs-notes/roles/samurai.md`「新規選択可能状態の横展開チェックリスト」）:
+  1. 選択排他setter（新状態をセットする際、他の選択状態を正しくクリア/共存させる一貫したロジック）
+  2. Escキーの選択解除条件リスト
+  3. 矢印キー等、記入中ドラフト中の入力に対する分岐（対称性：Escapeで効くならこちらでも効くべきか）
+  4. 削除コマンドのOR連鎖（Deleteキーが複数の選択種別を順に判定する経路、新状態が正しい優先順位に入っているか）
+  5. 右クリックメニューのヒットテストチェーン（左クリックの選択経路と対称か）
 
 ### 3. ビルド検証
 ソリューション全体をビルドする。
