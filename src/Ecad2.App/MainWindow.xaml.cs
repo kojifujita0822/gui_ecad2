@@ -667,6 +667,10 @@ public partial class MainWindow : Window
     // ContextMenuを都度生成する(ecad2初のContextMenu、前例なし。調査書
     // docs/ecad2-t055-increment3-precheck-onmitsu.md §1の推奨アプローチに倣う)。
     // Command+CommandParameterでバインドし、CanExecuteの反映(グレーアウト)はWPF標準機構に任せる。
+    //
+    // T-069(右クリックメニュー残り4系統の即着手可能部分): ヒットテスト優先順位はGuiEcad踏襲
+    // (要素→縦コネクタ→行、GroupFrame系は今回対象外のためT-067完了後に別途追加する)。要素・
+    // 縦コネクタは器のみパターン(既存メソッド呼出のみ)、行操作は既存のまま変更なし。
     private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
@@ -675,27 +679,72 @@ public partial class MainWindow : Window
         if (pos.Row < 0 || pos.Row >= sheet.Grid.Rows) return;
 
         var menu = new ContextMenu();
-        menu.Items.Add(new MenuItem
+
+        if (sheet.Elements.FirstOrDefault(el => el.Pos == pos) is not null)
         {
-            Header = $"行{pos.Row + 1}の前に行を挿入",
-            Command = _viewModel.InsertRowBeforeCommand,
-            CommandParameter = pos.Row,
-        });
-        menu.Items.Add(new MenuItem
+            _viewModel.SelectedCell = pos;
+            BuildElementContextMenuItems(menu, pos, sheet);
+        }
+        else if (LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
         {
-            Header = "末尾に行を追加",
-            Command = _viewModel.AddRowCommand,
-        });
-        menu.Items.Add(new MenuItem
+            _viewModel.SelectedCell = null;
+            _viewModel.SelectedConnector = connector;
+            var deleteConnectorItem = new MenuItem { Header = "縦コネクタ削除" };
+            deleteConnectorItem.Click += DeleteMenuItem_Click;
+            menu.Items.Add(deleteConnectorItem);
+        }
+        else
         {
-            Header = $"行{pos.Row + 1}を削除",
-            Command = _viewModel.DeleteRowAtCommand,
-            CommandParameter = pos.Row,
-        });
+            menu.Items.Add(new MenuItem
+            {
+                Header = $"行{pos.Row + 1}の前に行を挿入",
+                Command = _viewModel.InsertRowBeforeCommand,
+                CommandParameter = pos.Row,
+            });
+            menu.Items.Add(new MenuItem
+            {
+                Header = "末尾に行を追加",
+                Command = _viewModel.AddRowCommand,
+            });
+            menu.Items.Add(new MenuItem
+            {
+                Header = $"行{pos.Row + 1}を削除",
+                Command = _viewModel.DeleteRowAtCommand,
+                CommandParameter = pos.Row,
+            });
+        }
 
         LadderCanvasHost.ContextMenu = menu;
         menu.IsOpen = true;
         e.Handled = true;
+    }
+
+    // T-069: 要素上での右クリックメニュー項目(削除/機器名変更/コメント編集)。削除はDeleteMenuItem_Click
+    // (T-063、要素/コネクタ/配線プリミティブ横断の既存ハンドラ)をそのまま流用する(選択状態は要素のみに
+    // 絞られているため、DeleteSelectedElementだけがtrueを返す)。機器名変更は殿裁定どおりDeviceNameBoxへの
+    // 自動フォーカス(新規インライン入力ボックスは不採用)。コメント編集はT-080で完成済みのRungComment
+    // 編集UI(OpenRungCommentEditor)をF2キーと同じ対象条件(主回路シート対象外・描画範囲内の行のみ)で
+    // 呼ぶだけ(新規UI設計不要、家老裏取り訂正2026-07-13)。
+    private void BuildElementContextMenuItems(ContextMenu menu, Ecad2.Model.GridPos pos, Ecad2.Model.Sheet sheet)
+    {
+        var deleteItem = new MenuItem { Header = "削除" };
+        deleteItem.Click += DeleteMenuItem_Click;
+        menu.Items.Add(deleteItem);
+
+        var renameItem = new MenuItem { Header = "機器名変更" };
+        renameItem.Click += (_, _) =>
+        {
+            DeviceNameBox.Focus();
+            DeviceNameBox.SelectAll();
+        };
+        menu.Items.Add(renameItem);
+
+        if (!sheet.MainCircuit && pos.Row >= 0 && pos.Row < Ecad2.Rendering.DiagramRenderer.TotalRows(sheet))
+        {
+            var commentItem = new MenuItem { Header = "コメント編集" };
+            commentItem.Click += (_, _) => OpenRungCommentEditor(pos.Row, sheet);
+            menu.Items.Add(commentItem);
+        }
     }
 
     // T-041増分7隠密レビュー所見C対応: Alt+Tab等の外的要因でマウスキャプチャが失われた場合、
