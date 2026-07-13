@@ -50,6 +50,7 @@ ECAD2プロジェクト（`C:\ECAD2\`、WPF/.NET 8）で、家老から委譲さ
 - If the task adds a new coordinate-handling primitive or placement operation, You MUST self-check the 4-point boundary/clamp checklist（既存要素との整合・Grid範囲・画面外周/ページ境界・min>maxガード）, because T-033・T-041増分7・T-051・T-055増分1の4タスクで境界検証の個別実装分散が再発したため（詳細=`docs-notes/roles/samurai.md`「新規プリミティブ・座標処理の境界検証チェックリスト」、台帳PR-04、最多再発型）
 - If the task adds or changes a document/sheet-configuration-changing process（`ReplaceDocument`・シート追加/削除/並べ替え等）, You MUST check the 4-point state reset checklist（UndoManagerクリア・OutputPanelクリア・SelectedSheet通知・SelectedCell再クランプ）, because T-051・T-055増分1で状態クリア責務への追従漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「文書/シート構成変更処理の状態リセットチェックリスト」、台帳PR-05）
 - If you notice the same logic duplicated a third time (rule of three), You SHOULD report it to 家老 and ask whether to consolidate into a shared helper, because T-055・T-060で複製箇所の一部だけ修正され取りこぼした実害があるため（台帳PR-07）
+- If the task introduces a new application-wide mode（`AppMode`等）, You MUST enumerate all input pathways（マウスイベントハンドラ・グローバルキーボードショートカット・メニューCanExecute・ツールバーIsEnabled・Undo/Redo・テキスト編集欄・右クリックコンテキストメニュー）before applying the gate, because T-061で同一タスク内2周連続で、マウス側のみガードし機器名編集欄・画像挿入メニューへの適用漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「新規上位モード導入時の全入力経路列挙チェックリスト」、台帳PR-12）
 
 ### 3. ビルド検証
 ソリューション全体をビルドする。
