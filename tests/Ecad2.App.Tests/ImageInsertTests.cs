@@ -575,6 +575,9 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.Equal(25, image.XMm);
         Assert.Equal(27, image.YMm);
         Assert.True(vm.IsDirty);
+        // T-064追加修正(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像操作は全てUndo対象
+        // (他要素との非対称は許容)。移動もこの原則の対象であることを検証する。
+        Assert.True(vm.UndoCommand.CanExecute(null));
     }
 
     [Fact]
@@ -602,6 +605,31 @@ public class ImageInsertTests : ViewModelTestBase
         Assert.True(moved);
         Assert.Equal(20, image.XMm);   // 50 - WidthMm(30)
         Assert.True(vm.IsDirty);
+        Assert.True(vm.UndoCommand.CanExecute(null));
+    }
+
+    /// <summary>T-064追加修正(隠密フル観点レビュー指摘、殿裁定2026-07-13): 挿入(Undo記録1回目)
+    /// →矢印キー移動(Undo記録が無いと挿入前まで一気に戻ってしまう、隠密指摘の失敗シナリオ)→Undoで、
+    /// 移動1回分だけが戻り画像自体は残ること(挿入前まで巻き戻らないこと)を検証する。</summary>
+    [Fact]
+    public void UndoCommand_AfterMoveSelectedImage_RestoresPreviousPositionOnly()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 10, yMm: 10);
+        vm.ConfirmImageInsertDraft();
+
+        vm.MoveSelectedImage(5, 5, maxXMm: 1000, maxYMm: 1000);
+        Assert.Equal(15, vm.CurrentSheet!.Images[0].XMm);
+        Assert.Equal(15, vm.CurrentSheet!.Images[0].YMm);
+
+        vm.UndoCommand.Execute(null);
+
+        // Undo/Redoはドキュメント全体を再デシリアライズして差し替えるため、Undo実行前に保持していた
+        // ImageInsert参照は反映されない。CurrentSheet.Images[0]を都度再取得して検証する。
+        Assert.Single(vm.CurrentSheet!.Images);   // 挿入前まで巻き戻らず画像は残る
+        Assert.Equal(10, vm.CurrentSheet!.Images[0].XMm);
+        Assert.Equal(10, vm.CurrentSheet!.Images[0].YMm);
     }
 
     /// <summary>既に境界に達している状態でさらに外側へ動かそうとしても変化なし・IsDirtyも立たない

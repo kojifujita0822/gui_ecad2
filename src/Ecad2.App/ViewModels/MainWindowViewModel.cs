@@ -1249,6 +1249,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// SelectedConnectionDot)と同じMoveSelected*パターン)。maxXMm/maxYMmはページ境界(呼び出し元が
     /// sheet.Grid.Columns/Rows×CellMmを計算して渡す)。境界クランプはUpdateDragImageと同じ式
     /// (0〜max-Width/Height)を用いて画像操作全体で整合させる。実際に動けた場合のみMarkDirty()する。
+    /// T-064追加修正(隠密フル観点レビュー指摘、殿裁定2026-07-13): 参照元のMoveSelectedConnectionDot/
+    /// MoveSelectedFreeLineはUndo対象外が既存仕様だが、画像は殿裁定「画像操作は全てUndo対象、他要素
+    /// との非対称は許容」の対象のため、他の画像操作系メソッド(SelectedImageIsTracingOnly・
+    /// DeleteSelectedImage等)と同じくRecordSnapshotを値変更前に呼ぶ必要があった(横展開漏れ)。
     /// </summary>
     public bool MoveSelectedImage(double deltaXMm, double deltaYMm, double maxXMm, double maxYMm)
     {
@@ -1256,6 +1260,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         double newX = Math.Clamp(image.XMm + deltaXMm, 0, Math.Max(0, maxXMm - image.WidthMm));
         double newY = Math.Clamp(image.YMm + deltaYMm, 0, Math.Max(0, maxYMm - image.HeightMm));
         if (newX == image.XMm && newY == image.YMm) return false;
+        UndoManager.RecordSnapshot(Document);
         image.XMm = newX;
         image.YMm = newY;
         MarkDirty();
