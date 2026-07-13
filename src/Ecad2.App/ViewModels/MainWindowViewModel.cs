@@ -1529,6 +1529,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             el.Pos.Row == pos.Row && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
     }
 
+    /// <summary>指定セル位置にヒットする要素を返す(T-069往復2周目修正1、右クリックメニューの
+    /// 要素判定用)。CellWidth>1(Motor等)の要素は左上アンカーセル以外の占有列もヒット対象に含める
+    /// (IsOccupiedと同じ区間交差判定、T-071バグ修正の教訓をヒットテストへ再適用)。</summary>
+    public ElementInstance? HitTestElement(GridPos pos)
+    {
+        if (CurrentSheet is not Sheet sheet) return null;
+        return sheet.Elements.FirstOrDefault(el =>
+            el.Pos.Row == pos.Row && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1);
+    }
+
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
     /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
     /// 共有する(IsWithinGridBounds)。cellWidthの意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>

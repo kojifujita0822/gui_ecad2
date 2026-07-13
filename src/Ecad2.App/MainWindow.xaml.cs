@@ -671,8 +671,17 @@ public partial class MainWindow : Window
     // T-069(右クリックメニュー残り4系統の即着手可能部分): ヒットテスト優先順位はGuiEcad踏襲
     // (要素→縦コネクタ→行、GroupFrame系は今回対象外のためT-067完了後に別途追加する)。要素・
     // 縦コネクタは器のみパターン(既存メソッド呼出のみ)、行操作は既存のまま変更なし。
+    //
+    // T-069往復2周目(隠密レビュー指摘、修正3+4): 記入中(Tool.Mode!=Select、縦コネクタ/自由線
+    // ドラフト・部品配置モード等)は右クリック処理自体を行わない。SelectedCellのsetterは値変化の
+    // 有無に関わらず常時ClearConnectorDraftIfAny/ClearFreeLineDraftIfAnyを実行する「選択状態を
+    // クリアする唯一の入口」設計(T-041由来)のため、これを経由するだけでメニューを開いた時点
+    // (選ぶ前)に記入中ドラフトが警告なく破棄されてしまう(殿裁定=保護する方針)。副次効果として、
+    // 部品配置モード中はDeviceNameBoxがCollapsedでFocus()が効かず「機器名変更」が無反応だった
+    // 問題(修正3)もこのガードで併せて解消される。
     private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var position = e.GetPosition(LadderCanvasHost);
         var pos = LadderCanvasHost.ToGridPos(position);
@@ -680,13 +689,18 @@ public partial class MainWindow : Window
 
         var menu = new ContextMenu();
 
-        if (sheet.Elements.FirstOrDefault(el => el.Pos == pos) is not null)
+        if (_viewModel.HitTestElement(pos) is not null)
         {
+            // T-069往復2周目修正2(隠密レビュー指摘): DeviceNameBoxの未確定編集(UpdateSourceTrigger=
+            // Explicit)を、選択切替でサイレント消失させないよう既存DeleteMenuItem_Clickと同じ規約で
+            // 確定してから選択状態を切り替える。
+            CommitDeviceNameEdit();
             _viewModel.SelectedCell = pos;
             BuildElementContextMenuItems(menu, pos, sheet);
         }
         else if (LadderCanvasHost.HitTestConnector(position, sheet) is Ecad2.Model.VerticalConnector connector)
         {
+            CommitDeviceNameEdit();
             _viewModel.SelectedCell = null;
             _viewModel.SelectedConnector = connector;
             var deleteConnectorItem = new MenuItem { Header = "縦コネクタ削除" };

@@ -567,4 +567,66 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Equal("新テキスト", vm.GetRungComment(4));
         Assert.Single(vm.CurrentSheet!.RungComments);
     }
+
+    // --- T-069往復2周目(隠密レビュー指摘・修正1): HitTestElementのCellWidth>1境界値 ---
+
+    /// <summary>
+    /// 隠密レビュー指摘・要修正1のRED先行証明用回帰テスト。CellWidth>1(Motor等)の要素は左上
+    /// アンカーセル以外の占有列も右クリックメニューのヒット対象に含める必要がある(IsOccupiedと
+    /// 同じ区間交差判定、T-071バグ修正の教訓)。旧実装は単純Pos一致のみだったため、アンカー以外の
+    /// セルでnullを返していた。
+    /// </summary>
+    [Fact]
+    public void HitTestElement_HitsNonAnchorCell_WhenCellWidthGreaterThanOne()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var motor = new ElementInstance
+        {
+            Kind = ElementKind.Motor,
+            Pos = new GridPos(0, 1),
+            CellWidth = 3,
+            DeviceName = "M1",
+        };
+        vm.CurrentSheet!.Elements.Add(motor);
+
+        // Motor(左上アンカー列1、CellWidth=3)は列1-3を占有。アンカー以外の列2でもヒットするはず。
+        var hit = vm.HitTestElement(new GridPos(0, 2));
+
+        Assert.Same(motor, hit);
+    }
+
+    [Fact]
+    public void HitTestElement_HitsAnchorCell()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var motor = new ElementInstance { Kind = ElementKind.Motor, Pos = new GridPos(0, 1), CellWidth = 3 };
+        vm.CurrentSheet!.Elements.Add(motor);
+
+        Assert.Same(motor, vm.HitTestElement(new GridPos(0, 1)));
+    }
+
+    [Fact]
+    public void HitTestElement_ReturnsNull_OutsideOccupiedRange()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var motor = new ElementInstance { Kind = ElementKind.Motor, Pos = new GridPos(0, 1), CellWidth = 3 };
+        vm.CurrentSheet!.Elements.Add(motor);
+
+        Assert.Null(vm.HitTestElement(new GridPos(0, 4)));
+        Assert.Null(vm.HitTestElement(new GridPos(0, 0)));
+    }
+
+    [Fact]
+    public void HitTestElement_ReturnsNull_DifferentRow()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var motor = new ElementInstance { Kind = ElementKind.Motor, Pos = new GridPos(0, 1), CellWidth = 3 };
+        vm.CurrentSheet!.Elements.Add(motor);
+
+        Assert.Null(vm.HitTestElement(new GridPos(1, 2)));
+    }
 }
