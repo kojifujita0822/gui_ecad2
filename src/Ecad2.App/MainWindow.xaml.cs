@@ -65,6 +65,11 @@ public partial class MainWindow : Window
     // (MouseUp/LostMouseCaptureでOFFに戻す、他ドラッグ系のView状態保持と同じ設計)。
     private string? _testModePressedDevice;
 
+    // T-061修正(A-1確認事項1、殿裁定=Enterキーをテスト通電操作として新規結線): マウス側の
+    // _testModePressedDeviceとは別に持つ(マウスとキーボードが同時に別要素を操作する可能性への
+    // 安全側、責務分離)。PreviewKeyUpでOFFに戻す。
+    private string? _testModeEnterPressedDevice;
+
     // T-061第五歩: 実時間タイマパネル(GuiEcad StartRealtimeTimer/StopRealtimeTimer/OnRealtimeTick
     // 踏襲)。DispatcherTimer/StopwatchともWPF標準機構のためView層に持たせる(VM層はUIタイマーに
     // 依存させない既存方針)。
@@ -544,6 +549,10 @@ public partial class MainWindow : Window
         if (!ConfirmDiscardIfDirty()) e.Cancel = true;
     }
 
+    // T-061修正E-1(静的レビューPR-07該当): 行範囲チェック式が3箇所(テストモード左クリック・
+    // 右クリックのrowInRange・ShowTestModeContextMenu)に手書き重複していたため共有化する。
+    private static bool IsRowInRange(int row, Ecad2.Model.Sheet sheet) => row >= 0 && row < sheet.Grid.Rows;
+
     // キャンバスクリックでセルを選択する(T-026段階4新配置フロー)。旧T-016フロー(ツール選択→
     // クリックで即配置)は廃止。ただしツールバーボタン経由(Tool.Mode==PlaceElement、殿裁定で
     // ゴースト表示は簡易版=視覚プレビューなしのステータスバー表示に留める、T-029へ切り出し)の
@@ -564,11 +573,16 @@ public partial class MainWindow : Window
             if (_viewModel.CurrentSheet is Ecad2.Model.Sheet testSheet)
             {
                 var testPos = LadderCanvasHost.ToGridPos(position);
-                if (testPos.Row >= 0 && testPos.Row < testSheet.Grid.Rows
+                if (IsRowInRange(testPos.Row, testSheet)
                     && _viewModel.TestModePress(testPos) is string pressedDevice)
                 {
-                    _testModePressedDevice = pressedDevice;
-                    LadderCanvasHost.CaptureMouse();
+                    // T-061修正D-2(静的レビュー指摘): 他5箇所の確立パターン(CaptureMouse戻り値
+                    // チェック)と異なりここだけ戻り値未チェックだった。キャプチャ失敗時はモーメンタリ
+                    // がON固定されうるため、即座にTestModeReleaseでOFFへ戻す。
+                    if (LadderCanvasHost.CaptureMouse())
+                        _testModePressedDevice = pressedDevice;
+                    else
+                        _viewModel.TestModeRelease(pressedDevice);
                 }
                 RedrawCanvas();
             }
@@ -977,6 +991,11 @@ public partial class MainWindow : Window
     // 実機確認が必要な範囲へ縮小する(HasSelectedElement化に伴うプロパティパネル切替の実挙動)。
     private void LadderCanvasHost_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // T-061修正D-1(静的レビュー指摘): テストモード分岐がHasAnyDraftガード(T-069確立)より前に
+        // あり、記入中ドラフトの保護を迂回していた。Modeセッタで既にドラフトを明示クリアする
+        // ようになった(D-1本体)ため実害は塞がったが、二重の安全網としてガードの後段へ移す。
+        if (_viewModel.HasAnyDraft) return;
+
         // T-061第四歩: テストモード中は作画モード用メニューと完全に切り替え、接点(ContactNO/NC)
         // 限定の手動強制ON/OFFメニューのみを出す(GuiEcad ShowContactContextMenu踏襲)。
         if (_viewModel.Mode == ViewModels.AppMode.Test)
@@ -985,12 +1004,10 @@ public partial class MainWindow : Window
             e.Handled = true;
             return;
         }
-
-        if (_viewModel.HasAnyDraft) return;
         if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var position = e.GetPosition(LadderCanvasHost);
         var pos = LadderCanvasHost.ToGridPos(position);
-        bool rowInRange = pos.Row >= 0 && pos.Row < sheet.Grid.Rows;
+        bool rowInRange = IsRowInRange(pos.Row, sheet);
         // T-064往復2周目修正1(隠密再レビュー指摘): 画像はグリッド非依存の自由配置要素で、上部
         // 余白帯(Y<MarginMm)等の行範囲外にも配置・リサイズできる。行範囲外ガードを画像ヒット
         // テストより先に置くと、範囲外にある画像は右クリックメニューが一切出ず、行範囲チェックの
@@ -1080,10 +1097,14 @@ public partial class MainWindow : Window
         if (_viewModel.CurrentTestSession is not Ecad2.Simulation.TestSession session
             || _viewModel.CurrentSheet is not Ecad2.Model.Sheet sheet) return;
         var pos = LadderCanvasHost.ToGridPos(position);
-        if (pos.Row < 0 || pos.Row >= sheet.Grid.Rows) return;
+        if (!IsRowInRange(pos.Row, sheet)) return;
         if (_viewModel.HitTestElement(pos) is not Ecad2.Model.ElementInstance hit || hit.DeviceName is not string dev)
             return;
-        if (hit.Kind is not (Ecad2.Model.ElementKind.ContactNO or Ecad2.Model.ElementKind.ContactNC)) return;
+        // T-061修正C-2(静的レビュー): hit.Kindは自作パーツ配置時に常時既定値ContactNOのまま固定
+        // される(T-046由来)ため、この判定は常にfalse(素通り)になりガードが機能していなかった。
+        // PartResolver.ComponentKind経由で実際の電気的種別を解決するIsRealContactElement(C-3と
+        // 共通ヘルパー)へ置換する。
+        if (!_viewModel.IsRealContactElement(hit)) return;
 
         bool isForced = session.State.Inputs.TryGetValue(dev, out var cur) && cur;
 
@@ -1392,38 +1413,38 @@ public partial class MainWindow : Window
                 FocusCanvas();
                 e.Handled = true;
                 break;
-            case Key.F5 when noModifier:
+            case Key.F5 when noModifier && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("a接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F6 when noModifier:
+            case Key.F6 when noModifier && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("b接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F5 when shift:
+            case Key.F5 when shift && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("a接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F6 when shift:
+            case Key.F6 when shift && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("b接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F7 when noModifier:
+            case Key.F7 when noModifier && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("コイル", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F8 when noModifier:
+            case Key.F8 when noModifier && _viewModel.CanEditDiagram:
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F9 when noModifier:
+            case Key.F9 when noModifier && _viewModel.CanEditDiagram:
                 // T-041増分5: F9で自由線(横線)手動記入モードを開始する(主回路シート限定、
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A」)。制御回路シートでは
                 // 当面未使用(原案どおり、自動横配線があるため対応する手動記入は無い)。
                 TryBeginFreeLineDraft(horizontal: true);
                 e.Handled = true;
                 break;
-            case Key.F9 when shift:
+            case Key.F9 when shift && _viewModel.CanEditDiagram:
                 // T-041増分2/5: sF9はシート種別で対象が切替わる(殿裁定「シート種別で自動切替」)。
                 // 制御回路シート→縦コネクタ手動記入、主回路シート→自由線(縦線)手動記入。
                 if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sf9Sheet && sf9Sheet.MainCircuit)
@@ -1432,7 +1453,7 @@ public partial class MainWindow : Window
                     TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
-            case Key.System when noModifier && e.SystemKey == Key.F10:
+            case Key.System when noModifier && e.SystemKey == Key.F10 && _viewModel.CanEditDiagram:
                 // T-041増分3/5: F10もシート種別で対象が切替わる(制御回路→配線分断、主回路→接続点)。
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」。
                 // 忍者実機発見(F10無反応・メインメニューへフォーカス移動)への対処: F10はAlt併用
@@ -1458,6 +1479,18 @@ public partial class MainWindow : Window
                 e.Handled = true;
                 break;
             case Key.Up or Key.Down or Key.Left or Key.Right when noModifier && IsCanvasFocused():
+                // T-061修正A-1(殿裁定確定=第三案): テストモード中は矢印キーによるSelectedCellの
+                // 単純移動のみ許可し、選択中プリミティブ(Connector/WireBreak/FreeLine/ConnectionDot/
+                // Image)の平行移動は編集操作に該当するため禁止のままとする。Tool.Modeはテスト中は
+                // 常にSelectのため下記Tool.Mode分岐には到達しないが、Selected*は意図的にモード遷移で
+                // クリアされない設計(5-1注)のため、この専用分岐が無いと選択中プリミティブの移動へ
+                // 素通りしてしまう。
+                if (!_viewModel.CanEditDiagram)
+                {
+                    MoveSelectedCell(e.Key);
+                    e.Handled = true;
+                    break;
+                }
                 // design-brief原則1「単キーショートカットはキャンバスフォーカス時のみ有効」に従い、
                 // 他パネル(シートナビゲーション/機器表)にフォーカスがある間は既定のリスト操作に譲る。
                 // キャンバスフォーカス時はScrollViewer(CanvasArea)の既定スクロールを上書きし、
@@ -1503,15 +1536,18 @@ public partial class MainWindow : Window
                 AdjustConnectorDraft(e.Key, cellCenterStep: true);
                 e.Handled = true;
                 break;
-            case Key.Up or Key.Down when shift && IsCanvasFocused() && _viewModel.SelectedConnector is not null:
+            case Key.Up or Key.Down when shift && IsCanvasFocused() && _viewModel.CanEditDiagram
+                    && _viewModel.SelectedConnector is not null:
                 // T-041増分7(殿裁定P-033=案2): Tabで選んだ操作対象端点(始点/終点)をUp=-1/Down=+1で
                 // 伸縮する。VerticalConnectorは常に縦線のためLeft/Rightの端点伸縮は意味を持たず未対応。
+                // T-061修正A-1: 端点伸縮は編集操作のためCanEditDiagramガード対象(選択中プリミティブの
+                // 移動禁止と同根)。
                 if (_viewModel.ResizeSelectedConnectorEndpoint(e.Key == Key.Up ? -1 : 1))
                     RedrawCanvas();
                 e.Handled = true;
                 break;
             case Key.Up or Key.Down or Key.Left or Key.Right when shift && IsCanvasFocused()
-                    && _viewModel.SelectedFreeLine is not null:
+                    && _viewModel.CanEditDiagram && _viewModel.SelectedFreeLine is not null:
                 // T-041増分7横展開: Tabで選んだ操作対象端点(始点/終点)を伸縮する。自由線は水平線
                 // (Left/Rightのみ意味を持つ)・垂直線(Up/Downのみ)のいずれかのため、線の向きに沿わない
                 // キーは呼び出し元(ResizeSelectedFreeLineByKey)が無視する(AdjustFreeLineDraftと同型)。
@@ -1524,7 +1560,7 @@ public partial class MainWindow : Window
                 _viewModel.ToggleSelectedEndpoint();
                 e.Handled = true;
                 break;
-            case Key.F2 when noModifier && IsCanvasFocused()
+            case Key.F2 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram
                     && _viewModel.SelectedCell is { } commentCell
                     && _viewModel.CurrentSheet is Ecad2.Model.Sheet commentSheet:
                 // T-080往復1周目・追加I(殿裁定): 選択セルの行の行コメントエディタをキーボードで
@@ -1537,7 +1573,7 @@ public partial class MainWindow : Window
                     OpenRungCommentEditor(commentCell.Row, commentSheet);
                 e.Handled = true;
                 break;
-            case Key.Delete when noModifier && IsCanvasFocused():
+            case Key.Delete when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
                 // 選択中の要素を削除する(T-017追加スコープ)。Escは従来通り選択解除のみで削除しない
                 // (殿裁定)。矢印キーと同様キャンバスフォーカス時のみ有効。
                 // T-041増分1/3/5(案A): 選択中の要素が無く配線プリミティブ(縦コネクタ・配線分断・
@@ -1547,6 +1583,19 @@ public partial class MainWindow : Window
                     || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
                     || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage())
                     RedrawCanvas();
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && _viewModel.Mode == ViewModels.AppMode.Test
+                    && !e.IsRepeat && _viewModel.SelectedCell is Ecad2.Model.GridPos testEnterPos:
+                // T-061修正(A-1確認事項1、殿裁定新規結線): テストモード中、選択セル上の要素への
+                // Enter押下をマウス左クリック相当として扱う(TestModePressをマウスハンドラと共用)。
+                // モーメンタリ解除はWindow_PreviewKeyUpでEnterキーアップ時に行う。e.IsRepeatで
+                // キーリピート(押しっぱなしのKeyDown連続発火)による多重実行を防ぐ。通常のEnter配置
+                // 確定ケース(下記、Tool.Mode==PlaceElement)とは独立したcase(テスト中はTool.Modeが
+                // 常にSelectのため両者は排他)。
+                if (_viewModel.TestModePress(testEnterPos) is string enterPressedDevice)
+                    _testModeEnterPressedDevice = enterPressedDevice;
+                RedrawCanvas();
                 e.Handled = true;
                 break;
             case Key.Enter when noModifier && IsCanvasFocused()
@@ -1605,12 +1654,14 @@ public partial class MainWindow : Window
                 // DeviceNameBox編集中の未確定入力を確定してからUndoを実行しないと、Undoで
                 // Documentが差し替わった後にフォーカスが外れた際、別の要素へ誤書き込みされうる。
                 CommitDeviceNameEdit();
-                _viewModel.UndoCommand.Execute(null);
+                // T-061修正A-3: CanExecute(CanEditDiagram統合済み)を経由せず直接Executeしていたため
+                // テストモード中もキーボード経由でUndoが実行できてしまっていた(静的レビュー指摘)。
+                if (_viewModel.UndoCommand.CanExecute(null)) _viewModel.UndoCommand.Execute(null);
                 e.Handled = true;
                 break;
             case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
                 CommitDeviceNameEdit();
-                _viewModel.RedoCommand.Execute(null);
+                if (_viewModel.RedoCommand.CanExecute(null)) _viewModel.RedoCommand.Execute(null);
                 e.Handled = true;
                 break;
             case Key.G when Keyboard.Modifiers == ModifierKeys.Control:
@@ -1634,6 +1685,19 @@ public partial class MainWindow : Window
                 _viewModel.DeleteRowCommand.Execute(null);
                 e.Handled = true;
                 break;
+        }
+    }
+
+    // T-061修正(A-1確認事項1): Enterキーによるテスト通電操作のモーメンタリ解除
+    // (Window_PreviewKeyDownの新規Enterケースと対、マウスのMouseUp/LostMouseCaptureに相当)。
+    private void Window_PreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter && _testModeEnterPressedDevice is string device)
+        {
+            _viewModel.TestModeRelease(device);
+            _testModeEnterPressedDevice = null;
+            RedrawCanvas();
+            e.Handled = true;
         }
     }
 

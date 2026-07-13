@@ -9,6 +9,7 @@
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown"
+        PreviewKeyUp="Window_PreviewKeyUp"
         PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
         Closing="Window_Closing">
     <Window.Resources>
@@ -144,7 +145,8 @@
                 <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C"/>
                 <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V"/>
                 <Separator/>
-                <MenuItem Header="削除(_D)" InputGestureText="Delete" Click="DeleteMenuItem_Click"/>
+                <MenuItem Header="削除(_D)" InputGestureText="Delete" Click="DeleteMenuItem_Click"
+                          IsEnabled="{Binding CanEditDiagram}"/>
             </MenuItem>
             <MenuItem Header="図面(_D)">
                 <MenuItem Header="ドキュメント情報(_I)" Click="DocumentInfoMenuItem_Click" IsEnabled="{Binding HasProject}"/>
@@ -156,7 +158,8 @@
             </MenuItem>
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>
-                <MenuItem Header="テストモード(_M)" IsCheckable="True" IsChecked="{Binding IsTestMode, Mode=TwoWay}"/>
+                <MenuItem Header="テストモード(_M)" IsCheckable="True" IsChecked="{Binding IsTestMode, Mode=TwoWay}"
+                          IsEnabled="{Binding HasProject}"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <MenuItem Header="バージョン情報(_A)" Click="AboutMenuItem_Click"/>
@@ -283,7 +286,7 @@
                         AutomationProperties.Name="a接点配置 (F5)"
                         Tag="a接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F5"/>
@@ -293,7 +296,7 @@
                         AutomationProperties.Name="OR a接点配置 (Shift+F5)"
                         Tag="OR:a接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF5"/>
@@ -303,7 +306,7 @@
                         AutomationProperties.Name="b接点配置 (F6)"
                         Tag="b接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F6"/>
@@ -313,7 +316,7 @@
                         AutomationProperties.Name="OR b接点配置 (Shift+F6)"
                         Tag="OR:b接点" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9 M4,15 L14,3"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF6"/>
@@ -323,7 +326,7 @@
                         AutomationProperties.Name="コイル配置 (F7)"
                         Tag="コイル" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L4,9 M14,9 L16,9 M9,4 A5,5 0 1 1 8.999,4"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F7"/>
@@ -333,7 +336,7 @@
                         AutomationProperties.Name="端子台配置 (F8)"
                         Tag="端子台" Click="BuiltinPlaceButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L6,9 M12,9 L16,9 M9,6 A3,3 0 1 1 8.999,6 M9,3 L9,15"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F8"/>
@@ -354,7 +357,7 @@
                         AutomationProperties.Name="自由線(横線)記入 (F9)"
                         Click="FreeLineHorizontalButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding IsMainCircuitSheet}">
+                        IsEnabled="{Binding CanPlaceOnMainCircuit}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,9 L16,9"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F9"/>
@@ -364,7 +367,7 @@
                         AutomationProperties.Name="自由線(縦線)記入 (Shift+F9)"
                         Click="FreeLineVerticalButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding IsMainCircuitSheet}">
+                        IsEnabled="{Binding CanPlaceOnMainCircuit}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M9,3 L9,15"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF9"/>
@@ -374,7 +377,7 @@
                         AutomationProperties.Name="縦分岐線記入 (Shift+F9)"
                         Click="VerticalConnectorButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding IsControlCircuitSheet}">
+                        IsEnabled="{Binding CanPlaceOnControlCircuit}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M9,3.3 m-1.3,0 a1.3,1.3 0 1 0 2.6,0 a1.3,1.3 0 1 0 -2.6,0 M4.5,3.3 L13.5,3.3 M9,4.6 L9,12 M5.5,9 L9,12.5 L12.5,9" Fill="Black"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="sF9"/>
@@ -384,7 +387,7 @@
                         AutomationProperties.Name="接続点記入 (F10)"
                         Click="ConnectionDotButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding IsMainCircuitSheet}">
+                        IsEnabled="{Binding CanPlaceOnMainCircuit}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M9,9 m-3,0 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0" Fill="Black"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F10"/>
@@ -394,7 +397,7 @@
                         AutomationProperties.Name="配線分断記入 (F10)"
                         Click="WireBreakButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding IsControlCircuitSheet}">
+                        IsEnabled="{Binding CanPlaceOnControlCircuit}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M5,3 L9,9 L12,13.5 M13,3 L9,9 L6,13.5 M6,12.2 A1.3,1.3 0 1 1 5.999,12.2 M12,12.2 A1.3,1.3 0 1 1 11.999,12.2"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F10"/>
@@ -405,7 +408,7 @@
                         AutomationProperties.Name="自作パーツ"
                         Click="OpenPartSelectionButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
-                        IsEnabled="{Binding HasProject}">
+                        IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M3,3 L15,3 L15,15 L3,15 Z M9,6 L9,12 M6,9 L12,9"/>
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>

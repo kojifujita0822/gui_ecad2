@@ -23,6 +23,12 @@ public sealed class EvalResult
     public int Iterations { get; init; }
     /// <summary>周期的振動の周期長（Status==Cyclic のときのみ有意）。0 は不明。</summary>
     public int CycleLength { get; init; }
+    /// <summary>要素単位（<see cref="Component.SourceElementId"/>キー）の導通状態（T-061修正B群）。
+    /// コイルの励磁状態(<see cref="SimState.Energized"/>)のみを見ていた描画側の色分けが、接点・
+    /// 押しボタン・セレクトSW・NC系・限時タイマ接点で機能不全だった問題を、<see cref="IsConducting"/>
+    /// （NO/NC反転・タイマ限時判定・セレクトSWノッチ判定を正しく持つ既存ロジック）の結果をそのまま
+    /// 要素単位で持ち帰ることで解消する。Status==Converged のときのみ値を持つ（Cyclic/Divergingは空）。</summary>
+    public Dictionary<Guid, bool> ElementConducting { get; init; } = new();
 }
 
 /// <summary>
@@ -68,6 +74,12 @@ public sealed class Evaluator
                 // 短絡: 負荷を除いた導通グラフで左右母線フラッド集合が重なる（floodL ∩ floodR が非空）。
                 var shorts = new HashSet<int>(floodL);
                 shorts.IntersectWith(floodR);
+                // T-061修正B群: 要素単位の導通状態を、既存のIsConducting(NO/NC反転・タイマ限時判定・
+                // セレクトSWノッチ判定を正しく持つ)をそのまま再利用して格納する(新規判定ロジックは
+                // 書かない、rule of three対応)。
+                var elementConducting = new Dictionary<Guid, bool>();
+                foreach (var c in _net.Components)
+                    elementConducting[c.SourceElementId] = IsConducting(c, next);
                 return new EvalResult
                 {
                     Status = EvalStatus.Converged,
@@ -75,6 +87,7 @@ public sealed class Evaluator
                     PoweredNets = powered,
                     ShortCircuitNets = shorts,
                     Iterations = it,
+                    ElementConducting = elementConducting,
                 };
             }
 

@@ -248,11 +248,16 @@ public sealed class DiagramRenderer
 
         HashSet<int>? powered = null;
         Dictionary<string, bool>? energized = null;
+        // T-061修正B群: 要素単位の導通状態(Evaluator.EvalResult.ElementConducting、NO/NC反転・
+        // タイマ限時判定・セレクトSWノッチ判定を正しく持つIsConductingの結果)。Render内部で
+        // 評価が完結するため、外部への経路新設(SimState拡張等)は不要でここで直接DrawElementへ渡す。
+        Dictionary<Guid, bool>? elementConducting = null;
         if (sim is not null)
         {
             var eval = new Evaluator(netlist).Evaluate(sim);
             powered = eval.PoweredNets;
             energized = eval.State.Energized;
+            elementConducting = eval.ElementConducting;
         }
 
         // 要素 Id → (左net, 右net)
@@ -299,7 +304,7 @@ public sealed class DiagramRenderer
         DrawDots(r, sheet, rowStart, rowEnd);
         DrawFrames(r, sheet, rowStart, rowEnd, totalRows);
         foreach (var e in sheet.Elements)
-            if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs);
+            if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs, elementConducting);
         DrawRungComments(r, sheet, columns, rowStart, rowEnd);
 
         if (scaled) r.PopTransform();
@@ -932,8 +937,13 @@ public sealed class DiagramRenderer
     };
 
     // 要素記号（ローカル座標へ平行移動して描く）。energized で通電色、inputs で手動強制の青塗りを制御。
+    // elementConducting(T-061修正B群)は要素単位の導通状態(Evaluator.IsConducting結果、NO/NC反転・
+    // タイマ限時判定・セレクトSWノッチ判定込み)で、コイル以外(接点・押しボタン・セレクトSW等)の
+    // 通電色分けに使う。energizedはコイルの励磁状態のみを持つため、通電色そのものの判定には使わない
+    // (テストモード中かどうかの判定にのみ残す、energizedはelementConductingと常に同時に非null)。
     private void DrawElement(IRenderer r, ElementInstance e, Dictionary<string, bool>? energized,
-                             Dictionary<string, bool>? inputs = null)
+                             Dictionary<string, bool>? inputs = null,
+                             Dictionary<Guid, bool>? elementConducting = null)
     {
         int lb = LeftBoundary(e), rb = RightBoundary(e);
         double width = e.CellWidth * Cell;
@@ -946,11 +956,26 @@ public sealed class DiagramRenderer
             ? PartResolver.ComponentKind(e, _lib)
             : e.Kind;
 
-        // T-061(殿裁定(3)=LDmicro式「通電=赤/非通電=グレー」): energizedが非nullならテストモード中。
-        // デバイス名を持つ要素(=命令として評価される記号)のみ対象、無印の配線・枠等は対象外。
+        // 負荷（コイル・ランプ等）か判定。自作パーツはライブラリ経由で解決。
+        bool isLoad = part is not null
+            ? PartResolver.CreatesComponent(e, _lib) && ElementCatalog.IsLoad(PartResolver.ComponentKind(e, _lib))
+            : ElementCatalog.IsLoad(e.Kind);
+
+        // T-061修正B群(殿裁定(3)=LDmicro式「通電=赤/非通電=グレー」): energizedが非nullならテスト
+        // モード中。負荷(コイル・ランプ・タイマコイル等)自体の通電判定はIsConducting経由の
+        // elementConductingでは常にfalseになる(Evaluator.IsConductingは接点の"導通"を判定する
+        // ロジックで、コイルの"励磁"とは別概念、switch文のdefaultでfalseに落ちる実装ミスを実装中に
+        // 発見・訂正)ため、負荷はenergized[DeviceName](励磁状態)を見る。負荷以外(接点・押しボタン・
+        // セレクトSW等)はelementConducting[e.Id](NO/NC反転・タイマ限時判定・セレクトSWノッチ判定を
+        // 正しく持つ)を見る——旧実装は全要素についてenergized[DeviceName]のみを見ており、負荷以外は
+        // 常時グレー固定になる不具合があった(静的レビューB-1/B-2/B-3)。デバイス名を持つ要素
+        // (=命令として評価される記号)のみ対象、無印の配線・枠等は対象外。
         bool testMode = energized is not null;
-        bool on = testMode && e.DeviceName is not null
-                  && energized!.TryGetValue(e.DeviceName, out var v) && v;
+        bool on = testMode && e.DeviceName is not null && (
+            isLoad
+                ? energized!.TryGetValue(e.DeviceName, out var isEnergized) && isEnergized
+                : elementConducting is not null && elementConducting.TryGetValue(e.Id, out var conducting) && conducting
+        );
         var stroke = on ? _theme.Get(StrokeRole.SymbolOutline) with { Color = DrawingTheme.Powered }
                    : testMode && e.DeviceName is not null
                         ? _theme.Get(StrokeRole.SymbolOutline) with { Color = DrawingTheme.NonEnergizedGray }
@@ -961,11 +986,6 @@ public sealed class DiagramRenderer
         bool manuallyForced = isContact && e.DeviceName is not null && inputs is not null
                               && inputs.TryGetValue(e.DeviceName, out var mv) && mv;
         Color? contactFill = manuallyForced ? DrawingTheme.ManualForced : null;
-
-        // 負荷（コイル・ランプ等）か判定。自作パーツはライブラリ経由で解決。
-        bool isLoad = part is not null
-            ? PartResolver.CreatesComponent(e, _lib) && ElementCatalog.IsLoad(PartResolver.ComponentKind(e, _lib))
-            : ElementCatalog.IsLoad(e.Kind);
 
         // 1×1 セル背景塗り: 負荷が通電中、またはカスタムパーツが手動強制中
         Color? bgFill = (on && isLoad) ? DrawingTheme.ManualForced

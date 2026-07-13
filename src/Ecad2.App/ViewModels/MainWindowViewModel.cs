@@ -30,6 +30,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         get => _tool;
         set
         {
+            // T-061修正A-2: テストモード中はSelectDefault以外への変更を拒否する(二重の安全網)。
+            // ツールバーのIsEnabled(CanEditDiagram)が万一漏れてもTool自体が変化しないため、
+            // IsPartSelectionVisible等の副作用(テストモード中に右パネルが部品選択リストへ
+            // 切り替わってしまう表示不整合、静的レビューA-2)が発生しない。
+            if (_appMode == AppMode.Test && value.Mode != ToolMode.Select) return;
             // 隠密再レビュー指摘: IsEnabledガード無しだと無効時も_tool(値型)のボクシングが
             // 無条件発生する(finding7と同根)。短絡評価でfalse時は_toolへ触れないようにする。
             object? oldValue = TraceLog.IsEnabled ? _tool : null;
@@ -57,25 +62,38 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (_appMode == value) return;
             _appMode = value;
+            // T-061修正E-4: if/else両分岐で_testSessions.Clear()を重複呼び出ししていたのを1回に統一
+            // (else節はこの1行のためだけに存在していた、隠密レビュー指摘)。
+            _testSessions.Clear();
             if (_appMode == AppMode.Test)
             {
                 // GuiEcad踏襲(殿裁定(5)=シートまたぎ状態保持方針): ON化のたびに全シート分の
                 // セッションをクリアして作り直す(ON中はシートをまたいでも保持、OFF→ON再遷移時は
-                // まっさらに戻る)。進行中の配置ドラフト(Tool)もGuiEcadの「ドラッグ/パン状態の破棄」
-                // に相当するため選択モードへ戻す。
-                _testSessions.Clear();
+                // まっさらに戻る)。
+                // T-061修正D-1(隠密レビュー指摘): 進行中の記入ドラフト(縦コネクタ/自由線/画像挿入)は
+                // 元コメントが「ドラッグ/パン状態の破棄」を謳いながら実装がクリアしていなかった
+                // (コメントと実装の乖離)。ReplaceDocumentと同じ確立パターンで明示的にクリアする。
+                ClearConnectorDraftIfAny();
+                ClearFreeLineDraftIfAny();
+                CancelImageInsertDraft();
                 Tool = ToolState.SelectDefault;
                 if (CurrentSheet is Sheet sheet) GetOrCreateTestSession(sheet).Evaluate();
             }
-            else
-            {
-                _testSessions.Clear();
-            }
             OnPropertyChanged(nameof(Mode));
             OnPropertyChanged(nameof(IsTestMode));
+            OnPropertyChanged(nameof(CanEditDiagram));
+            OnPropertyChanged(nameof(CanPlaceOnMainCircuit));
+            OnPropertyChanged(nameof(CanPlaceOnControlCircuit));
             OutputPanel.RunDrcCommand.Execute(null);
         }
     }
+
+    /// <summary>編集操作(要素配置・削除・Undo/Redo等)が可能か(T-061修正、A-1/A-2対応の単一ゲート)。
+    /// プロジェクト未作成、またはテストモード中はfalse。個別経路(ツールバー・キーボード・メニュー・
+    /// Undo/Redo)がそれぞれ独自にHasProject/Mode参照を持っていたことが静的レビューで発覚したバグ
+    /// (キーボード・メニューにMode参照が皆無で編集操作が素通し)の根本原因だったため、単一プロパティへ
+    /// 集約する(パターン再発台帳PR-12)。</summary>
+    public bool CanEditDiagram => HasProject && Mode == AppMode.Drawing;
 
     /// <summary>ツールバーToggleButton・メニューのIsCheckedバインド用(T-061、殿裁定(4))。</summary>
     public bool IsTestMode
@@ -274,6 +292,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// CurrentSheetがnullの間は常にfalse。</summary>
     public bool IsControlCircuitSheet => CurrentSheet is Sheet sheet && !sheet.MainCircuit;
 
+    /// <summary>主回路シート限定の配置系ツールバーボタン(自由線横線・接続点)が有効か(T-061修正
+    /// A-1/A-2対応)。シート種別条件とCanEditDiagram(編集操作可否)のAND。</summary>
+    public bool CanPlaceOnMainCircuit => IsMainCircuitSheet && CanEditDiagram;
+
+    /// <summary>制御回路シート限定の配置系ツールバーボタン(縦分岐線・配線分断)が有効か(同上)。</summary>
+    public bool CanPlaceOnControlCircuit => IsControlCircuitSheet && CanEditDiagram;
+
     /// <summary>CurrentSheet・およびそれに連動する活性制御プロパティ(T-047)の変更通知をまとめて
     /// 発火する。CurrentSheetIndexのsetter・NotifyCurrentSheetChanged・ReplaceDocumentの3箇所が
     /// CurrentSheetの実体を変えうる経路であり(T-041増分5隠密レビュー指摘、CurrentSheetIndexの
@@ -283,6 +308,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CurrentSheet));
         OnPropertyChanged(nameof(IsMainCircuitSheet));
         OnPropertyChanged(nameof(IsControlCircuitSheet));
+        OnPropertyChanged(nameof(CanPlaceOnMainCircuit));
+        OnPropertyChanged(nameof(CanPlaceOnControlCircuit));
     }
 
     /// <summary>
@@ -299,7 +326,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// の後に呼ぶ(T-019、殿実機検出の修正)。HasProjectはReplaceDocument内でのみ明示通知しており、
     /// シート追加/削除がDocument.Sheetsを直接操作するSheetNavigationViewModel側からは通知されず、
     /// Sheets=0(濃紺)からシート追加しても画面が作業領域色へ切り替わらない欠陥があった。</summary>
-    public void NotifyHasProjectChanged() => OnPropertyChanged(nameof(HasProject));
+    public void NotifyHasProjectChanged()
+    {
+        OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(CanEditDiagram));
+        OnPropertyChanged(nameof(CanPlaceOnMainCircuit));
+        OnPropertyChanged(nameof(CanPlaceOnControlCircuit));
+    }
 
     /// <summary>Sheets 0→1遷移(起動直後濃紺スタートから最初のシート追加、殿裁定2026-07-05)後に
     /// 呼ぶ(隠密レビュー指摘、往復2周目回帰)。CurrentSheetIndexの既定値が0のため、追加後に
@@ -2002,8 +2035,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             case DeviceClass.SelectSwitch:
                 CycleSelectSwitch(session, sheet, device);
                 return null;
-            default:
+            // T-061修正C-3(静的レビュー、確認事項4=無反応のみ・ステータスメッセージなし):
+            // DeviceClass.RelayはContactNO/NC・Coil・ContactorMain3Pを一括りにしている(機器表分類
+            // としては正しい設計、P-020対応)ため、そのまま左クリックの操作可否判定に使うのは不適切。
+            // 真のContactNO/NCのみToggleInputを実行し、Coil/ContactorMain3Pは無反応(旧実装は
+            // defaultへ丸められ無差別にToggleInputされ強制導通してしまっていた)。
+            case DeviceClass.Relay when IsRealContactElement(element):
                 session.ToggleInput(device);
+                return null;
+            default:
+                // Lamp/Terminal/Timer/Counter/Other、およびRelayのうちCoil/ContactorMain3Pは無反応。
                 return null;
         }
     }
@@ -2014,14 +2055,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (CurrentTestSession is TestSession session) session.SetInput(device, false);
     }
 
+    /// <summary>要素が実際にContactNO/NCとして評価されるか(T-061修正C-2/C-3共通判定)。自作パーツの
+    /// Kind不整合(PlaceElementAtSelectedCellがElementInstance.Kindを設定せず常時既定値ContactNOの
+    /// まま固定される、T-046由来の既知の構造的制約)を踏まえ、PartResolver.ComponentKind経由で
+    /// 実際の電気的種別を解決する(rule of three、TestModePress/ShowTestModeContextMenu両方で使う)。
+    /// CreatesComponent=false(自作パーツNonSimulated等)はfalse。</summary>
+    public bool IsRealContactElement(ElementInstance element)
+        => PartResolver.CreatesComponent(element, PartLibrary)
+           && PartResolver.ComponentKind(element, PartLibrary) is ElementKind.ContactNO or ElementKind.ContactNC;
+
     /// <summary>セレクトSWのノッチ順送り(T-061第三歩、GuiEcad MainPage.xaml.cs CycleSelectSwitch
     /// 全文移植)。同一デバイス名のSelectSwitch要素群が持つPosition値(重複除去・昇順)を巡回する。
     /// 該当要素が無ければ(組込みSelectSwitchでない自作パーツ等)ToggleInputへフォールバックする
-    /// (GuiEcad同型の安全弁)。</summary>
-    private static void CycleSelectSwitch(TestSession session, Sheet sheet, string deviceName)
+    /// (GuiEcad同型の安全弁)。
+    /// T-061修正C-1(静的レビュー): 元実装は`e.Kind == ElementKind.SelectSwitch`で直接判定していたが、
+    /// セレクトSWは実際にはPartId="basic-select-switch"の自作パーツ的配置(BasicPartTemplates)で
+    /// あり、PlaceElementAtSelectedCellがElementInstance.Kindを設定しないため常時既定値ContactNO
+    /// のまま固定される(T-046由来の既知の構造的制約)。この判定は常にfalseになりノッチ順送りが
+    /// 死んでいた(常時ToggleInputへフォールバック)。既存の確立解決パターンResolveDeviceClass
+    /// (Category/Role/IsOrEligible判定込み)へ置換し、インスタンスメソッド化する。</summary>
+    private void CycleSelectSwitch(TestSession session, Sheet sheet, string deviceName)
     {
         var positions = sheet.Elements
-            .Where(e => e.DeviceName == deviceName && e.Kind == ElementKind.SelectSwitch
+            .Where(e => e.DeviceName == deviceName && ResolveDeviceClass(e) == DeviceClass.SelectSwitch
                      && e.Params.ContainsKey(ParamKeys.Position))
             .Select(e => int.TryParse(e.Params[ParamKeys.Position], out int n) ? n : 0)
             .Distinct().OrderBy(x => x).ToList();
@@ -2256,6 +2312,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(CurrentSheetIndex), oldSheetIndex);
         NotifyCurrentSheetDependentPropertiesChanged();
         OnPropertyChanged(nameof(HasProject));
+        OnPropertyChanged(nameof(CanEditDiagram));
         OnPropertyChanged(nameof(SelectedCell), oldSelectedCell);
         OnPropertyChanged(nameof(SelectedCellDisplay));
         OnPropertyChanged(nameof(SelectedElement));
@@ -2316,7 +2373,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 sheet.Grid.Rows++;
                 FinishRowCountChange(sheet);
             },
-            () => CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
+            () => CanEditDiagram && CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
 
         DeleteRowCommand = new RelayCommand(
             () =>
@@ -2327,7 +2384,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 sheet.Grid.Rows--;
                 FinishRowCountChange(sheet);
             },
-            () => CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
+            () => CanEditDiagram && CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
 
         // T-055増分2: シート設定ダイアログ経由でGrid.Rows・Bus.LeftName/RightNameをまとめて更新。
         UpdateSheetSettingsCommand = new RelayCommand(param =>
@@ -2398,13 +2455,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         // T-051: Undo/Redo基盤(案C、殿裁定)。MVP対象範囲はSheetNavigationViewModelのシート追加/削除のみ
         // (RecordSnapshotの呼び出しはSheetNavigationViewModel.AddCommand/DeleteCommand側で行う)。
+        // T-061修正A-3(確認事項2=案A確定): テストモード中はUndo/Redo自体を無効化する
+        // (「テストモード=観察専用」の一貫性、CanEditDiagram統一ゲートへ統合)。
         UndoCommand = new RelayCommand(
             () =>
             {
                 if (UndoManager.Undo(Document) is not LadderDocument restored) return;
                 ApplyUndoRedoSnapshot(restored);
             },
-            () => UndoManager.CanUndo);
+            () => CanEditDiagram && UndoManager.CanUndo);
 
         RedoCommand = new RelayCommand(
             () =>
@@ -2412,7 +2471,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 if (UndoManager.Redo(Document) is not LadderDocument restored) return;
                 ApplyUndoRedoSnapshot(restored);
             },
-            () => UndoManager.CanRedo);
+            () => CanEditDiagram && UndoManager.CanRedo);
     }
 
     /// <summary>T-051往復3周目(隠密再々レビューPLAUSIBLE、docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md):
