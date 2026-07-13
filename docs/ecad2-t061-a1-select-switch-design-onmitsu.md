@@ -93,27 +93,96 @@ private DeviceClass ResolveDeviceClass(ElementInstance element)
 
 ---
 
-## 3. 【要殿確認】既存ユーザー環境への反映問題(T-037既知パターンの再発懸念)
+## 3. 既存ユーザー環境への反映(マイグレーション処理、殿裁定=選択肢2採用・恒久対応をA-1スコープに含める)
 
-`PartFolderStore.SeedBasics()`(`PartFolderStore.cs:141-153`)は「冪等：既存ファイルは上書きしない」
-設計(`if (File.Exists(path)) continue;`)。つまり**既に一度でもアプリを起動し「図形/」フォルダへ
-`セレクトSW.gcadpart`が展開済みの環境では、`BasicPartTemplates`側のRole変更(2-1)が自動的には
-反映されない**。
+### 3-0. 【訂正】前版の事実誤認
 
-これはT-037(`IsOrEligible`フィールド追加時)で既に実機確認込みでCONFIRMEDされた既知パターンの再発
-(`docs/archive/ecad2-t037-review-onmitsu-2.md`)。当時提示された恒久対応案は(a)基本図形(Id=`basic-*`)
-限定の起動時マイグレーション処理、(b)`.gcadpart`へのSchemaVersion導入、いずれも**未実装のまま**。
+前版(初稿)は「T-037で確認された同型の反映問題は恒久対応が未実装のまま」と報告したが、これは
+**誤りだった**。一次情報(実コード)を再確認したところ、`PartFolderStore.Enumerate()`
+(`PartFolderStore.cs:77-89`)内に、**T-037往復3周目で既にマイグレーション処理が実装・テスト済み**
+であることを確認した(対応するテストは`tests/Ecad2.Core.Tests/PartFolderStoreTests.cs:154-199`他)。
+前版の誤りは、Explore委譲時に参照したのが往復2周目時点の「レビュー指摘」文書
+(`docs/archive/ecad2-t037-review-onmitsu-2.md`)のみで、その後の実装コミット(往復3周目)を実コードで
+確認していなかったことが原因。ここに訂正する。
 
-**本件はA-1構造対処そのものとは別軸の技術的負債であり、以下いずれかの方針を殿・家老に確認されたし**:
+### 3-1. 既存の確立パターン(T-037、IsOrEligible補正)
 
-- **選択肢1**: 今回はマイグレーション未対応のまま進め、開発機の該当ファイル(`図形/セレクトSW.gcadpart`)
-  を手動削除して再展開させる運用回避で済ませる(リリース済み環境が無い/少数なら現実的)。
-- **選択肢2**: 恒久対応(マイグレーション処理新設)をA-1のスコープに含め、規模をさらに拡大する。
-- **選択肢3**: マイグレーション処理を別タスク化し、`docs/proposed.md`等へ切り出す(A-1は構造対処のみ
-  完了させ、反映は別問題として扱う)。
+```csharp
+// PartFolderStore.cs:77-89(Enumerate()内、Id重複チェックより前)
+if (!def.IsOrEligible && (def.Id == BasicPartTemplates.ContactNOId || def.Id == BasicPartTemplates.ContactNCId))
+{
+    def.IsOrEligible = true;
+    try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
+}
+```
 
-`docs/ecad2-release-procedure`(過去メモリ)によればv0.2リリース手順が既に確立されており、既存の
-公開・配布状況次第でこの論点の緊急度が変わる。**隠密の判断範囲外のため、殿確認を仰ぐ**。
+特徴: `Enumerate()`(パーツ列挙、アプリ起動時に`PartPaletteViewModel`経由で毎回実行)内で、固定Id
+限定・単一フィールド限定の差分検出→書き戻しを行う。書き戻し失敗はtry-catchでベストエフォート
+(読み取り専用・OneDrive同期中でも起動を止めない、T-039の教訓)。冪等(既に補正済みなら`!def.IsOrEligible`
+がfalseで何もしない)。
+
+### 3-2. 採用方式: 上記パターンをそのまま踏襲する(新規メソッド不要)
+
+`SeedBasics()`(新規ファイル生成)とは別に、`Enumerate()`内の同ブロック直後へ、セレクトSW用の
+同型マイグレーションを追加するだけで足りる。(a)基本図形限定の起動時マイグレーション処理という
+当初案の枠組みと同じだが、**既存の実装場所・パターンを再利用するため新規基盤は不要**、(b)の
+SchemaVersion導入は見送る(過剰、KISS)。
+
+```csharp
+// A-1構造対処(T-061): 旧版JSON(PartRole.SelectSwitch追加より前)はセレクトSWがRole=ContactNOの
+// まま保存されている。固定Id(SelectSwitchId)のときだけRole=SelectSwitchへ補正する
+// (上記IsOrEligible補正と同型パターン、T-037踏襲)。ユーザーが意図的に他のRoleへ変更していた
+// 場合は尊重し上書きしない(ContactNOのままの場合のみ対象)。
+if (def.Id == BasicPartTemplates.SelectSwitchId && def.Role == PartRole.ContactNO)
+{
+    def.Role = PartRole.SelectSwitch;
+    try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
+}
+```
+
+配置位置: `PartFolderStore.cs`の既存IsOrEligible補正ブロック(85-89行目)の直後。Id重複チェック
+(94行目以降)より前に置く(コピー耐性、T-037と同じ理由=本ファイルが後でコピーにより新Id再採番
+されても、書き戻し内容には補正後のRoleが引き継がれる)。
+
+### 3-3. 統合方法・呼び出しタイミング
+
+新規メソッド不要。`Enumerate()`は既に`PartPaletteViewModel`コンストラクタ経由でアプリ起動毎回
+呼ばれており(`SeedBasics()`とは別系統の既存呼び出し)、追加ブロックもこの既存経路へ自動的に乗る。
+`SeedBasics()`(未展開ファイルの新規作成)と`Enumerate()`内マイグレーション(既存ファイルの是正)は
+役割が異なり、両者の実行順序(`PartPaletteViewModel`コンストラクタで`SeedBasics()`→`Enumerate()`
+相当の順)を変える必要は無い(未展開ならSeedBasicsが新規作成、既存なら次のEnumerate等でマイグレーション
+対象になる)。
+
+### 3-4. 安全策(影響範囲)
+
+1. **自作パーツ・他の基本図形への誤爆防止**: 対象は`def.Id == BasicPartTemplates.SelectSwitchId`
+   という固定Id完全一致のみ。IsOrEligible補正(ContactNOId/ContactNCIdの2件限定)と同じ限定方式。
+2. **他フィールドの非破壊**: 修正対象はRoleのみ。ユーザーがPrimitives(見た目)やNameを編集していても
+   `def`の他プロパティはLoadOne時点のまま保持され、Role変更後にSaveOneで書き戻すため保持される。
+3. **ユーザーの意図的な変更の尊重**: `def.Role == PartRole.ContactNO`(旧デフォルト値そのもの)の
+   場合のみ対象とする。ユーザーが何らかの理由でRoleを別の値に変更済みなら対象外(上書きしない)。
+4. **書き戻し失敗のベストエフォート**: 既存パターンと同じtry-catch。
+
+### 3-5. テスト設計(既存`PartFolderStoreTests.cs`への追加、既存パターンを型として再利用)
+
+既存の`Enumerate_LegacySelectSwitchJsonWithoutIsOrEligible_StaysFalse`(179-199行目、固定Id補正の
+対象を限定していることの再混入防止テスト)と同じ固定Id・同じ手法で、以下を追加する:
+
+| テスト名 | 検証内容 |
+|---|---|
+| `Enumerate_LegacySelectSwitchJsonWithContactNORole_BackfillsToSelectSwitchRoleAndSaves` | 旧版JSON(`"role":"contactNO"`、固定Id=SelectSwitchId)が`Role=SelectSwitch`に補正され、ファイルにも書き戻されること(`...IsOrEligible_BackfillsTrueAndSaves`と同型) |
+| `Enumerate_SelectSwitchAlreadyMigrated_NoChangeIdempotent` | 既にRole=SelectSwitchのファイルは再実行しても変化しない(冪等性) |
+| `Enumerate_UserCustomizedSelectSwitchRole_NotOverwritten` | ユーザーが意図的に別Role(例:ContactNC)へ変更済みのセレクトSW.gcadpartは上書きされない(安全策3の検証) |
+| `Enumerate_OtherBasicPartWithContactNORole_NotAffected` | 固定Id=ContactNOId(通常のa接点)は対象外(Id不一致)でRole=ContactNOのまま変化しない(誤爆防止) |
+| `Enumerate_LegacySelectSwitchJsonReadOnly_BackfillsInMemoryWithoutThrowing` | 読み取り専用ファイルでの書き戻し失敗時も例外を伝播させず起動を止めない(既存の同型テストを流用) |
+
+### 3-6. 後方互換性(JSON直列化形式の確認)
+
+`JsonOptions.Default`(`src/Ecad2.Core/Persistence/JsonOptions.cs:18`)は
+`Converters = { new JsonStringEnumConverter(JsonNamingPolicy.CamelCase) }`を使用しており、`PartRole`
+は文字列直列化(`"contactNO"`等)される。**enum値の追加(`SelectSwitch`)は既存の整数値ズレを起こさず、
+既存ファイルの`"role":"contactNO"`はそのまま正しくデシリアライズされる**(T-071設計書の既存知見と
+一致、確認済み)。
 
 ---
 
@@ -128,8 +197,8 @@ private DeviceClass ResolveDeviceClass(ElementInstance element)
 | 影響なし(確認済み) | `PartThumbnailRenderer.cs:43-44` | `IsOrEligible`ゲートで到達せず |
 | 影響なし(確認済み) | `.gcad`図面ファイル形式 | `PartRole`は図面に非保存 |
 | 影響なし(確認済み) | `MainWindowViewModelTests.cs:346-383` | Kind直接検証、経路と無関係 |
-| 要検討(規模別軸) | `PartFolderStore.SeedBasics()` | 既存環境への反映問題、殿確認要(3節) |
-| テスト新設要 | `GcadCompatibilityTests.cs` | SelectSwitch用の後方互換テスト無し |
+| 対処済み(3節、殿裁定=選択肢2) | `PartFolderStore.Enumerate()` | マイグレーション処理追加(T-037パターン踏襲、新規メソッド不要) |
+| テスト新設要 | `PartFolderStoreTests.cs` | マイグレーション処理の回帰テスト5件(3-5節) |
 
 `switch (part.Role)`という網羅的switch式は`PartResolver.cs:47`の1箇所のみ(Grep確認済み)。同箇所は
 `_ => throw new InvalidOperationException(...)`というcatch-allを持つため、`SelectSwitch`ケース追加を
@@ -187,20 +256,26 @@ public void Evaluate_SelectSwitchNotch_ConductsOnlyMatchingPosition(...)
 `Evaluator.Evaluate`を実行、`EvalResult.ElementConducting[要素Id]`が期待通りになることを検証する
 (B群修正=T-061で追加済みの`ElementConducting`をそのまま活用できる、rule of three対応)。
 
-### 5-5. 後方互換(GcadCompatibilityTests新設)
+### 5-5. 後方互換
 
-セレクトSWの`.gcadpart`を(旧版=Role未定義または`ContactNO`のまま保存されたファイルを想定した)
-デシリアライズテストを追加し、後方互換の扱いを明示する。JSON上の`"role"`キーが存在しない/旧値の
-場合にどう振る舞うべきか(既定値へのフォールバック挙動)を、3節の移行方針(選択肢1〜3)と合わせて
-確定させる必要がある。
+マイグレーション処理そのものの回帰テストは3-5節(`PartFolderStoreTests.cs`)で確定済み。
+`GcadCompatibilityTests.cs`(GuiEcad実サンプルとの互換性検証が主目的)側への追加は必須ではないが、
+GuiEcad由来の実セレクトSWサンプル(`.gcadpart`)が入手できるなら、`role: "contactNO"`のままの
+実サンプルが正しくマイグレーションされることの追加確認として任意で検討してよい(優先度低)。
 
 ---
 
 ## 6. 不明点
 
-- 3節の移行方針(選択肢1〜3のいずれを取るか)は隠密の判断範囲外、殿確認要。
 - 2-2節の`ResolveDeviceClass`特殊分岐の削除可否(シンプル化提案)は実装時に家老・侍判断でよいか未確認。
 
 ## 7. 派生提案
 
-なし(3節の移行問題は「派生」ではなくA-1本体に不可分の論点として本書に含めた)。
+なし。
+
+## 8. 実装規模の総括
+
+コア対処(2節): 3ファイル3箇所+横展開1箇所。マイグレーション処理(3節): 既存`Enumerate()`への
+追加ブロック1箇所(新規メソッド・新規基盤不要)。テスト新設: `PartFolderStoreTests.cs`へ5件、
+`Evaluator`/`NetlistBuilder`層へTheory1件。前版時点の「実装規模は当初懸念より小さい」という見立ては、
+マイグレーション処理を恒久対応化した後も維持できる見込み(既存の確立パターンを再利用できたため)。
