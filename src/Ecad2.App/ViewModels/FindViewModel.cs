@@ -120,14 +120,19 @@ public sealed class FindViewModel : ViewModelBase
 
     /// <summary>現在のQueryで再検索する。allowJump=falseはUndo/Redo等のDocument差し替え後専用
     /// (T-070隠密レビュー指摘D-3対応、RefreshAfterDocumentReplaced参照)——SelectedCellを巻き戻さず
-    /// 現状維持する殿裁定の意味論を、再検索によるJumpToで壊さないため。</summary>
+    /// 現状維持する殿裁定の意味論を、再検索によるJumpToで壊さないため。
+    /// T-070隠密レビュー指摘E-1対応: allowJump=falseでもCurrentIndexを無条件で0(先頭)へ戻すと、
+    /// Next/Prevで既に他の一致(例: 2件目B)へジャンプ済みの状態(SelectedCell=B)と食い違い、
+    /// 置換ボタンがCurrentMatch=Matches[0](A、画面上非選択)を誤って書き換えてしまう(データ整合性
+    /// 直結の重大バグ)。allowJump=falseのときはMatches内でSelectedCellと一致する要素があれば
+    /// そのインデックスを使い、無ければ0にフォールバックする。</summary>
     private void RunSearch(bool allowJump = true)
     {
         string trimmed = Query.Trim();
         Matches = trimmed.Length == 0
             ? Array.Empty<FindMatch>()
             : DeviceRenamer.Find(_owner.Document, trimmed).Select(m => new FindMatch(m.Sheet, m.Element)).ToList();
-        CurrentIndex = Matches.Count > 0 ? 0 : -1;
+        CurrentIndex = Matches.Count == 0 ? -1 : allowJump ? 0 : IndexOfSelectedCellOrZero();
         // CurrentIndexがSetProperty同値ガードで通知されないケース(前回検索結果と偶然同じ添字)でも
         // Matches自体は入れ替わっているため、StatusText/CurrentMatchは無条件で再通知する。
         OnPropertyChanged(nameof(StatusText));
@@ -137,6 +142,20 @@ public sealed class FindViewModel : ViewModelBase
         // (Enterでの確定時は案内メッセージが出る設計と非対称)。ドラフト中はジャンプ自体を抑制して保護する
         // (Matches/CurrentIndex自体は更新するため検索結果件数表示は正しいまま)。
         if (allowJump && CurrentMatch is { } m && !_owner.HasAnyDraft) JumpTo(m);
+    }
+
+    /// <summary>Matches内で現在のSelectedCell(シート・セル座標とも一致)を指す要素のインデックスを
+    /// 返す。見つからなければ0(T-070隠密レビュー指摘E-1、RunSearch参照)。</summary>
+    private int IndexOfSelectedCellOrZero()
+    {
+        if (_owner.SelectedCell is not GridPos selectedCell) return 0;
+        for (int i = 0; i < Matches.Count; i++)
+        {
+            if (Matches[i].Element.Pos == selectedCell
+                && _owner.Document.Sheets.IndexOf(Matches[i].Sheet) == _owner.CurrentSheetIndex)
+                return i;
+        }
+        return 0;
     }
 
     /// <summary>次の一致へ循環移動する((Index+1)%Count方式、GuiEcad踏襲=先頭↔末尾を跨いで循環)。</summary>

@@ -409,4 +409,65 @@ public class FindViewModelTests : ViewModelTestBase
 
         Assert.NotNull(vm.ConnectorDraftPreview);
     }
+
+    // ===== T-070往復4周目(隠密3周目レビュー指摘E-1)の回帰テスト =====
+
+    [Fact]
+    public void ReplaceOneCommand_AfterUndoWhileJumpedToSecondMatch_ReplacesSelectedCellNotFirstMatch()
+    {
+        // E-1(最重要): Next/Prevで2件目(B)へジャンプ済み(SelectedCell=B)の状態で無関係な編集を
+        // Undoすると、RefreshAfterDocumentReplacedがCurrentIndexを無条件で0(A)へ戻していたため、
+        // 画面上はB選択に見えるのに「置換」を押すとCurrentMatch=A(画面上非選択)が誤って書き換わり、
+        // Bは変更されないまま残っていた(データ整合性直結の重大バグ)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        var a = MakeContact(0, 0, "X001");
+        var b = MakeContact(1, 0, "X001");
+        sheet.Elements.Add(a);
+        sheet.Elements.Add(b);
+        vm.Find.Query = "X001";
+        vm.Find.NextCommand.Execute(null);   // A -> B、SelectedCell = b.Pos
+        Assert.Equal(b.Pos, vm.SelectedCell);
+
+        // 無関係な編集(シート追加)でUndo履歴を作り、Undoで戻す(Document自体が差し替わる)。
+        // AddCommand自体がCurrentSheetIndexを新シートへ切り替えSelectedCellをリセットする副作用を
+        // 持つため、シート1へ戻り選択状態を復元してからUndoする(別シートで作業後、元のシートの
+        // 選択状態のままUndoを押す、という実際のワークフローの再現)。
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = b.Pos;
+        vm.UndoCommand.Execute(null);
+
+        vm.Find.ReplaceWith = "X999";
+        vm.Find.ReplaceOneCommand.Execute(null);
+
+        var currentA = vm.CurrentSheet!.Elements.Single(e => e.Pos == a.Pos);
+        var currentB = vm.CurrentSheet!.Elements.Single(e => e.Pos == b.Pos);
+        Assert.Equal("X001", currentA.DeviceName);   // Aは変更されない
+        Assert.Equal("X999", currentB.DeviceName);   // 画面上選択中のBが置換される
+    }
+
+    [Fact]
+    public void RunSearch_AfterUndo_NoMatchAtSelectedCell_FallsBackToFirstMatch()
+    {
+        // E-1境界値: Undo後、SelectedCellがどの一致要素の位置とも一致しない場合は0(先頭)へ
+        // フォールバックすること(通常の検索・置換フローへの回帰がないことの確認)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        var a = MakeContact(0, 0, "X001");
+        sheet.Elements.Add(a);
+        vm.Find.Query = "X001";
+
+        // AddCommand自体がCurrentSheetIndexを新シートへ切り替えSelectedCellをリセットする副作用を
+        // 持つため、シート1へ戻り選択状態を設定してからUndoする。
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 0;
+        vm.SelectedCell = new GridPos(9, 9);   // 一致要素とは無関係な位置
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal(0, vm.Find.CurrentIndex);
+        Assert.Equal(a.Pos, vm.Find.CurrentMatch!.Element.Pos);
+    }
 }
