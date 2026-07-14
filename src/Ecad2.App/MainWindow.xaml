@@ -159,7 +159,7 @@
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>
                 <MenuItem Header="テストモード(_M)" IsCheckable="True" IsChecked="{Binding IsTestMode, Mode=TwoWay}"
-                          IsEnabled="{Binding HasProject}"/>
+                          IsEnabled="{Binding HasProject}" InputGestureText="Ctrl+T"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <MenuItem Header="バージョン情報(_A)" Click="AboutMenuItem_Click"/>

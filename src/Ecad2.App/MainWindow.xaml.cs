@@ -1310,6 +1310,12 @@ public partial class MainWindow : Window
         bool noModifier = Keyboard.Modifiers == ModifierKeys.None;
         switch (e.Key)
         {
+            case Key.F11 when noModifier:
+                // T-087(殿直接指示): 既存のパネル循環(Shift+Tab、SheetNavList/LadderCanvasHost/
+                // DeviceTableGridの3つのみ)に部品パネルが含まれていなかった欠落を埋める。
+                FocusPanel(PartSelectionList);
+                e.Handled = true;
+                break;
             case Key.Escape:
                 // T-070: 検索バー表示中のEscapeは最優先でバーを閉じる。本ハンドラはTunnelingで
                 // FindQueryBox(専用のFindQueryBox_PreviewKeyDown)より先に発火するため、ここで
@@ -1710,6 +1716,12 @@ public partial class MainWindow : Window
             case Key.G when Keyboard.Modifiers == ModifierKeys.Control:
                 // T-056: メニューのInputGestureText表示(Ctrl+G)と整合させる。
                 _viewModel.IsGridVisible = !_viewModel.IsGridVisible;
+                e.Handled = true;
+                break;
+            case Key.T when Keyboard.Modifiers == ModifierKeys.Control:
+                // T-087(殿直接指示): テストモードのON/OFFトグル。メニュー/ツールバーのIsTestMode
+                // バインド(Click無しの直接TwoWayバインド)と同じ単純トグルに揃える。
+                _viewModel.IsTestMode = !_viewModel.IsTestMode;
                 e.Handled = true;
                 break;
             case Key.F when Keyboard.Modifiers == ModifierKeys.Control:
@@ -2576,10 +2588,15 @@ public partial class MainWindow : Window
             if (IsWithin(panels[i], current)) { index = i; break; }
         }
         int next = (index + 1) % panels.Length;
-        var target = panels[next];
+        FocusPanel(panels[next]);
+    }
 
-        // 対象要素が独立したFocusScope内にある場合、Keyboard.Focus()だけでは実フォーカスが
-        // 移らないことがあるため、まずFocusScope自体にも論理フォーカスを設定しておく。
+    // T-087: CyclePanelFocus(2581-2585行相当)から抽出した単一要素向けフォーカス設定処理
+    // (F11の部品パネル直接フォーカスと共有、rule of two)。対象要素が独立したFocusScope内にある
+    // 場合、Keyboard.Focus()だけでは実フォーカスが移らないことがあるため、まずFocusScope自体にも
+    // 論理フォーカスを設定しておく。
+    private static void FocusPanel(UIElement target)
+    {
         var scope = FocusManager.GetFocusScope(target);
         FocusManager.SetFocusedElement(scope, target);
         Keyboard.Focus(target);
