@@ -572,6 +572,14 @@
                                 <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
                                          IsEnabled="{Binding CanEditDiagram}"
                                          LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
+                                <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
+                                     (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
+                                <StackPanel Visibility="{Binding IsSelectedElementSelectSwitch, Converter={StaticResource BoolToVisibility}}">
+                                    <TextBlock Text="ノッチ位置:" Margin="0,8,0,2"/>
+                                    <TextBox x:Name="NotchPositionBox" Text="{Binding SelectedElementNotchPosition, UpdateSourceTrigger=Explicit}"
+                                             IsEnabled="{Binding CanEditDiagram}"
+                                             LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
+                                </StackPanel>
                             </StackPanel>
                             <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
                                  ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->

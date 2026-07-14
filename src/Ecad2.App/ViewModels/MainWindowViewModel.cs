@@ -389,6 +389,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasSelectedElement));
                 OnPropertyChanged(nameof(SelectedElementKindDisplay));
                 OnPropertyChanged(nameof(SelectedElementDeviceName));
+                OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
+                OnPropertyChanged(nameof(SelectedElementNotchPosition));
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -1756,6 +1758,38 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>SelectedElementがセレクトSWか(T-086、プロパティパネルのノッチ位置入力欄表示制御用)。
+    /// ResolveDeviceClassはT-061 A-1で確立済みの判定(自作パーツのSelectSwitch特殊判定込み)を
+    /// 再利用する(rule of three回避)。</summary>
+    public bool IsSelectedElementSelectSwitch
+        => SelectedElement is ElementInstance selEl && ResolveDeviceClass(selEl) == DeviceClass.SelectSwitch;
+
+    /// <summary>SelectedElementのノッチ位置(T-086、ElementInstance.Params[ParamKeys.Position])。
+    /// セレクトSW限定(IsSelectedElementSelectSwitchでXAML側表示制御)。0-99の整数のみ許可
+    /// (GuiEcad踏襲の範囲制約、殿裁定)、範囲外・非数値入力は値を変更せず表示のみ元へ戻す。
+    /// 値未変化ならRecordSnapshotしない(T-070 A-5と同型の配慮)。</summary>
+    public string SelectedElementNotchPosition
+    {
+        get => SelectedElement?.Params.TryGetValue(ParamKeys.Position, out var v) == true ? v : "";
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            string oldValue = el.Params.TryGetValue(ParamKeys.Position, out var ov) ? ov : "";
+            if (!int.TryParse(value.Trim(), out int n) || n < 0 || n > 99)
+            {
+                OnPropertyChanged(nameof(SelectedElementNotchPosition), oldValue);
+                return;
+            }
+            string newValue = n.ToString();
+            if (oldValue == newValue) return;
+
+            UndoManager.RecordSnapshot(Document);
+            el.Params[ParamKeys.Position] = newValue;
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementNotchPosition), oldValue);
+        }
+    }
+
     /// <summary>
     /// SelectedElement(選択中の要素)を削除する(T-017追加スコープ、Deleteキー)。SelectedCell自体は
     /// 維持する(削除後もハイライト位置・矢印キー操作の起点を保つ、GX Works3等の一般的な挙動)。
@@ -1777,6 +1811,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSelectedElement));
         OnPropertyChanged(nameof(SelectedElementKindDisplay));
         OnPropertyChanged(nameof(SelectedElementDeviceName));
+        OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
+        OnPropertyChanged(nameof(SelectedElementNotchPosition));
         DeviceTable.Refresh();
         return true;
     }
@@ -1902,6 +1938,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSelectedElement));
         OnPropertyChanged(nameof(SelectedElementKindDisplay));
         OnPropertyChanged(nameof(SelectedElementDeviceName));
+        OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
+        OnPropertyChanged(nameof(SelectedElementNotchPosition));
     }
 
     private string _statusMessage = "";
@@ -2384,6 +2422,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSelectedElement));
         OnPropertyChanged(nameof(SelectedElementKindDisplay));
         OnPropertyChanged(nameof(SelectedElementDeviceName));
+        OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
+        OnPropertyChanged(nameof(SelectedElementNotchPosition));
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから

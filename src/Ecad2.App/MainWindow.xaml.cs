@@ -258,15 +258,28 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter) CommitDeviceNameEdit();
     }
 
+    // T-086: ノッチ位置編集(DeviceNameBoxと同型のExplicit確定)。CommitDeviceNameEditが
+    // NotchPositionBoxも併せて確定するため、専用のCommitメソッドは設けず既存を呼ぶ。
+    private void NotchPositionBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
+
+    private void NotchPositionBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) CommitDeviceNameEdit();
+    }
+
     // T-049(殿裁定): デバイス名編集中、フォーカスを保持したままCtrl+S/N/O・ウィンドウクローズが
     // 実行されると、UpdateSourceTrigger=Explicit(上記コメント参照)ゆえLostKeyboardFocus/Enterの
     // いずれも発火せず、編集内容がサイレントに保存漏れ/無確認破棄されうる(P-013)。保存・破棄判定
     // (SaveDocument/ConfirmDiscardIfDirty)の入口で必ず本メソッドを呼び、確定してから判定する
     // (確認ダイアログは挟まない、殿裁定)。SelectedElementDeviceNameのsetterは同値なら早期returnする
     // ため(値変更が無い呼び出しは無害)、常時呼んでよい。
+    // T-086: NotchPositionBoxも同型のUpdateSourceTrigger=Explicit入力欄のため、CommitDeviceNameEditの
+    // 呼び出し元全箇所(P-071型の呼び忘れ再発防止)で併せて確定させる。NotchPositionBoxは
+    // IsSelectedElementSelectSwitch=falseの間Bindingが無効な場合があるため?.で安全に扱う。
     private void CommitDeviceNameEdit()
     {
         DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        NotchPositionBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         RedrawCanvas();
     }
 
