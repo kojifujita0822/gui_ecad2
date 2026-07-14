@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.IO;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
@@ -9,6 +10,8 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using AvalonDock.Layout;
+using AvalonDock.Layout.Serialization;
 
 namespace Ecad2.App;
 
@@ -91,6 +94,34 @@ public partial class MainWindow : Window
     private ListBoxItem? _sheetDragSourceContainer;
     private Adorner? _sheetReorderAdorner;
 
+    // T-058増分1(殿裁定): 誤操作でパネルがフロート化/オートハイド化しキーボード・マウスいずれでも
+    // 復旧不能になる致命的UXが忍者実機確認で確定したため、全パネル共通のレイアウトリセット機能
+    // (Ctrl+Alt+R)を新設する。起動直後の既定レイアウトをXmlLayoutSerializerで文字列として保持し、
+    // リセット時にDeserializeし直す(PoC実証済み手法の流用)。
+    private readonly Dictionary<string, object?> _dockingContentRegistry = new();
+    private string? _defaultDockingLayoutXml;
+
+    // 殿実機確認で発覚(重要): フロート化したパネル自体にフォーカスがある間はメインウィンドウの
+    // PreviewKeyDownが発火せず復旧不能のままだった——AvalonDockはフロート化したLayoutAnchorableを
+    // 別のWindowインスタンス(独自のフォーカス・イベントツリー)として生成するため。
+    // EventManager.RegisterClassHandlerでアプリケーション内の全Windowインスタンス
+    // (メインウィンドウ・AvalonDockフロートウィンドウ問わず)をクラスハンドラとして捕捉することで、
+    // どこにフォーカスがあってもCtrl+Alt+Rが機能するようにする。
+    static MainWindow()
+    {
+        EventManager.RegisterClassHandler(typeof(Window), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalResetLayoutShortcut));
+    }
+
+    private static void OnGlobalResetLayoutShortcut(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.R || Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt)) return;
+        if (Application.Current.MainWindow is MainWindow mainWindow)
+        {
+            mainWindow.ResetDockingLayoutToDefault();
+            e.Handled = true;
+        }
+    }
+
     public MainWindow()
     {
         InitializeComponent();
@@ -101,6 +132,47 @@ public partial class MainWindow : Window
         // 呼び出しが描画トリガーのため、バインディングだけでは自動再描画されない。
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         RedrawCanvas();
+        RegisterDockingContents();
+        _defaultDockingLayoutXml = SerializeCurrentDockingLayout();
+    }
+
+    private void RegisterDockingContents()
+    {
+        foreach (var anchorable in LeftPaletteDockingManager.Layout.Descendents().OfType<LayoutAnchorable>())
+        {
+            _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
+        }
+        foreach (var document in LeftPaletteDockingManager.Layout.Descendents().OfType<LayoutDocument>())
+        {
+            _dockingContentRegistry[document.ContentId] = document.Content;
+        }
+    }
+
+    private string SerializeCurrentDockingLayout()
+    {
+        var serializer = new XmlLayoutSerializer(LeftPaletteDockingManager);
+        using var writer = new StringWriter();
+        serializer.Serialize(writer);
+        return writer.ToString();
+    }
+
+    // Ctrl+Alt+Rハンドラから呼ばれる。既定レイアウト文字列からDeserializeし直し、
+    // LayoutSerializationCallbackでContentIdをキーに元のコンテンツを再バインドする
+    // (Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
+    private void ResetDockingLayoutToDefault()
+    {
+        if (_defaultDockingLayoutXml is null) return;
+        var serializer = new XmlLayoutSerializer(LeftPaletteDockingManager);
+        serializer.LayoutSerializationCallback += (s, args) =>
+        {
+            if (args.Model.ContentId != null && _dockingContentRegistry.TryGetValue(args.Model.ContentId, out var content))
+            {
+                args.Content = content;
+            }
+        };
+        using var reader = new StringReader(_defaultDockingLayoutXml);
+        serializer.Deserialize(reader);
+        _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
