@@ -1370,14 +1370,16 @@ public partial class MainWindow : Window
         bool noModifier = Keyboard.Modifiers == ModifierKeys.None;
         switch (e.Key)
         {
-            case Key.F11 when noModifier:
-                // T-087(殿直接指示)往復修正(隠密静的レビュー指摘): 部品パネルはTool.Mode==
-                // PlaceElementの間のみ表示される(IsPartSelectionVisible)。非表示中はPartSelectionList
-                // がCollapsedのためFocus()だけでは反応しない。ActivateOpenPartSelection(既存の
-                // OpenPartSelectionButton_Click等が使う確立パターン)でパネルを表示させてから
-                // フォーカスする。
+            case Key.F11 when noModifier && _viewModel.CanEditDiagram:
+                // T-087往復3周目修正(隠密静的レビュー指摘): 部品パネルはTool.Mode==PlaceElementの
+                // 間のみ表示される(IsPartSelectionVisible)。ActivateOpenPartSelectionでパネルを
+                // 表示させた直後、Collapsed→Visible切替はMeasure/Arrange未完了のためFocus()の
+                // 同期呼び出しは失敗しうる(PlacementDeviceNameBox・RungCommentBoxと同型、
+                // Dispatcher.BeginInvoke(DispatcherPriority.Loaded)でレイアウトパス完了後に確定)。
+                // 加えてF11自体にもCanEditDiagramガードを追加する(Ctrl+Tと同型のPR-13再発防止、
+                // 部品パネルを開く既存の「自作パーツ」ボタンもCanEditDiagramで保護されている)。
                 ActivateOpenPartSelection();
-                FocusPanel(PartSelectionList);
+                Dispatcher.BeginInvoke(new Action(() => FocusPanel(PartSelectionList)), DispatcherPriority.Loaded);
                 e.Handled = true;
                 break;
             case Key.Escape:
@@ -2692,7 +2694,19 @@ public partial class MainWindow : Window
             if (IsWithin(panels[i], current)) { index = i; break; }
         }
         int next = (index + 1) % panels.Length;
-        FocusPanel(panels[next]);
+        var target = panels[next];
+        if (ReferenceEquals(target, PartSelectionList))
+        {
+            // T-087往復3周目修正(隠密静的レビュー指摘): 部品パネルは非表示の場合がありpanels配列に
+            // 加えるだけでは循環でこの番が来てもFocus()が恒常的に失敗する。F11と同じく
+            // ActivateOpenPartSelectionでパネルを表示させ、レイアウトパス完了後にフォーカスする。
+            ActivateOpenPartSelection();
+            Dispatcher.BeginInvoke(new Action(() => FocusPanel(target)), DispatcherPriority.Loaded);
+        }
+        else
+        {
+            FocusPanel(target);
+        }
     }
 
     // T-087: CyclePanelFocus(2581-2585行相当)から抽出した単一要素向けフォーカス設定処理
