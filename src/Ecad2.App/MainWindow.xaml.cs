@@ -824,6 +824,10 @@ public partial class MainWindow : Window
             return;
         }
 
+        // T-061往復修正: テストモード中は_testModePressedDeviceが未設定(TestModePressがnullを
+        // 返すケース)でも、以降の通常クリック処理(セル選択等)へフォールスルーしない。
+        if (ShouldSkipSelectionInTestMode(_viewModel.Mode)) return;
+
         // T-041増分7実機確認で発覚(往復1周目): Escでキャンセル済み(IsDragging*=falseだが
         // *DragConsumedByEscape=true)のマウスアップは、押していた指を離しただけの後始末。
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
@@ -2386,6 +2390,15 @@ public partial class MainWindow : Window
     // 呼び出し側で早期returnとして使うため対称に保護される(個別の特別扱いをしない設計)。
     internal static bool ShouldSkipSelectionForRungCommentAreaClick(int? hitTestRow)
         => hitTestRow is not null;
+
+    // T-061往復修正(バグ、忍者実機確認・隠密静的レビュー合同発見): LadderCanvasHost_
+    // PreviewMouseLeftButtonUpにMode==Testのガードが無く、TestModePressがnullを返すケース
+    // (SelectSwitch/Relay(ContactNO/NC以外)/ヒット無し等)で、_testModePressedDeviceが未設定の
+    // まま通常編集モードの選択処理(セル選択等)へ意図せずフォールスルーしていた
+    // (MouseDown側のコメント「テストモード中は選択操作を一切行わない」という設計意図との食い違い)。
+    // ShouldSkipSelectionForRungCommentAreaClickと同型の判定関数として抽出する(テスト容易性)。
+    internal static bool ShouldSkipSelectionInTestMode(ViewModels.AppMode mode)
+        => mode == ViewModels.AppMode.Test;
 
     // 行コメントエディタを開く(右母線右側ダブルクリック、またはF2キー=往復1周目追加I)。
     // 既存コメントがあれば読み込む。表示状態はIsRungCommentEditorVisible(往復1周目指摘F)への
