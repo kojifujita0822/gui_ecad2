@@ -115,6 +115,12 @@ public partial class MainWindow : Window
     private static void OnGlobalResetLayoutShortcut(object sender, KeyEventArgs e)
     {
         if (e.Key != Key.R || Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt)) return;
+        // 隠密静的レビュー指摘(CONFIRMED): typeof(Window)クラスハンドラはモーダルダイアログ
+        // (AddSheetDialog等)も捕捉してしまい、ダイアログ表示中にCtrl+Alt+Rを押すと裏で
+        // メインウィンドウのレイアウトが無言リセットされていた。メインウィンドウ自身、または
+        // AvalonDockが生成するフロートウィンドウ(LayoutFloatingWindowControl派生)からの
+        // イベントのみを対象とし、それ以外(モーダルダイアログ)は無視する。
+        if (sender is not (MainWindow or AvalonDock.Controls.LayoutFloatingWindowControl)) return;
         if (Application.Current.MainWindow is MainWindow mainWindow)
         {
             mainWindow.ResetDockingLayoutToDefault();
