@@ -75,6 +75,28 @@ public class Ecad2Native {
         }
         keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
     }
+    // AvalonDockのタブ切り離し・境界リサイズ等、独自DragService(CaptureMouse+MouseMove)ベースの
+    // ドラッグ判定はSendInput単発では検知されず、多段階の中間移動が必須(2026-07-14、T-058検証で
+    // 実証。隠密2調査でAvalonDock自体がUIA標準Drag/DropTargetパターン未実装・独自実装と裏付け済み、
+    // 詳細はdocs/ecad2-t058-avalondock-drag-debug-technique-survey-onmitsu2.md参照)。
+    // 既定steps=40/stepDelayMs=40は忍者実測(タブ切り離し40ステップ・40ms間隔で安定成功)を採用。
+    // 【要注意】移動距離が短すぎると判定閾値に届かず失敗することがある(境界リサイズの実例:
+    // 60px/30ステップ/50ms間隔→未反映、100px/60ステップ/30ms間隔→成功。距離は最低100px以上を
+    // 目安にすること)。
+    public static void DragDrop(int x1, int y1, int x2, int y2, int steps, int stepDelayMs) {
+        SetCursorPos(x1, y1);
+        System.Threading.Thread.Sleep(200);
+        mouse_event(MOUSEEVENTF_LEFTDOWN, 0, 0, 0, UIntPtr.Zero);
+        System.Threading.Thread.Sleep(150);
+        for (int i = 1; i <= steps; i++) {
+            int ix = x1 + (x2 - x1) * i / steps;
+            int iy = y1 + (y2 - y1) * i / steps;
+            SetCursorPos(ix, iy);
+            System.Threading.Thread.Sleep(stepDelayMs);
+        }
+        System.Threading.Thread.Sleep(200);
+        mouse_event(MOUSEEVENTF_LEFTUP, 0, 0, 0, UIntPtr.Zero);
+    }
 }
 "@
 }
@@ -291,6 +313,28 @@ function Invoke-Ecad2CanvasRightClick {
     $rect = Get-Ecad2WindowRect
     Set-Ecad2Foreground
     [Ecad2Native]::RightClick($rect.Left + $RelativeX, $rect.Top + $RelativeY)
+}
+
+# AvalonDockペイン(タブ切り離し・境界線リサイズ等)のドラッグ操作専用（2026-07-14、T-058検証で新設）。
+# 【フォーカス・カーソル強奪注意】SetCursorPos+mouse_eventでグローバルなマウスカーソルを動かす。
+# 【AvalonDock特有の注意】UIA標準のInvoke/Select等では代替不可（AvalonDockはUIA標準Drag/
+# DropTargetパターンを実装しておらず、独自DragService(CaptureMouse+MouseMove)でのみ判定するため。
+# 隠密2調査でAvalonDock本家自身も実ドラッグを自動テストせず「メニュー操作・UIAパターン・内部API
+# 直接呼び出し」で代替している事実を確認済み、詳細は
+# docs/ecad2-t058-avalondock-drag-debug-technique-survey-onmitsu2.md参照）。
+# 座標はスクリーン絶対座標（対象タブ/境界Thumbの中心をFind-Ecad2Element等で取得して渡すこと。
+# 境界ThumbはUI Automation上ControlType=Thumb、LocalizedControlType="縮小表示"で現れる）。
+# 【パラメータ目安】既定steps=40/StepDelayMs=40は忍者実測(タブ切り離し)の値。距離が短いと判定
+# 閾値に届かず無反応のことがある（境界リサイズの実例: 60px/30ステップ/50ms間隔→未反映、
+# 100px/60ステップ/30ms間隔→成功）。**移動距離は最低100px以上を目安にする**こと。無反応だった
+# 場合はまず距離を増やして再試行し、それでも反応しなければ実装側の問題を疑う。
+function Invoke-Ecad2Drag {
+    param(
+        [Parameter(Mandatory)][int]$FromX, [Parameter(Mandatory)][int]$FromY,
+        [Parameter(Mandatory)][int]$ToX, [Parameter(Mandatory)][int]$ToY,
+        [int]$Steps = 40, [int]$StepDelayMs = 40
+    )
+    [Ecad2Native]::DragDrop($FromX, $FromY, $ToX, $ToY, $Steps, $StepDelayMs)
 }
 
 function Invoke-Ecad2Scroll {
