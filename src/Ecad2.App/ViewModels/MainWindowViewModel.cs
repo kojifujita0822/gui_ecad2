@@ -2449,6 +2449,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         var oldSelectedSheet = SheetNavigation.SelectedSheet;
 
         Document = newDocument;
+        // T-087往復修正(PR-13、隠密静的レビュー指摘の二次被害懸念への対処): テストモード中に
+        // 新規作成/開く操作が実行された場合(Ctrl+T等のガード漏れで万一Mode=Testのままここに
+        // 到達しても)、新Documentが作画モードで編集可能な状態から始まるようにする。Mode setter
+        // 自体を呼ぶことで、副作用(ClearConnectorDraftIfAny等・CanEditDiagram等の通知)も正しく
+        // 実行される。
+        Mode = AppMode.Drawing;
         CurrentFilePath = filePath;
         _currentSheetIndex = 0;
         _selectedCell = null;

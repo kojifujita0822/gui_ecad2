@@ -1371,8 +1371,12 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.F11 when noModifier:
-                // T-087(殿直接指示): 既存のパネル循環(Shift+Tab、SheetNavList/LadderCanvasHost/
-                // DeviceTableGridの3つのみ)に部品パネルが含まれていなかった欠落を埋める。
+                // T-087(殿直接指示)往復修正(隠密静的レビュー指摘): 部品パネルはTool.Mode==
+                // PlaceElementの間のみ表示される(IsPartSelectionVisible)。非表示中はPartSelectionList
+                // がCollapsedのためFocus()だけでは反応しない。ActivateOpenPartSelection(既存の
+                // OpenPartSelectionButton_Click等が使う確立パターン)でパネルを表示させてから
+                // フォーカスする。
+                ActivateOpenPartSelection();
                 FocusPanel(PartSelectionList);
                 e.Handled = true;
                 break;
@@ -1798,9 +1802,11 @@ public partial class MainWindow : Window
                 _viewModel.IsGridVisible = !_viewModel.IsGridVisible;
                 e.Handled = true;
                 break;
-            case Key.T when Keyboard.Modifiers == ModifierKeys.Control:
-                // T-087(殿直接指示): テストモードのON/OFFトグル。メニュー/ツールバーのIsTestMode
-                // バインド(Click無しの直接TwoWayバインド)と同じ単純トグルに揃える。
+            case Key.T when Keyboard.Modifiers == ModifierKeys.Control && _viewModel.HasProject:
+                // T-087(殿直接指示)往復修正(PR-13、隠密静的レビュー指摘): テストモードのON/OFF
+                // トグル。メニュー/ツールバーのIsTestModeバインドはIsEnabled="{Binding HasProject}"
+                // で保護されているが、キーボードショートカットは既存の統一ゲートを素通りしやすい
+                // (PR-13、T-070 A-1と同型の再発)。HasProjectをここでも明示的に確認する。
                 _viewModel.IsTestMode = !_viewModel.IsTestMode;
                 e.Handled = true;
                 break;
@@ -2668,7 +2674,10 @@ public partial class MainWindow : Window
 
     private void CyclePanelFocus()
     {
-        UIElement[] panels = { SheetNavList, LadderCanvasHost, DeviceTableGrid };
+        // T-087往復修正(隠密静的レビュー指摘): F11で部品パネルへ直接フォーカスした後、Shift+Tabの
+        // 循環対象にPartSelectionListが含まれていないと意図しない遷移(直前のパネルへ戻れない等)に
+        // なるため、既存循環対象の末尾に追加する。
+        UIElement[] panels = { SheetNavList, LadderCanvasHost, DeviceTableGrid, PartSelectionList };
 
         // FocusManager.GetFocusedElement(this) は Window スコープの論理フォーカスしか返さない。
         // CanvasArea(ScrollViewer)は FocusManager.IsFocusScope="True" で独立したFocusScopeのため、
