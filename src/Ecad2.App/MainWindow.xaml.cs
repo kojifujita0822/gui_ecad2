@@ -2691,13 +2691,14 @@ public partial class MainWindow : Window
         var target = panels[next];
         if (ReferenceEquals(target, PartSelectionList))
         {
-            // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): F11と共有するActivateAndFocusPartSelection
-            // 経由に統一。CanEditDiagramガードを内包するため、プロジェクト未作成状態でShift+Tabの
-            // 循環がこの番に来てもTool.Mode=PlaceElementへ意図せず遷移しない(副作用1解消)。同時に
-            // ActivateOpenPartSelection内のCancelResidualDraftForToolSwitch呼び出し自体が起きなく
-            // なるため、記入中ドラフトの無警告破棄(副作用2)・武装済みToolの意図しないリセット
-            // (副作用3)もまとめて解消される。
-            ActivateAndFocusPartSelection();
+            // T-087往復5周目修正(隠密設計書、殿裁定): 記入中ドラフト等でActivateAndFocusPartSelectionが
+            // 抑制(false)された場合、循環がこの番で「詰まる」のを避けるため次のパネルへ自動スキップする
+            // (殿裁定=Shift+Tab循環は無反応ではなく自動スキップ、F11単発は無反応のまま据え置き)。
+            // panels配列の末尾がPartSelectionListのため、次は必ずpanels[0](SheetNavList)に戻る。
+            if (!ActivateAndFocusPartSelection())
+            {
+                FocusPanel(panels[(next + 1) % panels.Length]);
+            }
         }
         else
         {
@@ -2705,16 +2706,29 @@ public partial class MainWindow : Window
         }
     }
 
-    // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): F11・CyclePanelFocusのPartSelectionList
-    // 分岐で重複していた「部品パネルを開いてフォーカスする」ロジックを統合する共有ヘルパー。
-    // CanEditDiagramガードを内包することで、呼び出し元がガードを付け忘れても安全側に倒れる
-    // (CyclePanelFocusにはこれまでガードが無かった=今回の往復の発端)。
-    private void ActivateAndFocusPartSelection()
+    // T-087往復5周目修正(隠密設計書docs/ecad2-t087-part-panel-focus-design-onmitsu.md、殿裁定):
+    // 対症療法(ガード後追い)ではなく、ActivateOpenPartSelection自体の無条件呼び出しという根本原因を
+    // 解消する。記入中ドラフトがある間はこの操作自体を抑制し(F5〜F10等と同じ「無反応」で一貫性、
+    // 殿裁定)、Tool.Modeが既にPlaceElement(武装済み含む)ならTool再代入自体を行わずフォーカス移動
+    // のみで足りる。戻り値は呼び出し元(CyclePanelFocus)が抑制発生を検知し次パネルへスキップするため。
+    private bool ActivateAndFocusPartSelection()
     {
-        if (!_viewModel.CanEditDiagram) return;
-        ActivateOpenPartSelection();
+        if (ShouldSuppressPartSelectionActivation(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft))
+            return false;
+        if (ShouldReactivateToolForPartSelection(_viewModel.Tool.Mode))
+            ActivateOpenPartSelection();
         Dispatcher.BeginInvoke(new Action(() => FocusPanel(PartSelectionList)), DispatcherPriority.Loaded);
+        return true;
     }
+
+    // T-087往復5周目修正: ActivateAndFocusPartSelectionの判定ロジックのみをinternal static抽出し
+    // 単体テスト可能にする(ShouldSkipSelectionInTestModeと同型パターン、コードビハインドの
+    // Dispatcher/UI要素依存部分から判定ロジックを切り離す)。
+    internal static bool ShouldSuppressPartSelectionActivation(bool canEditDiagram, bool hasAnyDraft)
+        => !canEditDiagram || hasAnyDraft;
+
+    internal static bool ShouldReactivateToolForPartSelection(ViewModels.ToolMode currentToolMode)
+        => currentToolMode != ViewModels.ToolMode.PlaceElement;
 
     // T-087: CyclePanelFocus(2581-2585行相当)から抽出した単一要素向けフォーカス設定処理
     // (F11の部品パネル直接フォーカスと共有、rule of two)。対象要素が独立したFocusScope内にある

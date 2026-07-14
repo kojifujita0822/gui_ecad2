@@ -22,4 +22,32 @@ public class T087FixTests : ViewModelTestBase
         Assert.Equal(AppMode.Drawing, vm.Mode);
         Assert.True(vm.CanEditDiagram);
     }
+
+    // T-087往復5周目修正(隠密設計書、殿裁定): ActivateAndFocusPartSelectionの判定ロジックのみを
+    // internal static抽出したShouldSuppressPartSelectionActivation/ShouldReactivateToolForPartSelection
+    // の回帰テスト(ShouldSkipSelectionInTestModeと同型パターン)。
+    [Theory]
+    [InlineData(false, false, true)]
+    [InlineData(false, true, true)]
+    [InlineData(true, true, true)]
+    [InlineData(true, false, false)]
+    public void ShouldSuppressPartSelectionActivation_CanEditDiagramがfalseまたはHasAnyDraftがtrueならtrue(
+        bool canEditDiagram, bool hasAnyDraft, bool expectedSuppress)
+    {
+        bool actual = MainWindow.ShouldSuppressPartSelectionActivation(canEditDiagram, hasAnyDraft);
+
+        Assert.Equal(expectedSuppress, actual);
+    }
+
+    [Theory]
+    [InlineData(ToolMode.PlaceElement, false)]
+    [InlineData(ToolMode.Select, true)]
+    [InlineData(ToolMode.PlaceConnector, true)]
+    public void ShouldReactivateToolForPartSelection_ModeがPlaceElement以外のときのみtrue(
+        ToolMode currentMode, bool expectedReactivate)
+    {
+        bool actual = MainWindow.ShouldReactivateToolForPartSelection(currentMode);
+
+        Assert.Equal(expectedReactivate, actual);
+    }
 }
