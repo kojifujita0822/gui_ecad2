@@ -1332,6 +1332,75 @@ public sealed class MainWindowViewModel : ViewModelBase
         => CancelDrag(ref _draggingImage,
             image => { image.XMm = _dragImageOrigXMm; image.YMm = _dragImageOrigYMm; });
 
+    // T-088: 基本図形(Element)のドラッグ移動(画像ドラッグと同型パターン、GridPos単位)。
+    // GuiEcad踏襲(調査書docs/ecad2-element-move-feature-survey-onmitsu.md)だが、Undo方式は
+    // GuiEcadの個別コマンドではなくecad2既存のRecordSnapshot方式を用いる(T-086調査時と同じ設計差)。
+    private ElementInstance? _draggingElement;
+    private GridPos _dragElementOrigPos;
+
+    /// <summary>要素をドラッグ中か。</summary>
+    public bool IsDraggingElement => _draggingElement is not null;
+
+    /// <summary>ドラッグ中の要素を外部要因により強制的にキャンセルする(ForceCancelDragImageIfAnyと
+    /// 同型)。</summary>
+    private void ForceCancelDragElementIfAny()
+        => ForceCancelIfAny(
+            () => _draggingElement is not null,
+            CancelDragElement,
+            () => OnPropertyChanged(nameof(IsDraggingElement)));
+
+    /// <summary>要素のドラッグ(移動)を開始する(T-088)。</summary>
+    public void BeginDragElement(ElementInstance element)
+    {
+        _draggingElement = element;
+        _dragElementOrigPos = element.Pos;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(グリッド座標)に応じて要素の位置を更新する(T-088)。
+    /// ValidatePlacement(境界+占有、自分自身は除外)を満たす場合のみ位置更新する(満たさなければ
+    /// その場に留まる、GuiEcad CellEmpty踏襲の挙動)。</summary>
+    public void UpdateDragElement(GridPos pos)
+    {
+        if (_draggingElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return;
+        if (ValidatePlacement(pos, element.CellWidth, sheet, exclude: element))
+            element.Pos = pos;
+    }
+
+    /// <summary>要素のドラッグを確定する(T-088)。ConfirmDragImageと同型(開始時から実際に位置が
+    /// 変化していれば、一旦開始時位置へ戻してRecordSnapshotを呼んでから確定値へ戻す)。</summary>
+    public void ConfirmDragElement()
+    {
+        if (_draggingElement is not ElementInstance element) { _draggingElement = null; return; }
+        if (element.Pos != _dragElementOrigPos)
+        {
+            var confirmedPos = element.Pos;
+            element.Pos = _dragElementOrigPos;
+            UndoManager.RecordSnapshot(Document);
+            element.Pos = confirmedPos;
+            MarkDirty();
+        }
+        _draggingElement = null;
+    }
+
+    /// <summary>要素のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-088)。</summary>
+    public void CancelDragElement()
+        => CancelDrag(ref _draggingElement, element => element.Pos = _dragElementOrigPos);
+
+    /// <summary>SelectedElementを矢印キー1回分(Ctrl+矢印キー、殿裁定2026-07-14)平行移動する
+    /// (T-088、GridPos単位)。ValidatePlacement(境界+占有、自分自身は除外)を満たす場合のみ移動する。
+    /// 実際に動けた場合のみRecordSnapshot+MarkDirty()する(MoveSelectedImageと同型)。</summary>
+    public bool MoveSelectedElement(int deltaRow, int deltaColumn)
+    {
+        if (SelectedElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return false;
+        var newPos = new GridPos(element.Pos.Row + deltaRow, element.Pos.Column + deltaColumn);
+        if (newPos == element.Pos) return false;
+        if (!ValidatePlacement(newPos, element.CellWidth, sheet, exclude: element)) return false;
+        UndoManager.RecordSnapshot(Document);
+        element.Pos = newPos;
+        MarkDirty();
+        return true;
+    }
+
     /// <summary>選択中の画像を矢印キー1回分(Shift無し)平行移動する(T-064、隠密静的調査
     /// `docs/ecad2-t064-arrow-key-investigation-onmitsu.md`により原因特定、殿裁定2026-07-13で
     /// 実装。他の選択可能状態(SelectedConnector/SelectedWireBreak/SelectedFreeLine/
@@ -2097,11 +2166,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
         && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
 
-    private static bool IsOccupied(GridPos pos, int cellWidth, Sheet sheet)
+    /// <summary>T-088: excludeを渡すと、その要素自身は占有判定の対象から除外する(移動時、元の
+    /// セルに自分自身が居座っていることで「占有されている」と誤判定されるのを防ぐ)。新規配置時は
+    /// exclude省略(null)で従来どおりの判定になる。</summary>
+    private static bool IsOccupied(GridPos pos, int cellWidth, Sheet sheet, ElementInstance? exclude = null)
     {
         int left = pos.Column, right = pos.Column + cellWidth - 1;
         return sheet.Elements.Any(el =>
-            el.Pos.Row == pos.Row && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
+            el != exclude && el.Pos.Row == pos.Row && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
     }
 
     /// <summary>指定セル位置にヒットする要素を返す(T-069往復2周目修正1、右クリックメニューの
@@ -2189,8 +2261,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
     /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
     /// 共有する(IsWithinGridBounds)。cellWidthの意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
-    private bool ValidatePlacement(GridPos pos, int cellWidth, Sheet sheet)
-        => IsWithinGridBounds(pos, cellWidth, sheet) && !IsOccupied(pos, cellWidth, sheet);
+    private bool ValidatePlacement(GridPos pos, int cellWidth, Sheet sheet, ElementInstance? exclude = null)
+        => IsWithinGridBounds(pos, cellWidth, sheet) && !IsOccupied(pos, cellWidth, sheet, exclude);
 
     /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
     /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
@@ -2395,6 +2467,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 無く、上の_selectedCellは直接代入(setterバイパス)のため自動クリアが効かない
         // (SelectedConnector等と同じ理由、ここだけ横展開漏れしていた)。
         SelectedImage = null;
+        // T-088: 要素のドラッグ中状態(_draggingElement)も同様に旧文書の実体を持ち越さない。
+        // SelectedElementはSelectedCellからの算出プロパティで専用setterが無いため、
+        // SelectedImage等と異なりここで明示的に呼ぶ必要がある。
+        ForceCancelDragElementIfAny();
         // T-041増分2隠密レビュー指摘(観点3 CONFIRMED): 記入中(_connectorDraft)も同様に、直接代入
         // (_selectedCell)経由ではSelectedCellのsetterの自動クリアが効かないため、ここでも明示する。
         ClearConnectorDraftIfAny();

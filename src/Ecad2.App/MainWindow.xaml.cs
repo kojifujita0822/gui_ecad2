@@ -61,6 +61,11 @@ public partial class MainWindow : Window
     private bool _imageResizeStarted;
     private bool _imageResizeConsumedByEscape;
 
+    // T-088: 基本図形(Element)ドラッグの同種の状態(画像ドラッグと同型)。
+    private Point _elementDragPressPositionDip;
+    private bool _elementDragStarted;
+    private bool _elementDragConsumedByEscape;
+
     // T-061第三歩: テストモード中、押しボタンのモーメンタリ動作用に押下中のデバイス名を保持する
     // (MouseUp/LostMouseCaptureでOFFに戻す、他ドラッグ系のView状態保持と同じ設計)。
     private string? _testModePressedDevice;
@@ -169,6 +174,14 @@ public partial class MainWindow : Window
             if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
             _imageResizeStarted = false;
             _imageResizeConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingElement) && !_viewModel.IsDraggingElement)
+        {
+            // T-088: ForceCancelDragElementIfAny(ReplaceDocument等の外部要因)による強制キャンセルに
+            // View側の状態(マウスキャプチャ・しきい値・Escape消費フラグ)も追随させる(他ドラッグ系と同型)。
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _elementDragStarted = false;
+            _elementDragConsumedByEscape = false;
         }
     }
 
@@ -723,6 +736,24 @@ public partial class MainWindow : Window
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragImage(); return; }
             _imageDragPressPositionDip = position;
             _imageDragStarted = false;
+            return;
+        }
+
+        // T-088: 選択中の要素(SelectedElement)本体を押下したらドラッグ(移動)を開始する
+        // (調査書docs/ecad2-element-move-feature-survey-onmitsu.md、既存の縦コネクタ・画像ドラッグと
+        // 同型パターン)。
+        if (_viewModel.SelectedElement is Ecad2.Model.ElementInstance dragElem)
+        {
+            var elemHitPos = LadderCanvasHost.ToGridPos(position);
+            if (elemHitPos.Row == dragElem.Pos.Row
+                && elemHitPos.Column >= dragElem.Pos.Column
+                && elemHitPos.Column <= dragElem.Pos.Column + dragElem.CellWidth - 1)
+            {
+                _viewModel.BeginDragElement(dragElem);
+                if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragElement(); return; }
+                _elementDragPressPositionDip = position;
+                _elementDragStarted = false;
+            }
         }
     }
 
@@ -822,6 +853,18 @@ public partial class MainWindow : Window
             var (xMm, yMm) = LadderCanvasHost.ToMmPoint(position);
             _viewModel.UpdateResizeImage(xMm, yMm);
             RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsDraggingElement)
+        {
+            if (!_elementDragStarted)
+            {
+                if ((position - _elementDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _elementDragStarted = true;
+            }
+            _viewModel.UpdateDragElement(LadderCanvasHost.ToGridPos(position));
+            RedrawCanvas();
         }
     }
 
@@ -846,7 +889,8 @@ public partial class MainWindow : Window
         // キャプチャを解放するのみで、通常のクリック処理(セル選択/配線プリミティブ選択切替)は行わない
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
         if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
-            || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape)
+            || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape
+            || _elementDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
@@ -855,6 +899,7 @@ public partial class MainWindow : Window
             _connectionDotDragConsumedByEscape = false;
             _imageDragConsumedByEscape = false;
             _imageResizeConsumedByEscape = false;
+            _elementDragConsumedByEscape = false;
             return;
         }
 
@@ -911,6 +956,14 @@ public partial class MainWindow : Window
             _viewModel.ConfirmResizeImage();
             LadderCanvasHost.ReleaseMouseCapture();
             _imageResizeStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingElement)
+        {
+            _viewModel.ConfirmDragElement();
+            LadderCanvasHost.ReleaseMouseCapture();
+            _elementDragStarted = false;
             RedrawCanvas();
             return;
         }
@@ -1235,12 +1288,19 @@ public partial class MainWindow : Window
             _imageResizeStarted = false;
             RedrawCanvas();
         }
+        if (_viewModel.IsDraggingElement)
+        {
+            _viewModel.CancelDragElement();
+            _elementDragStarted = false;
+            RedrawCanvas();
+        }
         _connectorDragConsumedByEscape = false;
         _wireBreakDragConsumedByEscape = false;
         _freeLineDragConsumedByEscape = false;
         _connectionDotDragConsumedByEscape = false;
         _imageDragConsumedByEscape = false;
         _imageResizeConsumedByEscape = false;
+        _elementDragConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -1389,6 +1449,17 @@ public partial class MainWindow : Window
                     _viewModel.CancelResizeImage();
                     _imageResizeStarted = false;
                     _imageResizeConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsDraggingElement)
+                {
+                    // T-088: 要素ドラッグ中のEscも他ドラッグ系と同型の独立最優先層とする。
+                    _viewModel.CancelDragElement();
+                    _elementDragStarted = false;
+                    _elementDragConsumedByEscape = true;
                     RedrawCanvas();
                     FocusCanvas();
                     e.Handled = true;
@@ -1573,6 +1644,15 @@ public partial class MainWindow : Window
                     MoveSelectedImageByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
+                e.Handled = true;
+                break;
+            case Key.Up or Key.Down or Key.Left or Key.Right
+                    when Keyboard.Modifiers == ModifierKeys.Control && IsCanvasFocused() && _viewModel.CanEditDiagram:
+                // T-088(殿裁定2026-07-14): Ctrl+矢印キーで選択中の要素(SelectedElement)を平行移動
+                // する。通常の矢印キー(修飾キー無し)はSelectedCellの単純移動のまま維持し、Ctrl併用時
+                // のみ要素移動に切り替える(SelectedElementはSelectedCellから自動算出される特殊
+                // プロパティのため、他のSelected*と異なり修飾キーで区別する必要がある)。
+                MoveSelectedElementByKey(e.Key);
                 e.Handled = true;
                 break;
             case Key.Left or Key.Right when shift && IsCanvasFocused()
@@ -1962,6 +2042,21 @@ public partial class MainWindow : Window
             Key.Down => _viewModel.MoveSelectedImage(0, step, maxXMm, maxYMm),
             Key.Left => _viewModel.MoveSelectedImage(-step, 0, maxXMm, maxYMm),
             Key.Right => _viewModel.MoveSelectedImage(step, 0, maxXMm, maxYMm),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
+    }
+
+    // T-088(殿裁定2026-07-14): 選択中の要素(SelectedElement)をCtrl+矢印キー1回分、GridPos単位で
+    // 平行移動する(MoveSelectedImageByKeyと同型)。
+    private void MoveSelectedElementByKey(Key key)
+    {
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedElement(-1, 0),
+            Key.Down => _viewModel.MoveSelectedElement(1, 0),
+            Key.Left => _viewModel.MoveSelectedElement(0, -1),
+            Key.Right => _viewModel.MoveSelectedElement(0, 1),
             _ => false,
         };
         if (moved) RedrawCanvas();
