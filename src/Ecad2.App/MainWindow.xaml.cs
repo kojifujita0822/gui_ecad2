@@ -1371,15 +1371,9 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             case Key.F11 when noModifier && _viewModel.CanEditDiagram:
-                // T-087往復3周目修正(隠密静的レビュー指摘): 部品パネルはTool.Mode==PlaceElementの
-                // 間のみ表示される(IsPartSelectionVisible)。ActivateOpenPartSelectionでパネルを
-                // 表示させた直後、Collapsed→Visible切替はMeasure/Arrange未完了のためFocus()の
-                // 同期呼び出しは失敗しうる(PlacementDeviceNameBox・RungCommentBoxと同型、
-                // Dispatcher.BeginInvoke(DispatcherPriority.Loaded)でレイアウトパス完了後に確定)。
-                // 加えてF11自体にもCanEditDiagramガードを追加する(Ctrl+Tと同型のPR-13再発防止、
-                // 部品パネルを開く既存の「自作パーツ」ボタンもCanEditDiagramで保護されている)。
-                ActivateOpenPartSelection();
-                Dispatcher.BeginInvoke(new Action(() => FocusPanel(PartSelectionList)), DispatcherPriority.Loaded);
+                // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): CyclePanelFocusのPartSelectionList
+                // 分岐(下記)と重複していたロジックをActivateAndFocusPartSelectionへ統合(rule of two)。
+                ActivateAndFocusPartSelection();
                 e.Handled = true;
                 break;
             case Key.Escape:
@@ -2697,16 +2691,29 @@ public partial class MainWindow : Window
         var target = panels[next];
         if (ReferenceEquals(target, PartSelectionList))
         {
-            // T-087往復3周目修正(隠密静的レビュー指摘): 部品パネルは非表示の場合がありpanels配列に
-            // 加えるだけでは循環でこの番が来てもFocus()が恒常的に失敗する。F11と同じく
-            // ActivateOpenPartSelectionでパネルを表示させ、レイアウトパス完了後にフォーカスする。
-            ActivateOpenPartSelection();
-            Dispatcher.BeginInvoke(new Action(() => FocusPanel(target)), DispatcherPriority.Loaded);
+            // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): F11と共有するActivateAndFocusPartSelection
+            // 経由に統一。CanEditDiagramガードを内包するため、プロジェクト未作成状態でShift+Tabの
+            // 循環がこの番に来てもTool.Mode=PlaceElementへ意図せず遷移しない(副作用1解消)。同時に
+            // ActivateOpenPartSelection内のCancelResidualDraftForToolSwitch呼び出し自体が起きなく
+            // なるため、記入中ドラフトの無警告破棄(副作用2)・武装済みToolの意図しないリセット
+            // (副作用3)もまとめて解消される。
+            ActivateAndFocusPartSelection();
         }
         else
         {
             FocusPanel(target);
         }
+    }
+
+    // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): F11・CyclePanelFocusのPartSelectionList
+    // 分岐で重複していた「部品パネルを開いてフォーカスする」ロジックを統合する共有ヘルパー。
+    // CanEditDiagramガードを内包することで、呼び出し元がガードを付け忘れても安全側に倒れる
+    // (CyclePanelFocusにはこれまでガードが無かった=今回の往復の発端)。
+    private void ActivateAndFocusPartSelection()
+    {
+        if (!_viewModel.CanEditDiagram) return;
+        ActivateOpenPartSelection();
+        Dispatcher.BeginInvoke(new Action(() => FocusPanel(PartSelectionList)), DispatcherPriority.Loaded);
     }
 
     // T-087: CyclePanelFocus(2581-2585行相当)から抽出した単一要素向けフォーカス設定処理
