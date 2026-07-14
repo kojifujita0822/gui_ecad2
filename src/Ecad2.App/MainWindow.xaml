@@ -21,6 +21,7 @@
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
+        <converters:FindVisibleToOutputTitleConverter x:Key="FindVisibleToOutputTitle"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -444,8 +445,9 @@
                     <avalonDock:LayoutPanel Orientation="Horizontal">
                         <avalonDock:LayoutAnchorablePane>
                             <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False">
+                                <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitle="シート"を
+                                     表示するため、旧実装の手動タイトルTextBlockは二重表示になっていた。削除。 -->
                                 <DockPanel>
-                                    <TextBlock DockPanel.Dock="Top" Text="シート" FontWeight="Bold" Margin="4"/>
                                     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="4">
                                         <Button x:Name="AddSheetButton" Content="＋" Width="28" ToolTip="シート追加"
                                                 Click="AddSheetButton_Click"/>
@@ -638,71 +640,79 @@
              殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
              行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
              (OutputPanelViewModel.SelectedDiagnostic参照)。高さはGridSplitterでドラッグ調整可能
-             (T-059、既定160・MinHeight=80はMainContentArea.RowDefinitions側で指定)。 -->
-        <DockPanel x:Name="OutputPanelArea" Grid.Row="4">
-            <Border DockPanel.Dock="Top" BorderBrush="Gray" BorderThickness="0,1,0,0">
-                <Grid>
-                    <!-- T-070(DoD(3)7項目目「検索結果パネル」): FindBar表示中は検索結果、非表示中は
-                         DRC結果を表示する自動連動(UI/UX論点でないため実装設計として侍裁量、GuiEcad
-                         はタブ切替UIだがecad2は簡略化)。 -->
-                    <TextBlock Text="出力" FontWeight="Bold" Margin="4,2"
-                               Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"/>
-                    <TextBlock Text="検索結果" FontWeight="Bold" Margin="4,2"
-                               Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"/>
-                </Grid>
-            </Border>
-            <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
-                 受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり
-                 該当箇所列(Width="*")が正しく展開されず左寄せの狭い帯になっていた。Gridでラップし両方を
-                 重ねてVisibilityで切替える(上のTextBlock 2枚と同型のパターン)ことで、Gridの方が
-                 DockPanelのFill対象になり両DataGridとも正しくStar列展開を受けられるようにする。 -->
-            <Grid>
-                <DataGrid x:Name="FindResultsGrid" ItemsSource="{Binding Find.Matches}"
-                          Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
-                          AutoGenerateColumns="False" IsReadOnly="True"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-                    <DataGrid.RowStyle>
-                        <Style TargetType="DataGridRow">
-                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
-                        </Style>
-                    </DataGrid.RowStyle>
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="シート" Binding="{Binding SheetName}" Width="100"/>
-                        <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="100"/>
-                        <DataGridTextColumn Header="該当箇所" Binding="{Binding Location}" Width="*"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-                <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
-                          SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
-                          Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"
-                          AutoGenerateColumns="False" IsReadOnly="True"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal">
-                    <DataGrid.RowStyle>
-                        <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
-                             T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
-                        <Style TargetType="DataGridRow">
-                            <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
-                        </Style>
-                    </DataGrid.RowStyle>
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
-                                            Width="60">
-                            <DataGridTextColumn.ElementStyle>
-                                <Style TargetType="TextBlock">
-                                    <Setter Property="Foreground" Value="{Binding Severity, Converter={StaticResource SeverityToBrush}}"/>
-                                    <Setter Property="FontWeight" Value="Bold"/>
-                                </Style>
-                            </DataGridTextColumn.ElementStyle>
-                        </DataGridTextColumn>
-                        <DataGridTextColumn Header="コード" Binding="{Binding Code}" Width="110"/>
-                        <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="80"/>
-                        <DataGridTextColumn Header="メッセージ" Binding="{Binding Message}" Width="*"/>
-                        <DataGridTextColumn Header="該当箇所" Binding="{Binding Locations, Converter={StaticResource LocationsToText}}"
-                                            Width="140"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </Grid>
-        </DockPanel>
+             (T-059、既定160・MinHeight=80はMainContentArea.RowDefinitions側で指定)。
+             T-058増分2: AvalonDock化。左パレット用DockingManagerとは独立した2つ目のインスタンスとして
+             この位置(MainContentArea.Row="4")のみを管理する(案C、家老裁可済み)。既存のT-059
+             GridSplitter(直前のGrid.Row="3")はDockingManager外側の境界リサイズ用としてそのまま維持する
+             (DockingManager自身が持つのは内部ペイン間のリサイザーのみ)。 -->
+        <avalonDock:DockingManager x:Name="OutputPanelDockingManager" Grid.Row="4">
+            <avalonDock:LayoutRoot>
+                <avalonDock:LayoutPanel Orientation="Horizontal">
+                    <avalonDock:LayoutAnchorablePane>
+                        <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitleを表示するため、旧実装の
+                             手動タイトルTextBlock(出力/検索結果切替)は二重表示になっていた。切替表示自体は
+                             タブタイトルへ一本化し(FindVisibleToOutputTitleConverter)、内部のBorder+TextBlock
+                             は削除する。 -->
+                        <avalonDock:LayoutAnchorable Title="{Binding Find.IsVisible, Converter={StaticResource FindVisibleToOutputTitle}}"
+                                                     ContentId="OutputPanel" CanClose="False">
+                            <DockPanel>
+                                <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
+                                     受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり
+                                     該当箇所列(Width="*")が正しく展開されず左寄せの狭い帯になっていた。Gridでラップし両方を
+                                     重ねてVisibilityで切替える(上のTextBlock 2枚と同型のパターン)ことで、Gridの方が
+                                     DockPanelのFill対象になり両DataGridとも正しくStar列展開を受けられるようにする。 -->
+                                <Grid>
+                                    <DataGrid x:Name="FindResultsGrid" ItemsSource="{Binding Find.Matches}"
+                                              Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                                        <DataGrid.RowStyle>
+                                            <Style TargetType="DataGridRow">
+                                                <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
+                                            </Style>
+                                        </DataGrid.RowStyle>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="シート" Binding="{Binding SheetName}" Width="100"/>
+                                            <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="100"/>
+                                            <DataGridTextColumn Header="該当箇所" Binding="{Binding Location}" Width="*"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                    <DataGrid x:Name="OutputGrid" ItemsSource="{Binding OutputPanel.Diagnostics}"
+                                              SelectedItem="{Binding OutputPanel.SelectedDiagnostic}"
+                                              Visibility="{Binding Find.IsVisible, Converter={StaticResource InverseBoolToVisibility}}"
+                                              AutoGenerateColumns="False" IsReadOnly="True"
+                                              HeadersVisibility="Column" GridLinesVisibility="Horizontal">
+                                        <DataGrid.RowStyle>
+                                            <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
+                                                 T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
+                                            <Style TargetType="DataGridRow">
+                                                <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
+                                            </Style>
+                                        </DataGrid.RowStyle>
+                                        <DataGrid.Columns>
+                                            <DataGridTextColumn Header="重大度" Binding="{Binding Severity, Converter={StaticResource SeverityToText}}"
+                                                                Width="60">
+                                                <DataGridTextColumn.ElementStyle>
+                                                    <Style TargetType="TextBlock">
+                                                        <Setter Property="Foreground" Value="{Binding Severity, Converter={StaticResource SeverityToBrush}}"/>
+                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                    </Style>
+                                                </DataGridTextColumn.ElementStyle>
+                                            </DataGridTextColumn>
+                                            <DataGridTextColumn Header="コード" Binding="{Binding Code}" Width="110"/>
+                                            <DataGridTextColumn Header="機器名" Binding="{Binding DeviceName}" Width="80"/>
+                                            <DataGridTextColumn Header="メッセージ" Binding="{Binding Message}" Width="*"/>
+                                            <DataGridTextColumn Header="該当箇所" Binding="{Binding Locations, Converter={StaticResource LocationsToText}}"
+                                                                Width="140"/>
+                                        </DataGrid.Columns>
+                                    </DataGrid>
+                                </Grid>
+                            </DockPanel>
+                        </avalonDock:LayoutAnchorable>
+                    </avalonDock:LayoutAnchorablePane>
+                </avalonDock:LayoutPanel>
+            </avalonDock:LayoutRoot>
+        </avalonDock:DockingManager>
         </Grid>
 
         <!-- ステータスバー: design-brief 4節#6「モード可視化の多重化」。現在の配置ツールモードと

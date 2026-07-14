@@ -10,6 +10,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
+using AvalonDock;
 using AvalonDock.Layout;
 using AvalonDock.Layout.Serialization;
 
@@ -98,8 +99,12 @@ public partial class MainWindow : Window
     // 復旧不能になる致命的UXが忍者実機確認で確定したため、全パネル共通のレイアウトリセット機能
     // (Ctrl+Alt+R)を新設する。起動直後の既定レイアウトをXmlLayoutSerializerで文字列として保持し、
     // リセット時にDeserializeし直す(PoC実証済み手法の流用)。
+    // T-058増分2(家老裁可・案C): 出力パネルは左パレットとは独立した2つ目のDockingManagerとして
+    // 追加したため、レイアウトリセットは複数DockingManagerをまとめて処理できるよう汎用化する。
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
-    private string? _defaultDockingLayoutXml;
+    private readonly Dictionary<DockingManager, string> _defaultDockingLayoutXmlByManager = new();
+
+    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager };
 
     // 殿実機確認で発覚(重要): フロート化したパネル自体にフォーカスがある間はメインウィンドウの
     // PreviewKeyDownが発火せず復旧不能のままだった——AvalonDockはフロート化したLayoutAnchorableを
@@ -139,45 +144,55 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         RedrawCanvas();
         RegisterDockingContents();
-        _defaultDockingLayoutXml = SerializeCurrentDockingLayout();
+        SerializeDefaultDockingLayouts();
     }
 
     private void RegisterDockingContents()
     {
-        foreach (var anchorable in LeftPaletteDockingManager.Layout.Descendents().OfType<LayoutAnchorable>())
+        foreach (var manager in AllDockingManagers)
         {
-            _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
-        }
-        foreach (var document in LeftPaletteDockingManager.Layout.Descendents().OfType<LayoutDocument>())
-        {
-            _dockingContentRegistry[document.ContentId] = document.Content;
+            foreach (var anchorable in manager.Layout.Descendents().OfType<LayoutAnchorable>())
+            {
+                _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
+            }
+            foreach (var document in manager.Layout.Descendents().OfType<LayoutDocument>())
+            {
+                _dockingContentRegistry[document.ContentId] = document.Content;
+            }
         }
     }
 
-    private string SerializeCurrentDockingLayout()
+    private void SerializeDefaultDockingLayouts()
     {
-        var serializer = new XmlLayoutSerializer(LeftPaletteDockingManager);
-        using var writer = new StringWriter();
-        serializer.Serialize(writer);
-        return writer.ToString();
+        foreach (var manager in AllDockingManagers)
+        {
+            var serializer = new XmlLayoutSerializer(manager);
+            using var writer = new StringWriter();
+            serializer.Serialize(writer);
+            _defaultDockingLayoutXmlByManager[manager] = writer.ToString();
+        }
     }
 
     // Ctrl+Alt+Rハンドラから呼ばれる。既定レイアウト文字列からDeserializeし直し、
     // LayoutSerializationCallbackでContentIdをキーに元のコンテンツを再バインドする
     // (Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
+    // 複数DockingManager(左パレット・出力パネル)をまとめてリセットする(家老申し送り)。
     private void ResetDockingLayoutToDefault()
     {
-        if (_defaultDockingLayoutXml is null) return;
-        var serializer = new XmlLayoutSerializer(LeftPaletteDockingManager);
-        serializer.LayoutSerializationCallback += (s, args) =>
+        foreach (var manager in AllDockingManagers)
         {
-            if (args.Model.ContentId != null && _dockingContentRegistry.TryGetValue(args.Model.ContentId, out var content))
+            if (!_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var xml)) continue;
+            var serializer = new XmlLayoutSerializer(manager);
+            serializer.LayoutSerializationCallback += (s, args) =>
             {
-                args.Content = content;
-            }
-        };
-        using var reader = new StringReader(_defaultDockingLayoutXml);
-        serializer.Deserialize(reader);
+                if (args.Model.ContentId != null && _dockingContentRegistry.TryGetValue(args.Model.ContentId, out var content))
+                {
+                    args.Content = content;
+                }
+            };
+            using var reader = new StringReader(xml);
+            serializer.Deserialize(reader);
+        }
         _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
     }
 
