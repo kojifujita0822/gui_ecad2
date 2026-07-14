@@ -21,7 +21,6 @@
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
-        <converters:FindVisibleToOutputTitleConverter x:Key="FindVisibleToOutputTitle"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -649,12 +648,15 @@
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
                     <avalonDock:LayoutAnchorablePane>
-                        <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitleを表示するため、旧実装の
-                             手動タイトルTextBlock(出力/検索結果切替)は二重表示になっていた。切替表示自体は
-                             タブタイトルへ一本化し(FindVisibleToOutputTitleConverter)、内部のBorder+TextBlock
-                             は削除する。 -->
-                        <avalonDock:LayoutAnchorable Title="{Binding Find.IsVisible, Converter={StaticResource FindVisibleToOutputTitle}}"
-                                                     ContentId="OutputPanel" CanClose="False">
+                        <!-- 殿ご指摘(実機確認)による2周目修正: AvalonDockのタブヘッダー自体がTitleを表示する
+                             ため、旧実装の手動タイトルTextBlock(出力/検索結果切替)は二重表示になっていた
+                             (1周目で解消)。しかしTitleへの{Binding Find.IsVisible}は忍者実機確認で完全に
+                             空白になる新たな不具合を招いた——原因はLayoutAnchorable(LayoutContent→
+                             LayoutElement:DependencyObject)がFrameworkElementではなくWPFのDataContext
+                             継承(Visual/Logical Tree経由)の対象外のため(GitHub一次ソース確認済み、
+                             忍者の推測通り)。BindingではなくMainWindow.xaml.csでFind.PropertyChangedを
+                             購読しTitleを直接更新する方式に切替える(UpdateOutputPanelTitle参照)。 -->
+                        <avalonDock:LayoutAnchorable Title="出力" ContentId="OutputPanel" CanClose="False">
                             <DockPanel>
                                 <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
                                      受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり

@@ -145,6 +145,29 @@ public partial class MainWindow : Window
         RedrawCanvas();
         RegisterDockingContents();
         SerializeDefaultDockingLayouts();
+        // 忍者実機確認で発覚(往復2周目): LayoutAnchorable(LayoutContent→LayoutElement:DependencyObject)
+        // はFrameworkElementではなくWPFのDataContext継承(Visual/Logical Tree経由)の対象外のため、
+        // Title="{Binding Find.IsVisible, ...}"は解決されず完全に空白になっていた(GitHub一次ソース
+        // 確認済み、家老経由の追加検証=DataGrid等Content内部のBindingは正常でTitleのみ機能せず、で
+        // 裏付け済み)。BindingではなくFind.PropertyChangedを購読しTitleを直接更新する方式に切替える。
+        _viewModel.Find.PropertyChanged += Find_PropertyChanged;
+        UpdateOutputPanelTitle();
+    }
+
+    private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ViewModels.FindViewModel.IsVisible))
+            UpdateOutputPanelTitle();
+    }
+
+    private void UpdateOutputPanelTitle()
+    {
+        var outputAnchorable = OutputPanelDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == "OutputPanel");
+        if (outputAnchorable != null)
+        {
+            outputAnchorable.Title = _viewModel.Find.IsVisible ? "検索結果" : "出力";
+        }
     }
 
     private void RegisterDockingContents()
