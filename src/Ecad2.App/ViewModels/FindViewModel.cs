@@ -118,7 +118,10 @@ public sealed class FindViewModel : ViewModelBase
     public ICommand ReplaceOneCommand { get; }
     public ICommand ReplaceAllCommand { get; }
 
-    private void RunSearch()
+    /// <summary>現在のQueryで再検索する。allowJump=falseはUndo/Redo等のDocument差し替え後専用
+    /// (T-070隠密レビュー指摘D-3対応、RefreshAfterDocumentReplaced参照)——SelectedCellを巻き戻さず
+    /// 現状維持する殿裁定の意味論を、再検索によるJumpToで壊さないため。</summary>
+    private void RunSearch(bool allowJump = true)
     {
         string trimmed = Query.Trim();
         Matches = trimmed.Length == 0
@@ -133,20 +136,22 @@ public sealed class FindViewModel : ViewModelBase
         // たびに走る自動JumpToがSelectedCellセッター経由で無警告にドラフトを破棄してしまう
         // (Enterでの確定時は案内メッセージが出る設計と非対称)。ドラフト中はジャンプ自体を抑制して保護する
         // (Matches/CurrentIndex自体は更新するため検索結果件数表示は正しいまま)。
-        if (CurrentMatch is { } m && !_owner.HasAnyDraft) JumpTo(m);
+        if (allowJump && CurrentMatch is { } m && !_owner.HasAnyDraft) JumpTo(m);
     }
 
     /// <summary>次の一致へ循環移動する((Index+1)%Count方式、GuiEcad踏襲=先頭↔末尾を跨いで循環)。</summary>
     private void Next()
     {
-        if (Matches.Count == 0) return;
+        // T-070隠密レビュー指摘D-5: B-2のドラフト保護(RunSearch内の自動JumpToのみ)がNext/Prev/
+        // JumpToMatchには適用されておらず、これらの明示操作経由で記入中ドラフトが無警告破棄され得た。
+        if (Matches.Count == 0 || _owner.HasAnyDraft) return;
         CurrentIndex = (CurrentIndex + 1) % Matches.Count;
         JumpTo(Matches[CurrentIndex]);
     }
 
     private void Prev()
     {
-        if (Matches.Count == 0) return;
+        if (Matches.Count == 0 || _owner.HasAnyDraft) return;
         CurrentIndex = (CurrentIndex - 1 + Matches.Count) % Matches.Count;
         JumpTo(Matches[CurrentIndex]);
     }
@@ -167,6 +172,8 @@ public sealed class FindViewModel : ViewModelBase
     /// 頼らずRowのPreviewMouseLeftButtonDownから確実に呼ぶ設計にする)。</summary>
     public void JumpToMatch(FindMatch match)
     {
+        // T-070隠密レビュー指摘D-5: Next/Prevと同様、検索結果行クリック経由もドラフト保護対象。
+        if (_owner.HasAnyDraft) return;
         int idx = Matches.ToList().IndexOf(match);
         if (idx < 0) return;
         CurrentIndex = idx;
@@ -204,15 +211,13 @@ public sealed class FindViewModel : ViewModelBase
         RunSearch();
     }
 
-    /// <summary>Undo/Redoによる Document 差し替え後、古い Sheet/ElementInstance 参照を保持したままの
-    /// 検索結果を破棄する(T-070隠密レビューB-1対応、MainWindowViewModel.ApplyUndoRedoSnapshotから呼ぶ)。
-    /// OutputPanel.ClearResultsと同型の単純クリアとし、JumpToは伴わない(Undo/RedoはSelectedCellを
-    /// 巻き戻さず現状維持する殿裁定の意味論を、再検索によるJumpToで壊さないため)。</summary>
-    public void ClearResults()
-    {
-        Matches = Array.Empty<FindMatch>();
-        CurrentIndex = -1;
-        OnPropertyChanged(nameof(StatusText));
-        OnPropertyChanged(nameof(CurrentMatch));
-    }
+    /// <summary>Document差し替え(Undo/Redo・新規作成・開く)後、古いSheet/ElementInstance参照を
+    /// 保持したままの検索結果を整合させる(T-070隠密レビューB-1/D-3/D-4対応、
+    /// MainWindowViewModel.ApplyUndoRedoSnapshot・ReplaceDocumentから呼ぶ)。
+    /// D-3(往復2周目指摘): B-1初版は単純Matchesクリアのみだったため、Undo後もQueryへ一致する要素が
+    /// 実在するのに検索結果パネルが「0/0」に固定される新たな誤表示を生んでいた。現在のQueryで
+    /// 再検索することで実データとの整合を回復するが、allowJump=falseでJumpToは伴わない
+    /// (Undo/RedoがSelectedCellを巻き戻さず現状維持する殿裁定の意味論を、再検索によるJumpToで
+    /// 壊さないため)。</summary>
+    public void RefreshAfterDocumentReplaced() => RunSearch(allowJump: false);
 }

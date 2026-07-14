@@ -32,14 +32,26 @@ public static class DeviceRenamer
             }
         }
 
-        // DeviceTable のキー移行（from が登録されていれば to へ移す。大文字小文字を区別しない）
+        // DeviceTable のキー移行（from が登録されていれば to へ移す。大文字小文字を区別しない）。
+        // T-070隠密レビュー指摘D-2: to が既に別の Device として登録済みの場合、無条件上書きすると
+        // to 側の既存 BOM 情報(Model/Maker/Quantity)が失われる。既に to が存在するなら from 側は
+        // 削除のみに留め、to の既存 Device は保持する(MainWindowViewModel.MigrateOrRegisterDeviceの
+        // 単発置換側と同種の保護、片方だけ保護され非対称になっていたものを揃える)。ただし
+        // "m1"->"M1"のような大文字小文字違いの自己リネームでは、to の既存キー探索が from 自身
+        // (key)にヒットしうる。それは「別枠で既に登録済み」ではなく移行対象そのものなので、
+        // key と同一なら「既に登録済み」扱いにせず通常どおりキー移行する。
         var key = doc.Devices.ByName.Keys
             .FirstOrDefault(k => string.Equals(k, from, StringComparison.OrdinalIgnoreCase));
         if (key is not null && doc.Devices.ByName.TryGetValue(key, out var device))
         {
+            var existingToKey = doc.Devices.ByName.Keys
+                .FirstOrDefault(k => string.Equals(k, to, StringComparison.OrdinalIgnoreCase));
             doc.Devices.ByName.Remove(key);
-            device.Name = to;
-            doc.Devices.ByName[to] = device;
+            if (existingToKey is null || existingToKey == key)
+            {
+                device.Name = to;
+                doc.Devices.ByName[to] = device;
+            }
         }
 
         return count;

@@ -284,11 +284,13 @@ public class FindViewModelTests : ViewModelTestBase
     }
 
     [Fact]
-    public void Undo_ClearsFindResults()
+    public void Undo_RefreshesFindResultsAgainstCurrentDocumentWithoutStaleReferences()
     {
-        // B-1: Undo/RedoでDocumentが差し替わったら、古いSheet/ElementInstance参照を保持したままの
-        // 検索結果(Matches)が破棄されること(放置すると検索結果パネルの行クリックでJumpToが
-        // 無言returnする沈黙不整合が起きる)。
+        // B-1/D-3(往復2周目指摘): Undo/RedoでDocumentが差し替わっても、Queryに一致する要素が実在
+        // するなら再検索により正しくMatchesへ反映されること。B-1初版は単純クリアのみだったため、
+        // 検索結果が実データと食い違う「0/0」誤表示が残っていた(D-3)。Matchesの中身も新Documentの
+        // 実オブジェクトを指しており、古いSheet参照を保持していないこと(B-1本来の検証観点、
+        // 古い参照のままだと検索結果パネルの行クリックでJumpToが無言returnする沈黙不整合が起きる)。
         var vm = CreateViewModel();
         vm.NewDocument();
         var sheet = vm.CurrentSheet!;
@@ -299,7 +301,9 @@ public class FindViewModelTests : ViewModelTestBase
 
         vm.UndoCommand.Execute(null);
 
-        Assert.Empty(vm.Find.Matches);
+        var match = Assert.Single(vm.Find.Matches);
+        Assert.NotSame(sheet, match.Sheet);   // 古いDocumentのSheet参照ではない
+        Assert.Same(vm.CurrentSheet!.Elements[0], match.Element);
     }
 
     [Fact]
@@ -316,6 +320,92 @@ public class FindViewModelTests : ViewModelTestBase
         Assert.NotNull(vm.ConnectorDraftPreview);
 
         vm.Find.Query = "X001";
+
+        Assert.NotNull(vm.ConnectorDraftPreview);
+    }
+
+    // ===== T-070往復3周目(隠密2周目レビュー指摘D-1〜D-5)の回帰テスト =====
+
+    [Fact]
+    public void ReplaceOneCommand_CaseOnlyChange_MultipleElementsShareOldName_DoesNotLeaveDuplicateDeviceEntry()
+    {
+        // D-1(A-3修正の不完全性): 旧名を複数要素が共有している場合、大文字小文字違いの置換で
+        // 重複エントリ("m1"と"M1")が残らないこと。前回のA-3テストは要素1個のケースのみ
+        // カバーしており、複数要素同名という別条件下での再発は未検証だった。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        var a = MakeContact(0, 0, "m1");
+        var b = MakeContact(1, 0, "m1");
+        sheet.Elements.Add(a);
+        sheet.Elements.Add(b);
+        vm.Document.Devices.ByName["m1"] = new Device { Name = "m1", Model = "MODEL-1" };
+        vm.Find.Query = "m1";
+        vm.Find.ReplaceWith = "M1";
+
+        vm.Find.ReplaceOneCommand.Execute(null);
+
+        Assert.Equal("M1", a.DeviceName);
+        Assert.Equal("m1", b.DeviceName);   // Bは変更されない(置換1件のみ)
+        Assert.Single(vm.Document.Devices.ByName);
+        Assert.True(vm.Document.Devices.ByName.ContainsKey("m1"));   // Bがまだ参照するため維持される
+    }
+
+    [Fact]
+    public void ReplaceAllCommand_ExistingTargetDevice_PreservesTargetBomInfo()
+    {
+        // D-2: 全置換の置換先が既存Deviceの場合、そのBOM情報を無条件上書きしないこと(単発置換側の
+        // MigrateOrRegisterDeviceは既存Device保護を持つが、ReplaceAllDeviceNameはDeviceRenamer.Rename
+        // 直呼びのみでこの保護が無く非対称だった)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "M1"));
+        vm.Document.Devices.ByName["M1"] = new Device { Name = "M1", Model = "OLD" };
+        vm.Document.Devices.ByName["M2"] = new Device { Name = "M2", Model = "NEW" };
+        vm.Find.Query = "M1";
+        vm.Find.ReplaceWith = "M2";
+
+        vm.Find.ReplaceAllCommand.Execute(null);
+
+        Assert.Equal("NEW", vm.Document.Devices.ByName["M2"].Model);
+        Assert.False(vm.Document.Devices.ByName.ContainsKey("M1"));
+    }
+
+    [Fact]
+    public void NewDocument_RefreshesFindResults_DoesNotKeepStaleMatches()
+    {
+        // D-4(PR-05型): 新規作成・開く(ReplaceDocument)経路でも、Find.Matchesが旧Document参照の
+        // まま取り残されないこと(B-1対応がApplyUndoRedoSnapshotのみに適用され、ReplaceDocumentへの
+        // 横展開が漏れていた)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(0, 0, "X001"));
+        vm.Find.Query = "X001";
+        Assert.NotEmpty(vm.Find.Matches);
+
+        vm.NewDocument();
+
+        Assert.Empty(vm.Find.Matches);
+    }
+
+    [Fact]
+    public void Next_WhileConnectorDraftPending_DoesNotDiscardDraft()
+    {
+        // D-5: B-2のドラフト保護(RunSearch内の自動JumpToのみ)がNext/Prev/JumpToMatchには適用され
+        // ていなかった。「次へ」ボタン等の明示操作経由でも記入中ドラフトを破棄しないこと。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet = vm.CurrentSheet!;
+        sheet.Elements.Add(MakeContact(2, 2, "X001"));
+        sheet.Elements.Add(MakeContact(3, 2, "X001"));
+        vm.Find.Query = "X001";
+        vm.SelectedCell = new GridPos(5, 5);
+        vm.BeginConnectorDraft();
+        Assert.NotNull(vm.ConnectorDraftPreview);
+
+        vm.Find.NextCommand.Execute(null);
 
         Assert.NotNull(vm.ConnectorDraftPreview);
     }

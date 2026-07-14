@@ -1805,33 +1805,48 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 旧名がこの要素の変更後もう他のどの要素からも参照されなくなる場合は、既存Deviceオブジェクトを
     /// そのまま新名へキー移行しBOM情報(Model/Maker/Quantity)を保持する(DeviceRenamer.Renameのキー
     /// 移行と同型の意図だが、対象はDocument全体の一括リネームではなくこの1要素のみの変更後の参照状況)。
-    /// まだ他要素から旧名が参照されるか新名が既に登録済みの場合は、従来通り新規Deviceを作成する。
     /// キー検索はDeviceRenamer.Rename/RemoveDeviceIfUnreferencedと同じくOrdinalIgnoreCaseで行う
     /// (指摘A-3=既定のOrdinal比較のままだと大文字小文字違いの置換で重複エントリが残る不具合の修正)。
-    /// </summary>
+    /// T-070隠密レビュー指摘D-1(A-3修正の不完全性)対応: 旧名を複数要素が共有している場合
+    /// (oldStillReferenced==true)、旧キーを削除できずキー移行もできないため、素朴に新規Deviceを
+    /// 作ると"m1"(旧)と"M1"(新)が並立してしまっていた(Dictionary&lt;string,Device&gt;自体は
+    /// Ordinal比較のため大文字小文字違いの2キーを区別なく共存させてしまう)。旧名がまだ他要素から
+    /// 参照される場合は、新名が(大文字小文字違い含め)既に登録済みならその既存Deviceをそのまま使い、
+    /// 重複エントリを作らないようにする。</summary>
     private void MigrateOrRegisterDevice(string oldName, string newName, ElementInstance element)
     {
         var oldKey = oldName.Length > 0
             ? Document.Devices.ByName.Keys.FirstOrDefault(k => string.Equals(k, oldName, StringComparison.OrdinalIgnoreCase))
             : null;
         // "m1"->"M1"のような大文字小文字違いの自己リネームでは、newNameの既存キー探索がoldKey自身に
-        // ヒットしてしまう(OrdinalIgnoreCase比較のため)。それは「別枠で既に登録済み」ではなく移行対象
-        // そのものなので、oldKeyと同一なら「既に登録済み」扱いにしない。
+        // ヒットしうる(OrdinalIgnoreCase比較のため)。
         var existingNewKey = Document.Devices.ByName.Keys
             .FirstOrDefault(k => string.Equals(k, newName, StringComparison.OrdinalIgnoreCase));
-        if (existingNewKey is not null && existingNewKey != oldKey) return;
 
         // element自身は呼び出し元(ReplaceOneDeviceName)で既にDeviceName=newNameへ変更済みのため、
         // 同一の判定(自己リネーム時)で誤って「まだ旧名を参照している」と自己ヒットしないよう除外する。
         bool oldStillReferenced = oldName.Length > 0 && Document.Sheets.Any(s =>
             s.Elements.Any(e => e != element && string.Equals(e.DeviceName, oldName, StringComparison.OrdinalIgnoreCase)));
 
-        if (oldKey is not null && !oldStillReferenced && Document.Devices.ByName.Remove(oldKey, out var device))
+        if (oldKey is not null && !oldStillReferenced)
         {
-            device.Name = newName;
+            if (existingNewKey is not null && existingNewKey != oldKey)
+            {
+                // 新名は既に別のDeviceとして登録済み。移行はできないため旧キーのみ削除し、
+                // 既存の新名Deviceは上書きしない(D-2と同種の保護、単発置換側)。
+                Document.Devices.ByName.Remove(oldKey);
+                return;
+            }
+            Document.Devices.ByName.Remove(oldKey, out var device);
+            device!.Name = newName;
             Document.Devices.ByName[newName] = device;
             return;
         }
+
+        // ここに来るのは、旧名エントリが無い、または旧名がまだ他要素から参照される場合。
+        // 新名が(大文字小文字違い含め)既に登録済みならそれをそのまま使い、重複エントリを作らない
+        // (D-1: 旧キー"m1"はBの参照のため残したまま、新規に"M1"は作らない)。
+        if (existingNewKey is not null) return;
 
         Document.Devices.ByName[newName] = new Device { Name = newName, Class = ResolveDeviceClass(element) };
     }
@@ -2383,6 +2398,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         StatusMessage = "";
         Tool = ToolState.SelectDefault;
         OutputPanel.ClearResults();
+        // T-070隠密レビュー指摘D-4(PR-05型): B-1対応(ApplyUndoRedoSnapshot)と同じ理由で、新規作成・
+        // 開く経路でも旧文書のSheet/ElementInstance参照を保持したままの検索結果を整合させる
+        // (放置すると検索結果パネルの行クリックでJumpToが無言returnする同型の沈黙不整合が起きる)。
+        Find.RefreshAfterDocumentReplaced();
         // T-051バグ修正#1(隠密レビューCONFIRMED重大): 無関係な旧文書のUndo/Redo履歴を持ち越すと、
         // 別ファイルへの切替後にUndoで旧文書の状態が復元され、それを保存すると新ファイルパスへ
         // 誤って上書きされるデータ破損事故になる。文書差し替えの入口で必ず履歴を破棄する。
@@ -2576,8 +2595,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         OutputPanel.ClearResults();
         // T-070隠密レビュー指摘B-1: 上記と同じ理由で、旧文書のSheet/ElementInstance参照を保持した
         // ままの検索結果も破棄する(放置すると検索結果パネルの行クリックでJumpToが無言returnする
-        // 同型の沈黙不整合が起きる)。
-        Find.ClearResults();
+        // 同型の沈黙不整合が起きる)。D-3(往復2周目指摘): 単純クリアのみだとUndo後もQueryへ一致する
+        // 要素が実在するのに「0/0」誤表示が残るため、現在のQueryで再検索して整合させる
+        // (JumpToは伴わない、RefreshAfterDocumentReplaced参照)。
+        Find.RefreshAfterDocumentReplaced();
         MarkDirty();
     }
 }
