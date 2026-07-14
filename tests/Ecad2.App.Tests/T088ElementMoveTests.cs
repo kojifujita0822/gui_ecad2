@@ -32,6 +32,30 @@ public class T088ElementMoveTests : ViewModelTestBase
         Assert.True(moved);
         Assert.Equal(new GridPos(5, 6), element.Pos);
         Assert.True(vm.UndoCommand.CanExecute(null));
+        // T-088隠密静的レビュー指摘(findings1): SelectedCellも新しい位置へ追随し、
+        // SelectedElement(SelectedCellから算出)が引き続き同じ要素を指すこと。
+        Assert.Equal(new GridPos(5, 6), vm.SelectedCell);
+        Assert.Same(element, vm.SelectedElement);
+    }
+
+    [Fact]
+    public void MoveSelectedElement_連続移動が2回とも成功する()
+    {
+        // T-088隠密静的レビュー指摘(findings1、最重要の機能不全の直接再現): SelectedCellが
+        // 追随しないと1回目の移動後にSelectedElementがnullになり、2回目のMoveSelectedElementが
+        // 常にfalseを返す(Ctrl+矢印キー連続移動が1回しか効かない)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
+        var element = vm.SelectedElement!;
+
+        bool firstMove = vm.MoveSelectedElement(0, 1);
+        bool secondMove = vm.MoveSelectedElement(0, 1);
+
+        Assert.True(firstMove);
+        Assert.True(secondMove);
+        Assert.Equal(new GridPos(5, 7), element.Pos);
+        Assert.Equal(new GridPos(5, 7), vm.SelectedCell);
     }
 
     [Fact]
@@ -77,6 +101,31 @@ public class T088ElementMoveTests : ViewModelTestBase
         Assert.Equal(new GridPos(7, 8), element.Pos);
         Assert.False(vm.IsDraggingElement);
         Assert.True(vm.UndoCommand.CanExecute(null));
+        // T-088隠密静的レビュー指摘(findings1): 確定後、SelectedCellも新しい位置へ追随すること。
+        Assert.Equal(new GridPos(7, 8), vm.SelectedCell);
+        Assert.Same(element, vm.SelectedElement);
+    }
+
+    [Fact]
+    public void ConfirmDragElement後に再ドラッグできる()
+    {
+        // T-088隠密静的レビュー指摘(findings1): SelectedCellが追随しないと、確定直後に
+        // SelectedElementがnullになり再ドラッグ(BeginDragElement)が実質不可能になる。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
+        var element = vm.SelectedElement!;
+        vm.BeginDragElement(element);
+        vm.UpdateDragElement(new GridPos(7, 8));
+        vm.ConfirmDragElement();
+
+        Assert.NotNull(vm.SelectedElement);
+        vm.BeginDragElement(vm.SelectedElement!);
+        vm.UpdateDragElement(new GridPos(2, 2));
+        vm.ConfirmDragElement();
+
+        Assert.Equal(new GridPos(2, 2), element.Pos);
+        Assert.Equal(new GridPos(2, 2), vm.SelectedCell);
     }
 
     [Fact]
@@ -130,5 +179,43 @@ public class T088ElementMoveTests : ViewModelTestBase
 
         Assert.Equal(new GridPos(5, 5), element.Pos);
         Assert.False(vm.UndoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SelectedCellを外部から変更するとドラッグ中状態がキャンセルされる()
+    {
+        // T-088隠密静的レビュー指摘(findings2): SelectedCellのsetter(唯一のクリア入口一元化
+        // パターン)にForceCancelDragElementIfAnyが組み込まれていることの直接検証。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
+        var element = vm.SelectedElement!;
+        vm.BeginDragElement(element);
+        vm.UpdateDragElement(new GridPos(7, 8));
+
+        vm.SelectedCell = new GridPos(0, 0);
+
+        Assert.False(vm.IsDraggingElement);
+        Assert.Equal(new GridPos(5, 5), element.Pos);
+    }
+
+    [Fact]
+    public void DeleteSelectedElement_ドラッグ中の要素を削除するとドラッグ状態もクリアされる()
+    {
+        // T-088隠密静的レビュー指摘(findings5): DeleteSelectedElementはSelectedCellのsetterを
+        // 経由しないため、findings2の対処だけでは横展開されない箇所への直接検証。BeginDragElement
+        // 直後(まだ位置未変更、SelectedCellと要素実位置が一致する状態)でDeleteキー相当を呼ぶ
+        // シナリオ(UpdateDragElementで位置を動かすとSelectedElementがSelectedCellから算出
+        // できなくなり別のバグ(findings1)を誘発してしまうため、それとは独立に検証する)。
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
+        var element = vm.SelectedElement!;
+        vm.BeginDragElement(element);
+
+        bool deleted = vm.DeleteSelectedElement();
+
+        Assert.True(deleted);
+        Assert.False(vm.IsDraggingElement);
     }
 }

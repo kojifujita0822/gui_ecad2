@@ -368,6 +368,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedConnectionDot = null;
             // T-064: 画像も同様に扱う。
             SelectedImage = null;
+            // T-088隠密静的レビュー指摘(findings2): 要素のドラッグ中状態(_draggingElement)も同様に
+            // クリアする。SelectedElementはSelectedCellからの算出プロパティで専用setterを持たない
+            // ため、他のSelected*と異なりここで明示的に呼ぶ必要がある。SetCurrentSheetIndexCore・
+            // ApplyUndoRedoSnapshotはいずれもこのsetter経由でSelectedCellを更新するため、ここへの
+            // 追加だけで両経路とも横展開される(findings3・findings4を一挙に解消)。
+            ForceCancelDragElementIfAny();
             // T-041増分2隠密レビュー指摘(観点3 CONFIRMED、所見E=増分1所見Aの反復): 記入中
             // (_connectorDraft)はSelectedCellとは別枠の状態だったため、CurrentSheetIndexの
             // シート切替経由でSelectedCellがクリアされてもTool/_connectorDraftが残留し、
@@ -1378,6 +1384,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             UndoManager.RecordSnapshot(Document);
             element.Pos = confirmedPos;
             MarkDirty();
+            // T-088隠密静的レビュー指摘(findings1、最重要): SelectedElementはSelectedCellから
+            // 位置逆算する算出プロパティのため、element.Posのみ書き換えるとSelectedCellが古い
+            // 位置のまま残り、移動直後にSelectedElementが自分自身を見失いnullを返す(Ctrl+矢印
+            // キー連続移動・再ドラッグが効かなくなる)。ドラッグ状態を先にクリアしてからSelectedCell
+            // を更新する(setter経由のForceCancelDragElementIfAnyが確定直後の自分自身をキャンセル
+            // 扱いしないための順序)。
+            _draggingElement = null;
+            SelectedCell = confirmedPos;
+            return;
         }
         _draggingElement = null;
     }
@@ -1398,6 +1413,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         UndoManager.RecordSnapshot(Document);
         element.Pos = newPos;
         MarkDirty();
+        // T-088隠密静的レビュー指摘(findings1、最重要): ConfirmDragElementと同じ理由でSelectedCell
+        // を新しい位置へ追随させる(でないとCtrl+矢印キー連続移動が1回しか効かなくなる)。
+        SelectedCell = newPos;
         return true;
     }
 
@@ -1873,6 +1891,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         string? deviceName = el.DeviceName;
         sheet.Elements.Remove(el);
         MarkDirty();
+        // T-088隠密静的レビュー指摘(findings5): 削除対象がドラッグ中の要素だった場合に備え、
+        // ドラッグ中状態を明示的にクリアする(DeleteSelectedElementはSelectedCellのsetterを経由
+        // しないため、findings2の対処だけでは横展開されない)。
+        ForceCancelDragElementIfAny();
 
         if (deviceName is not null) RemoveDeviceIfUnreferenced(deviceName);
 
