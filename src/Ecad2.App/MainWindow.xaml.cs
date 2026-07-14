@@ -1280,8 +1280,13 @@ public partial class MainWindow : Window
             // IsDefault)で処理されるため本ガードの影響を受けず、ここで個別処理してもバッティングしない。
             if (e.Key == Key.Escape && _viewModel.Find.IsVisible)
             {
+                // T-070隠密独立調査(A-7再発、ecad2-t070-a7-escape-double-press-investigation-onmitsu.md):
+                // e.Handled=trueにするとWPF標準のAccessKeyManager(配置バーIsCancelボタンのEscape検出、
+                // PostProcessInput経由)がPostProcessInput到達時点でHandled=trueのため丸ごとスキップ
+                // され、配置バーが1回目のEscapeで閉じなかった。ClosePlacementBar()を明示的に呼び、
+                // 検索バー・配置バーとも1回のEscapeで対称に閉じるようにする(FocusCanvas()も内包)。
                 _viewModel.Find.IsVisible = false;
-                FocusCanvas();
+                ClosePlacementBar();
                 e.Handled = true;
             }
             return;
