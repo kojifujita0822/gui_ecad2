@@ -6,6 +6,10 @@
     <ProjectReference Include="..\Ecad2.Pdf\Ecad2.Pdf.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Dirkster.AvalonDock" Version="4.74.1" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

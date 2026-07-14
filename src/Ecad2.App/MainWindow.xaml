@@ -6,6 +6,7 @@
         xmlns:local="clr-namespace:Ecad2.App"
         xmlns:views="clr-namespace:Ecad2.App.Views"
         xmlns:converters="clr-namespace:Ecad2.App.Converters"
+        xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown"
@@ -429,33 +430,49 @@
 
             <!-- 左パレット: シートナビゲーション(T-026)。GuiEcadのナビツリー調査結果を踏襲し、
                  実質フラットリスト(1シート=1ノード、階層なし)とする。部品選択は右パネルへ移設予定
-                 (T-026段階4、案B=状況依存切替)。 -->
-            <Border x:Name="LeftPaletteArea" Grid.Column="0" BorderBrush="Gray" BorderThickness="0,0,1,0">
-                <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="シート" FontWeight="Bold" Margin="4"/>
-                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="4">
-                        <Button x:Name="AddSheetButton" Content="＋" Width="28" ToolTip="シート追加"
-                                Click="AddSheetButton_Click"/>
-                        <Button x:Name="DeleteSheetButton" Content="－" Width="28" Margin="4,0,0,0" ToolTip="シート削除"
-                                Command="{Binding SheetNavigation.DeleteCommand}"/>
-                        <Button x:Name="RenameSheetButton" Content="名前変更" Margin="4,0,0,0" ToolTip="シート名変更"
-                                Click="RenameSheetButton_Click"/>
-                        <Button x:Name="SheetSettingsButton" Content="設定" Margin="4,0,0,0"
-                                ToolTip="シート設定(行数・母線名)" Click="SheetSettingsButton_Click"/>
-                    </StackPanel>
-                    <!-- T-082: ドラッグ&ドロップ並び替え(殿裁定「案A」=標準フィードバック)。
-                         AllowDrop+Preview系マウスイベント+DragOver/Dropはコードビハインドで処理する
-                         (WPFのListBoxに標準並び替え機能は無く明示実装、Explore調査で確認済み)。 -->
-                    <ListBox x:Name="SheetNavList" ItemsSource="{Binding SheetNavigation.Sheets}"
-                             SelectedItem="{Binding SheetNavigation.SelectedSheet}"
-                             DisplayMemberPath="Name" BorderThickness="0" AllowDrop="True"
-                             PreviewMouseLeftButtonDown="SheetNavList_PreviewMouseLeftButtonDown"
-                             PreviewMouseMove="SheetNavList_PreviewMouseMove"
-                             DragOver="SheetNavList_DragOver"
-                             DragLeave="SheetNavList_DragLeave"
-                             Drop="SheetNavList_Drop"/>
-                </DockPanel>
-            </Border>
+                 (T-026段階4、案B=状況依存切替)。
+                 T-058増分1: AvalonDock導入。DockingManagerは当面この列(左パレット)のみを管理し、
+                 増分2/3で出力パネル・右パネルを順次このDockingManagerへ追加していく土台とする
+                 (キャンバス列のFindBarオーバーレイ座標系への影響を避けるため、案Aを一段絞った設計、
+                 家老裁可済み)。既存のDockPanel中身(シート追加/削除/名前変更/設定ボタン・
+                 D&D並び替え対応ListBox)はそのままLayoutAnchorableへ移植。 -->
+            <avalonDock:DockingManager x:Name="LeftPaletteDockingManager" Grid.Column="0">
+                <avalonDock:LayoutRoot>
+                    <!-- LayoutRoot.RootPanelはLayoutPanel型必須(LayoutAnchorablePaneを直接子には
+                         できない、実機確認で発覚したXamlParseException)。単一ペインでも
+                         LayoutPanelで包む。 -->
+                    <avalonDock:LayoutPanel Orientation="Horizontal">
+                        <avalonDock:LayoutAnchorablePane>
+                            <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Text="シート" FontWeight="Bold" Margin="4"/>
+                                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="4">
+                                        <Button x:Name="AddSheetButton" Content="＋" Width="28" ToolTip="シート追加"
+                                                Click="AddSheetButton_Click"/>
+                                        <Button x:Name="DeleteSheetButton" Content="－" Width="28" Margin="4,0,0,0" ToolTip="シート削除"
+                                                Command="{Binding SheetNavigation.DeleteCommand}"/>
+                                        <Button x:Name="RenameSheetButton" Content="名前変更" Margin="4,0,0,0" ToolTip="シート名変更"
+                                                Click="RenameSheetButton_Click"/>
+                                        <Button x:Name="SheetSettingsButton" Content="設定" Margin="4,0,0,0"
+                                                ToolTip="シート設定(行数・母線名)" Click="SheetSettingsButton_Click"/>
+                                    </StackPanel>
+                                    <!-- T-082: ドラッグ&ドロップ並び替え(殿裁定「案A」=標準フィードバック)。
+                                         AllowDrop+Preview系マウスイベント+DragOver/Dropはコードビハインドで処理する
+                                         (WPFのListBoxに標準並び替え機能は無く明示実装、Explore調査で確認済み)。 -->
+                                    <ListBox x:Name="SheetNavList" ItemsSource="{Binding SheetNavigation.Sheets}"
+                                             SelectedItem="{Binding SheetNavigation.SelectedSheet}"
+                                             DisplayMemberPath="Name" BorderThickness="0" AllowDrop="True"
+                                             PreviewMouseLeftButtonDown="SheetNavList_PreviewMouseLeftButtonDown"
+                                             PreviewMouseMove="SheetNavList_PreviewMouseMove"
+                                             DragOver="SheetNavList_DragOver"
+                                             DragLeave="SheetNavList_DragLeave"
+                                             Drop="SheetNavList_Drop"/>
+                                </DockPanel>
+                            </avalonDock:LayoutAnchorable>
+                        </avalonDock:LayoutAnchorablePane>
+                    </avalonDock:LayoutPanel>
+                </avalonDock:LayoutRoot>
+            </avalonDock:DockingManager>
 
             <!-- IsTabStop=Falseはタブオーダーからの除外のみ(懸念4の迷い込み先解消、T-021設計集約
                  プラン根拠4)。Focusable自体は既定のtrueのまま残し矢印キーでのリサイズは温存する。 -->
