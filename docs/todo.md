@@ -27,6 +27,13 @@
 **着手前調査要**：GuiEcad側の実装形式（数値入力かドロップダウン等）・既存プロパティパネルの
 「機器名」「コメント」欄と同型UIで足りるか、を隠密へ調査依頼予定。UI/UX分岐（入力形式・ラベル・
 既存T-061 A-1/G-1タスクとの関係整理）は着手時に殿確認【MUST】。
+**調査完了（2026-07-14、`docs/ecad2-t086-select-switch-position-ui-survey-onmitsu.md`）**：
+GuiEcadはプロパティパネル内Kind別条件分岐の専用数値入力（WinUI NumberBox、0-99）で実装、ecad2は
+同種のKind別プロパティUIが皆無につき本件が最初の実装例。侍の副産物調査（サンプル図面のSS1要素は
+Params空、Position書き込み経路が皆無と実測込みで裏付け）とも整合。**殿裁定（2026-07-14）＝入力
+形式はTextBox+数値バリデーション（DeviceNameBox同型）、範囲制約はGuiEcad踏襲(0〜99)**。侍へ実装
+采配済み（押しボタン調査と並行、順序は侍裁量）。副次効果：本UI完了で`CycleSelectSwitch`の
+positions常に空集合問題（T-061観点1判定不能の一因）も解消見込み。
 
 ### T-083 ダークモード搭載（AvalonDock連動、T-058と同時実装） — Approved（gated、殿直接指示2026-07-12）
 
