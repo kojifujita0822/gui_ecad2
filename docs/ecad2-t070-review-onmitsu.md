@@ -238,3 +238,100 @@ Document変更を伴う操作はReplaceOne/ReplaceAllのみで、両者ともA-1
 ## 結論(往復2周目時点)
 
 **要再修正5件(D-1〜D-5、全てCONFIRMED)+cleanup3件**。侍への差し戻しを推奨する。
+
+---
+
+## E群: 往復3周目レビュー(コミットaf9d1fa、2026-07-14、D-1〜D-5修正への追加検証)
+
+D-1〜D-5修正(af9d1fa)の実装確認+`code-review`スキル(--effort high、5エージェント)+追加verify2件。
+**新規に1件の重大バグ(E-1)を発見**。4周目回避のため特に慎重に検証したが、報告を避けられない重大度。
+
+### E-1(最重要・新規、CONFIRMED): RefreshAfterDocumentReplacedのCurrentIndexリセットが、Undo後の誤爆置換を招く
+
+- **file**: `src/Ecad2.App/ViewModels/FindViewModel.cs`(`RunSearch`/`RefreshAfterDocumentReplaced`)+
+  `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`(`ApplyUndoRedoSnapshot`)
+- D-3対応で追加された`RunSearch(bool allowJump = true)`は、`allowJump=false`でも`CurrentIndex = Matches.Count > 0 ? 0 : -1;`を無条件実行する(スキップされるのは`JumpTo`呼び出しのみ)。一方
+  `ApplyUndoRedoSnapshot`はSelectedCellを明示的に保持する設計(殿裁定、Undo/RedoはSelectedCellを
+  巻き戻さない)。この結果、Next/Prevで検索結果の2件目(B)へジャンプ済み(SelectedCell=B、
+  CurrentIndex=1)の状態で無関係な編集をUndoすると、`Find.RefreshAfterDocumentReplaced()`が
+  `CurrentIndex`を強制的に0(A)へ巻き戻す一方、SelectedCellはBのまま据え置かれる。
+- **failure_scenario**: 上記の状態で、画面上はB(SelectedCellのハイライト)が選択されて見えるのに、
+  ここで「置換」ボタン(ReplaceOneCommand)を押すと`CurrentMatch`(=Matches[0]=A)が対象になり、
+  **ユーザーが意図していないA(画面上非選択)が書き換わり、選択しているつもりのBは変更されない**。
+  検証エージェントが`FindResultsGrid`の行ハイライトバインディング有無も確認したが、検索結果パネル
+  には`SelectedItem`連動が無く、キャンバス上のSelectedCellが実質唯一の視覚的「現在位置」手掛かりの
+  ため、「表示とCurrentMatchは一致するので実害なし」という反論は成立しないと判定。
+- D-3(RefreshAfterDocumentReplaced導入)が生んだ新しい副作用であり、D-1〜D-5そのものの再発ではない。
+
+### E-2(軽微、CONFIRMED、実害は表示のみ): D-1の保護分岐でDevice.Nameの表記が更新されないまま残る
+
+- **file**: `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`(`MigrateOrRegisterDevice`、1849行付近)
+- 旧名を複数要素が共有し(oldStillReferenced=true)、かつ大文字小文字違いの自己リネームで
+  `existingNewKey`が`oldKey`自身にヒットする場合、`if (existingNewKey is not null) return;`が
+  成立し`Device.Name`もキーも更新されない。要素側の表示(盤面、"M1")と機器表側の表示
+  (`Device.Name`、"m1"のまま)が食い違って残る。
+- **実害評価**: シミュレーション側は`Device.Name`ではなく要素自身の`DeviceName`文字列を直接見るため
+  機能的な動作(通電判定等)には影響しない。機器表(BOM)の表示列が食い違うのみ。「置換1件のみ」
+  という殿裁定(機器名の一意性は保証しない設計)の一時的な副産物であり、D-1が解決した「重複エントリ」
+  問題そのものの再発ではないため、修正の要否は家老・殿判断でよい(緊急性は低い)。
+
+### E群cleanup(簡易確認、優先度低)
+
+- `MigrateOrRegisterDevice`の`Document.Devices.ByName.Remove(oldKey, out var device); device!.Name = newName;`が、Removeの戻り値(bool)を無視しnull免除演算子(!)で握りつぶしている。現状は到達不能だが将来の変更でNullReferenceExceptionの罠になりうる。
+- 「置換先が既存Deviceなら上書きしない」保護ロジックが`MigrateOrRegisterDevice`(App層)と
+  `DeviceRenamer.Rename`(Core層)に独立実装され重複(Reuse)。将来3本目のリネーム経路が追加された際に
+  同型の保護漏れが再発するリスク(rule of three関連)。
+- OrdinalIgnoreCaseキー線形探索(`Keys.FirstOrDefault`)が計5箇所(RemoveDeviceIfUnreferenced・
+  MigrateOrRegisterDevice2箇所・DeviceRenamer.Rename2箇所)に複製、rule of three超過の疑い。
+
+### DoD確認結果
+
+- DoD1(D-1〜D-5の実装確認): 5件とも指摘どおり実装されている(E-1はD-3実装が生んだ別の新規副作用)。
+- DoD2(D-2自己リネームケース): `DeviceRenamer.Rename`の`existingToKey == key`分岐で自己リネームを
+  正しく通常のキー移行として扱えることを確認、妥当。
+- DoD3(RED先行証明5件の妥当性): 5件全て個別精査、直前コミット(218a769)で確実にFAILすることを
+  論理確認、検出力に疑義なし。
+- DoD4(code-review併用): 実施済み(5エージェント+追加verify2件)。
+- DoD5(4周目回避への配慮): 結果としてE-1という新規の重大バグが見つかり、往復4周目の修正が必要な
+  状況になった。これはD-1〜D-5の往復3周目修正そのものではなく、D-3(RefreshAfterDocumentReplaced)
+  という新設ロジックが生んだ別の副作用であり、見逃せば実データ破損(意図しない機器名の書き換え)に
+  直結するため報告する。
+
+## 結論(往復3周目時点)
+
+**D-1〜D-5は概ね正しく修正されている**が、**E-1(誤爆置換、重大)の追加修正が必要**。E-2・cleanupは
+緊急性低。E-1の対処案としては、`RunSearch(allowJump: false)`実行時に`CurrentIndex`を「Matchesの中に
+SelectedCellと一致する要素があればそのインデックス、無ければ0」へ設定する(SelectedCellとの整合性を
+保つ)方式が単純か。侍への差し戻しを推奨する。
+
+---
+
+## F群: 往復4周目レビュー(コミット6184e29、2026-07-14、E-1修正の確認・決着)
+
+`IndexOfSelectedCellOrZero`新設によるE-1修正を`code-review`スキル(--effort high、3エージェント+
+sweep)で検証。**correctness bugは0件**(3エージェント独立確認、実装は隠密の対処案どおり正しい)。
+
+### RED先行証明2件の妥当性・侍の自己申告の正確性
+
+- `ReplaceOneCommand_AfterUndoWhileJumpedToSecondMatch_ReplacesSelectedCellNotFirstMatch`(誤爆置換
+  再現): 直前実装(af9d1fa、CurrentIndexが無条件で0)で確実にFAILすることを論理確認、検出力あり。
+- `RunSearch_AfterUndo_NoMatchAtSelectedCell_FallsBackToFirstMatch`(境界値): **侍の自己申告(「旧実装
+  でも偶然合格し検出力なし」)は正確と確認**。「一致無し→0を返す」という新実装のフォールバック
+  分岐が、旧実装の「無条件0」と数学的に一致するため構造的に判別不能(要素数・SelectedCell位置に
+  関わらず常に成立)。回帰確認テストとして残す判断は妥当。
+
+### 気づき(修正不要、参考記録)
+
+- `IndexOfSelectedCellOrZero`のシート比較条件(`Document.Sheets.IndexOf(...) == CurrentSheetIndex`)を
+  専用に検証するテストが無い(複数シートに同座標・同名要素があるケースが未検証)。現状のロジック
+  自体は正しいと確認済みだが、将来この条件がリファクタリングで誤って削除された場合、E-1と同型の
+  誤爆が再発してもテストでは検出できない隙間がある。緊急性なし、次にこの周辺へ手を入れる際の
+  参考情報として記録。
+- cleanup(三項演算子ネストの可読性・既存SelectedElement解決ロジックとの重複・CurrentIndexと
+  SelectedCellの二重状態管理)は軽微、E-2・往復2周目cleanupと合わせて家老裁定どおり対象外のまま。
+
+## 結論(往復4周目・最終)
+
+**E-1修正は正しく実装されており、correctness bugは無し。T-070は決着**。侍の自己申告(検出力なし
+テストの正直な報告)も正確と確認。テストギャップ1件(気づき)を記録したが修正は不要、次回この周辺に
+手を入れる際の参考情報に留める。実機確認は殿指示により後日持ち越し。
