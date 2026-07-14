@@ -187,8 +187,25 @@ function Find-Ecad2Element {
 # 選択・テキスト入力(ValuePattern.SetValue)で完結する検証は極力この経路を使い、
 # Send-Ecad2Keys/Invoke-Ecad2ScreenClick系（フォーカス・カーソルを強制的に奪う）は
 # キーボードショートカット自体の検証・キャンバス内座標操作等、代替手段が無い場面に限定すること。
+#
+# -ClickFallback: SelectionChangedバインドを持たず、ItemContainerStyleの
+# PreviewMouseLeftButtonDownイベントハンドラのみで選択処理する要素（PartSelectionList等、
+# 同一項目の再選択を成立させる意図的パターン）向け。SelectionItemPattern.Select()は別プロセスの
+# COMプロキシ越しの呼び出しであり、対象のUIElementへ実マウスイベントを発火させないため
+# PreviewMouseLeftButtonDownハンドラが起動しない（2026-07-14、T-061検証で実証。RaiseEventでの
+# イベント合成はプロセス境界を越えられず原理的に不可能なため採用せず）。指定時は要素の中心座標へ
+# 物理クリック（Invoke-Ecad2ScreenClick相当）を送ることでハンドラを確実に発火させる。
+# 【フォーカス強奪注意】物理クリックのためフォーカスを占有する。既定（スイッチ未指定時）の
+# Invoke/Select/Toggle経路には一切影響しない。
 function Invoke-Ecad2Element {
-    param([Parameter(Mandatory)]$Element)
+    param([Parameter(Mandatory)]$Element, [switch]$ClickFallback)
+    if ($ClickFallback) {
+        $r = $Element.Current.BoundingRectangle
+        $cx = [int]($r.X + $r.Width / 2)
+        $cy = [int]($r.Y + $r.Height / 2)
+        Invoke-Ecad2ScreenClick -X $cx -Y $cy
+        return $true
+    }
     $ip = $null
     if ($Element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$ip)) {
         $ip.Invoke(); return $true
