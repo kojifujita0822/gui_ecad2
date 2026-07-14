@@ -51,6 +51,7 @@ ECAD2プロジェクト（`C:\ECAD2\`、WPF/.NET 8）で、家老から委譲さ
 - If the task adds or changes a document/sheet-configuration-changing process（`ReplaceDocument`・シート追加/削除/並べ替え等）, You MUST check the 4-point state reset checklist（UndoManagerクリア・OutputPanelクリア・SelectedSheet通知・SelectedCell再クランプ）, because T-051・T-055増分1で状態クリア責務への追従漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「文書/シート構成変更処理の状態リセットチェックリスト」、台帳PR-05）
 - If you notice the same logic duplicated a third time (rule of three), You SHOULD report it to 家老 and ask whether to consolidate into a shared helper, because T-055・T-060で複製箇所の一部だけ修正され取りこぼした実害があるため（台帳PR-07）
 - If the task introduces a new application-wide mode（`AppMode`等）, You MUST enumerate all input pathways（マウスイベントハンドラ・グローバルキーボードショートカット・メニューCanExecute・ツールバーIsEnabled・Undo/Redo・テキスト編集欄・右クリックコンテキストメニュー）before applying the gate, because T-061で同一タスク内2周連続で、マウス側のみガードし機器名編集欄・画像挿入メニューへの適用漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「新規上位モード導入時の全入力経路列挙チェックリスト」、台帳PR-12）
+- If the task adds a new feature/command/keyboard shortcut to an application that already has an established unified gate（`CanEditDiagram`・`HasProject`等）, You MUST verify the new feature's CanExecute/IsEnabled/execution condition references that gate（特にモード遷移自体をトリガーする機能は、そのトリガー自体に既存の前提条件が掛かっているか個別確認）, because T-070のReplaceOne/ReplaceAllCommand・T-087のCtrl+Tショートカットの2件で、既存ゲートを迂回してモード中に禁止すべき操作が実行できてしまう同型バグが独立に再発したため（詳細=`docs-notes/roles/samurai.md`「既存統一ゲートへの新機能接続確認」、台帳PR-13）
 
 ### 3. ビルド検証
 ソリューション全体をビルドする。
