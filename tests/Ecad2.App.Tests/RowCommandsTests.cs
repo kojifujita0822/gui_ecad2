@@ -78,6 +78,23 @@ public class RowCommandsTests : ViewModelTestBase
         Assert.False(vm.AddRowCommand.CanExecute(null));
     }
 
+    /// <summary>
+    /// T-090回帰テスト(隠密指摘P-090、PR-13型)。MainWindow.xaml.csのCtrl+Shift+Upハンドラが
+    /// CanExecuteを経由せず直接Executeしていたため、テストモード中でもキーボード経由で行追加が
+    /// 実行できてしまっていた。本テストはCanExecute自体がCanEditDiagram(Mode==Drawing)を
+    /// 見ていることを検証する(View層のキーボードハンドラ配線自体はコードビハインドでテスト基盤
+    /// が無いため対象外、忍者の実機確認に委ねる)。
+    /// </summary>
+    [Fact]
+    public void AddRowCommand_CanExecute_ReturnsFalse_WhenModeIsTest()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.Mode = AppMode.Test;
+
+        Assert.False(vm.AddRowCommand.CanExecute(null));
+    }
+
     [Fact]
     public void DeleteRowCommand_Execute_DecreasesRowsByOne()
     {
@@ -143,6 +160,18 @@ public class RowCommandsTests : ViewModelTestBase
     public void DeleteRowCommand_CanExecute_ReturnsFalse_WhenNoCurrentSheet()
     {
         var vm = CreateViewModel();
+
+        Assert.False(vm.DeleteRowCommand.CanExecute(null));
+    }
+
+    /// <summary>T-090回帰テスト。上記AddRowCommand版と同事情(Mode==TestならCanEditDiagramがfalse)。</summary>
+    [Fact]
+    public void DeleteRowCommand_CanExecute_ReturnsFalse_WhenModeIsTest()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.CurrentSheet!.Grid.Rows = 10;
+        vm.Mode = AppMode.Test;
 
         Assert.False(vm.DeleteRowCommand.CanExecute(null));
     }

@@ -1529,38 +1529,42 @@ public partial class MainWindow : Window
             // T-070隠密レビュー指摘A-6: 以下F5〜F10の配置ショートカットは他の同種ケース(F2/Delete/
             // 矢印キー等)と異なりIsCanvasFocused()を持たず非対称だった。FindQueryBox等にフォーカスが
             // ある状態でもF5等が素通しで成立し、意図せず要素が配置されてしまっていた。
-            case Key.F5 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            // T-091修正(隠密指摘P-093、T-087のF11実装=ActivateAndFocusPartSelection/
+            // ShouldSuppressPartSelectionActivationと同型): case guardが!HasAnyDraftを見ておらず、
+            // 記入中(縦コネクタ/自由線/画像挿入ドラフト中)でも配置バーが開いてしまいドラフトが
+            // キャンセルされず宙に浮いていた。
+            case Key.F5 when noModifier && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("a接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F6 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F6 when noModifier && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("b接点", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F5 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F5 when shift && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("a接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F6 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F6 when shift && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("b接点", isOr: true);
                 e.Handled = true;
                 break;
-            case Key.F7 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F7 when noModifier && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("コイル", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F8 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F8 when noModifier && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 TryPlaceBuiltin("端子台", isOr: false);
                 e.Handled = true;
                 break;
-            case Key.F9 when noModifier && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F9 when noModifier && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 // T-041増分5: F9で自由線(横線)手動記入モードを開始する(主回路シート限定、
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A」)。制御回路シートでは
                 // 当面未使用(原案どおり、自動横配線があるため対応する手動記入は無い)。
                 TryBeginFreeLineDraft(horizontal: true);
                 e.Handled = true;
                 break;
-            case Key.F9 when shift && IsCanvasFocused() && _viewModel.CanEditDiagram:
+            case Key.F9 when shift && IsCanvasFocused() && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 // T-041増分2/5: sF9はシート種別で対象が切替わる(殿裁定「シート種別で自動切替」)。
                 // 制御回路シート→縦コネクタ手動記入、主回路シート→自由線(縦線)手動記入。
                 if (_viewModel.CurrentSheet is Ecad2.Model.Sheet sf9Sheet && sf9Sheet.MainCircuit)
@@ -1569,7 +1573,7 @@ public partial class MainWindow : Window
                     TryBeginConnectorDraft();
                 e.Handled = true;
                 break;
-            case Key.System when noModifier && IsCanvasFocused() && e.SystemKey == Key.F10 && _viewModel.CanEditDiagram:
+            case Key.System when noModifier && IsCanvasFocused() && e.SystemKey == Key.F10 && ShouldAllowShortcutPlacement(_viewModel.CanEditDiagram, _viewModel.HasAnyDraft):
                 // T-041増分3/5: F10もシート種別で対象が切替わる(制御回路→配線分断、主回路→接続点)。
                 // `ecad2-t041-key-flow-proposal-samurai.md`4節・殿裁定「案A・F10」。
                 // 忍者実機発見(F10無反応・メインメニューへフォーカス移動)への対処: F10はAlt併用
@@ -1820,12 +1824,17 @@ public partial class MainWindow : Window
                 break;
             case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
                 // T-055増分1: 末尾行を1行追加する(ツールバー「行を追加」ボタンと同一コマンド)。
-                _viewModel.AddRowCommand.Execute(null);
+                // T-090修正(隠密指摘P-090、PR-13型): CanExecute(CanEditDiagram含む)を経由せず直接
+                // Executeしていたため、テストモード中等でもキーボード経由で行追加が実行できてしまって
+                // いた(Execute内の安全弁は行数上限のみでCanEditDiagramはカバーしていない、T-061修正
+                // A-3のUndo/Redo同型パターン踏襲)。
+                if (_viewModel.AddRowCommand.CanExecute(null)) _viewModel.AddRowCommand.Execute(null);
                 e.Handled = true;
                 break;
             case Key.Down when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
                 // T-055増分1: 末尾行を1行削除する(ツールバー「行を削除」ボタンと同一コマンド)。
-                _viewModel.DeleteRowCommand.Execute(null);
+                // T-090修正: 上記AddRowCommandと同事情。
+                if (_viewModel.DeleteRowCommand.CanExecute(null)) _viewModel.DeleteRowCommand.Execute(null);
                 e.Handled = true;
                 break;
         }
@@ -2726,6 +2735,11 @@ public partial class MainWindow : Window
     // Dispatcher/UI要素依存部分から判定ロジックを切り離す)。
     internal static bool ShouldSuppressPartSelectionActivation(bool canEditDiagram, bool hasAnyDraft)
         => !canEditDiagram || hasAnyDraft;
+
+    // T-091修正(隠密指摘P-093): F5〜F10グローバルショートカットのcase guard判定を
+    // internal static抽出し単体テスト可能にする(ShouldSuppressPartSelectionActivationと同型パターン)。
+    internal static bool ShouldAllowShortcutPlacement(bool canEditDiagram, bool hasAnyDraft)
+        => canEditDiagram && !hasAnyDraft;
 
     internal static bool ShouldReactivateToolForPartSelection(ViewModels.ToolMode currentToolMode)
         => currentToolMode != ViewModels.ToolMode.PlaceElement;
