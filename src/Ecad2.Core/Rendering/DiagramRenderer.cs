@@ -305,6 +305,8 @@ public sealed class DiagramRenderer
         DrawFrames(r, sheet, rowStart, rowEnd, totalRows);
         foreach (var e in sheet.Elements)
             if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs, elementConducting);
+        if (sim is not null)
+            DrawTimerCountdowns(r, sheet, netlist, sim, energized, rowStart, rowEnd);
         DrawRungComments(r, sheet, columns, rowStart, rowEnd);
 
         if (scaled) r.PopTransform();
@@ -1031,6 +1033,45 @@ public sealed class DiagramRenderer
         }
 
         DrawElementLabel(r, e, lb, rb, width, resolvedKind);
+    }
+
+    /// <summary>テストモード中、計時中の限時タイマ接点(TimerContactNO/NC)の上に残り時間
+    /// (Setpoint-TimerElapsed)を小窓表示する(殿直接要求2026-07-15、GuiEcad完全踏襲、
+    /// GuiEcad.App/MainPage.Drawing.cs DrawTimerCountdowns移植)。瞬時接点(TimerInstantContactNO/NC)
+    /// は対象外(殿指摘=瞬時接点に設定時間は不要)。時限到達後(残り時間0以下)は接点が既に動作済みの
+    /// ため非表示。</summary>
+    private void DrawTimerCountdowns(IRenderer r, Sheet sheet, Netlist netlist, SimState sim,
+                                      Dictionary<string, bool>? energized, int rowStart, int rowEnd)
+    {
+        if (energized is null) return;
+        foreach (var e in sheet.Elements)
+        {
+            if (e.Pos.Row < rowStart || e.Pos.Row >= rowEnd) continue;
+            if (e.DeviceName is not string dev) continue;
+            if (!PartResolver.CreatesComponent(e, _lib)) continue;
+            var kind = PartResolver.ComponentKind(e, _lib);
+            if (kind is not (ElementKind.TimerContactNO or ElementKind.TimerContactNC)) continue;
+            if (!netlist.TimerSetpoints.TryGetValue(dev, out double sp)) continue;
+            if (!energized.TryGetValue(dev, out var on) || !on) continue;
+
+            double elapsed = sim.TimerElapsed.TryGetValue(dev, out var t) ? t : 0;
+            double remaining = Math.Max(0, sp - elapsed);
+            if (remaining <= 0) continue;
+
+            var (l, right) = PartResolver.BoundarySpan(e, _lib);
+            double cx = (X(l) + X(right)) / 2;
+            double cy = YRow(e.Pos.Row) - Cell * 1.15;
+            double w = Cell * 1.15, h = Cell * 0.55;
+            var rect = new Rect2D(cx - w / 2, cy - h / 2, w, h);
+            r.FillRectangle(rect, new Color(230, 255, 246, 200));
+            r.DrawRectangle(rect, new StrokeStyle(new Color(255, 235, 170, 70), 0.25));
+            var ts = _theme.Text(TextRole.LineNumber) with
+            {
+                FontSizeMm = 2.4, Bold = true, HAlign = HAlign.Center, VAlign = VAlign.Middle,
+                Color = new Color(255, 30, 30, 30),
+            };
+            r.DrawText(remaining.ToString("0.0") + "s", new Point2D(cx, cy), ts);
+        }
     }
 
     /// <summary>配置プレビュー用に1要素を指定色（半透明可）で描く。Render の後に呼ぶこと

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Linq;
 using System.Windows.Input;
 using Ecad2.App.Commands;
@@ -399,6 +400,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedElementNotchPosition));
                 OnPropertyChanged(nameof(IsSelectedElementLamp));
                 OnPropertyChanged(nameof(SelectedElementLampColor));
+                OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
+                OnPropertyChanged(nameof(SelectedElementSetpoint));
+                OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -1912,6 +1916,75 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>SelectedElementがタイマ限時接点(NO/NC計2種)か(T-096、プロパティパネルの
+    /// 設定時間入力欄表示制御用)。殿直接指摘(2026-07-15)＝**瞬時接点(TimerInstantContactNO/NC)に
+    /// 設定時間は不要**(瞬時=遅延なしで切り替わる接点のため、プリセット時間の概念自体が無関係)。
+    /// 加えて殿訂正(同日)＝タイマーコイル本体(ElementKind.Timer)は仕様として存在しない。
+    /// よって対象は限時接点2種のみに絞る。IsRealContactElementと同型、PartResolver.ComponentKind
+    /// 直接判定で瞬時接点・その他種別を除外する(ResolveDeviceClass経由のDeviceClass.Timerは
+    /// 限時/瞬時を区別できないため使わない)。</summary>
+    public bool IsSelectedElementTimerRelated
+        => SelectedElement is ElementInstance selEl
+           && PartResolver.CreatesComponent(selEl, PartLibrary)
+           && PartResolver.ComponentKind(selEl, PartLibrary) is ElementKind.TimerContactNO or ElementKind.TimerContactNC;
+
+    /// <summary>Setpoint編集対象の実要素を解決する(T-096)。殿訂正によりスコープ簡略化＝
+    /// タイマーコイル本体が存在しないため同名コイル検索は不要、選択要素自身を返すだけでよい
+    /// (通常のコイル(リレー等)と接点はDeviceName一致で人間側が運用、既存のDeviceName入力の
+    /// 仕組みそのまま)。</summary>
+    private ElementInstance? ResolveSetpointTargetElement() => SelectedElement;
+
+    /// <summary>タイマー設定時間(秒、T-096、殿裁定=GuiEcad完全踏襲)。0〜9999の整数丸め
+    /// (GuiEcad仕様、NumberBox代替)。ResolveSetpointTargetElementで解決した実要素の
+    /// Params[Setpoint]を読み書きする。範囲外・非数値は値を変更せず表示のみ元へ戻す
+    /// (SelectedElementNotchPositionと同型パターン)。値未変化ならRecordSnapshotしない。</summary>
+    public string SelectedElementSetpoint
+    {
+        get
+        {
+            var target = ResolveSetpointTargetElement();
+            return target?.Params.TryGetValue(ParamKeys.Setpoint, out var v) == true ? v : "";
+        }
+        set
+        {
+            var target = ResolveSetpointTargetElement();
+            if (target is null) return;
+            string oldValue = target.Params.TryGetValue(ParamKeys.Setpoint, out var ov) ? ov : "";
+            if (!double.TryParse(value.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double n)
+                || n < 0 || n > 9999)
+            {
+                OnPropertyChanged(nameof(SelectedElementSetpoint), oldValue);
+                return;
+            }
+            string newValue = Math.Round(n).ToString(CultureInfo.InvariantCulture);
+            if (oldValue == newValue) return;
+
+            UndoManager.RecordSnapshot(Document);
+            target.Params[ParamKeys.Setpoint] = newValue;
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementSetpoint), oldValue);
+            OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
+        }
+    }
+
+    /// <summary>Setpointのスライダー用ミラー値(T-096、0〜10秒・1秒刻みのクイック設定、GuiEcad仕様)。
+    /// SelectedElementSetpointと同一実体を指し、setterはSelectedElementSetpointへ委譲することで
+    /// Undo記録・MarkDirty・通知を一元化する(DRY、家老裁可=都度記録のシンプル案)。Slider自体の
+    /// Minimum/Maximum=0/10が範囲を保証するためクランプ処理はgetter側のみ(既存値が9999等
+    /// 10超過でもSlider表示は10にクランプ)。</summary>
+    public double SelectedElementSetpointSliderValue
+    {
+        get
+        {
+            var target = ResolveSetpointTargetElement();
+            if (target?.Params.TryGetValue(ParamKeys.Setpoint, out var v) == true
+                && double.TryParse(v, NumberStyles.Any, CultureInfo.InvariantCulture, out double n))
+                return Math.Clamp(n, 0, 10);
+            return 0;
+        }
+        set => SelectedElementSetpoint = Math.Round(value).ToString(CultureInfo.InvariantCulture);
+    }
+
     /// <summary>
     /// SelectedElement(選択中の要素)を削除する(T-017追加スコープ、Deleteキー)。SelectedCell自体は
     /// 維持する(削除後もハイライト位置・矢印キー操作の起点を保つ、GX Works3等の一般的な挙動)。
@@ -1941,6 +2014,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
+        OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
+        OnPropertyChanged(nameof(SelectedElementSetpoint));
+        OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         DeviceTable.Refresh();
         return true;
     }
@@ -2070,6 +2146,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
+        OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
+        OnPropertyChanged(nameof(SelectedElementSetpoint));
+        OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
     }
 
     private string _statusMessage = "";
@@ -2569,6 +2648,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
+        OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
+        OnPropertyChanged(nameof(SelectedElementSetpoint));
+        OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから

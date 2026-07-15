@@ -655,6 +655,20 @@
                                                              LostKeyboardFocus="LampColorBox_LostKeyboardFocus" PreviewKeyDown="LampColorBox_PreviewKeyDown"/>
                                                 </DockPanel>
                                             </StackPanel>
+                                            <!-- T-096: タイマ接点(限時/瞬時NO/NC計4種)限定の設定時間入力欄(殿裁定=GuiEcad完全踏襲、
+                                                 NumberBox代替のTextBox+Sliderの2点セット・双方向同期)。TextBoxはDeviceNameBoxと同型の
+                                                 Explicit確定、SliderはGuiEcad仕様どおり通常のTwoWayバインディング(ドラッグ中
+                                                 リアルタイム反映)。 -->
+                                            <StackPanel Visibility="{Binding IsSelectedElementTimerRelated, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="設定時間(秒):" Margin="0,8,0,2"/>
+                                                <TextBox x:Name="SetpointBox" Text="{Binding SelectedElementSetpoint, UpdateSourceTrigger=Explicit}"
+                                                         IsEnabled="{Binding CanEditDiagram}"
+                                                         LostKeyboardFocus="SetpointBox_LostKeyboardFocus" PreviewKeyDown="SetpointBox_PreviewKeyDown"/>
+                                                <Slider Minimum="0" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                        Value="{Binding SelectedElementSetpointSliderValue, Mode=TwoWay}"
+                                                        IsEnabled="{Binding CanEditDiagram}"
+                                                        AutomationProperties.Name="設定時間クイック設定(0～10秒)"/>
+                                            </StackPanel>
                                         </StackPanel>
                                         <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
                                              ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
