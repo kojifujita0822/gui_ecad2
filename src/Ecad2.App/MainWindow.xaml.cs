@@ -572,6 +572,16 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter) CommitDeviceNameEdit();
     }
 
+    // T-097: ラベル高さオフセット編集(DeviceNameBox/NotchPositionBox/LampColorBox/SetpointBoxと同型の
+    // Explicit確定)。CommitDeviceNameEditがLabelDyBoxも併せて確定するため、専用のCommitメソッドは
+    // 設けず既存を呼ぶ。
+    private void LabelDyBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
+
+    private void LabelDyBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) CommitDeviceNameEdit();
+    }
+
     // T-049(殿裁定): デバイス名編集中、フォーカスを保持したままCtrl+S/N/O・ウィンドウクローズが
     // 実行されると、UpdateSourceTrigger=Explicit(上記コメント参照)ゆえLostKeyboardFocus/Enterの
     // いずれも発火せず、編集内容がサイレントに保存漏れ/無確認破棄されうる(P-013)。保存・破棄判定
@@ -583,12 +593,15 @@ public partial class MainWindow : Window
     // IsSelectedElementSelectSwitch=falseの間Bindingが無効な場合があるため?.で安全に扱う。
     // T-085: LampColorBoxも同型(IsSelectedElementLamp=falseの間は?.で安全に扱う)。
     // T-096: SetpointBoxも同型(IsSelectedElementTimerRelated=falseの間は?.で安全に扱う)。
+    // T-097: LabelDyBoxも同型(全要素種別共通ゆえ種別限定Visibilityは無いが、HasSelectedElement=false
+    // の間はBinding自体が無効なため同様に?.で安全に扱う)。
     private void CommitDeviceNameEdit()
     {
         DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         NotchPositionBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         LampColorBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         SetpointBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        LabelDyBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         RedrawCanvas();
     }
 

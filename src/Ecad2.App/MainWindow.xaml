@@ -669,6 +669,15 @@
                                                         IsEnabled="{Binding CanEditDiagram}"
                                                         AutomationProperties.Name="設定時間クイック設定(0～10秒)"/>
                                             </StackPanel>
+                                            <!-- T-097: ラベル高さオフセット(LabelDy)入力欄。全要素種別共通(種別限定なし、
+                                                 ラベル密集時の重なり回避用個別微調整)。殿裁定=種別既定の表示位置を0とした
+                                                 相対オフセット方式。DeviceNameBox等と同型のExplicit確定。 -->
+                                            <StackPanel>
+                                                <TextBlock Text="ラベル高さ調整(mm、既定位置=0):" Margin="0,8,0,2"/>
+                                                <TextBox x:Name="LabelDyBox" Text="{Binding SelectedElementLabelDy, UpdateSourceTrigger=Explicit}"
+                                                         IsEnabled="{Binding CanEditDiagram}"
+                                                         LostKeyboardFocus="LabelDyBox_LostKeyboardFocus" PreviewKeyDown="LabelDyBox_PreviewKeyDown"/>
+                                            </StackPanel>
                                         </StackPanel>
                                         <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
                                              ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->

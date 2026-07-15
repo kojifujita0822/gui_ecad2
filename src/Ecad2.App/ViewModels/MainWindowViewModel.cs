@@ -403,6 +403,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
                 OnPropertyChanged(nameof(SelectedElementSetpoint));
                 OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
+                OnPropertyChanged(nameof(SelectedElementLabelDy));
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -1985,6 +1986,61 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SelectedElementSetpoint = Math.Round(value).ToString(CultureInfo.InvariantCulture);
     }
 
+    /// <summary>要素のラベル位置計算に用いる実効種別を解決する(T-097)。T-071バグ修正の教訓
+    /// (DiagramRenderer.cs:953、e.Kindは自作パーツ・組込みパーツ問わずPartId配置時は常に既定値
+    /// ContactNOのまま)により、DefaultLabelDyへ渡す種別はPartResolver.ComponentKind経由で解決する
+    /// 必要がある(IsSelectedElementTimerRelatedと同型パターン)。CreatesComponent=falseの場合は
+    /// DiagramRenderer.csのresolvedKind計算と同様e.Kindへフォールバックする。</summary>
+    private ElementKind ResolveLabelKind(ElementInstance element)
+        => PartResolver.CreatesComponent(element, PartLibrary)
+           ? PartResolver.ComponentKind(element, PartLibrary)
+           : element.Kind;
+
+    /// <summary>ラベル高さオフセットの相対値(mm、T-097、殿裁定=種別既定の表示位置(
+    /// <see cref="ElementCatalog.DefaultLabelDy"/>)を0として+-で上下させる相対オフセット方式)。
+    /// 実体である<c>Params[LabelDy]</c>は絶対値で保持する(<c>DrawElementLabel</c>が個別値優先・
+    /// 無ければ種別既定を使う設計のため、絶対値のままにしておく必要がある)。相対値0(既定通り)を
+    /// 設定した場合はParams[LabelDy]エントリ自体を削除し既定へフォールバックさせる(LampColorの
+    /// 空値クリアと同型の発想、保存ファイルを不要に汚さない)。数値以外・非有限値(NaN/Infinity)は
+    /// 値を変更せず表示のみ元へ戻す(SelectedElementSetpointと同型パターン)。全要素種別が対象
+    /// (LampColor/Setpoint等と異なり種別限定なし、ラベル密集回避の個別微調整という性質上)。</summary>
+    public string SelectedElementLabelDy
+    {
+        get
+        {
+            if (SelectedElement is not ElementInstance el) return "";
+            double defaultDy = ElementCatalog.DefaultLabelDy(ResolveLabelKind(el));
+            double absolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var s)
+                && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double v)
+                ? v : defaultDy;
+            return (absolute - defaultDy).ToString(CultureInfo.InvariantCulture);
+        }
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            double defaultDy = ElementCatalog.DefaultLabelDy(ResolveLabelKind(el));
+            double oldAbsolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var os)
+                && double.TryParse(os, NumberStyles.Any, CultureInfo.InvariantCulture, out double ov)
+                ? ov : defaultDy;
+            string oldValue = (oldAbsolute - defaultDy).ToString(CultureInfo.InvariantCulture);
+
+            if (!double.TryParse(value.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double offset)
+                || !double.IsFinite(offset))
+            {
+                OnPropertyChanged(nameof(SelectedElementLabelDy), oldValue);
+                return;
+            }
+            string newValue = offset.ToString(CultureInfo.InvariantCulture);
+            if (oldValue == newValue) return;
+
+            UndoManager.RecordSnapshot(Document);
+            if (offset == 0) el.Params.Remove(ParamKeys.LabelDy);
+            else el.Params[ParamKeys.LabelDy] = (defaultDy + offset).ToString(CultureInfo.InvariantCulture);
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementLabelDy), oldValue);
+        }
+    }
+
     /// <summary>
     /// SelectedElement(選択中の要素)を削除する(T-017追加スコープ、Deleteキー)。SelectedCell自体は
     /// 維持する(削除後もハイライト位置・矢印キー操作の起点を保つ、GX Works3等の一般的な挙動)。
@@ -2017,6 +2073,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
+        OnPropertyChanged(nameof(SelectedElementLabelDy));
         DeviceTable.Refresh();
         return true;
     }
@@ -2149,6 +2206,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
+        OnPropertyChanged(nameof(SelectedElementLabelDy));
     }
 
     private string _statusMessage = "";
@@ -2651,6 +2709,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
+        OnPropertyChanged(nameof(SelectedElementLabelDy));
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから
