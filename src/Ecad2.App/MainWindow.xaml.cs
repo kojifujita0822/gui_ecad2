@@ -104,7 +104,10 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
     private readonly Dictionary<DockingManager, string> _defaultDockingLayoutXmlByManager = new();
 
-    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager, RightPanelDockingManager };
+    // T-058増分5: PlacementToolBarDockingManagerを追加。RegisterDockingContents/
+    // SerializeDefaultDockingLayouts/ResetDockingLayoutToDefault/LoadDockingLayoutFromFileIfExists
+    // はいずれもAllDockingManagersを汎用的に回っているため、この1行の追加のみで横展開される。
+    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager, RightPanelDockingManager, PlacementToolBarDockingManager };
 
     // T-058増分4(殿裁定=保存タイミング両方・保存先アプリ共通設定): 明示保存済みの既定レイアウトを
     // %AppData%配下へDockingManager単位の個別XMLとして永続化する。_defaultDockingLayoutXmlByManager
@@ -123,6 +126,7 @@ public partial class MainWindow : Window
         nameof(LeftPaletteDockingManager) => "left-palette.xml",
         nameof(OutputPanelDockingManager) => "output-panel.xml",
         nameof(RightPanelDockingManager) => "right-panel.xml",
+        nameof(PlacementToolBarDockingManager) => "placement-toolbar.xml",
         _ => throw new ArgumentOutOfRangeException(nameof(managerName), managerName, "未知のDockingManager"),
     };
 

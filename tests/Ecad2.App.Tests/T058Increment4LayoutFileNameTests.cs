@@ -12,6 +12,7 @@ public class T058Increment4LayoutFileNameTests
     [InlineData("LeftPaletteDockingManager", "left-palette.xml")]
     [InlineData("OutputPanelDockingManager", "output-panel.xml")]
     [InlineData("RightPanelDockingManager", "right-panel.xml")]
+    [InlineData("PlacementToolBarDockingManager", "placement-toolbar.xml")]
     public void GetDockingLayoutFileName_既知のDockingManager名は対応するファイル名を返す(
         string managerName, string expectedFileName)
     {

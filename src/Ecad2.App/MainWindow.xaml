@@ -172,8 +172,17 @@
             </MenuItem>
         </Menu>
 
-        <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド) -->
-        <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
+        <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド)
+             T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化、1段目は現行ToolBarTray固定維持):
+             既存Grid.Row="1"を内側Auto/Auto2行のラッパーGridへ差し替え、外側MainContentAreaの
+             RowDefinitions・以降のGrid.Row参照(メイン作業域等)は無改修で済ませる(T-059の
+             GridSplitter追加時と同型の「ラッパー内で行を増やす」手法、設計叩き台2節)。 -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+        <ToolBarTray x:Name="ToolBarArea" Grid.Row="0" IsLocked="True">
             <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
                 <!-- T-095(殿裁定2026-07-15、方針転換): ラベル表示をショートカット表示から機能名表示へ
                      変更。ショートカットは既存ToolTip("機能名 (ショートカット)"形式)へマウスオーバー時
@@ -267,7 +276,16 @@
                     </StackPanel>
                 </ToggleButton>
             </ToolBar>
-            <ToolBar Band="1" BandIndex="0" ToolBarTray.IsLocked="True">
+        </ToolBarTray>
+        <!-- T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化): 独立DockingManager方式
+             (増分1〜4と同型パターン踏襲)。ボタン群自体(Style/Command/ToolTip等)は無改修、
+             配置場所のみ移動。 -->
+        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Row="1">
+            <avalonDock:LayoutRoot>
+                <avalonDock:LayoutPanel Orientation="Horizontal">
+                    <avalonDock:LayoutAnchorablePane>
+                        <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False">
+                            <ToolBar Band="0" BandIndex="0">
                 <!-- ラダー専用コマンド。F5=AND(a接点)/F6=NAND(b接点)、Shift+F5=OR(ORa接点)/
                      Shift+F6=NOR(ORb接点)というキー体系(殿裁定、T-026段階4)。ボタンは「選択中セルへ
                      ダイアログ経由で配置」に統一(キーボードショートカットと同じTryPlaceElementを
@@ -427,8 +445,13 @@
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>
                     </StackPanel>
                 </Button>
-            </ToolBar>
-        </ToolBarTray>
+                            </ToolBar>
+                        </avalonDock:LayoutAnchorable>
+                    </avalonDock:LayoutAnchorablePane>
+                </avalonDock:LayoutPanel>
+            </avalonDock:LayoutRoot>
+        </avalonDock:DockingManager>
+        </Grid>
 
         <!-- メイン作業域: 左パレット / 中央キャンバス / 右パネル -->
         <Grid x:Name="MainWorkAreaGrid" Grid.Row="2">
