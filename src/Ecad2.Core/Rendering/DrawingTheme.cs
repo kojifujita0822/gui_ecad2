@@ -36,7 +36,10 @@ public sealed class DrawingTheme
 
     // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
     public const double TableLineWidth = 0.18;
-    public const double PoweredWireWidth = 0.45;
+    // 殿直接要望(2026-07-15)=通電線(オレンジ色)の視認性向上のため0.45→0.8へ太く調整
+    // (画面DPI96想定で1px≈0.26mm、目安+0.26〜0.53mm=0.7〜1.0mm程度の中間値。実機の見た目は
+    // 忍者確認で最終判断)。
+    public const double PoweredWireWidth = 0.8;
 
     /// <summary>線幅の最小クランプ(mm)。画面(Win2D)とPDFで同一に保ち、極細線がどちらでも消えないようにする。</summary>
     public const double MinStrokeWidthMm = 0.05;
