@@ -549,86 +549,89 @@
             <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
 
             <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
-                 上下2分割(GridSplitter)で常時同時参照可能にする(タブ切替不要)。 -->
-            <Border x:Name="RightPanelArea" Grid.Column="4" BorderBrush="Gray" BorderThickness="1,0,0,0">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="*" MinHeight="80"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="*" MinHeight="80"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- 上段: 機器表 -->
-                    <DockPanel Grid.Row="0">
-                        <TextBlock DockPanel.Dock="Top" Text="機器表" FontWeight="Bold" Margin="4"/>
-                        <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
-                                  HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
-                                  CanUserAddRows="False" CanUserDeleteRows="False">
-                            <DataGrid.Columns>
-                                <DataGridTextColumn Header="機器名" Binding="{Binding Name}" IsReadOnly="True"/>
-                                <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}" IsReadOnly="True"/>
-                                <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
-                            </DataGrid.Columns>
-                        </DataGrid>
-                    </DockPanel>
-
-                    <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
-
-                    <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
-                         Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全SelectionEntries、
-                         サムネイル付きラッパー。T-015)を表示し、それ以外はプロパティを表示する。
-                         プロパティ側はさらにHasSelectedElementで「要素を選択してください」
-                         プレースホルダと選択中要素の詳細表示を切替える(T-017)。 -->
-                    <Grid Grid.Row="2">
-                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
-                            <TextBlock DockPanel.Dock="Top" Text="プロパティ" FontWeight="Bold" Margin="4"/>
-                            <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
-                                       Visibility="{Binding HasNoPropertySelection, Converter={StaticResource BoolToVisibility}}"/>
-                            <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}"/>
-                                <TextBlock Text="デバイス名:" Margin="0,8,0,2"/>
-                                <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
-                                         IsEnabled="{Binding CanEditDiagram}"
-                                         LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
-                                <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
-                                     (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
-                                <StackPanel Visibility="{Binding IsSelectedElementSelectSwitch, Converter={StaticResource BoolToVisibility}}">
-                                    <TextBlock Text="ノッチ位置:" Margin="0,8,0,2"/>
-                                    <TextBox x:Name="NotchPositionBox" Text="{Binding SelectedElementNotchPosition, UpdateSourceTrigger=Explicit}"
-                                             IsEnabled="{Binding CanEditDiagram}"
-                                             LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
-                                 ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
-                            <StackPanel Margin="4" Visibility="{Binding HasSelectedImage, Converter={StaticResource BoolToVisibility}}">
-                                <TextBlock Text="画像" FontWeight="SemiBold"/>
-                                <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="Gray"/>
-                                <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}"/>
-                            </StackPanel>
-                        </DockPanel>
-                        <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">
-                            <TextBlock DockPanel.Dock="Top" Text="部品選択" FontWeight="Bold" Margin="4"/>
-                            <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.SelectionEntries}" BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <StackPanel Orientation="Horizontal" Margin="2">
-                                            <Image Source="{Binding Thumbnail}" Width="24" Height="24" Margin="0,0,4,0"/>
-                                            <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40" VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                 上下2分割で常時同時参照可能にする(タブ切替不要)。
+                 T-058増分3: AvalonDock導入。左パレット・出力パネルと同様、独立したDockingManagerとして
+                 この列(右パネル)のみを管理する(案C踏襲、家老裁可済み)。上下分割はLayoutPanel
+                 (Orientation="Vertical")一つで実現(内蔵リサイザーに置き換わるため旧GridSplitterは削除)。
+                 下段(プロパティ⇔部品選択)のタイトルはAvalonDockのオフツリー構造ゆえBindingが機能せず
+                 (docs-notes/handover-next-session.md§3)、MainWindow.xaml.csでIsPartSelectionVisible変更を
+                 購読しTitleを直接更新する方式(UpdateRightPanelBottomTitle参照、増分2のUpdateOutputPanelTitle
+                 と同型)。手動タイトルTextBlockはAvalonDockタブヘッダーとの二重表示を避けるため削除
+                 (増分1/2の教訓)。 -->
+            <avalonDock:DockingManager x:Name="RightPanelDockingManager" Grid.Column="4">
+                <avalonDock:LayoutRoot>
+                    <avalonDock:LayoutPanel Orientation="Vertical">
+                        <avalonDock:LayoutAnchorablePane>
+                            <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False">
+                                <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
+                                          HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
+                                          CanUserAddRows="False" CanUserDeleteRows="False">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="機器名" Binding="{Binding Name}" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}" IsReadOnly="True"/>
+                                        <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                            </avalonDock:LayoutAnchorable>
+                        </avalonDock:LayoutAnchorablePane>
+                        <avalonDock:LayoutAnchorablePane>
+                            <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
+                                 Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全SelectionEntries、
+                                 サムネイル付きラッパー。T-015)を表示し、それ以外はプロパティを表示する。
+                                 プロパティ側はさらにHasSelectedElementで「要素を選択してください」
+                                 プレースホルダと選択中要素の詳細表示を切替える(T-017)。Title初期値="プロパティ"
+                                 (既定表示、UpdateRightPanelBottomTitleが以後の状況変化を追従)。 -->
+                            <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False">
+                                <Grid>
+                                    <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
+                                        <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
+                                                   Visibility="{Binding HasNoPropertySelection, Converter={StaticResource BoolToVisibility}}"/>
+                                        <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}"/>
+                                            <TextBlock Text="デバイス名:" Margin="0,8,0,2"/>
+                                            <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
+                                                     IsEnabled="{Binding CanEditDiagram}"
+                                                     LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
+                                            <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
+                                                 (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
+                                            <StackPanel Visibility="{Binding IsSelectedElementSelectSwitch, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="ノッチ位置:" Margin="0,8,0,2"/>
+                                                <TextBox x:Name="NotchPositionBox" Text="{Binding SelectedElementNotchPosition, UpdateSourceTrigger=Explicit}"
+                                                         IsEnabled="{Binding CanEditDiagram}"
+                                                         LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
+                                            </StackPanel>
                                         </StackPanel>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                                <ListBox.ItemContainerStyle>
-                                    <Style TargetType="ListBoxItem">
-                                        <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartSelectionItem_Clicked"/>
-                                    </Style>
-                                </ListBox.ItemContainerStyle>
-                            </ListBox>
-                        </DockPanel>
-                    </Grid>
-                </Grid>
-            </Border>
+                                        <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
+                                             ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
+                                        <StackPanel Margin="4" Visibility="{Binding HasSelectedImage, Converter={StaticResource BoolToVisibility}}">
+                                            <TextBlock Text="画像" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="Gray"/>
+                                            <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.SelectionEntries}" BorderThickness="0"
+                                             Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="2">
+                                                    <Image Source="{Binding Thumbnail}" Width="24" Height="24" Margin="0,0,4,0"/>
+                                                    <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                        <ListBox.ItemContainerStyle>
+                                            <Style TargetType="ListBoxItem">
+                                                <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartSelectionItem_Clicked"/>
+                                            </Style>
+                                        </ListBox.ItemContainerStyle>
+                                    </ListBox>
+                                </Grid>
+                            </avalonDock:LayoutAnchorable>
+                        </avalonDock:LayoutAnchorablePane>
+                    </avalonDock:LayoutPanel>
+                </avalonDock:LayoutRoot>
+            </avalonDock:DockingManager>
         </Grid>
 
         <!-- T-059(殿直接指示2026-07-11): メイン作業域⇔出力パネルの高さをドラッグ調整可能にする

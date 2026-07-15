@@ -104,7 +104,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
     private readonly Dictionary<DockingManager, string> _defaultDockingLayoutXmlByManager = new();
 
-    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager };
+    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager, RightPanelDockingManager };
 
     // 殿実機確認で発覚(重要): フロート化したパネル自体にフォーカスがある間はメインウィンドウの
     // PreviewKeyDownが発火せず復旧不能のままだった——AvalonDockはフロート化したLayoutAnchorableを
@@ -152,6 +152,7 @@ public partial class MainWindow : Window
         // 裏付け済み)。BindingではなくFind.PropertyChangedを購読しTitleを直接更新する方式に切替える。
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
+        UpdateRightPanelBottomTitle();
     }
 
     private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -167,6 +168,19 @@ public partial class MainWindow : Window
         if (outputAnchorable != null)
         {
             outputAnchorable.Title = _viewModel.Find.IsVisible ? "検索結果" : "出力";
+        }
+    }
+
+    // T-058増分3: 増分2のUpdateOutputPanelTitleと同型。右パネル下段はIsPartSelectionVisible
+    // (Tool.Modeから算出、Tool.setterでOnPropertyChanged明示発火)の変化に応じ
+    // 「プロパティ」⇔「部品選択」を直接更新する(AvalonDockのオフツリー構造ゆえBinding不可)。
+    private void UpdateRightPanelBottomTitle()
+    {
+        var bottomAnchorable = RightPanelDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == "RightPanelBottom");
+        if (bottomAnchorable != null)
+        {
+            bottomAnchorable.Title = _viewModel.IsPartSelectionVisible ? "部品選択" : "プロパティ";
         }
     }
 
@@ -249,6 +263,10 @@ public partial class MainWindow : Window
             LadderCanvasHost.ShowGrid = _viewModel.IsGridVisible;
             RedrawCanvas();
         }
+
+        // T-058増分3: 右パネル下段タイトルの状況依存切替(UpdateRightPanelBottomTitle参照)。
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsPartSelectionVisible))
+            UpdateRightPanelBottomTitle();
 
         // T-041増分7隠密レビュー所見A対応: ドラッグ中に外部要因(Delete・シート切替・ドキュメント
         // 差し替え、いずれもSelectedConnector等のsetterを経由する)でForceCancelDrag*IfAnyが発火し
