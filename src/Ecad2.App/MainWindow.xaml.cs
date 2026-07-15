@@ -397,6 +397,16 @@ public partial class MainWindow : Window
             RedrawCanvas();
         }
 
+        // T-083 PoC(家老采配2026-07-15): 作図キャンバス色のテーマ切替。IsGridVisibleと同型、
+        // LadderCanvasはDraw()呼び出しが描画トリガーのため明示的に再描画する。
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDarkMode))
+        {
+            LadderCanvasHost.Theme = _viewModel.IsDarkMode
+                ? Ecad2.Rendering.DrawingTheme.Dark
+                : Ecad2.Rendering.DrawingTheme.Default;
+            RedrawCanvas();
+        }
+
         // T-058増分3: 右パネル下段タイトルの状況依存切替(UpdateRightPanelBottomTitle参照)。
         if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsPartSelectionVisible))
             UpdateRightPanelBottomTitle();

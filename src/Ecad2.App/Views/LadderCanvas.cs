@@ -30,8 +30,15 @@ public sealed class LadderCanvas : FrameworkElement
     // ShowGrid: 作図ガイドの薄いグリッド線を画面表示するか(T-030で常時trueとして導入、
     // T-056でユーザーが切替可能に)。PDF出力(Ecad2.Pdf)側は別のDiagramRendererインスタンス
     // を使うため、ここでの設定は画面表示にのみ影響する。
-    private DiagramRenderer _renderer = new(options: new Ecad2.Rendering.RenderOptions { ShowGrid = true });
     private bool _showGrid = true;
+    // Theme: 作図キャンバス色のテーマ(T-083 PoC)。ShowGridと同型、_rendererの再生成が必要。
+    private DrawingTheme _theme = DrawingTheme.Default;
+    private DiagramRenderer _renderer = new(DrawingTheme.Default, new Ecad2.Rendering.RenderOptions { ShowGrid = true });
+
+    /// <summary>ShowGrid/Themeいずれかの変更後、両方の現在値を反映して_rendererを再生成する
+    /// (どちらか一方のセッターが他方の設定を巻き戻さないようにする)。</summary>
+    private void RebuildRenderer()
+        => _renderer = new DiagramRenderer(_theme, new Ecad2.Rendering.RenderOptions { ShowGrid = _showGrid });
 
     /// <summary>作図ガイドのグリッド線を画面表示するか(T-056、既定=表示は殿裁定2026-07-11)。
     /// 変更しただけでは画面に反映されない(このクラスはDraw()呼び出しが描画トリガーのため、
@@ -43,7 +50,21 @@ public sealed class LadderCanvas : FrameworkElement
         {
             if (_showGrid == value) return;
             _showGrid = value;
-            _renderer = new DiagramRenderer(options: new Ecad2.Rendering.RenderOptions { ShowGrid = value });
+            RebuildRenderer();
+        }
+    }
+
+    /// <summary>作図キャンバス色のテーマ(T-083 PoC、家老采配2026-07-15=最小疎通)。
+    /// ShowGridと同型、変更しただけでは画面に反映されないため呼び出し元が明示的に再描画すること
+    /// (MainWindow.RedrawCanvas参照)。</summary>
+    public DrawingTheme Theme
+    {
+        get => _theme;
+        set
+        {
+            if (ReferenceEquals(_theme, value)) return;
+            _theme = value;
+            RebuildRenderer();
         }
     }
 
@@ -152,9 +173,14 @@ public sealed class LadderCanvas : FrameworkElement
         using (DrawingContext dc = visual.RenderOpen())
         {
             // DrawingVisualは実際に何か描画された領域のみがヒットテスト対象になる(WPFの仕様)。
-            // 罫線・要素が無い空きセルもクリックで拾えるよう、まず透明な背景矩形をページ全体に
-            // 描画しておく(T-026 OR入力実機検証で発覚: 空き行が常にヒットテスト対象外だった)。
-            dc.DrawRectangle(Brushes.Transparent, null, new Rect(0, 0, widthDip, heightDip));
+            // 罫線・要素が無い空きセルもクリックで拾えるよう、まず背景矩形をページ全体に描画して
+            // おく(T-026 OR入力実機検証で発覚: 空き行が常にヒットテスト対象外だった)。
+            // T-083 PoC: 従来は常にBrushes.Transparentだったが、作図キャンバス色のテーマ切替
+            // (家老采配2026-07-15)に伴い_theme.Backgroundで塗る(ヒットテスト対象になる条件は
+            // 「何か描画されていること」のみで不透明である必要はない)。
+            var bg = _theme.Background;
+            dc.DrawRectangle(new SolidColorBrush(System.Windows.Media.Color.FromArgb(bg.A, bg.R, bg.G, bg.B)),
+                null, new Rect(0, 0, widthDip, heightDip));
 
             var wpfRenderer = new WpfRenderer(dc);
             // T-061: sim(テストモード中のみ非null)を渡すと通電配線・励磁要素が通電色でハイライトされる。

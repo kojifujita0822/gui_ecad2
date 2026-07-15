@@ -156,6 +156,9 @@
             </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>
+                <!-- T-083 PoC(家老采配2026-07-15、殿指示済み配置): 作図キャンバス色のテーマ切替。
+                     メニュー配置はここに確定済み、起動時既定・OSテーマ追従・永続化等はPoC後に殿確認。 -->
+                <MenuItem Header="ダークモード(作図色)(_D)" IsCheckable="True" IsChecked="{Binding IsDarkMode, Mode=TwoWay}"/>
                 <Separator/>
                 <!-- T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド): 現在のパネルレイアウト
                      (左パレット・出力パネル・右パネル)を既定として%AppData%配下へ保存する。

@@ -176,6 +176,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref _isGridVisible, value);
     }
 
+    private bool _isDarkMode;
+
+    /// <summary>作図キャンバス色をダークモード(<see cref="Ecad2.Rendering.DrawingTheme.Dark"/>)に
+    /// するか(T-083 PoC、家老采配2026-07-15=作図キャンバス色のテーマ切替の最小疎通)。「表示」
+    /// メニューのトグル項目で切替。IsGridVisibleと同型で非永続(PoC段階、永続化・起動時既定・
+    /// OSテーマ追従等の残るUI/UX論点はPoCが固まった段階で改めて殿確認のうえ本実装で詰める)。</summary>
+    public bool IsDarkMode
+    {
+        get => _isDarkMode;
+        set => SetProperty(ref _isDarkMode, value);
+    }
+
     /// <summary>
     /// 開いているドキュメント全体（複数シートを保持）。起動直後は空(Sheets=0、HasProject=false=
     /// 濃紺スタート、殿裁定2026-07-05)。新規/開く(T-019)ではReplaceDocumentで丸ごと差し替える。
