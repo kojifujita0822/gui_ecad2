@@ -65,3 +65,16 @@
   非対応箇所を個別に扱う前提でPoCを組むこと。
 - AvalonDock導入PoC（T-058、侍担当）と合わせて、実際にThemeMode=Dark時の見た目・
   フラッシュ有無をPoC上で目視確認することを推奨する。
+
+## 追記（2026-07-15、隠密再調査時の独立検証）
+
+家老の采配で本題目を再度調査したところ、結論は本調査書と完全一致（独立検証として結論の
+信頼性を補強）。追加で確認できた点のみ2件を記す。
+
+- **ecad2はWindowsFormsHost不使用**（`src`配下grep確認、0件）。.NET 9時代に報告された
+  WindowsFormsHostレンダリング破壊バグ（[Issue #10044](https://github.com/dotnet/wpf/issues/10044)）
+  の影響は受けない。
+- **API属性の鮮度再確認**：公式APIリファレンス（[Application.ThemeMode Property](https://learn.microsoft.com/en-us/dotnet/api/system.windows.application.thememode?view=windowsdesktop-10.0)）の
+  最終更新日は2026-07-01。この時点でも`[Experimental("WPF0001")]`属性は変わらず付与されたまま
+  （「This property is experimental and may be removed in future versions.」）。.NET 10 GAから
+  8ヶ月以上経過した現在でも実験的機能の位置づけは解除されていないことを再確認した。
