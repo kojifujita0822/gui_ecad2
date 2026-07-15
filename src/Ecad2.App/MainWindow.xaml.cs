@@ -2871,16 +2871,18 @@ public partial class MainWindow : Window
         return true;
     }
 
-    // T-087往復5周目修正: ActivateAndFocusPartSelectionの判定ロジックのみをinternal static抽出し
-    // 単体テスト可能にする(ShouldSkipSelectionInTestModeと同型パターン、コードビハインドの
-    // Dispatcher/UI要素依存部分から判定ロジックを切り離す)。
-    internal static bool ShouldSuppressPartSelectionActivation(bool canEditDiagram, bool hasAnyDraft)
-        => !canEditDiagram || hasAnyDraft;
-
     // T-091修正(隠密指摘P-093): F5〜F10グローバルショートカットのcase guard判定を
-    // internal static抽出し単体テスト可能にする(ShouldSuppressPartSelectionActivationと同型パターン)。
+    // internal static抽出し単体テスト可能にする(コードビハインドのDispatcher/UI要素依存部分から
+    // 判定ロジックを切り離す、ShouldSuppressPartSelectionActivationと同型パターン)。
     internal static bool ShouldAllowShortcutPlacement(bool canEditDiagram, bool hasAnyDraft)
         => canEditDiagram && !hasAnyDraft;
+
+    // T-087往復5周目修正: ActivateAndFocusPartSelectionの判定ロジックのみをinternal static抽出し
+    // 単体テスト可能にする(ShouldSkipSelectionInTestModeと同型パターン)。
+    // T-093(家老采配2026-07-15、P-095): ShouldAllowShortcutPlacementのド・モルガン否定と完全等価な
+    // 重複実装だったため、共通ロジックへ委譲する形に統合(呼び出し元・シグネチャは無改変)。
+    internal static bool ShouldSuppressPartSelectionActivation(bool canEditDiagram, bool hasAnyDraft)
+        => !ShouldAllowShortcutPlacement(canEditDiagram, hasAnyDraft);
 
     internal static bool ShouldReactivateToolForPartSelection(ViewModels.ToolMode currentToolMode)
         => currentToolMode != ViewModels.ToolMode.PlaceElement;
