@@ -170,18 +170,21 @@
         <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド) -->
         <ToolBarTray x:Name="ToolBarArea" Grid.Row="1" IsLocked="True">
             <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
+                <!-- T-095(殿裁定2026-07-15、方針転換): ラベル表示をショートカット表示から機能名表示へ
+                     変更。ショートカットは既存ToolTip("機能名 (ショートカット)"形式)へマウスオーバー時
+                     表示済みのためそのまま流用。機能名表記は簡潔化案(殿裁定=案2)を採用。 -->
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
                         AutomationProperties.Name="新規作成 (Ctrl+N)" Click="NewButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+N"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="新規"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)"
                         AutomationProperties.Name="開く (Ctrl+O)" Click="OpenButton_Click">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+O"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="開く"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)"
@@ -189,7 +192,7 @@
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+S"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="保存"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
@@ -197,14 +200,14 @@
                         AutomationProperties.Name="元に戻す (Ctrl+Z)" Command="{Binding UndoCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Z"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="戻す"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)"
                         AutomationProperties.Name="やり直し (Ctrl+Y)" Command="{Binding RedoCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Y"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="再実行"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
@@ -213,7 +216,7 @@
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+P"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="PDF出力"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
@@ -222,7 +225,7 @@
                         Command="{Binding AddRowCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M13,7 L13,13 M10,10 L16,10"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Shift+↑"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行追加"/>
                     </StackPanel>
                 </Button>
                 <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を削除 (Ctrl+Shift+Down)"
@@ -230,7 +233,7 @@
                         Command="{Binding DeleteRowCommand}">
                     <StackPanel>
                         <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M10,10 L16,10"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="Ctrl+Shift+↓"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行削除"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
