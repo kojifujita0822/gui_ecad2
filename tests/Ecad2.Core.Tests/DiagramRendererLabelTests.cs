@@ -57,6 +57,31 @@ public class DiagramRendererLabelTests
 
         Assert.Contains("赤", renderer.DrawnTexts);
     }
+
+    /// <summary>
+    /// T-097差し戻し1周目(隠密指摘、家老裏付け済み)の回帰テスト。DrawElementLabel(1118行)の
+    /// LabelDy既定値フォールバックが生のe.Kindを直接参照しており、PartId経由配置のCoil要素
+    /// (e.Kind=既定値ContactNOのまま、T-071由来の既知の制約)ではDefaultLabelDy(ContactNO)=-1.5が
+    /// 誤って使われ、正しいDefaultLabelDy(Coil)=-5.5との間に4mmのズレが生じていた。PartId経由配置の
+    /// Coilと、直接ElementKind.Coilを指定した要素(PartId無し、resolvedKind解決の影響を受けない
+    /// 対照群)を同じRowに配置し、LabelDy未設定時の機器名ラベルY座標が一致することを検証する。
+    /// </summary>
+    [Fact]
+    public void Render_PartIdPlacedCoilWithoutLabelDy_UsesCoilDefaultLabelDy_MatchingDirectKindElement()
+    {
+        var partIdElem = new ElementInstance { PartId = BasicPartTemplates.CoilId, Pos = new GridPos(0, 0), DeviceName = "Y001" };
+        var directKindElem = new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 5), DeviceName = "Y002" };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(partIdElem);
+        sheet.Elements.Add(directKindElem);
+
+        var renderer = new RecordingRenderer();
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());
+
+        double y001 = renderer.DrawnTextEntries.Single(t => t.Text == "Y001").Position.Y;
+        double y002 = renderer.DrawnTextEntries.Single(t => t.Text == "Y002").Position.Y;
+        Assert.Equal(y002, y001, precision: 6);
+    }
 }
 
 /// <summary>DrawTextの呼び出し引数(text)のみを記録するIRendererのテストダブル。他の描画命令は
@@ -64,6 +89,7 @@ public class DiagramRendererLabelTests
 internal sealed class RecordingRenderer : IRenderer
 {
     public List<string> DrawnTexts { get; } = new();
+    public List<(string Text, Point2D Position)> DrawnTextEntries { get; } = new();
 
     public void PushTransform(double translateX, double translateY, double scale = 1.0) { }
     public void PopTransform() { }
@@ -77,7 +103,11 @@ internal sealed class RecordingRenderer : IRenderer
     public void FillCircle(Point2D center, double radius, Color color) { }
     public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) { }
     public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) { }
-    public void DrawText(string text, Point2D position, TextStyle style) => DrawnTexts.Add(text);
+    public void DrawText(string text, Point2D position, TextStyle style)
+    {
+        DrawnTexts.Add(text);
+        DrawnTextEntries.Add((text, position));
+    }
     public Size2D MeasureText(string text, TextStyle style) => new(0, 0);
     public void DrawImage(string filePath, Rect2D bounds) { }
 }

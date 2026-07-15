@@ -1115,7 +1115,7 @@ public sealed class DiagramRenderer
         double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
             double.TryParse(s, System.Globalization.NumberStyles.Any,
                 System.Globalization.CultureInfo.InvariantCulture, out double v)
-            ? v : ElementCatalog.DefaultLabelDy(e.Kind);
+            ? v : ElementCatalog.DefaultLabelDy(resolvedKind);
 
         double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
         r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
