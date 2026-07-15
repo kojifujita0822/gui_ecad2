@@ -238,10 +238,11 @@
                 </Button>
                 <Separator/>
                 <!-- T-061(殿裁定(2)(4)): テストモード切替。上位enum(AppMode)一元管理、ツールバー
-                     ToggleButton+背景色変化(GuiEcad踏襲)。キーボードショートカットは新規割当なし
-                     (殿裁定(1)=F5表示矛盾はメニューのInputGestureText除去のみで解消)。 -->
-                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード"
-                              AutomationProperties.Name="テストモード"
+                     ToggleButton+背景色変化(GuiEcad踏襲)。T-087でCtrl+Tショートカットが新設された
+                     (MainWindow.xaml.cs、IsTestModeトグル)ため、他ボタンと同様ToolTip/
+                     AutomationProperties.Nameへ併記する(表記漏れ修正、家老采配2026-07-15)。 -->
+                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード (Ctrl+T)"
+                              AutomationProperties.Name="テストモード (Ctrl+T)"
                               IsChecked="{Binding IsTestMode}"
                               IsEnabled="{Binding HasProject}">
                     <StackPanel>
@@ -408,8 +409,11 @@
                     </StackPanel>
                 </Button>
                 <Separator/>
-                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ"
-                        AutomationProperties.Name="自作パーツ"
+                <!-- 家老采配(2026-07-15、表記漏れ修正): F11ショートカットが実在する
+                     (MainWindow.xaml.cs、ActivateAndFocusPartSelection)にもかかわらずToolTip/
+                     AutomationProperties.Nameに未併記だったため、他ボタンと同様の形式へ揃える。 -->
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ (F11)"
+                        AutomationProperties.Name="自作パーツ (F11)"
                         Click="OpenPartSelectionButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanEditDiagram}">
