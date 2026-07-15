@@ -2025,7 +2025,10 @@ public sealed class MainWindowViewModel : ViewModelBase
             double absolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var s)
                 && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double v)
                 ? v : defaultDy;
-            return (absolute - defaultDy).ToString(CultureInfo.InvariantCulture);
+            // Math.Round(6桁): defaultDy(-5.72等)が2進浮動小数点で正確に表現できない値だと、
+            // 減算結果が-3.499999999999999のような誤差付きになる(T-097補正でDefaultLabelDy(Coil)
+            // を-5.5→-5.72に変更した際に顕在化)。実用上mm単位で6桁の精度は過剰なため丸めて吸収する。
+            return Math.Round(absolute - defaultDy, 6).ToString(CultureInfo.InvariantCulture);
         }
         set
         {
@@ -2034,9 +2037,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             double oldAbsolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var os)
                 && double.TryParse(os, NumberStyles.Any, CultureInfo.InvariantCulture, out double ov)
                 ? ov : defaultDy;
-            string oldValue = (oldAbsolute - defaultDy).ToString(CultureInfo.InvariantCulture);
+            string oldValue = Math.Round(oldAbsolute - defaultDy, 6).ToString(CultureInfo.InvariantCulture);
 
-            if (!double.TryParse(value.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out double offset)
+            // T-097差し戻し2周目(忍者実機確認NG): 空文字列(クリア操作)は「相対オフセット0=既定へ
+            // 戻す」を意味する入力であり、Setpoint等の「非数値は無効」ガードをそのまま流用すると
+            // TryParse失敗経路に落ちて直前値へロールバックしてしまう(LabelDyはクリア=既定復帰という
+            // LampColorに近い意味論を持つため、Setpointと同一のガードでは扱えない)。空文字列のみ
+            // 明示的にoffset=0として扱い、それ以外の非数値・非有限値は従来どおり無効として弾く。
+            string trimmed = value.Trim();
+            double offset;
+            if (trimmed.Length == 0)
+            {
+                offset = 0;
+            }
+            else if (!double.TryParse(trimmed, NumberStyles.Any, CultureInfo.InvariantCulture, out offset)
                 || !double.IsFinite(offset))
             {
                 OnPropertyChanged(nameof(SelectedElementLabelDy), oldValue);
@@ -2047,7 +2061,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             UndoManager.RecordSnapshot(Document);
             if (offset == 0) el.Params.Remove(ParamKeys.LabelDy);
-            else el.Params[ParamKeys.LabelDy] = (defaultDy + offset).ToString(CultureInfo.InvariantCulture);
+            else el.Params[ParamKeys.LabelDy] = Math.Round(defaultDy + offset, 6).ToString(CultureInfo.InvariantCulture);
             MarkDirty();
             OnPropertyChanged(nameof(SelectedElementLabelDy), oldValue);
         }

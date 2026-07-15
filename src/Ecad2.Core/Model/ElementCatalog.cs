@@ -46,7 +46,12 @@ public static class ElementCatalog
         ElementKind.ContactNO or ElementKind.ContactNC => -1.5,
         ElementKind.PushButtonNC => -1.5,
         ElementKind.PushButtonNO => -0.5,
-        ElementKind.Coil => -5.5,   // コイルの丸の中あたりに表示（重なり回避）
+        // 忍者実機実測(2026-07-15、docs-notes/ecad2-t097-verify-ninja.md観点(1))で旧値-5.5では
+        // テキスト中心が円中心より約0.22mm(バウンディングボックス法-0.215mm/重心法-0.228mmの
+        // 中間)上にズレていたため、その分だけラベルを下げる方向(DrawElementLabel: yn = YRow(row)
+        // - Cell*0.50 - dy、dy>0で上へ)へ補正。dyを0.22減らす(より負にする)とynが0.22増え
+        // (下方向)、ズレが解消される。
+        ElementKind.Coil => -5.72,   // コイルの丸の中心に表示(実測補正済み、重なり回避)
         ElementKind.Lamp => -1.5,
         ElementKind.Terminal => -2.0,
         _ => 0.0,

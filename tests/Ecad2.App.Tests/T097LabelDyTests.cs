@@ -51,11 +51,11 @@ public class T097LabelDyTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         vm.NewDocument();
-        PlaceAt(vm, 0, 0, BasicPartTemplates.CoilId, "Y001");   // DefaultLabelDy(Coil) = -5.5
+        PlaceAt(vm, 0, 0, BasicPartTemplates.CoilId, "Y001");   // DefaultLabelDy(Coil) = -5.72(T-097補正後)
 
         vm.SelectedElementLabelDy = "2";
 
-        Assert.Equal("-3.5", vm.SelectedElement!.Params[ParamKeys.LabelDy]);
+        Assert.Equal("-3.72", vm.SelectedElement!.Params[ParamKeys.LabelDy]);
     }
 
     [Fact]
@@ -87,7 +87,6 @@ public class T097LabelDyTests : ViewModelTestBase
 
     [Theory]
     [InlineData("abc")]
-    [InlineData("")]
     [InlineData("NaN")]
     [InlineData("Infinity")]
     [InlineData("-Infinity")]
@@ -101,6 +100,27 @@ public class T097LabelDyTests : ViewModelTestBase
         vm.SelectedElementLabelDy = input;
 
         Assert.Equal("3", vm.SelectedElementLabelDy);
+    }
+
+    /// <summary>
+    /// T-097差し戻し2周目(忍者実機確認NG、docs-notes/ecad2-t097-verify-ninja.md観点(2))の回帰テスト。
+    /// LabelDy欄をCtrl+A→Deleteで空文字列にしてTabで確定する操作(=クリア)は、明示的な「0」入力と
+    /// 同じく既定へ戻る(Params[LabelDy]エントリ削除)べきだが、旧実装は空文字列をTryParse失敗経路
+    /// (非数値として無効)に流してしまい直前値へロールバックしていた。
+    /// </summary>
+    [Fact]
+    public void SelectedElementLabelDy_空文字列でクリアすると既定へ戻る()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 0, 0, BasicPartTemplates.CoilId, "Y001");
+        vm.SelectedElementLabelDy = "3";
+        Assert.True(vm.SelectedElement!.Params.ContainsKey(ParamKeys.LabelDy));   // 前提: 値設定でエントリが作られる
+
+        vm.SelectedElementLabelDy = "";
+
+        Assert.False(vm.SelectedElement!.Params.ContainsKey(ParamKeys.LabelDy));
+        Assert.Equal("0", vm.SelectedElementLabelDy);
     }
 
     [Fact]
