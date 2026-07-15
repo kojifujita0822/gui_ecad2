@@ -2579,6 +2579,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         // T-055増分1: 末尾行の追加・削除。CanExecuteはボタンのIsEnabled連動用、Execute内部の
         // ガードはキーボードショートカット等CanExecuteを経由しない呼び出しに対する安全弁
         // (二重化だが役割が異なるため許容、家老裁可済み)。
+        // T-092(殿裁定=ブロック方式): 記入中ドラフト(縦コネクタ/自由線/画像挿入)を保持したまま
+        // AddRow/DeleteRowを実行すると、ドラフトの行インデックスが無警告でクランプされ誤った行・
+        // 別シートへ確定されうる(P-094)。T-091(F5〜F10)と同型の横展開でHasAnyDraft中は不許可にする。
         AddRowCommand = new RelayCommand(
             () =>
             {
@@ -2586,7 +2589,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 sheet.Grid.Rows++;
                 FinishRowCountChange(sheet);
             },
-            () => CanEditDiagram && CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
+            () => CanEditDiagram && !HasAnyDraft && CurrentSheet is Sheet sheet && sheet.Grid.Rows < GridSpec.MaxRows);
 
         DeleteRowCommand = new RelayCommand(
             () =>
@@ -2597,7 +2600,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 sheet.Grid.Rows--;
                 FinishRowCountChange(sheet);
             },
-            () => CanEditDiagram && CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
+            () => CanEditDiagram && !HasAnyDraft && CurrentSheet is Sheet sheet && sheet.Grid.Rows > GridSpec.MinRows);
 
         // T-055増分2: シート設定ダイアログ経由でGrid.Rows・Bus.LeftName/RightNameをまとめて更新。
         UpdateSheetSettingsCommand = new RelayCommand(param =>
@@ -2670,13 +2673,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         // (RecordSnapshotの呼び出しはSheetNavigationViewModel.AddCommand/DeleteCommand側で行う)。
         // T-061修正A-3(確認事項2=案A確定): テストモード中はUndo/Redo自体を無効化する
         // (「テストモード=観察専用」の一貫性、CanEditDiagram統一ゲートへ統合)。
+        // T-092: 上記AddRow/DeleteRowと同事情。Undo/Redoで巻き戻る/やり直る対象はシート構成
+        // (T-051 MVP範囲)であり、記入中ドラフトが指す行・シートの前提が崩れうるため同様にブロックする。
         UndoCommand = new RelayCommand(
             () =>
             {
                 if (UndoManager.Undo(Document) is not LadderDocument restored) return;
                 ApplyUndoRedoSnapshot(restored);
             },
-            () => CanEditDiagram && UndoManager.CanUndo);
+            () => CanEditDiagram && !HasAnyDraft && UndoManager.CanUndo);
 
         RedoCommand = new RelayCommand(
             () =>
@@ -2684,7 +2689,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 if (UndoManager.Redo(Document) is not LadderDocument restored) return;
                 ApplyUndoRedoSnapshot(restored);
             },
-            () => CanEditDiagram && UndoManager.CanRedo);
+            () => CanEditDiagram && !HasAnyDraft && UndoManager.CanRedo);
     }
 
     /// <summary>T-051往復3周目(隠密再々レビューPLAUSIBLE、docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md):
