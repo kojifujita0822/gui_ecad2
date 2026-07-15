@@ -300,20 +300,22 @@ public partial class MainWindow : Window
 
     // Ctrl+Alt+Rハンドラから呼ばれる。T-058増分4(殿裁定(4)): 保存済みファイルがあればそちらを
     // 優先し、無ければ従来どおりハードコード既定(_defaultDockingLayoutXmlByManager)へ戻す。
-    // LayoutSerializationCallbackでContentIdをキーに元のコンテンツを再バインドする
-    // (Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
     // 複数DockingManager(左パレット・出力パネル・右パネル)をまとめてリセットする(家老申し送り)。
+    // 隠密静的レビュー指摘(CONFIRMED、severity中〜高、2026-07-15): 保存済みファイルはIO面は
+    // TryReadSavedDockingLayoutXmlで保護済みだが、読めても中身のXML構文が壊れているケース
+    // (手動編集ミス・アプリクラッシュ時の中途半端な書込み等)ではDeserialize自体が例外を投げ、
+    // LoadDockingLayoutFromFileIfExists()と非対称に無防備だった(実機RED実測: 破損XMLで
+    // 「予期しないエラー」ダイアログが発生することを確認済み)。TryDeserializeDockingLayoutで
+    // Deserialize自体も保護し、失敗時はハードコード既定側へ二段フォールバックする。
     private void ResetDockingLayoutToDefault()
     {
         foreach (var manager in AllDockingManagers)
         {
-            string? xml = TryReadSavedDockingLayoutXml(manager)
-                ?? _defaultDockingLayoutXmlByManager.GetValueOrDefault(manager);
-            if (xml is null) continue;
-            var serializer = new XmlLayoutSerializer(manager);
-            serializer.LayoutSerializationCallback += RebindDockingContent;
-            using var reader = new StringReader(xml);
-            serializer.Deserialize(reader);
+            string? savedXml = TryReadSavedDockingLayoutXml(manager);
+            if (savedXml is not null && TryDeserializeDockingLayout(manager, savedXml)) continue;
+
+            if (_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var defaultXml))
+                TryDeserializeDockingLayout(manager, defaultXml);
         }
         // T-058増分3隠密静的レビュー指摘1(CONFIRMED、増分2から持ち越しの既存欠陥の複製):
         // Deserialize直後のLayoutAnchorable.Titleは既定レイアウトXML焼き付け時点の初期値
@@ -338,6 +340,25 @@ public partial class MainWindow : Window
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             return null;
+        }
+    }
+
+    // 隠密静的レビュー指摘対応(2026-07-15): XmlLayoutSerializer.Deserialize自体(XML構文エラー等)
+    // をtry-catchで保護する。LayoutSerializationCallbackでContentIdをキーに元のコンテンツを
+    // 再バインドする(Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
+    private bool TryDeserializeDockingLayout(DockingManager manager, string xml)
+    {
+        try
+        {
+            var serializer = new XmlLayoutSerializer(manager);
+            serializer.LayoutSerializationCallback += RebindDockingContent;
+            using var reader = new StringReader(xml);
+            serializer.Deserialize(reader);
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Xml.XmlException)
+        {
+            return false;
         }
     }
 
