@@ -213,7 +213,7 @@ public partial class MainWindow : Window
     // Ctrl+Alt+Rハンドラから呼ばれる。既定レイアウト文字列からDeserializeし直し、
     // LayoutSerializationCallbackでContentIdをキーに元のコンテンツを再バインドする
     // (Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
-    // 複数DockingManager(左パレット・出力パネル)をまとめてリセットする(家老申し送り)。
+    // 複数DockingManager(左パレット・出力パネル・右パネル)をまとめてリセットする(家老申し送り)。
     private void ResetDockingLayoutToDefault()
     {
         foreach (var manager in AllDockingManagers)
@@ -230,6 +230,13 @@ public partial class MainWindow : Window
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
         }
+        // T-058増分3隠密静的レビュー指摘1(CONFIRMED、増分2から持ち越しの既存欠陥の複製):
+        // Deserialize直後のLayoutAnchorable.Titleは既定レイアウトXML焼き付け時点の初期値
+        // ("プロパティ"/"出力")のまま。状況依存中(部品選択モード・検索結果表示中)にリセットすると
+        // 中身はVisibilityバインディングにより現在の状況のまま変化しないため、タイトルだけ既定値へ
+        // 巻き戻り中身と食い違う。両タイトル同期メソッドを呼び直して整合を回復する。
+        UpdateOutputPanelTitle();
+        UpdateRightPanelBottomTitle();
         _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
     }
 
