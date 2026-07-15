@@ -564,7 +564,11 @@
             <avalonDock:DockingManager x:Name="RightPanelDockingManager" Grid.Column="4">
                 <avalonDock:LayoutRoot>
                     <avalonDock:LayoutPanel Orientation="Vertical">
-                        <avalonDock:LayoutAnchorablePane>
+                        <!-- T-058増分3範囲内欠陥修正(家老采配、忍者実機確認で実害確定): AvalonDock既定の
+                             DockMinHeight(25px、隠密reflection実測)ではDataGridが完全に不可視(BoundingRectangle
+                             =Empty)になるまで境界ドラッグで縮小可能だった。旧Grid実装時代のMinHeight="80"
+                             (MainContentArea.RowDefinitions、既存T-059出力パネル領域と同値)を踏襲し明示指定する。 -->
+                        <avalonDock:LayoutAnchorablePane DockMinHeight="80">
                             <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False">
                                 <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
                                           HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
@@ -577,7 +581,7 @@
                                 </DataGrid>
                             </avalonDock:LayoutAnchorable>
                         </avalonDock:LayoutAnchorablePane>
-                        <avalonDock:LayoutAnchorablePane>
+                        <avalonDock:LayoutAnchorablePane DockMinHeight="80">
                             <!-- 下段: プロパティ ⇔ 部品選択の状況依存切替(T-026段階4-7、案B=GX Works3式)。
                                  Tool.Mode==PlaceElementの間は部品選択(自作パーツ含む全SelectionEntries、
                                  サムネイル付きラッパー。T-015)を表示し、それ以外はプロパティを表示する。
