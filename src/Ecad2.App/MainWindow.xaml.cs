@@ -1922,7 +1922,14 @@ public partial class MainWindow : Window
                 NewButton_Click(sender, e);
                 e.Handled = true;
                 break;
-            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
+            // T-094(殿裁定2026-07-15、P-096起票): Ctrl+Z/YはF5〜F10や矢印キー等の他の多くの
+            // ショートカットが持つIsCanvasFocused()判定を欠いており、シートパネル等にフォーカスが
+            // あっても素通しで実行できてしまっていた(バグ扱い、フォーカス範囲の統一)。
+            // 副作用: DeviceNameBox編集中(=IsCanvasFocused()==false)はcase自体に到達しなくなり
+            // Ctrl+Zが無反応になる。CommitDeviceNameEdit()(T-051バグ修正#3)は編集欄からキャンバスへ
+            // フォーカスを戻した後の操作のみを想定する形になるが、他のF5〜F10と一貫した挙動であり、
+            // 呼び出し自体は残す(将来的にIsCanvasFocused範囲が変わってもガードとして機能する)。
+            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control && IsCanvasFocused():
                 // T-051: メニュー/ツールバーのInputGestureText表示(Ctrl+Z)と整合させる。
                 // T-051バグ修正#3(隠密レビューCONFIRMED重大): 既存Ctrl+S/O/Nと同型のガード。
                 // DeviceNameBox編集中の未確定入力を確定してからUndoを実行しないと、Undoで
@@ -1933,7 +1940,7 @@ public partial class MainWindow : Window
                 if (_viewModel.UndoCommand.CanExecute(null)) _viewModel.UndoCommand.Execute(null);
                 e.Handled = true;
                 break;
-            case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
+            case Key.Y when Keyboard.Modifiers == ModifierKeys.Control && IsCanvasFocused():
                 CommitDeviceNameEdit();
                 if (_viewModel.RedoCommand.CanExecute(null)) _viewModel.RedoCommand.Execute(null);
                 e.Handled = true;
@@ -1963,7 +1970,10 @@ public partial class MainWindow : Window
                     FocusCanvas();
                 e.Handled = true;
                 break;
-            case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+            // T-094(殿裁定2026-07-15、P-096起票、忍者T-090実機確認中に発覚): Ctrl+Shift+Up/Downも
+            // F5〜F10や矢印キー等と同様IsCanvasFocused()判定を欠いており、シートパネル等に
+            // フォーカスがあっても素通しで実行できてしまっていた(バグ扱い、フォーカス範囲の統一)。
+            case Key.Up when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && IsCanvasFocused():
                 // T-055増分1: 末尾行を1行追加する(ツールバー「行を追加」ボタンと同一コマンド)。
                 // T-090修正(隠密指摘P-090、PR-13型): CanExecute(CanEditDiagram含む)を経由せず直接
                 // Executeしていたため、テストモード中等でもキーボード経由で行追加が実行できてしまって
@@ -1972,7 +1982,7 @@ public partial class MainWindow : Window
                 if (_viewModel.AddRowCommand.CanExecute(null)) _viewModel.AddRowCommand.Execute(null);
                 e.Handled = true;
                 break;
-            case Key.Down when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift):
+            case Key.Down when Keyboard.Modifiers == (ModifierKeys.Control | ModifierKeys.Shift) && IsCanvasFocused():
                 // T-055増分1: 末尾行を1行削除する(ツールバー「行を削除」ボタンと同一コマンド)。
                 // T-090修正: 上記AddRowCommandと同事情。
                 if (_viewModel.DeleteRowCommand.CanExecute(null)) _viewModel.DeleteRowCommand.Execute(null);
