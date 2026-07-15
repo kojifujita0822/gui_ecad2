@@ -421,6 +421,22 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter) CommitDeviceNameEdit();
     }
 
+    // T-085: ランプ色編集(DeviceNameBox/NotchPositionBoxと同型のExplicit確定)。CommitDeviceNameEditが
+    // LampColorBoxも併せて確定するため、専用のCommitメソッドは設けず既存を呼ぶ。
+    private void LampColorBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
+
+    private void LampColorBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) CommitDeviceNameEdit();
+    }
+
+    // T-085: ランプ色クリアボタン。テキストを空にしてから即時確定する(DoD=クリアボタンつき)。
+    private void LampColorClearButton_Click(object sender, RoutedEventArgs e)
+    {
+        LampColorBox.Text = "";
+        CommitDeviceNameEdit();
+    }
+
     // T-049(殿裁定): デバイス名編集中、フォーカスを保持したままCtrl+S/N/O・ウィンドウクローズが
     // 実行されると、UpdateSourceTrigger=Explicit(上記コメント参照)ゆえLostKeyboardFocus/Enterの
     // いずれも発火せず、編集内容がサイレントに保存漏れ/無確認破棄されうる(P-013)。保存・破棄判定
@@ -430,10 +446,12 @@ public partial class MainWindow : Window
     // T-086: NotchPositionBoxも同型のUpdateSourceTrigger=Explicit入力欄のため、CommitDeviceNameEditの
     // 呼び出し元全箇所(P-071型の呼び忘れ再発防止)で併せて確定させる。NotchPositionBoxは
     // IsSelectedElementSelectSwitch=falseの間Bindingが無効な場合があるため?.で安全に扱う。
+    // T-085: LampColorBoxも同型(IsSelectedElementLamp=falseの間は?.で安全に扱う)。
     private void CommitDeviceNameEdit()
     {
         DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         NotchPositionBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        LampColorBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         RedrawCanvas();
     }
 

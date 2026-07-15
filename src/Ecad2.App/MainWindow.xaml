@@ -611,6 +611,22 @@
                                                          IsEnabled="{Binding CanEditDiagram}"
                                                          LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
                                             </StackPanel>
+                                            <!-- T-085: 表示灯(Lamp)限定の色記号入力欄(殿裁定2026-07-13、丸内に表示するフリーテキスト
+                                                 記号であり実際の表示色ではない)。DeviceNameBoxと同型のExplicit確定に加え、クリア
+                                                 ボタン(×)を新設する。 -->
+                                            <StackPanel Visibility="{Binding IsSelectedElementLamp, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="ランプ色（中央表示）:" Margin="0,8,0,2"/>
+                                                <DockPanel LastChildFill="True">
+                                                    <Button DockPanel.Dock="Right" Content="×" Width="24" Margin="4,0,0,0"
+                                                            IsEnabled="{Binding CanEditDiagram}"
+                                                            Click="LampColorClearButton_Click"
+                                                            AutomationProperties.Name="ランプ色クリア"/>
+                                                    <TextBox x:Name="LampColorBox" Text="{Binding SelectedElementLampColor, UpdateSourceTrigger=Explicit}"
+                                                             MaxLength="2"
+                                                             IsEnabled="{Binding CanEditDiagram}"
+                                                             LostKeyboardFocus="LampColorBox_LostKeyboardFocus" PreviewKeyDown="LampColorBox_PreviewKeyDown"/>
+                                                </DockPanel>
+                                            </StackPanel>
                                         </StackPanel>
                                         <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
                                              ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->

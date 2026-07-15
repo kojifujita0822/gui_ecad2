@@ -397,6 +397,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedElementDeviceName));
                 OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
                 OnPropertyChanged(nameof(SelectedElementNotchPosition));
+                OnPropertyChanged(nameof(IsSelectedElementLamp));
+                OnPropertyChanged(nameof(SelectedElementLampColor));
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -1851,6 +1853,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool IsSelectedElementSelectSwitch
         => SelectedElement is ElementInstance selEl && ResolveDeviceClass(selEl) == DeviceClass.SelectSwitch;
 
+    /// <summary>SelectedElementが表示灯(Lamp)か(T-085、プロパティパネルのランプ色入力欄表示制御用)。
+    /// IsSelectedElementSelectSwitchと同型。</summary>
+    public bool IsSelectedElementLamp
+        => SelectedElement is ElementInstance selEl && ResolveDeviceClass(selEl) == DeviceClass.Lamp;
+
     /// <summary>SelectedElementのノッチ位置(T-086、ElementInstance.Params[ParamKeys.Position])。
     /// セレクトSW限定(IsSelectedElementSelectSwitchでXAML側表示制御)。0-99の整数のみ許可
     /// (GuiEcad踏襲の範囲制約、殿裁定)、範囲外・非数値入力は値を変更せず表示のみ元へ戻す。
@@ -1874,6 +1881,34 @@ public sealed class MainWindowViewModel : ViewModelBase
             el.Params[ParamKeys.Position] = newValue;
             MarkDirty();
             OnPropertyChanged(nameof(SelectedElementNotchPosition), oldValue);
+        }
+    }
+
+    /// <summary>SelectedElementのランプ色(色記号、T-085、ElementInstance.Params[ParamKeys.LampColor])。
+    /// ランプ限定(IsSelectedElementLampでXAML側表示制御)。殿裁定(2026-07-13)＝実際の表示色ではなく
+    /// フリーテキストの記号(丸内にR/W/G等1〜2文字を表示)、上限2文字。空文字はクリア扱いでParamsから
+    /// 削除する(既存の描画・PDF出力側はTryGetValue+IsNullOrEmptyで無条件許容、器は変更不要)。
+    /// 値未変化ならRecordSnapshotしない(SelectedElementNotchPositionと同型の配慮)。</summary>
+    public string SelectedElementLampColor
+    {
+        get => SelectedElement?.Params.TryGetValue(ParamKeys.LampColor, out var v) == true ? v : "";
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            string oldValue = el.Params.TryGetValue(ParamKeys.LampColor, out var ov) ? ov : "";
+            string newValue = value.Trim();
+            if (newValue.Length > 2)
+            {
+                OnPropertyChanged(nameof(SelectedElementLampColor), oldValue);
+                return;
+            }
+            if (oldValue == newValue) return;
+
+            UndoManager.RecordSnapshot(Document);
+            if (newValue.Length > 0) el.Params[ParamKeys.LampColor] = newValue;
+            else el.Params.Remove(ParamKeys.LampColor);
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementLampColor), oldValue);
         }
     }
 
@@ -1904,6 +1939,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementLamp));
+        OnPropertyChanged(nameof(SelectedElementLampColor));
         DeviceTable.Refresh();
         return true;
     }
@@ -2031,6 +2068,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementLamp));
+        OnPropertyChanged(nameof(SelectedElementLampColor));
     }
 
     private string _statusMessage = "";
@@ -2528,6 +2567,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementLamp));
+        OnPropertyChanged(nameof(SelectedElementLampColor));
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから
