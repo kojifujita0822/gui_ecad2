@@ -106,31 +106,54 @@ public partial class MainWindow : Window
 
     private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager, RightPanelDockingManager };
 
+    // T-058増分4(殿裁定=保存タイミング両方・保存先アプリ共通設定): 明示保存済みの既定レイアウトを
+    // %AppData%配下へDockingManager単位の個別XMLとして永続化する。_defaultDockingLayoutXmlByManager
+    // (起動直後にキャプチャする出荷時ハードコード既定、メモリ上・不変)とは独立した別層であり、
+    // Ctrl+Alt+Rはファイルが存在すればそちらを優先する(4-4節)。
+    private string DockingLayoutDirectory =>
+        System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Ecad2", "docking-layout");
+
+    private string GetDockingLayoutFilePath(DockingManager manager) =>
+        System.IO.Path.Combine(DockingLayoutDirectory, GetDockingLayoutFileName(manager.Name));
+
+    /// <summary>DockingManagerのx:Name(FrameworkElement.Name)から保存ファイル名を導出する純粋関数
+    /// (単体テスト可能化のためinternal static、T-058増分4設計叩き台4節)。</summary>
+    internal static string GetDockingLayoutFileName(string managerName) => managerName switch
+    {
+        nameof(LeftPaletteDockingManager) => "left-palette.xml",
+        nameof(OutputPanelDockingManager) => "output-panel.xml",
+        nameof(RightPanelDockingManager) => "right-panel.xml",
+        _ => throw new ArgumentOutOfRangeException(nameof(managerName), managerName, "未知のDockingManager"),
+    };
+
     // 殿実機確認で発覚(重要): フロート化したパネル自体にフォーカスがある間はメインウィンドウの
     // PreviewKeyDownが発火せず復旧不能のままだった——AvalonDockはフロート化したLayoutAnchorableを
     // 別のWindowインスタンス(独自のフォーカス・イベントツリー)として生成するため。
     // EventManager.RegisterClassHandlerでアプリケーション内の全Windowインスタンス
     // (メインウィンドウ・AvalonDockフロートウィンドウ問わず)をクラスハンドラとして捕捉することで、
-    // どこにフォーカスがあってもCtrl+Alt+Rが機能するようにする。
+    // どこにフォーカスがあってもCtrl+Alt+R/Sが機能するようにする。
+    // T-058増分4: Ctrl+Alt+S(現在のレイアウトを既定として保存)もCtrl+Alt+Rと同じ理由で
+    // フロートウィンドウ上から機能させる必要があるため、同一ハンドラ内でキー判定を分岐する。
     static MainWindow()
     {
-        EventManager.RegisterClassHandler(typeof(Window), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalResetLayoutShortcut));
+        EventManager.RegisterClassHandler(typeof(Window), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalDockingLayoutShortcut));
     }
 
-    private static void OnGlobalResetLayoutShortcut(object sender, KeyEventArgs e)
+    private static void OnGlobalDockingLayoutShortcut(object sender, KeyEventArgs e)
     {
-        if (e.Key != Key.R || Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt)) return;
+        if (Keyboard.Modifiers != (ModifierKeys.Control | ModifierKeys.Alt)) return;
+        if (e.Key != Key.R && e.Key != Key.S) return;
         // 隠密静的レビュー指摘(CONFIRMED): typeof(Window)クラスハンドラはモーダルダイアログ
         // (AddSheetDialog等)も捕捉してしまい、ダイアログ表示中にCtrl+Alt+Rを押すと裏で
         // メインウィンドウのレイアウトが無言リセットされていた。メインウィンドウ自身、または
         // AvalonDockが生成するフロートウィンドウ(LayoutFloatingWindowControl派生)からの
         // イベントのみを対象とし、それ以外(モーダルダイアログ)は無視する。
         if (sender is not (MainWindow or AvalonDock.Controls.LayoutFloatingWindowControl)) return;
-        if (Application.Current.MainWindow is MainWindow mainWindow)
-        {
-            mainWindow.ResetDockingLayoutToDefault();
-            e.Handled = true;
-        }
+        if (Application.Current.MainWindow is not MainWindow mainWindow) return;
+
+        if (e.Key == Key.R) mainWindow.ResetDockingLayoutToDefault();
+        else mainWindow.SaveDockingLayoutAsDefault();
+        e.Handled = true;
     }
 
     public MainWindow()
@@ -145,6 +168,9 @@ public partial class MainWindow : Window
         RedrawCanvas();
         RegisterDockingContents();
         SerializeDefaultDockingLayouts();
+        // T-058増分4: 出荷時ハードコード既定(直前のSerializeDefaultDockingLayouts、不変)を必ず
+        // キャプチャした後に、保存済みファイルがあれば読み込んで適用する(順序が重要、設計叩き台3-1節)。
+        LoadDockingLayoutFromFileIfExists();
         // 忍者実機確認で発覚(往復2周目): LayoutAnchorable(LayoutContent→LayoutElement:DependencyObject)
         // はFrameworkElementではなくWPFのDataContext継承(Visual/Logical Tree経由)の対象外のため、
         // Title="{Binding Find.IsVisible, ...}"は解決されず完全に空白になっていた(GitHub一次ソース
@@ -210,7 +236,70 @@ public partial class MainWindow : Window
         }
     }
 
-    // Ctrl+Alt+Rハンドラから呼ばれる。既定レイアウト文字列からDeserializeし直し、
+    // T-058増分4: ResetDockingLayoutToDefault()の既存ラムダと同一ロジックのため共通化する
+    // (増分3隠密指摘2「rule of threeではあるが完全一致重複は避ける」と同型判断)。
+    // LoadDockingLayoutFromFileIfExists()とも共有する。
+    private void RebindDockingContent(object? sender, LayoutSerializationCallbackEventArgs args)
+    {
+        if (args.Model.ContentId != null && _dockingContentRegistry.TryGetValue(args.Model.ContentId, out var content))
+        {
+            args.Content = content;
+        }
+    }
+
+    // T-058増分4(殿裁定=保存タイミング両方): アプリ終了時(Window_Closing)・明示コマンド
+    // (SaveDockingLayoutMenuItem_Click)の双方から呼ばれる単一の保存メソッド。書込失敗
+    // (権限/容量等)はクラッシュさせずステータスメッセージのみに留める(殿裁定(5)フォールバック)。
+    private void SaveDockingLayoutAsDefault()
+    {
+        try
+        {
+            Directory.CreateDirectory(DockingLayoutDirectory);
+            foreach (var manager in AllDockingManagers)
+            {
+                var serializer = new XmlLayoutSerializer(manager);
+                using var writer = new StreamWriter(GetDockingLayoutFilePath(manager));
+                serializer.Serialize(writer);
+            }
+            _viewModel.StatusMessage = "現在のパネルレイアウトを既定として保存しました";
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _viewModel.StatusMessage = "パネルレイアウトの保存に失敗しました";
+        }
+    }
+
+    // T-058増分4: 起動時、保存済みファイルがあれば適用する(SerializeDefaultDockingLayouts()の
+    // 直後から呼ぶこと、コンストラクタ参照)。ファイル無し/破損いずれもクラッシュさせず、その
+    // DockingManagerはXAML初期状態のまま起動を継続する(殿裁定(5)フォールバック)。
+    // 家老裁可(2026-07-15): 破損ファイル等で読込に失敗した場合は沈黙のフォールバックを避け、
+    // ステータスメッセージで一言知らせる(GCADのようなバージョン管理を持たない代わりの透明性確保)。
+    private void LoadDockingLayoutFromFileIfExists()
+    {
+        bool anyLoadFailed = false;
+        foreach (var manager in AllDockingManagers)
+        {
+            var path = GetDockingLayoutFilePath(manager);
+            if (!File.Exists(path)) continue;
+            try
+            {
+                var serializer = new XmlLayoutSerializer(manager);
+                serializer.LayoutSerializationCallback += RebindDockingContent;
+                using var reader = new StreamReader(path);
+                serializer.Deserialize(reader);
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Xml.XmlException)
+            {
+                // 破損ファイル等はハードコード既定(XAML初期状態)のまま起動を継続する。
+                anyLoadFailed = true;
+            }
+        }
+        if (anyLoadFailed)
+            _viewModel.StatusMessage = "保存済みレイアウトの読込に失敗したため既定で起動しました";
+    }
+
+    // Ctrl+Alt+Rハンドラから呼ばれる。T-058増分4(殿裁定(4)): 保存済みファイルがあればそちらを
+    // 優先し、無ければ従来どおりハードコード既定(_defaultDockingLayoutXmlByManager)へ戻す。
     // LayoutSerializationCallbackでContentIdをキーに元のコンテンツを再バインドする
     // (Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
     // 複数DockingManager(左パレット・出力パネル・右パネル)をまとめてリセットする(家老申し送り)。
@@ -218,15 +307,11 @@ public partial class MainWindow : Window
     {
         foreach (var manager in AllDockingManagers)
         {
-            if (!_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var xml)) continue;
+            string? xml = TryReadSavedDockingLayoutXml(manager)
+                ?? _defaultDockingLayoutXmlByManager.GetValueOrDefault(manager);
+            if (xml is null) continue;
             var serializer = new XmlLayoutSerializer(manager);
-            serializer.LayoutSerializationCallback += (s, args) =>
-            {
-                if (args.Model.ContentId != null && _dockingContentRegistry.TryGetValue(args.Model.ContentId, out var content))
-                {
-                    args.Content = content;
-                }
-            };
+            serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
         }
@@ -238,6 +323,22 @@ public partial class MainWindow : Window
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
         _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
+    }
+
+    // T-058増分4: 保存済みファイルの読込に失敗(破損等)した場合はnullを返し、呼び出し元で
+    // ハードコード既定へフォールバックさせる(殿裁定(5))。
+    private string? TryReadSavedDockingLayoutXml(DockingManager manager)
+    {
+        var path = GetDockingLayoutFilePath(manager);
+        if (!File.Exists(path)) return null;
+        try
+        {
+            return File.ReadAllText(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
     }
 
     private void ViewModel_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -470,6 +571,9 @@ public partial class MainWindow : Window
         var dialog = new Views.AboutDialog { Owner = this };
         dialog.ShowDialog();
     }
+
+    // T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド)。表示メニュー・Ctrl+Alt+S共通。
+    private void SaveDockingLayoutMenuItem_Click(object sender, RoutedEventArgs e) => SaveDockingLayoutAsDefault();
 
     // 図面→ドキュメント情報。ダイアログ表示自体はView側の責務のためcode-behindで行い、
     // 結果の反映はViewModelのApplyDocumentInfoへ委譲する(RenameSheetButton_Clickと同型、T-065)。
@@ -731,7 +835,13 @@ public partial class MainWindow : Window
     // ConfirmDiscardIfDirtyを流用し、キャンセル/保存中止時はクローズ自体を取り消す。
     private void Window_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (!ConfirmDiscardIfDirty()) e.Cancel = true;
+        if (!ConfirmDiscardIfDirty())
+        {
+            e.Cancel = true;
+            return;
+        }
+        // T-058増分4(殿裁定=保存タイミング両方の1つ、アプリ終了時自動保存)。
+        SaveDockingLayoutAsDefault();
     }
 
     // T-061修正E-1(静的レビューPR-07該当): 行範囲チェック式が3箇所(テストモード左クリック・

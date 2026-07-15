@@ -156,6 +156,11 @@
             </MenuItem>
             <MenuItem Header="表示(_V)">
                 <MenuItem Header="グリッド表示(_G)" IsCheckable="True" IsChecked="{Binding IsGridVisible, Mode=TwoWay}" InputGestureText="Ctrl+G"/>
+                <Separator/>
+                <!-- T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド): 現在のパネルレイアウト
+                     (左パレット・出力パネル・右パネル)を既定として%AppData%配下へ保存する。
+                     Ctrl+Alt+R(リセット)と対をなすキーバインド。 -->
+                <MenuItem Header="現在のレイアウトを既定として保存(_L)" InputGestureText="Ctrl+Alt+S" Click="SaveDockingLayoutMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>
