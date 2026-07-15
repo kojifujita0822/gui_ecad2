@@ -150,6 +150,10 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 int index = Sheets.IndexOf(sheet);
                 // T-051: Undo基盤(MVP対象範囲=シート追加/削除)。実行直前にスナップショットを記録する。
                 _owner.UndoManager.RecordSnapshot(_owner.Document);
+                // T-084 P-066: 削除前に「欠番が生じるか」を判定しておく(削除対象より大きいPageNumberを
+                // 持つシートが1件でも残るなら、その削除対象の番号が歯抜けになる。実再採番は行わない
+                // 現状維持のため警告表示のみで対応、殿裁定)。
+                bool createsPageNumberGap = Sheets.Any(s => s.PageNumber > sheet.PageNumber);
                 _owner.Document.Sheets.RemoveAt(index);
                 Sheets.RemoveAt(index);
                 // T-050往復2周目(隠密CONFIRMED二重発火の解消): 公開セッタではなくSetCurrentSheetIndexCore。
@@ -160,6 +164,21 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 // 家老裁定: Sheets数を変える全経路で通知発火の不変条件を揃える(AddCommandと同型の
                 // 欠陥、現状のガードにより到達不能でも将来ガード変更時の再発を防ぐため揃えておく)。
                 _owner.NotifyHasProjectChanged();
+                // T-084 P-067: 削除でモデル順序(シート構成)が変わる以上、旧文書に紐づくDRC結果は
+                // 破棄する(T-082 MoveSheetCommandと同一パターン、クリアすべき診断が存在する場合のみ
+                // 実行しステータスバーへ案内、診断が元から空なら「削除されました」は出さない)。
+                // T-084 P-066: DRC案内と欠番警告は独立事象のため、両方該当する場合は連結して表示する
+                // (どちらか一方に上書きされて他方の情報が失われないようにする)。
+                var statusMessages = new List<string>();
+                if (_owner.OutputPanel.Diagnostics.Count > 0)
+                {
+                    _owner.OutputPanel.ClearResults();
+                    statusMessages.Add("DRC結果が削除されました。DRC再実行してください。");
+                }
+                if (createsPageNumberGap)
+                    statusMessages.Add("シート削除によりページ番号に欠番が生じました。");
+                if (statusMessages.Count > 0)
+                    _owner.StatusMessage = string.Join(" ", statusMessages);
                 // T-050修正(P-044): 削除された選択シート(sheet)が旧値。ローカルに手元にあるため
                 // 旧値をnull化せず2引数版でちょうど1回通知する。
                 OnPropertyChanged(nameof(SelectedSheet), sheet);

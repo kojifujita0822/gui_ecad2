@@ -65,6 +65,115 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         Assert.True(vm.SheetNavigation.DeleteCommand.CanExecute(null));
     }
 
+    // --- T-084: シート削除時の後始末2件(P-067=DRC結果破棄案内、P-066=PageNumber欠番警告) ---
+
+    /// <summary>
+    /// P-067対応: T-082 MoveSheetCommandと同一パターン。削除によりモデル順序(シート構成)が変わる
+    /// 以上、クリアすべきDRC診断が存在する場合はClearResults+殿指定文言をステータスバーへ表示する。
+    /// 末尾(PageNumber最大)を削除するため欠番は生じない(P-066側の文言は含まれないことも併せて検証)。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenDiagnosticsExist_ClearsResultsAndShowsStatusMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、末尾)を選択
+        vm.OutputPanel.Diagnostics.Add(new Diagnostic(
+            DiagnosticSeverity.Warning, "DRC-XREF-001", "CR1", "テスト診断",
+            new[] { new CircuitRef(1, 1) }));
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Empty(vm.OutputPanel.Diagnostics);
+        Assert.Equal("DRC結果が削除されました。DRC再実行してください。", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// 殿裁定「案A」の付帯条件(T-082と同型): 何も消えていないのに「削除されました」と表示するのは
+    /// 偽になるため、クリアすべき診断が元から存在しない場合はStatusMessageを上書きしない。
+    /// 末尾削除ゆえ欠番警告も出ないケース。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenNoDiagnosticsAndDeletingLastSheet_DoesNotOverwriteStatusMessage()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、末尾)を選択
+        vm.StatusMessage = "既存の案内";
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal("既存の案内", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// P-066対応: PageNumberの実再採番は行わない(現状維持)。末尾以外(PageNumber=2、残り1,3の
+    /// 途中)を削除すると、削除後もPageNumber=3のシートが残るため2が欠番になる。この場合のみ
+    /// 警告メッセージを表示する。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenDeletingNonLastSheet_ShowsPageNumberGapWarning()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、途中)を選択
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal("シート削除によりページ番号に欠番が生じました。", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// P-066の誤表示防止側: 末尾(PageNumber最大=3)を削除した場合は欠番が生じない
+    /// (残り1,2のまま連続)ため、警告を表示しない。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenDeletingLastSheet_DoesNotShowPageNumberGapWarning()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 2;   // シート3(PageNumber=3、末尾)を選択
+        vm.StatusMessage = "既存の案内";
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal("既存の案内", vm.StatusMessage);
+    }
+
+    /// <summary>
+    /// P-067とP-066は独立事象のため、両方該当する場合は一方に上書きされず両方の文言が
+    /// 連結して表示されることを検証する。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_WhenBothDiagnosticsExistAndDeletingNonLastSheet_ShowsBothMessages()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、途中)を選択
+        vm.OutputPanel.Diagnostics.Add(new Diagnostic(
+            DiagnosticSeverity.Warning, "DRC-XREF-001", "CR1", "テスト診断",
+            new[] { new CircuitRef(1, 1) }));
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal(
+            "DRC結果が削除されました。DRC再実行してください。 シート削除によりページ番号に欠番が生じました。",
+            vm.StatusMessage);
+    }
+
     [Fact]
     public void AddCommand_MarksDirty()
     {
