@@ -32,4 +32,10 @@
     <SolidColorBrush x:Key="DialogBackgroundBrush" Color="White"/>
     <SolidColorBrush x:Key="DialogForegroundBrush" Color="#000000"/>
     <SolidColorBrush x:Key="DialogBorderBrush" Color="Gray"/>
+
+    <!-- T-083増分3差し戻し(2026-07-16、忍者実機確認NG=観点3): TextBox入力欄はBackground/Foreground
+         未指定だとWPF既定(白背景)のままダーク時に浮いて見える。ダイアログ・固定色パネル内の
+         入力欄向けに専用キーを新設する。 -->
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="White"/>
+    <SolidColorBrush x:Key="InputForegroundBrush" Color="#000000"/>
 </ResourceDictionary>

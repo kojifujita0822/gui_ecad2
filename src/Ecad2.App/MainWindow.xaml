@@ -575,6 +575,8 @@
                     <TextBlock Text="検索:" VerticalAlignment="Center" Margin="0,0,4,0"/>
                     <TextBox x:Name="FindQueryBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
                              AutomationProperties.Name="検索"
+                             Background="{DynamicResource InputBackgroundBrush}"
+                             Foreground="{DynamicResource InputForegroundBrush}"
                              Text="{Binding Find.Query, UpdateSourceTrigger=PropertyChanged}"
                              PreviewKeyDown="FindQueryBox_PreviewKeyDown"/>
                     <TextBlock Text="{Binding Find.StatusText}" VerticalAlignment="Center" Width="60" Margin="0,0,4,0"/>
@@ -586,6 +588,8 @@
                     <TextBlock Text="置換後:" VerticalAlignment="Center" Margin="8,0,4,0"/>
                     <TextBox x:Name="FindReplaceBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
                              AutomationProperties.Name="置換後"
+                             Background="{DynamicResource InputBackgroundBrush}"
+                             Foreground="{DynamicResource InputForegroundBrush}"
                              Text="{Binding Find.ReplaceWith, UpdateSourceTrigger=PropertyChanged}"/>
                     <Button Content="置換" Width="48" VerticalAlignment="Center" Margin="0,0,4,0"
                             AutomationProperties.Name="置換" Command="{Binding Find.ReplaceOneCommand}"/>
@@ -924,7 +928,9 @@
                            Text="{Binding SelectedItem.DisplayName, ElementName=PlacementPartComboBox}"
                            MinWidth="60" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <TextBox x:Name="PlacementDeviceNameBox" Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
-                         AutomationProperties.Name="デバイス名"/>
+                         AutomationProperties.Name="デバイス名"
+                         Background="{DynamicResource InputBackgroundBrush}"
+                         Foreground="{DynamicResource InputForegroundBrush}"/>
                 <Button Content="OK" Width="60" VerticalAlignment="Center" IsDefault="True" Click="PlacementOkButton_Click" Margin="0,0,4,0"/>
                 <Button Content="キャンセル" Width="76" VerticalAlignment="Center" IsCancel="True" Click="PlacementCancelButton_Click" Margin="0,0,8,0"/>
                 <!-- 拡張表示ボタン(T-033増分3): 構想図末尾の[拡張表示]の配置のみ。詳細画面はT-028で
@@ -953,6 +959,8 @@
                 Panel.ZIndex="100">
             <TextBox x:Name="RungCommentBox" Width="140" MaxLength="20"
                      AutomationProperties.Name="行コメント"
+                     Background="{DynamicResource InputBackgroundBrush}"
+                     Foreground="{DynamicResource InputForegroundBrush}"
                      PreviewKeyDown="RungCommentBox_PreviewKeyDown"
                      LostKeyboardFocus="RungCommentBox_LostKeyboardFocus"/>
         </Border>

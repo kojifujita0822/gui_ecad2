@@ -8,7 +8,9 @@
         Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="新しいシート名:" Margin="0,0,0,4"/>
-        <TextBox x:Name="NameBox" Margin="0,0,0,12"/>
+        <TextBox x:Name="NameBox" Margin="0,0,0,12"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
             <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>

@@ -8,13 +8,19 @@
         Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="行数(1〜60):" Margin="0,0,0,4"/>
-        <TextBox x:Name="RowsBox" Margin="0,0,0,4"/>
+        <TextBox x:Name="RowsBox" Margin="0,0,0,4"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock x:Name="RowsErrorText" Text="1〜60の範囲で入力してください" Foreground="Red"
                    Visibility="Collapsed" Margin="0,0,0,8"/>
         <TextBlock Text="左母線名:" Margin="0,0,0,4"/>
-        <TextBox x:Name="LeftNameBox" Margin="0,0,0,12"/>
+        <TextBox x:Name="LeftNameBox" Margin="0,0,0,12"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="右母線名:" Margin="0,0,0,4"/>
-        <TextBox x:Name="RightNameBox" Margin="0,0,0,12"/>
+        <TextBox x:Name="RightNameBox" Margin="0,0,0,12"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
             <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>

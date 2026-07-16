@@ -28,4 +28,9 @@
     <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#FF2D2D30"/>
     <SolidColorBrush x:Key="DialogForegroundBrush" Color="#FFF0F0F0"/>
     <SolidColorBrush x:Key="DialogBorderBrush" Color="#FF565656"/>
+
+    <!-- T-083増分3差し戻し(2026-07-16、忍者実機確認NG=観点3、詳細はTheme.Light.xaml参照)。
+         ダイアログ背景(#FF2D2D30)よりやや明るくし、入力可能領域であることを視覚的に区別する。 -->
+    <SolidColorBrush x:Key="InputBackgroundBrush" Color="#FF3C3C3C"/>
+    <SolidColorBrush x:Key="InputForegroundBrush" Color="#FFF0F0F0"/>
 </ResourceDictionary>

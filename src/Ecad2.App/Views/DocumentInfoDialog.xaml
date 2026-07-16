@@ -8,21 +8,37 @@
         Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="社名:" Margin="0,0,0,4"/>
-        <TextBox x:Name="CompanyNameBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="CompanyNameBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="タイトル:" Margin="0,0,0,4"/>
-        <TextBox x:Name="TitleBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="TitleBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="図番:" Margin="0,0,0,4"/>
-        <TextBox x:Name="DrawingNoBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="DrawingNoBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="客先:" Margin="0,0,0,4"/>
-        <TextBox x:Name="CustomerBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="CustomerBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="設計者:" Margin="0,0,0,4"/>
-        <TextBox x:Name="DesignerBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="DesignerBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="製図者:" Margin="0,0,0,4"/>
-        <TextBox x:Name="DrafterBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="DrafterBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="検図者:" Margin="0,0,0,4"/>
-        <TextBox x:Name="CheckerBox" Margin="0,0,0,8"/>
+        <TextBox x:Name="CheckerBox" Margin="0,0,0,8"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="日付:" Margin="0,0,0,4"/>
-        <TextBox x:Name="DateBox" Margin="0,0,0,12"/>
+        <TextBox x:Name="DateBox" Margin="0,0,0,12"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
             <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>

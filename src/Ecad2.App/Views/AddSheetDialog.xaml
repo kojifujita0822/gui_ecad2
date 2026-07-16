@@ -8,7 +8,9 @@
         Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="シート名:" Margin="0,0,0,4"/>
-        <TextBox x:Name="NameBox" Margin="0,0,0,12"/>
+        <TextBox x:Name="NameBox" Margin="0,0,0,12"
+                 Background="{DynamicResource InputBackgroundBrush}"
+                 Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="種別:" Margin="0,0,0,4"/>
         <RadioButton x:Name="ControlCircuitRadio" Content="制御回路" GroupName="SheetType"
                      IsChecked="True" Margin="0,0,0,4"/>
