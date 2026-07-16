@@ -18,14 +18,10 @@
     <SolidColorBrush x:Key="ToolBarBackgroundBrush" Color="#F0F0F0"/>
     <SolidColorBrush x:Key="ToolBarForegroundBrush" Color="#000000"/>
 
-    <!-- T-083増分2(2026-07-16、家老采配): メニューバー背景色が暗色化しない現象への試行として
-         SystemColors系キーのオーバーライドを追加したが、実機確認(忍者、観点3)で**効果なし**と
-         確定した。ControlTemplate書き換え(TemplateBinding/通常Binding双方)も含め複数手法を
-         試したが解決せず、殿裁定によりメニューバー背景色は保留(AvalonDock層Bと同様の扱い)。
-         このオーバーライド自体は無害だが実効性はない、後日再挑戦時の参考として残置する。 -->
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#F0F0F0"/>
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#F0F0F0"/>
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#000000"/>
+    <!-- T-083増分2で試行したSystemColors系キーのオーバーライドは、殿実機確認(2026-07-16)で
+         IsCheckable="True"のMenuItem(グリッド表示・ダークモード等)のみ文字色オーバーライドが
+         作用し、背景オーバーライドは作用しないため「白地に白文字で文字が見えない」実害が
+         判明し、削除した(T-083増分7、家老裁量)。メニュー背景色の暗色化は引き続き保留。 -->
 
     <!-- T-083増分3新規: 各種ダイアログ(AddSheetDialog等)・固定色パネル(FindBar/ElementPlacementBar/
          RungCommentEditor)の配色。 -->

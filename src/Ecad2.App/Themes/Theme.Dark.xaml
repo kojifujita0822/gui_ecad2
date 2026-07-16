@@ -18,11 +18,8 @@
     <SolidColorBrush x:Key="ToolBarBackgroundBrush" Color="#FF2D2D30"/>
     <SolidColorBrush x:Key="ToolBarForegroundBrush" Color="#FFF0F0F0"/>
 
-    <!-- メニューバー背景色暗色化の試行(実機確認で効果なしと確定、詳細はTheme.Light.xaml参照)。
-         保留中のため実効性はないが後日再挑戦時の参考として残置する。 -->
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#FF2D2D30"/>
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#FF2D2D30"/>
-    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#FFF0F0F0"/>
+    <!-- T-083増分2で試行したSystemColors系キーのオーバーライドは「白地に白文字」実害が判明し
+         削除した(詳細はTheme.Light.xaml参照)。 -->
 
     <!-- T-083増分3新規: 各種ダイアログ・固定色パネルの配色。 -->
     <SolidColorBrush x:Key="DialogBackgroundBrush" Color="#FF2D2D30"/>
