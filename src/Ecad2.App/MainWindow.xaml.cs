@@ -532,22 +532,16 @@ public partial class MainWindow : Window
             LadderCanvasHost.Clear();
     }
 
-    // T-083増分1: 4つの独立DockingManager(ツールバー/左パレット/右パネル/出力パネル)全てへ
-    // 同一のVS2013テーマを設定する。取りこぼし(PR-17と同種の横展開漏れ)を避けるため単一箇所に集約。
+    // T-083増分1: 全DockingManager(AllDockingManagers、T-058増分5で確立済みの横展開防止機構)へ
+    // 同一のVS2013テーマを設定する(隠密指摘により置換2026-07-16、往復2周目)。
     private void ApplyDockingManagerThemes(bool isDarkMode)
     {
-        PlacementToolBarDockingManager.Theme = isDarkMode
-            ? new AvalonDock.Themes.Vs2013DarkTheme()
-            : new AvalonDock.Themes.Vs2013LightTheme();
-        LeftPaletteDockingManager.Theme = isDarkMode
-            ? new AvalonDock.Themes.Vs2013DarkTheme()
-            : new AvalonDock.Themes.Vs2013LightTheme();
-        RightPanelDockingManager.Theme = isDarkMode
-            ? new AvalonDock.Themes.Vs2013DarkTheme()
-            : new AvalonDock.Themes.Vs2013LightTheme();
-        OutputPanelDockingManager.Theme = isDarkMode
-            ? new AvalonDock.Themes.Vs2013DarkTheme()
-            : new AvalonDock.Themes.Vs2013LightTheme();
+        foreach (var manager in AllDockingManagers)
+        {
+            manager.Theme = isDarkMode
+                ? new AvalonDock.Themes.Vs2013DarkTheme()
+                : new AvalonDock.Themes.Vs2013LightTheme();
+        }
     }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
