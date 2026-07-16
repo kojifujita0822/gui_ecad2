@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="シート設定" Height="270" Width="320"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="行数(1〜60):" Margin="0,0,0,4"/>
         <TextBox x:Name="RowsBox" Margin="0,0,0,4"/>

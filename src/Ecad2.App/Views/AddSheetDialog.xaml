@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="シート追加" Height="210" Width="320"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="シート名:" Margin="0,0,0,4"/>
         <TextBox x:Name="NameBox" Margin="0,0,0,12"/>

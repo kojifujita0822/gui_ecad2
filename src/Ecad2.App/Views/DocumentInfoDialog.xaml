@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="ドキュメント情報" Height="430" Width="340"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="社名:" Margin="0,0,0,4"/>
         <TextBox x:Name="CompanyNameBox" Margin="0,0,0,8"/>

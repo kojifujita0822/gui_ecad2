@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="シート名の変更" Height="140" Width="320"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock Text="新しいシート名:" Margin="0,0,0,4"/>
         <TextBox x:Name="NameBox" Margin="0,0,0,12"/>

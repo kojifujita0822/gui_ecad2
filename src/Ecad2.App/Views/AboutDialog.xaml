@@ -3,7 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="バージョン情報" Height="130" Width="280"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
-        ShowInTaskbar="False">
+        ShowInTaskbar="False"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
     <StackPanel Margin="12">
         <TextBlock x:Name="VersionText" Margin="0,0,0,12" FontSize="14" HorizontalAlignment="Center"/>
         <Button Content="OK" Width="70" IsDefault="True" IsCancel="True" HorizontalAlignment="Center" Click="OkButton_Click"/>
