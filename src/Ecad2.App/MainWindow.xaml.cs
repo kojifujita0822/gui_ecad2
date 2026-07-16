@@ -405,6 +405,11 @@ public partial class MainWindow : Window
                 ? Ecad2.Rendering.DrawingTheme.Dark
                 : Ecad2.Rendering.DrawingTheme.Default;
             RedrawCanvas();
+
+            // T-083増分1(家老采配2026-07-16): AvalonDockドッキングクローム(タブ・タイトルバー等)を
+            // VS2013テーマへ連動。4つのDockingManagerへ同型適用のため、取りこぼし防止で共通化する
+            // (PR-17と同種の横展開漏れ再発パターン、隠密所見)。
+            ApplyDockingManagerThemes(_viewModel.IsDarkMode);
         }
 
         // T-058増分3: 右パネル下段タイトルの状況依存切替(UpdateRightPanelBottomTitle参照)。
@@ -522,6 +527,24 @@ public partial class MainWindow : Window
                 _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.CurrentTestSession?.State);
         else
             LadderCanvasHost.Clear();
+    }
+
+    // T-083増分1: 4つの独立DockingManager(ツールバー/左パレット/右パネル/出力パネル)全てへ
+    // 同一のVS2013テーマを設定する。取りこぼし(PR-17と同種の横展開漏れ)を避けるため単一箇所に集約。
+    private void ApplyDockingManagerThemes(bool isDarkMode)
+    {
+        PlacementToolBarDockingManager.Theme = isDarkMode
+            ? new AvalonDock.Themes.Vs2013DarkTheme()
+            : new AvalonDock.Themes.Vs2013LightTheme();
+        LeftPaletteDockingManager.Theme = isDarkMode
+            ? new AvalonDock.Themes.Vs2013DarkTheme()
+            : new AvalonDock.Themes.Vs2013LightTheme();
+        RightPanelDockingManager.Theme = isDarkMode
+            ? new AvalonDock.Themes.Vs2013DarkTheme()
+            : new AvalonDock.Themes.Vs2013LightTheme();
+        OutputPanelDockingManager.Theme = isDarkMode
+            ? new AvalonDock.Themes.Vs2013DarkTheme()
+            : new AvalonDock.Themes.Vs2013LightTheme();
     }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。
