@@ -170,6 +170,9 @@ public partial class MainWindow : Window
         // 呼び出しが描画トリガーのため、バインディングだけでは自動再描画されない。
         _viewModel.PropertyChanged += ViewModel_PropertyChanged;
         RedrawCanvas();
+        // T-083増分1追加修正(家老采配2026-07-16): 起動直後(トグル未操作、IsDarkMode既定値=false)
+        // でもDockingManagerがVS2013 Lightテーマ適用済みの状態にしておく(既存意匠統一の帰結)。
+        ApplyDockingManagerThemes(_viewModel.IsDarkMode);
         RegisterDockingContents();
         SerializeDefaultDockingLayouts();
         // T-058増分4: 出荷時ハードコード既定(直前のSerializeDefaultDockingLayouts、不変)を必ず
