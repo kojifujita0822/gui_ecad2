@@ -1,0 +1,25 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework">
+    <!--
+        T-083増分2(層C=UIクローム基盤、家老采配2026-07-16): ダークテーマの配色定義。
+        WorkAreaBackgroundBrush/EmptyStateBackgroundBrushは層A(Ecad2.Core.Rendering.DrawingTheme.Dark)
+        のBackground(#FF202224)・GridColor(#FF464A50)と値を揃え、テーマ全体の一貫性を保つ。
+    -->
+    <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#FF202224"/>
+    <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="#FF202224"/>
+    <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#FF464A50"/>
+    <!-- T-061由来の意味色(通電/励磁と同一)。テーマ非依存のためLightと同値。 -->
+    <SolidColorBrush x:Key="TestModeActiveBrush" Color="#E63C00"/>
+
+    <!-- T-083増分2新規: メニュー・ツールバー本体の配色。 -->
+    <SolidColorBrush x:Key="MenuBarBackgroundBrush" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="MenuBarForegroundBrush" Color="#FFF0F0F0"/>
+    <SolidColorBrush x:Key="ToolBarBackgroundBrush" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="ToolBarForegroundBrush" Color="#FFF0F0F0"/>
+
+    <!-- WPF既定のMenuコントロールの既知制限(Theme.Light.xaml参照)への対応。 -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#FFF0F0F0"/>
+</ResourceDictionary>

@@ -413,6 +413,10 @@ public partial class MainWindow : Window
             // VS2013テーマへ連動。4つのDockingManagerへ同型適用のため、取りこぼし防止で共通化する
             // (PR-17と同種の横展開漏れ再発パターン、隠密所見)。
             ApplyDockingManagerThemes(_viewModel.IsDarkMode);
+
+            // T-083増分2(家老采配2026-07-16): UIクローム(メニュー・ツールバー本体・シート0件時
+            // キャンバス色等)のテーマ切替。WPF標準のMergedDictionaries差替え方式(新規外部依存なし)。
+            ApplyUiChromeTheme(_viewModel.IsDarkMode);
         }
 
         // T-058増分3: 右パネル下段タイトルの状況依存切替(UpdateRightPanelBottomTitle参照)。
@@ -542,6 +546,22 @@ public partial class MainWindow : Window
                 ? new AvalonDock.Themes.Vs2013DarkTheme()
                 : new AvalonDock.Themes.Vs2013LightTheme();
         }
+    }
+
+    // T-083増分2(層C=UIクローム基盤): Application.Resourcesのテーマ辞書(Theme.Light.xaml/
+    // Theme.Dark.xaml)を差し替える。App.xamlに既定でTheme.Light.xamlが1件マージ済みのため、
+    // 既存の1件を除去してから新テーマを追加する(WPF標準の伝統的テーマ切替手法)。
+    private void ApplyUiChromeTheme(bool isDarkMode)
+    {
+        var dictionaries = Application.Current.Resources.MergedDictionaries;
+        var themeUri = new Uri(isDarkMode ? "Themes/Theme.Dark.xaml" : "Themes/Theme.Light.xaml", UriKind.Relative);
+        var newTheme = new ResourceDictionary { Source = themeUri };
+
+        var existing = dictionaries.FirstOrDefault(d =>
+            d.Source is not null && (d.Source.OriginalString.EndsWith("Theme.Light.xaml") || d.Source.OriginalString.EndsWith("Theme.Dark.xaml")));
+        if (existing is not null) dictionaries.Remove(existing);
+
+        dictionaries.Add(newTheme);
     }
 
     // Ctrl+マウスホイールでキャンバスを拡大縮小する。Ctrl無しは通常のスクロールに委ねる。

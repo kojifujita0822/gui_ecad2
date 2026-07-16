@@ -127,7 +127,10 @@
             </Grid.RowDefinitions>
 
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
-        <Menu x:Name="MenuBarArea" Grid.Row="0">
+        <!-- T-083増分2: メニュー本体の配色をDynamicResource化(層C=UIクローム基盤)。 -->
+        <Menu x:Name="MenuBarArea" Grid.Row="0"
+              Background="{DynamicResource MenuBarBackgroundBrush}"
+              Foreground="{DynamicResource MenuBarForegroundBrush}">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N" Click="NewButton_Click"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
@@ -185,8 +188,13 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
-        <ToolBarTray x:Name="ToolBarArea" Grid.Row="0" IsLocked="True">
-            <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True">
+        <!-- T-083増分2: 1段目ツールバー本体の配色をDynamicResource化(層C=UIクローム基盤)。
+             2段目(配置ツール)はAvalonDock管轄(層B、PlacementToolBarDockingManager)のため対象外。 -->
+        <ToolBarTray x:Name="ToolBarArea" Grid.Row="0" IsLocked="True"
+                     Background="{DynamicResource ToolBarBackgroundBrush}">
+            <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True"
+                     Background="{DynamicResource ToolBarBackgroundBrush}"
+                     Foreground="{DynamicResource ToolBarForegroundBrush}">
                 <!-- T-095(殿裁定2026-07-15、方針転換): ラベル表示をショートカット表示から機能名表示へ
                      変更。ショートカットは既存ToolTip("機能名 (ショートカット)"形式)へマウスオーバー時
                      表示済みのためそのまま流用。機能名表記は簡潔化案(殿裁定=案2)を採用。 -->
@@ -532,10 +540,10 @@
                          2026-07-05)、新規/開くで白の作業領域へ遷移する(MainWindowViewModel.
                          HasProject/NotifyHasProjectChanged参照)。 -->
                     <Style TargetType="ScrollViewer">
-                        <Setter Property="Background" Value="{StaticResource WorkAreaBackgroundBrush}"/>
+                        <Setter Property="Background" Value="{DynamicResource WorkAreaBackgroundBrush}"/>
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding HasProject}" Value="False">
-                                <Setter Property="Background" Value="{StaticResource EmptyStateBackgroundBrush}"/>
+                                <Setter Property="Background" Value="{DynamicResource EmptyStateBackgroundBrush}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>

@@ -1,0 +1,28 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework">
+    <!--
+        T-083増分2(層C=UIクローム基盤、家老采配2026-07-16): ライトテーマの配色定義。
+        既存App.xamlの4ブラシ(GX Works3実機調査T-012由来)をそのまま踏襲する。
+    -->
+    <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#24325A"/>
+    <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="White"/>
+    <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#D2D2D2"/>
+    <!-- T-061由来の意味色(通電/励磁と同一)。テーマ非依存だがLight/Dark両辞書に同値を持たせ、
+         4ブラシの統合方針(隠密調査書)に揃える。 -->
+    <SolidColorBrush x:Key="TestModeActiveBrush" Color="#E63C00"/>
+
+    <!-- T-083増分2新規: メニュー・ツールバー本体の配色。WPF既定(SystemColors)相当の明るい配色。 -->
+    <SolidColorBrush x:Key="MenuBarBackgroundBrush" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="MenuBarForegroundBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="ToolBarBackgroundBrush" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="ToolBarForegroundBrush" Color="#000000"/>
+
+    <!-- WPF既定のMenuコントロールはBackground/Foregroundプロパティへの直接設定が反映されず、
+         SystemColors系のDynamicResourceキーを内部で参照する既知の制限があるため、実機確認(2026-07-16)
+         でMenuBarBackgroundBrush設定のみでは反映されないことを確認した。SystemColorsキー自体を
+         オーバーライドすることで対応する。 -->
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBarBrushKey}" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="#000000"/>
+</ResourceDictionary>

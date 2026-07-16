@@ -5,16 +5,15 @@
              StartupUri="MainWindow.xaml">
     <Application.Resources>
         <!--
-            GX Works3実機調査(T-012)より: 配色は状態依存。
-            空状態(プロジェクト未作成)=濃紺、作業領域(ラダーエディタ内部)=白+黒グリッド。
-            グリッド色はEcad2.Core.Rendering.DrawingTheme.GridGray(#D2D2D2)と一貫させる。
+            T-083増分2(家老采配2026-07-16): 4ブラシ(GX Works3実機調査T-012由来、うち3つは元々
+            ここに直接定義されていた)をTheme.Light.xaml/Theme.Dark.xamlへ統合し、IsDarkMode変更時
+            にMergedDictionariesを差し替える方式(MainWindow.xaml.cs ApplyUiChromeTheme参照)へ移行。
+            起動時既定はライトモード(殿裁定)のためTheme.Light.xamlを既定で読み込む。
         -->
-        <!-- 濃紺の明度調整(殿裁定2026-07-05): #1E2A47→#24325A(「ほんの少しだけ明るく」)。 -->
-        <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#24325A"/>
-        <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="White"/>
-        <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#D2D2D2"/>
-        <!-- T-061: テストモードON中のツールバートグルボタン背景。Ecad2.Core.Rendering.DrawingTheme.Powered
-             (通電/励磁の意味色、RGB 230,60,0)と同一色を流用し、テストモード全体を象徴する色として一貫させる。 -->
-        <SolidColorBrush x:Key="TestModeActiveBrush" Color="#E63C00"/>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Theme.Light.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
