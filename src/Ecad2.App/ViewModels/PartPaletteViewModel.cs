@@ -1,6 +1,7 @@
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
+using Ecad2.Rendering;
 using Ecad2.Rendering.Wpf;
 
 namespace Ecad2.App.ViewModels;
@@ -70,4 +71,13 @@ public sealed class PartPaletteViewModel : ViewModelBase
     public PartSelectionEntryViewModel? ResolveEntry(string partId, bool isOr) =>
         SelectionEntries.FirstOrDefault(e => e.Definition.Id == partId && e.IsOr == isOr)
         ?? SelectionEntries.FirstOrDefault(e => e.Definition.Id == partId);
+
+    /// <summary>T-083新規発見5(家老采配2026-07-17): 部品選択パネルのサムネイルはビットマップ事前
+    /// レンダリング(RenderTargetBitmap)ゆえブラシ差替えでは対応できず、テーマ切替時に全件再生成
+    /// する必要がある。MainWindow.xaml.csのIsDarkMode変更ハンドラから呼ばれる想定。</summary>
+    public void RefreshThumbnails(Color foreground)
+    {
+        foreach (var entry in SelectionEntries)
+            entry.Thumbnail = PartThumbnailRenderer.Render(entry.Definition, Library, isOr: entry.IsOr, foreground: foreground);
+    }
 }

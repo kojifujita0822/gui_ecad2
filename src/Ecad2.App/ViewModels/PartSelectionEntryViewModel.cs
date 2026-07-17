@@ -9,12 +9,21 @@ namespace Ecad2.App.ViewModels;
 /// PartFolderEntryへの転送プロパティとし、既存バインディング({Binding Category}等)の互換を保つ。
 /// Entry(元のPartFolderEntry)は配置処理(TryPlaceElement)へそのまま渡すために公開する。
 /// </summary>
-public sealed class PartSelectionEntryViewModel
+public sealed class PartSelectionEntryViewModel : ViewModelBase
 {
     public PartFolderEntry Entry { get; }
     public string Category => Entry.Category;
     public PartDefinition Definition => Entry.Definition;
-    public ImageSource Thumbnail { get; }
+
+    private ImageSource _thumbnail;
+    /// <summary>T-083新規発見5(家老采配2026-07-17): ダークモード切替時にサムネイルを再生成できる
+    /// よう可変プロパティ化(従来は読み取り専用)。PartPaletteViewModel.RefreshThumbnailsが
+    /// テーマ切替時に差し替える。</summary>
+    public ImageSource Thumbnail
+    {
+        get => _thumbnail;
+        set => SetProperty(ref _thumbnail, value);
+    }
 
     /// <summary>OR接続配置用の論理エントリか(T-037、殿裁定=案A)。true時は配置操作(TryPlaceElement)
     /// のisOr引数へそのまま渡す。Entry(PartFolderEntry)自体は通常版と共有し、Core層は無変更
@@ -28,7 +37,7 @@ public sealed class PartSelectionEntryViewModel
     public PartSelectionEntryViewModel(PartFolderEntry entry, ImageSource thumbnail, bool isOr = false)
     {
         Entry = entry;
-        Thumbnail = thumbnail;
+        _thumbnail = thumbnail;
         IsOr = isOr;
     }
 }

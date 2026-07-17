@@ -36,12 +36,17 @@ public static class PartThumbnailRenderer
     /// (T-035、IsOrEligibleは維持されたままIdのみ変わる)でOR視覚表現が欠落する退行を持ち込んでいた)。
     /// それ以外(ORa/ORb以外の5種、および将来isOr=trueになりうるその他の部品)は従来どおり
     /// PartDefinitionの形状をそのまま描画する。</summary>
-    public static ImageSource Render(PartDefinition definition, PartLibrary library, bool isOr = false, double cellMm = 9.0)
+    // T-083新規発見5(家老采配2026-07-17): サムネイルは固定でDrawingTheme.Black(黒)を使用していた
+    // ためダークモードでも黒色のまま視認困難だった。呼び出し元(PartPaletteViewModel)がアプリの
+    // 現在のテーマに応じたForeground色を渡せるようオプション引数化する(既定値=従来どおり黒、
+    // 既存呼び出し・テストとの後方互換を維持)。
+    public static ImageSource Render(PartDefinition definition, PartLibrary library, bool isOr = false, double cellMm = 9.0, Color? foreground = null)
     {
+        var fg = foreground ?? DrawingTheme.Black;
         if (isOr && definition.IsOrEligible)
         {
-            if (definition.Role == PartRole.ContactNO) return RenderGlyph(OrContactNoGlyph, cellMm);
-            if (definition.Role == PartRole.ContactNC) return RenderGlyph(OrContactNcGlyph, cellMm);
+            if (definition.Role == PartRole.ContactNO) return RenderGlyph(OrContactNoGlyph, cellMm, fg);
+            if (definition.Role == PartRole.ContactNC) return RenderGlyph(OrContactNcGlyph, cellMm, fg);
         }
 
         var renderer = new DiagramRenderer(options: new RenderOptions { CellMm = cellMm, MarginMm = 0 });
@@ -53,7 +58,7 @@ public static class PartThumbnailRenderer
         using (var dc = visual.RenderOpen())
         {
             var wpfRenderer = new WpfRenderer(dc);
-            renderer.DrawPreview(wpfRenderer, element, DrawingTheme.Black, library);
+            renderer.DrawPreview(wpfRenderer, element, fg, library);
         }
 
         var bitmap = new RenderTargetBitmap(sizeDip, sizeDip, 96, 96, PixelFormats.Pbgra32);
@@ -63,16 +68,17 @@ public static class PartThumbnailRenderer
     }
 
     // GX様式グリフ(18x18キャンバス基準のGeometry)をsizeDip四方の正方形へ均等スケールして描画する。
-    private static ImageSource RenderGlyph(Geometry glyph, double cellMm)
+    private static ImageSource RenderGlyph(Geometry glyph, double cellMm, Color foreground)
     {
         int sizeDip = (int)Math.Round(cellMm * K);
         double scale = sizeDip / 18.0;
+        var brush = new SolidColorBrush(System.Windows.Media.Color.FromArgb(foreground.A, foreground.R, foreground.G, foreground.B));
 
         var visual = new DrawingVisual();
         using (var dc = visual.RenderOpen())
         {
             dc.PushTransform(new ScaleTransform(scale, scale));
-            dc.DrawGeometry(null, new Pen(Brushes.Black, 1.0), glyph);
+            dc.DrawGeometry(null, new Pen(brush, 1.0), glyph);
             dc.Pop();
         }
 
