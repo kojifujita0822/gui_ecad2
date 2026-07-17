@@ -34,4 +34,16 @@
          入力欄向けに専用キーを新設する。 -->
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="White"/>
     <SolidColorBrush x:Key="InputForegroundBrush" Color="#000000"/>
+
+    <!-- T-083増分5新規(家老采配2026-07-17): ペイン内コンテンツ(ListBox/DataGrid)の配色。
+         対象=シート一覧(SheetNavList)・機器表(DeviceTableGrid)・出力/検索結果(OutputGrid/
+         FindResultsGrid)・部品選択(PartSelectionList)。既定値のまま(白)だった箇所を
+         DynamicResource化する(調査書「追記2」対応表)。 -->
+    <SolidColorBrush x:Key="PanelContentBackgroundBrush" Color="White"/>
+    <SolidColorBrush x:Key="PanelContentForegroundBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="PanelContentSelectedBackgroundBrush" Color="#FF0078D7"/>
+    <SolidColorBrush x:Key="PanelContentSelectedForegroundBrush" Color="White"/>
+    <SolidColorBrush x:Key="PanelHeaderBackgroundBrush" Color="#F0F0F0"/>
+    <SolidColorBrush x:Key="PanelHeaderForegroundBrush" Color="#000000"/>
+    <SolidColorBrush x:Key="PanelGridLineBrush" Color="#D2D2D2"/>
 </ResourceDictionary>

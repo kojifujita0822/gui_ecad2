@@ -14,6 +14,42 @@
             <ResourceDictionary.MergedDictionaries>
                 <ResourceDictionary Source="Themes/Theme.Light.xaml"/>
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- T-083増分5(家老采配2026-07-17): ペイン内ListBox/DataGridの暗黙的スタイル。
+                 対象コントロールはMainWindow.xaml内5箇所(SheetNavList/DeviceTableGrid/
+                 FindResultsGrid/OutputGrid/PartSelectionList)のみ(Explore確認済み)。
+                 既存ItemContainerStyle/RowStyleを個別指定済みの箇所はBasedOnで継承する。 -->
+            <Style TargetType="{x:Type ListBox}">
+                <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
+            </Style>
+            <Style TargetType="{x:Type ListBoxItem}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="{x:Type DataGrid}">
+                <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
+                <Setter Property="RowBackground" Value="{DynamicResource PanelContentBackgroundBrush}"/>
+                <Setter Property="HorizontalGridLinesBrush" Value="{DynamicResource PanelGridLineBrush}"/>
+                <Setter Property="VerticalGridLinesBrush" Value="{DynamicResource PanelGridLineBrush}"/>
+            </Style>
+            <Style TargetType="{x:Type DataGridRow}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="{x:Type DataGridColumnHeader}">
+                <Setter Property="Background" Value="{DynamicResource PanelHeaderBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource PanelHeaderForegroundBrush}"/>
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

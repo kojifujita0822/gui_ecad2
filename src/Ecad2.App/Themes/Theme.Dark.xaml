@@ -30,4 +30,14 @@
          ダイアログ背景(#FF2D2D30)よりやや明るくし、入力可能領域であることを視覚的に区別する。 -->
     <SolidColorBrush x:Key="InputBackgroundBrush" Color="#FF3C3C3C"/>
     <SolidColorBrush x:Key="InputForegroundBrush" Color="#FFF0F0F0"/>
+
+    <!-- T-083増分5新規(家老采配2026-07-17、詳細はTheme.Light.xaml参照)。
+         DialogBackgroundBrush/DialogBorderBrushと値を揃え、他の暗色パネルとの統一感を保つ。 -->
+    <SolidColorBrush x:Key="PanelContentBackgroundBrush" Color="#FF2D2D30"/>
+    <SolidColorBrush x:Key="PanelContentForegroundBrush" Color="#FFF0F0F0"/>
+    <SolidColorBrush x:Key="PanelContentSelectedBackgroundBrush" Color="#FF0E639C"/>
+    <SolidColorBrush x:Key="PanelContentSelectedForegroundBrush" Color="#FFFFFFFF"/>
+    <SolidColorBrush x:Key="PanelHeaderBackgroundBrush" Color="#FF3E3E42"/>
+    <SolidColorBrush x:Key="PanelHeaderForegroundBrush" Color="#FFF0F0F0"/>
+    <SolidColorBrush x:Key="PanelGridLineBrush" Color="#FF565656"/>
 </ResourceDictionary>

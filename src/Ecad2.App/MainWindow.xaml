@@ -729,7 +729,7 @@
                                             </DataTemplate>
                                         </ListBox.ItemTemplate>
                                         <ListBox.ItemContainerStyle>
-                                            <Style TargetType="ListBoxItem">
+                                            <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
                                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartSelectionItem_Clicked"/>
                                             </Style>
                                         </ListBox.ItemContainerStyle>
@@ -780,7 +780,7 @@
                                               AutoGenerateColumns="False" IsReadOnly="True"
                                               HeadersVisibility="Column" GridLinesVisibility="Horizontal">
                                         <DataGrid.RowStyle>
-                                            <Style TargetType="DataGridRow">
+                                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="FindResultsGridRow_Clicked"/>
                                             </Style>
                                         </DataGrid.RowStyle>
@@ -798,7 +798,7 @@
                                         <DataGrid.RowStyle>
                                             <!-- 同一行の再クリックでもジャンプを確実に実行する(T-018忍者実機検証で発見、
                                                  T-016のPartSelectionItem_Clickedと同種のWPF既知の罠への対処)。 -->
-                                            <Style TargetType="DataGridRow">
+                                            <Style TargetType="DataGridRow" BasedOn="{StaticResource {x:Type DataGridRow}}">
                                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="OutputGridRow_Clicked"/>
                                             </Style>
                                         </DataGrid.RowStyle>
