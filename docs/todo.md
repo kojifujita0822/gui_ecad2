@@ -440,6 +440,11 @@ theme非対応のまま据え置かれていた見落としと推定（着手時
 冗長（継承で代替可）／`PlacementToolBarIconStyle`のStroke再指定が本コミットでデッドコード化し
 コメント（MainWindow.xaml:93-94「2段目専用キーのため1段目には影響しない」）が事実と矛盾——実害
 なしだが保守性のため追随修正が望ましい。
+**完了（2026-07-17、侍、コミット3165d49）**：コメントを事実に追随させ修正。
+**T-083待機列3件、全完了（2026-07-17）**：新規発見4（TextBox5箇所色対応、8cf7e87）・新規発見5
+（部品アイコンダーク対応、399019d）・cleanup（コメント追随、3165d49）、いずれも実装・実機確認・
+build/test回帰なし・コミット済み。**残る未コミット分はMainWindow.xaml/App.xaml/
+MainWindow.xaml.cs（T-099要件1+T-089叩き台、殿確認待ちのため意図的に留保中）のみ**。
 **新規発見4（隠密発見2026-07-17、範囲内欠陥・PR-18確認）：プロパティパネルのTextBox5箇所
 （DeviceNameBox/NotchPositionBox/LampColorBox/SetpointBox/LabelDyBox）がInputBackgroundBrush/
 ForegroundBrush対象外のまま残存**——増分3で確立したはずの入力欄対応表からも漏れていた。殿提示の
