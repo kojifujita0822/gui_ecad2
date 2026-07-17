@@ -41,11 +41,15 @@
                 </Trigger>
             </Style.Triggers>
         </Style>
+        <!-- T-083新規発見3(殿直接指摘2026-07-17): 1段目は増分2でToolBar本体の背景色のみ対応し、
+             アイコンのGeometry Fill色(Path.Stroke、継承されない非継承プロパティ)はtheme非対応の
+             まま据え置かれていた見落とし。2段目(PlacementToolBarIconStyle、増分6で対応済み)と
+             同じパターンでDynamicResource化する。 -->
         <Style x:Key="ToolBarIconStyle" TargetType="Path">
             <Setter Property="Width" Value="18"/>
             <Setter Property="Height" Value="18"/>
             <Setter Property="Stretch" Value="Uniform"/>
-            <Setter Property="Stroke" Value="Black"/>
+            <Setter Property="Stroke" Value="{DynamicResource ToolBarForegroundBrush}"/>
             <Setter Property="StrokeThickness" Value="1.4"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
@@ -658,16 +662,20 @@
                                     <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
                                         <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
                                                    Visibility="{Binding HasNoPropertySelection, Converter={StaticResource BoolToVisibility}}"/>
+                                        <!-- T-083新規発見1(殿直接指摘2026-07-17): 増分5の対応表がプロパティパネルの
+                                             背景透過(層Bペイン背景が透けて暗くなる)は把握済みだったが、中身のラベル
+                                             テキスト色までは対象に含めておらず黒固定のまま残存していた見落とし。
+                                             以下のTextBlock/CheckBoxへPanelContentForegroundBrushを適用する。 -->
                                         <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}"/>
-                                            <TextBlock Text="デバイス名:" Margin="0,8,0,2"/>
+                                            <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
+                                            <TextBlock Text="デバイス名:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                             <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
                                                      IsEnabled="{Binding CanEditDiagram}"
                                                      LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
                                             <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
                                                  (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
                                             <StackPanel Visibility="{Binding IsSelectedElementSelectSwitch, Converter={StaticResource BoolToVisibility}}">
-                                                <TextBlock Text="ノッチ位置:" Margin="0,8,0,2"/>
+                                                <TextBlock Text="ノッチ位置:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="NotchPositionBox" Text="{Binding SelectedElementNotchPosition, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
                                                          LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
@@ -676,7 +684,7 @@
                                                  記号であり実際の表示色ではない)。DeviceNameBoxと同型のExplicit確定に加え、クリア
                                                  ボタン(×)を新設する。 -->
                                             <StackPanel Visibility="{Binding IsSelectedElementLamp, Converter={StaticResource BoolToVisibility}}">
-                                                <TextBlock Text="ランプ色（中央表示）:" Margin="0,8,0,2"/>
+                                                <TextBlock Text="ランプ色（中央表示）:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <DockPanel LastChildFill="True">
                                                     <Button DockPanel.Dock="Right" Content="×" Width="24" Margin="4,0,0,0"
                                                             IsEnabled="{Binding CanEditDiagram}"
@@ -693,7 +701,7 @@
                                                  Explicit確定、SliderはGuiEcad仕様どおり通常のTwoWayバインディング(ドラッグ中
                                                  リアルタイム反映)。 -->
                                             <StackPanel Visibility="{Binding IsSelectedElementTimerRelated, Converter={StaticResource BoolToVisibility}}">
-                                                <TextBlock Text="設定時間(秒):" Margin="0,8,0,2"/>
+                                                <TextBlock Text="設定時間(秒):" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="SetpointBox" Text="{Binding SelectedElementSetpoint, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
                                                          LostKeyboardFocus="SetpointBox_LostKeyboardFocus" PreviewKeyDown="SetpointBox_PreviewKeyDown"/>
@@ -706,7 +714,7 @@
                                                  ラベル密集時の重なり回避用個別微調整)。殿裁定=種別既定の表示位置を0とした
                                                  相対オフセット方式。DeviceNameBox等と同型のExplicit確定。 -->
                                             <StackPanel>
-                                                <TextBlock Text="ラベル高さ調整(mm、既定位置=0):" Margin="0,8,0,2"/>
+                                                <TextBlock Text="ラベル高さ調整(mm、既定位置=0):" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="LabelDyBox" Text="{Binding SelectedElementLabelDy, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
                                                          LostKeyboardFocus="LabelDyBox_LostKeyboardFocus" PreviewKeyDown="LabelDyBox_PreviewKeyDown"/>
@@ -715,9 +723,9 @@
                                         <!-- T-064: 画像選択時のプロパティ表示。リサイズはドラッグハンドル方式(殿裁定)の
                                              ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
                                         <StackPanel Margin="4" Visibility="{Binding HasSelectedImage, Converter={StaticResource BoolToVisibility}}">
-                                            <TextBlock Text="画像" FontWeight="SemiBold"/>
+                                            <TextBlock Text="画像" FontWeight="SemiBold" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                             <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="Gray"/>
-                                            <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}"/>
+                                            <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                         </StackPanel>
                                     </DockPanel>
                                     <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.SelectionEntries}" BorderThickness="0"
