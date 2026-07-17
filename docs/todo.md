@@ -16,7 +16,37 @@
 
 ## 生きているタスク
 
-### T-089 ボタン押下状態の視覚的明示化 — Approved（gated、殿直接指示2026-07-14、P-091起票）
+### T-099 配置ツールバー2段目のドックタグ表示制御＋幅動的調整 — Approved（gated、殿直接指示2026-07-17）
+
+**起票=殿直接指示2026-07-17**「avalondockの仕様でドッキング時はdockタグ非表示はできるか？フロート時は
+表示する」「2段目ツールパネルに実装したい。またツールパネルの幅も動的に幅調整して。余白が多い」。
+対象範囲＝**配置ツールバー2段目のみ**（殿確認済み、他パネルへは広げない）。実装イメージ＝
+殿提示のGX Works3スクリーンショット（`c:\Users\kojif\Desktop\claude_TEMP\Dockimage.png`）の
+「接続先」タブ——ドッキング時はコンテンツ幅にフィットした細身のタブ（ピン留め・閉じるアイコンの
+みで文字ラベル+アイコン分だけの幅、余白なし）。
+
+**要件**：
+1. ドッキング状態の時、ドックタグ（タブヘッダー）を非表示にする
+2. フローティング状態の時はタブ／タイトルを表示する
+3. パネル幅をコンテンツに動的フィットさせ、現状の余白（既定の固定幅による空白）を解消する
+
+**家老の事前調査（2026-07-17、Web一次情報）**：AvalonDock（Dirkster99/AvalonDock）の
+`LayoutAnchorablePane`に`IsDirectlyHostedInFloatingWindow`／`IsHostedInFloatingWindow`という
+状態判定プロパティが存在。`AnchorablePaneControlStyle`内でこれをDataTrigger条件に使い、
+タブストリップ（`TabPanel`）の`Visibility`を切り替える構成が技術的な筋道と見立てる。ドッキング時
+（`LayoutAnchorablePaneControl`）とフローティング時（`LayoutAnchorableFloatingWindowControl`、
+`LayoutFloatingWindowControl`継承・独立ウィンドウ）は元々描画クラスが別なため、フローティング側は
+既存のタイトル表示（`DropDownControlArea`）がそのまま使える見込み。出典＝
+[LayoutAnchorablePane Wiki](https://github.com/Dirkster99/AvalonDock/wiki/LayoutAnchorablePane)・
+[LayoutAnchorableFloatingWindowControl Wiki](https://github.com/Dirkster99/AvalonDock/wiki/LayoutAnchorableFloatingWindowControl)。
+
+**リスク注記【重要】**：AvalonDockの`AnchorablePaneControlStyle`／`ControlTemplate`領域は、
+T-083増分1（層B）で「値は正しく設定されるが実描画に反映されない」事象に遭遇した経緯がある
+既知の要注意領域（最終的には検証ミスと判明したが、調査に一往復分を要した）。高リスク領域ゆえ
+実装速度より検証優先＝PoC（ドックタグ表示制御のみ、最小構成）→忍者実機確認→幅調整の増分実装、
+の順で進めること。
+
+**着手（2026-07-17）**：侍へPoCから着手を采配。
 
 **起票=P-091（殿直接要望2026-07-14）を殿裁定でタスク化**。ツールバー・メニュー等アプリ全体の
 ボタンについて、押したときに押されている（押下中）ことが視覚的にわかるようにしたい。**対象範囲
