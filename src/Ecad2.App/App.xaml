@@ -51,6 +51,24 @@
                 <Setter Property="Foreground" Value="{DynamicResource PanelHeaderForegroundBrush}"/>
             </Style>
 
+            <!-- T-083増分5欠陥修正(家老采配2026-07-17、隠密静的レビューCONFIRMED指摘):
+                 WPF既定のDataGridCell(全テーマ共通の暗黙的Style)はIsSelected=True時に
+                 SystemColors.HighlightBrushKey(OSアクセントカラー)でBackground/Foreground/
+                 BorderBrushを上書きするTriggerを持つ(dotnet/wpf DataGrid.xaml 308-341行、
+                 一次ソース裏取り済み)。セルが行のほぼ全面を前面描画するため、DataGridRowへの
+                 IsSelectedトリガーのみでは選択行の背景がOSアクセントカラーのまま残ってしまう。
+                 DataGridCell自体にも同様のIsSelectedトリガーを追加して対処する
+                 (ListBoxItemは単層構造のためこの問題は生じず対象外)。 -->
+            <Style TargetType="{x:Type DataGridCell}">
+                <Style.Triggers>
+                    <Trigger Property="IsSelected" Value="True">
+                        <Setter Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
+                        <Setter Property="BorderBrush" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- T-083増分7(家老采配2026-07-17、隠密調査書=docs/ecad2-t083-zoubun7-menu-dark-redesign-survey-onmitsu.md):
                  ドロップダウンメニューのダーク対応。根本原因はWPF既定(Aero2)MenuItemテンプレート内
                  SubMenuBorder(ポップアップ全体の背景)がStaticResource参照のためDynamicResource
