@@ -104,7 +104,28 @@ MenuItemテンプレート派生との実際の関連有無。
 別経路である可能性が高いと侍推定。この方向は打ち切り、作業ツリーは基準状態
 （対症療法削除+`IsVirtualizingAnchorable="False"`のみ）へ復元済み、build/test再確認済み。
 **殿裁定（2026-07-17）＝さらに調査を続ける**。隠密へUIAutomationCore発火源の追加調査を委譲。
-侍はT-100実装へ先行して着手。（殿直接要望2026-07-14）を殿裁定でタスク化**。ツールバー・メニュー等アプリ全体の
+侍はT-100実装へ先行して着手。
+**真の発火源、特定（2026-07-17、隠密、一次ソース確認、
+`docs/ecad2-t099-uiautomationcore-trigger-survey-onmitsu.md`）**：家老仮説（`DispatcherFrame
+.PushFrame`によるメッセージポンプ早回し）は一次ソースで裏付けられず率直に却下——`Dispatcher
+.PushFrameImpl`は既存メインループと処理内容が同一のWin32 `GetMessageW`ループに過ぎず、それ自体に
+「保留中レイアウトを早回しする」特別な機構は無いと確認。**代わりに真の発火源を発見**＝
+`HwndSource.cs`の`Process_WM_SIZE`（1401行）が、`WM_SIZE`受信時にルート`UIElement`へ**同期的な
+`Measure()`呼び出しを無条件で強制実行**する実装と確認（コメント「Invalidating layout here ensures
+that we do layout」）。侍が確認した「Win32 `MoveWindow`が効く」という実験結果と技術的に完全に
+一致する一次証拠。外部UIA `FindAll`が効いた理由は完全解明には至らず推測に留まるが、侍の
+「`GetChildren()`再帰では効果なし」という実験結果は本結論（本質は`WM_SIZE`経由の強制`Measure`、
+managed層完結のAutomationPeer操作はWin32メッセージを一切発行しない）と論理的に整合。
+**対処案（本命、提案）**：アプリ内からP/Invokeで自己の`MoveWindow`（現在の座標・サイズをそのまま
+指定=実質無変化リサイズ）または`SetWindowPos`+`SWP_FRAMECHANGED`を呼び出し、意図的に`WM_SIZE`を
+発火させる。外部UIAクライアントに頼らずアプリ内で完結する形。呼び出しタイミングは`ContentRendered`
+後が妥当と推定（実機比較検証推奨、隠密の調査範囲では実機未検証）。
+**着手（2026-07-17）**：本命案（自己`MoveWindow`/`SetWindowPos`呼び出し）の実装・実機検証を侍へ
+采配。
+
+### T-089 ボタン押下状態の視覚的明示化 — Approved（gated、殿直接指示2026-07-14、P-091起票）
+
+**起票=P-091（殿直接要望2026-07-14）を殿裁定でタスク化**。ツールバー・メニュー等アプリ全体の
 ボタンについて、押したときに押されている（押下中）ことが視覚的にわかるようにしたい。**対象範囲
 ＝全ボタン共通（殿裁定2026-07-14）**。家老grep確認＝`IsPressed`の言及がXAML側のButtonスタイル
 定義に見当たらず、WPF標準Buttonの既定描画（プラットフォーム依存の薄いフィードバック）に任せて
