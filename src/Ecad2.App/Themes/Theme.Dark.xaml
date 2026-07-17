@@ -40,4 +40,15 @@
     <SolidColorBrush x:Key="PanelHeaderBackgroundBrush" Color="#FF3E3E42"/>
     <SolidColorBrush x:Key="PanelHeaderForegroundBrush" Color="#FFF0F0F0"/>
     <SolidColorBrush x:Key="PanelGridLineBrush" Color="#FF565656"/>
+
+    <!-- T-083増分7新規(家老采配2026-07-17、詳細はTheme.Light.xaml参照)。
+         DialogBorderBrush・ツールバー配色と値を揃え、他の暗色パネルとの統一感を保つ。
+         アクセント色(選択/ホバー)はVS Dark系の明るい青。 -->
+    <SolidColorBrush x:Key="MenuPopupBorderBrush" Color="#FF565656"/>
+    <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FF505050"/>
+    <SolidColorBrush x:Key="MenuDisabledForegroundBrush" Color="#FF808080"/>
+    <SolidColorBrush x:Key="MenuItemAccentBackgroundBrush" Color="#4D3399FF"/>
+    <SolidColorBrush x:Key="MenuItemAccentBorderBrush" Color="#FF3399FF"/>
+    <SolidColorBrush x:Key="MenuItemHighlightDisabledBackgroundBrush" Color="#0AFFFFFF"/>
+    <SolidColorBrush x:Key="MenuItemHighlightDisabledBorderBrush" Color="#21FFFFFF"/>
 </ResourceDictionary>

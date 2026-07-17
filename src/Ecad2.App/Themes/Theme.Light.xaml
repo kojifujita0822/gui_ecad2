@@ -46,4 +46,18 @@
     <SolidColorBrush x:Key="PanelHeaderBackgroundBrush" Color="#F0F0F0"/>
     <SolidColorBrush x:Key="PanelHeaderForegroundBrush" Color="#000000"/>
     <SolidColorBrush x:Key="PanelGridLineBrush" Color="#D2D2D2"/>
+
+    <!-- T-083増分7新規(家老采配2026-07-17、隠密調査書=zoubun7-menu-dark-redesign-survey):
+         ドロップダウンメニューのControlTemplate派生用。値はWPF既定Aero2テーマ(Menu.xaml)の
+         対応キーをそのまま踏襲する(Menu.Static.Border/Separator/Disabled.Foreground/
+         MenuItem.Highlight.Background/Border/Highlight.Disabled.Background/Border)。
+         MenuBarBackgroundBrush/MenuBarForegroundBrush(既存、増分2定義)はポップアップ背景・
+         チェックマーク色として再利用する。 -->
+    <SolidColorBrush x:Key="MenuPopupBorderBrush" Color="#FF999999"/>
+    <SolidColorBrush x:Key="MenuSeparatorBrush" Color="#FFD7D7D7"/>
+    <SolidColorBrush x:Key="MenuDisabledForegroundBrush" Color="#FF707070"/>
+    <SolidColorBrush x:Key="MenuItemAccentBackgroundBrush" Color="#3D26A0DA"/>
+    <SolidColorBrush x:Key="MenuItemAccentBorderBrush" Color="#FF26A0DA"/>
+    <SolidColorBrush x:Key="MenuItemHighlightDisabledBackgroundBrush" Color="#0A000000"/>
+    <SolidColorBrush x:Key="MenuItemHighlightDisabledBorderBrush" Color="#21000000"/>
 </ResourceDictionary>

@@ -133,13 +133,16 @@
             </Grid.RowDefinitions>
 
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
-        <!-- T-083増分7(2026-07-16、殿指摘): 増分2でBackground/Foreground両方を設定していたが、
-             Foregroundは論理ツリーを通じてドロップダウンのMenuItemへ継承され、Dark時に「暗背景
-             オーバーライドが効かないサブメニュー」に白文字が乗り「白地に白文字」で読めなくなる
-             実害が判明。Backgroundのみ残すとサブメニューは読めるがトップバー自体は「暗背景+
-             既定黒文字」で低コントラストになるため、Background/Foreground both削除し、メニュー
-             全体を既定色(Light固定)に統一する。ダークモード連動はAvalonDock層Bと同様に保留。 -->
-        <Menu x:Name="MenuBarArea" Grid.Row="0">
+        <!-- T-083増分7初回(2026-07-16、殿指摘)で発覚した「白地に白文字」の根本原因は、ドロップダウン
+             全体の背景(SubMenuBorder)がWPF既定Aero2テーマ内でStaticResource参照されておりDynamicResource
+             オーバーライドが原理的に届かない構造的制約だった(検証ミスではない、隠密再調査書
+             docs/ecad2-t083-zoubun7-menu-dark-redesign-survey-onmitsu.md)。App.xamlでComponentResourceKey
+             による派生ControlTemplate(TopLevelHeaderTemplateKey/SubmenuItemTemplateKey)を新設して
+             ドロップダウン側を解決した後、ここでBackground/Foregroundを復活させる(2026-07-17、
+             T-083増分7再挑戦)。 -->
+        <Menu x:Name="MenuBarArea" Grid.Row="0"
+              Background="{DynamicResource MenuBarBackgroundBrush}"
+              Foreground="{DynamicResource MenuBarForegroundBrush}">
             <MenuItem Header="ファイル(_F)">
                 <MenuItem Header="新規(_N)" InputGestureText="Ctrl+N" Click="NewButton_Click"/>
                 <MenuItem Header="開く(_O)" InputGestureText="Ctrl+O" Click="OpenButton_Click"/>
