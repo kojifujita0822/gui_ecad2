@@ -209,6 +209,13 @@ TabItemコンテナ側のVisibilityで制御する形へ置き換え**（既存I
 推奨（隠密2所見）。また選択タブの`Background="White"`固定（AvalonDock既定コピー由来、
 `MainWindow.xaml:183`）はフロート時ダークモードで白浮きの見込み、根本修正時に併せて
 DynamicResource化を検討中。
+**隠密2仮説、実測で確定（2026-07-17、侍）**：DataTrigger（151-153行）コメントアウト+対症療法
+コード無効化のみ（`IsVirtualizingAnchorable="False"`等は変更せず）で、外部トリガー完全なし
+（`Start-Process`直叩き）のクリーン起動を2回実施、**2回とも起動直後から配置ツールバー2段目が
+正常表示**（潰れなし）。「PoC DataTriggerがHeaderPanel(ItemsHost)をCollapsedにしたことが
+コンテナ生成をブロックし潰れの真因」と確定。今日一日の対症療法・WM_SIZE系施策は一切不要だった
+ことが実証された。
+**着手（2026-07-17）**：根本修正（TabItemコンテナ側のVisibility制御へ置換）の実装を侍へ采配。
 
 ### T-089 ボタン押下状態の視覚的明示化 — Approved（gated、殿直接指示2026-07-14、P-091起票）
 
