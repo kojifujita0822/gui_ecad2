@@ -540,11 +540,17 @@ public partial class MainWindow : Window
     // 同一のVS2013テーマを設定する(隠密指摘により置換2026-07-16、往復2周目)。
     private void ApplyDockingManagerThemes(bool isDarkMode)
     {
+        // T-100(家老采配2026-07-17): VS2013テーマ(Theme設定でMergedDictionaries経由追加される)側の
+        // AnchorablePaneTitle暗黙的スタイルはハッチング模様(DragHandleTexture)を含むため、
+        // 各DockingManager.Resourcesへ直接キー登録して優先させる(ローカルエントリはMergedDictionaries
+        // より優先解決される)。
+        var anchorablePaneTitleStyle = (Style)FindResource("AnchorablePaneTitleNoDragHandleStyle");
         foreach (var manager in AllDockingManagers)
         {
             manager.Theme = isDarkMode
                 ? new AvalonDock.Themes.Vs2013DarkTheme()
                 : new AvalonDock.Themes.Vs2013LightTheme();
+            manager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] = anchorablePaneTitleStyle;
         }
     }
 

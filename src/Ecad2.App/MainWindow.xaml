@@ -7,6 +7,7 @@
         xmlns:views="clr-namespace:Ecad2.App.Views"
         xmlns:converters="clr-namespace:Ecad2.App.Converters"
         xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
+        xmlns:vs2013Themes="clr-namespace:AvalonDock.Themes.VS2013.Themes;assembly=AvalonDock.Themes.VS2013"
         mc:Ignorable="d"
         Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown"
@@ -99,6 +100,390 @@
             <!-- T-083増分6(殿指摘=ボタン文字色もダークモード連動): ToolBar.Foreground継承にも
                  頼らず明示指定する(2段目専用キーのため1段目には影響しない)。 -->
             <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
+        </Style>
+
+        <!-- T-099 PoC(家老采配2026-07-17、殿直接指示): 配置ツールバー2段目(PlacementToolBarDockingManager)
+             のみを対象に、ドッキング時はドックタグ(タブストリップ)を非表示、フローティング時は表示する。
+             AvalonDock既定のAnchorablePaneControlStyle(AvalonDock/Themes/generic.xaml、v4.74.1一次ソース
+             で実取得・確認済み)をコピーし、HeaderPanel(タブストリップ本体)のVisibilityへ
+             Model.IsDirectlyHostedInFloatingWindow(LayoutAnchorablePane.cs、PropertyChanged通知あり
+             動的追従可能・一次ソース確認済み)をバインドするDataTriggerのみ追加した派生スタイル。
+             DockingManager.AnchorablePaneControlStyleへローカル値として設定することで適用範囲を
+             このDockingManagerのみに限定する(他パネル=左パレット/出力/右パネルには一切影響しない、
+             殿確認済みの対象範囲)。要件3(パネル幅の動的フィット)は本PoCの範囲外、忍者確認後の
+             次段階で対応する。 -->
+        <Style x:Key="PlacementToolBarPaneControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
+            <Setter Property="Foreground" Value="{Binding Model.Root.Manager.Foreground, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="Background" Value="{Binding Model.Root.Manager.Background, RelativeSource={RelativeSource Self}}"/>
+            <Setter Property="TabStripPlacement" Value="Bottom"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
+                        <Grid ClipToBounds="true" KeyboardNavigation.TabNavigation="Local" SnapsToDevicePixels="true">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <!-- 既定テンプレート同様、マウスイベント捕捉用の透明Border -->
+                            <Border Grid.RowSpan="2" Background="Transparent"/>
+                            <Border x:Name="ContentPanel" Grid.Row="0" Grid.Column="0"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                KeyboardNavigation.DirectionalNavigation="Contained"
+                                KeyboardNavigation.TabIndex="2"
+                                KeyboardNavigation.TabNavigation="Cycle">
+                                <ContentPresenter x:Name="PART_SelectedContentHost"
+                                    Margin="{TemplateBinding Padding}"
+                                    ContentSource="SelectedContent"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Border>
+                            <avalonDock:AnchorablePaneTabPanel x:Name="HeaderPanel"
+                                Grid.Row="1" Margin="2,0,2,2" Panel.ZIndex="1"
+                                IsItemsHost="true" KeyboardNavigation.TabIndex="1"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsEnabled" Value="false">
+                                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+                            </Trigger>
+                            <!-- T-099 PoC本体: フローティングウィンドウに直接ホストされていない
+                                 (=ドッキング状態の)時、タブストリップを非表示にする。 -->
+                            <DataTrigger Binding="{Binding Model.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource Self}}" Value="False">
+                                <Setter TargetName="HeaderPanel" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="{x:Type TabItem}">
+                        <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
+                        <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
+                        <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type TabItem}">
+                                    <Grid SnapsToDevicePixels="true">
+                                        <Border x:Name="Bd"
+                                            Padding="{TemplateBinding Padding}"
+                                            Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="1,0,1,1">
+                                            <ContentPresenter x:Name="Content"
+                                                HorizontalAlignment="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                                VerticalAlignment="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                                ContentSource="Header"
+                                                RecognizesAccessKey="True"
+                                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </Border>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="Selector.IsSelected" Value="true">
+                                            <Setter Property="Background" Value="White"/>
+                                            <Setter Property="Panel.ZIndex" Value="1"/>
+                                            <Setter Property="Margin" Value="0,-1,-1,-2"/>
+                                        </Trigger>
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsMouseOver" Value="true"/>
+                                                <Condition Property="Selector.IsSelected" Value="false"/>
+                                            </MultiTrigger.Conditions>
+                                            <Setter Property="Background" Value="{DynamicResource {x:Static SystemColors.GradientInactiveCaptionBrushKey}}"/>
+                                            <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                                            <Setter Property="Panel.ZIndex" Value="0"/>
+                                        </MultiTrigger>
+                                        <Trigger Property="IsEnabled" Value="false">
+                                            <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count, FallbackValue=1}" Value="1">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <avalonDock:LayoutAnchorableTabItem Model="{Binding}"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <avalonDock:LayoutAnchorableControl Model="{Binding}"/>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- T-100(家老采配2026-07-17、隠密根本原因調査
+             docs/ecad2-t100-drag-handle-texture-root-cause-survey-onmitsu.md): ドッキング済み
+             タブヘッダー(全パネル共通)に常時表示されるハッチング模様の正体は、VS2013テーマ
+             パッケージ(Dirkster.AvalonDock.Themes.VS2013、一次ソースAnchorablePaneTitleの
+             暗黙的スタイル)内のRectangle x:Name="DragHandleTexture"(DrawingBrush市松模様、
+             Visual Studio系IDE定番の意図的な「ドラッグハンドル」意匠)。DockPanelのLastChildFill
+             機構により残りスペース全部を占有するため、タイトルラベルが短い単一タブ構成の
+             パネルでは常時目立つ形になる。侍の先行試行(8650a66、AvalonDock本体generic.xamlの
+             AnchorablePaneTitleStyleを元にGrid列0をAuto化)は、そもそも実行時に適用される
+             VS2013テーマ側の別スタイル(DockPanel構造、本体generic.xamlとは無関係)を標的にできて
+             いなかったため無効だった(標的の取り違え)。本スタイルはVS2013テーマの暗黙的スタイル
+             (AvalonDock.Themes.VS2013、一次ソース確認済み)を完全コピーし、DragHandleTextureの
+             Visibility="Collapsed"化のみを行う(増分7・T-099と同じ「既定コピー+標的差し替え」
+             手法)。StaticResource参照(DropDownControlArea/AvalonDockThemeVs2013ToolButtonStyle/
+             AvalonDockThemeVs2013ButtonStyle、いずれもVS2013テーマ内部専用キー)はコピー先では
+             解決できないためDynamicResourceへ変更。ToolTip文字列(x:Static
+             avalonDockProperties:Resources.*)は増分7・旧T-100同様、AvalonDock.Properties名前空間が
+             XmlnsDefinition未公開のため固定の日本語文字列に置換(機能に影響なし、補助説明のみ)。
+             MainWindow.xaml.csのApplyDockingManagerThemesから、Theme適用直後に各DockingManagerの
+             Resources[typeof(AnchorablePaneTitle)]へ本スタイルを直接登録し、VS2013テーマの
+             MergedDictionaries経由スタイルより優先させる。 -->
+        <Style x:Key="AnchorablePaneTitleNoDragHandleStyle" TargetType="{x:Type avalonDock:AnchorablePaneTitle}">
+            <Setter Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveBackground}}"/>
+            <Setter Property="Foreground" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveText}}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{TemplateBinding BorderBrush}"
+                            BorderThickness="{TemplateBinding BorderThickness}">
+                            <Grid Margin="2,2,3,3">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Rectangle
+                                    x:Name="DragHandleGeometryPlaceholder"
+                                    Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveGrip}}"
+                                    Visibility="Collapsed"/>
+                                <DockPanel>
+                                    <Border
+                                        Padding="2,0,4,0"
+                                        HorizontalAlignment="Left"
+                                        Background="{TemplateBinding Background}">
+                                        <avalonDock:DropDownControlArea
+                                            DropDownContextMenu="{Binding Model.Root.Manager.AnchorableContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
+                                            DropDownContextMenuDataContext="{Binding Path=LayoutItem, RelativeSource={RelativeSource TemplatedParent}}"
+                                            Style="{DynamicResource DropDownControlArea}">
+                                            <ContentPresenter
+                                                x:Name="Header"
+                                                Content="{Binding Model, RelativeSource={RelativeSource TemplatedParent}}"
+                                                ContentTemplate="{Binding Model.Root.Manager.AnchorableTitleTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                                                ContentTemplateSelector="{Binding Model.Root.Manager.AnchorableTitleTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}"
+                                                TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                        </avalonDock:DropDownControlArea>
+                                    </Border>
+                                    <!-- T-100本体: ハッチング模様の実体(DrawingBrush市松模様)を非表示化 -->
+                                    <Rectangle
+                                        x:Name="DragHandleTexture"
+                                        Height="5"
+                                        Margin="4,0,2,0"
+                                        VerticalAlignment="Center"
+                                        UseLayoutRounding="True"
+                                        RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                        Visibility="Collapsed">
+                                        <Rectangle.Fill>
+                                            <DrawingBrush
+                                                TileMode="Tile"
+                                                Viewbox="0,0,4,4"
+                                                ViewboxUnits="Absolute"
+                                                Viewport="0,0,4,4"
+                                                ViewportUnits="Absolute">
+                                                <DrawingBrush.Drawing>
+                                                    <GeometryDrawing Brush="{Binding Fill, ElementName=DragHandleGeometryPlaceholder, Mode=OneWay, Converter={avalonDock:NullToDoNothingConverter}}">
+                                                        <GeometryDrawing.Geometry>
+                                                            <GeometryGroup>
+                                                                <GeometryGroup.Children>
+                                                                    <RectangleGeometry Rect="0,0,1,1"/>
+                                                                    <RectangleGeometry Rect="2,2,1,1"/>
+                                                                </GeometryGroup.Children>
+                                                            </GeometryGroup>
+                                                        </GeometryDrawing.Geometry>
+                                                    </GeometryDrawing>
+                                                </DrawingBrush.Drawing>
+                                            </DrawingBrush>
+                                        </Rectangle.Fill>
+                                    </Rectangle>
+                                </DockPanel>
+                                <avalonDock:DropDownButton
+                                    x:Name="MenuDropDownButton"
+                                    Grid.Column="1"
+                                    Margin="1,1,1,0"
+                                    Width="15"
+                                    Height="15"
+                                    VerticalAlignment="Center"
+                                    DropDownContextMenu="{Binding Model.Root.Manager.AnchorableContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
+                                    DropDownContextMenuDataContext="{Binding Path=LayoutItem, RelativeSource={RelativeSource TemplatedParent}}"
+                                    Focusable="False"
+                                    Style="{DynamicResource AvalonDockThemeVs2013ToolButtonStyle}"
+                                    ToolTip="メニュー">
+                                    <Path
+                                        x:Name="PART_ImgMenuPin"
+                                        Margin="0,0,0,1"
+                                        Width="8"
+                                        Height="8"
+                                        Data="{DynamicResource PinMenu}"
+                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
+                                        Stretch="Uniform"/>
+                                </avalonDock:DropDownButton>
+                                <Button
+                                    x:Name="PART_AutoHidePin"
+                                    Grid.Column="2"
+                                    Margin="1,1,1,0"
+                                    Width="15"
+                                    Height="15"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding Path=LayoutItem.AutoHideCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                    Focusable="False"
+                                    Style="{DynamicResource AvalonDockThemeVs2013ButtonStyle}"
+                                    ToolTip="自動的に隠す"
+                                    Visibility="{Binding Path=IsEnabled, RelativeSource={RelativeSource Self}, Mode=OneWay, Converter={avalonDock:BoolToVisibilityConverter}}">
+                                    <Path
+                                        x:Name="PART_ImgAutoHidePin"
+                                        UseLayoutRounding="True"
+                                        RenderOptions.BitmapScalingMode="NearestNeighbor"
+                                        Width="11"
+                                        Height="11"
+                                        Data="{DynamicResource PinAutoHide}"
+                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
+                                        Stretch="Uniform"/>
+                                </Button>
+                                <Button
+                                    x:Name="PART_HidePin"
+                                    Grid.Column="3"
+                                    Margin="0,1,1,0"
+                                    Width="15"
+                                    Height="15"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Command="{Binding Path=LayoutItem.HideCommand, RelativeSource={RelativeSource TemplatedParent}}"
+                                    Focusable="False"
+                                    Style="{DynamicResource AvalonDockThemeVs2013ButtonStyle}"
+                                    ToolTip="閉じる"
+                                    Visibility="{Binding Path=IsEnabled, RelativeSource={RelativeSource Self}, Mode=OneWay, Converter={avalonDock:BoolToVisibilityConverter}}">
+                                    <Path
+                                        x:Name="PART_ImgHidePin"
+                                        Width="10"
+                                        Height="10"
+                                        Margin="1,0,0,1"
+                                        VerticalAlignment="Center"
+                                        Data="{DynamicResource PinClose}"
+                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
+                                        Stretch="Uniform"/>
+                                </Button>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding Model.IsAutoHidden, RelativeSource={RelativeSource Mode=Self}}" Value="True">
+                                <Setter TargetName="PART_AutoHidePin" Property="LayoutTransform">
+                                    <Setter.Value>
+                                        <RotateTransform Angle="90"/>
+                                    </Setter.Value>
+                                </Setter>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Model.CanClose, RelativeSource={RelativeSource Mode=Self}}" Value="True">
+                                <Setter TargetName="PART_HidePin" Property="Command" Value="{Binding Path=LayoutItem.CloseCommand, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                <Setter TargetName="PART_HidePin" Property="ToolTip" Value="閉じる"/>
+                            </DataTrigger>
+                            <!-- Tool Window : Caption / Active -->
+                            <DataTrigger Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveBackground}}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveText}}"/>
+                                <Setter TargetName="DragHandleGeometryPlaceholder" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveGrip}}"/>
+                            </DataTrigger>
+                            <!-- Tool Window : Caption : Button / Active -->
+                            <DataTrigger Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True">
+                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
+                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
+                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
+                            </DataTrigger>
+                            <!-- Tool Window : Caption : Button / Active, hovered -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=MenuDropDownButton}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
+                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_AutoHidePin}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
+                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_HidePin}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
+                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <!-- Tool Window : Caption : Button / Inactive, hovered -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=MenuDropDownButton}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
+                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_AutoHidePin}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
+                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_HidePin}" Value="True"/>
+                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
+                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
+                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
+                            </MultiDataTrigger>
+                            <!-- Tool Window : Caption : Button / Active / Inactive, pressed -->
+                            <Trigger SourceName="MenuDropDownButton" Property="IsChecked" Value="True">
+                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
+                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
+                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
+                            </Trigger>
+                            <Trigger SourceName="PART_AutoHidePin" Property="IsMouseCaptured" Value="True">
+                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
+                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
+                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
+                            </Trigger>
+                            <Trigger SourceName="PART_HidePin" Property="IsMouseCaptured" Value="True">
+                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
+                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
+                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -307,7 +692,9 @@
         <!-- T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化): 独立DockingManager方式
              (増分1〜4と同型パターン踏襲)。ボタン群自体(Style/Command/ToolTip等)は無改修、
              配置場所のみ移動。 -->
-        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Row="1">
+        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Row="1"
+                                   AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}"
+                                   IsVirtualizingAnchorable="False">
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
                     <avalonDock:LayoutAnchorablePane>
