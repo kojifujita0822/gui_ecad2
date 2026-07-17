@@ -186,6 +186,27 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
+        // T-099対症療法(家老采配2026-07-17、隠密調査打ち切り確定): 配置ツールバー2段目
+        // (PlacementToolBarDockingManager、IsVirtualizingAnchorable="False")のSelectedContentが
+        // 起動直後は初期解決されず潰れる現象。真因はWM_SIZE経由ではなく、診断ログ実測(WM_SIZE
+        // なしでUIA FindAll直後に正常化)により別経路と判明したが、文書化されておらず特定不能の
+        // ため根本解明は打ち切り。ファイルメニューを時間差で一瞬開閉する操作(Popup生成に伴う
+        // 何らかの副次効果)が対症療法として機能することを実機確認済み。副作用(操作後もファイル
+        // メニューのハイライトが残留する)対策として、IsSubmenuOpen=false直後にキャンバスへ
+        // 明示的にKeyboard.Focus()する(隠密提案、Keyboard.ClearFocus()だけでは
+        // MenuItem.IsHighlightedが解除されなかったため)。
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            if (MenuBarArea.Items.Count > 0 && MenuBarArea.Items[0] is MenuItem firstMenuItem)
+            {
+                firstMenuItem.IsSubmenuOpen = true;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    firstMenuItem.IsSubmenuOpen = false;
+                    Keyboard.Focus(LadderCanvasHost);
+                }), DispatcherPriority.ContextIdle);
+            }
+        }), DispatcherPriority.ContextIdle);
     }
 
     private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
