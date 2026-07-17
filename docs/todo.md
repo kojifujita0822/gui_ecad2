@@ -680,6 +680,16 @@ GroupFrameラベル編集[ダブルクリックインライン]は`UpdateSourceT
 殿裁定「移動=ドラッグ」の明示範囲）。**着手（2026-07-17）**：侍は矢印キー対応を除く範囲（ドラッグ
 移動・P-071/P-077/P-080の実装時注意）で先行実装、矢印キー対応は殿裁定待ちで後日追加可能な形に
 しておく。
+**基盤区切り完了（2026-07-17、侍、コミット837b407）**：ViewModel層——`SelectedFrame`新設
+（`SelectedCell`セッタへ排他クリア組込み、P-080対応=ドラフトクリア4種目として追加）、
+`DeleteSelectedFrame`/`RenameSelectedFrame`（P-071対応、確定処理の受け皿）、
+`BeginDragFrame`〜`ConfirmDragFrame`/`CancelDragFrame`（GridPos単位、Undo対応）、
+`BeginFrameDraft`〜`ConfirmFrameDraft`/`CancelFrameDraft`（キーボードステップ方式）、
+`IsFrameWithinGridBounds`（他要素との重複は占有判定対象外）。回帰テスト`T067GroupFrameTests.cs`
+新設、build/test回帰なし（App.Tests 695→712件+17、Core.Tests 120件）。**次段階**：
+(1)ヒットテスト+選択ハイライト描画 (2)キーボード/マウス配線 (3)マウスドラッグ新規作成
+(4)ラベル編集UI（P-071確定処理の実配線） (5)右クリックメニュー。P-077は(1)(5)実装時に意識する
+旨、侍より申告あり。
 
 ### T-046 「必ず通過するテスト」防止の仕組み化 — In-progress（制度は運用開始済み、CI化のみ残置）
 
