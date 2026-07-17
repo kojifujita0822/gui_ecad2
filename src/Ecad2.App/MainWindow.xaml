@@ -1056,8 +1056,12 @@
                                         <StackPanel Margin="4" Visibility="{Binding HasSelectedElement, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock Text="{Binding SelectedElementKindDisplay, StringFormat='種別: {0}'}" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                             <TextBlock Text="デバイス名:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
+                                            <!-- T-083新規発見4(家老采配2026-07-17、PR-18): 入力欄対応表から漏れていた
+                                                 InputBackgroundBrush/ForegroundBrush適用。 -->
                                             <TextBox x:Name="DeviceNameBox" Text="{Binding SelectedElementDeviceName, UpdateSourceTrigger=Explicit}"
                                                      IsEnabled="{Binding CanEditDiagram}"
+                                                     Background="{DynamicResource InputBackgroundBrush}"
+                                                     Foreground="{DynamicResource InputForegroundBrush}"
                                                      LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
                                             <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
                                                  (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
@@ -1065,6 +1069,8 @@
                                                 <TextBlock Text="ノッチ位置:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="NotchPositionBox" Text="{Binding SelectedElementNotchPosition, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
+                                                         Background="{DynamicResource InputBackgroundBrush}"
+                                                         Foreground="{DynamicResource InputForegroundBrush}"
                                                          LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
                                             </StackPanel>
                                             <!-- T-085: 表示灯(Lamp)限定の色記号入力欄(殿裁定2026-07-13、丸内に表示するフリーテキスト
@@ -1080,6 +1086,8 @@
                                                     <TextBox x:Name="LampColorBox" Text="{Binding SelectedElementLampColor, UpdateSourceTrigger=Explicit}"
                                                              MaxLength="2"
                                                              IsEnabled="{Binding CanEditDiagram}"
+                                                             Background="{DynamicResource InputBackgroundBrush}"
+                                                             Foreground="{DynamicResource InputForegroundBrush}"
                                                              LostKeyboardFocus="LampColorBox_LostKeyboardFocus" PreviewKeyDown="LampColorBox_PreviewKeyDown"/>
                                                 </DockPanel>
                                             </StackPanel>
@@ -1091,6 +1099,8 @@
                                                 <TextBlock Text="設定時間(秒):" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="SetpointBox" Text="{Binding SelectedElementSetpoint, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
+                                                         Background="{DynamicResource InputBackgroundBrush}"
+                                                         Foreground="{DynamicResource InputForegroundBrush}"
                                                          LostKeyboardFocus="SetpointBox_LostKeyboardFocus" PreviewKeyDown="SetpointBox_PreviewKeyDown"/>
                                                 <Slider Minimum="0" Maximum="10" TickFrequency="1" IsSnapToTickEnabled="True"
                                                         Value="{Binding SelectedElementSetpointSliderValue, Mode=TwoWay}"
@@ -1104,6 +1114,8 @@
                                                 <TextBlock Text="ラベル高さ調整(mm、既定位置=0):" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                                 <TextBox x:Name="LabelDyBox" Text="{Binding SelectedElementLabelDy, UpdateSourceTrigger=Explicit}"
                                                          IsEnabled="{Binding CanEditDiagram}"
+                                                         Background="{DynamicResource InputBackgroundBrush}"
+                                                         Foreground="{DynamicResource InputForegroundBrush}"
                                                          LostKeyboardFocus="LabelDyBox_LostKeyboardFocus" PreviewKeyDown="LabelDyBox_PreviewKeyDown"/>
                                             </StackPanel>
                                         </StackPanel>
