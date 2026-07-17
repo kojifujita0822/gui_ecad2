@@ -92,7 +92,10 @@
                  縮小後に過密な印象になるため、この段のみ細く上書きする。 -->
             <Setter Property="StrokeThickness" Value="1.0"/>
             <!-- T-083増分6(家老采配2026-07-16、殿指摘): アイコン線色をダークモード連動。
-                 2段目専用キーのため1段目(ToolBarIconStyle)には影響しない。 -->
+                 着手当時は1段目(ToolBarIconStyle)が非対応だったため2段目専用に明示指定したが、
+                 その後の新規発見3対応(コミット1648d2b)で基底ToolBarIconStyle自体にも同じ
+                 DynamicResourceが設定されたため、本SetterはBasedOn継承と同値でデッドコード化
+                 している(cleanup指摘、隠密2026-07-17。実害なし、明示性のため残置)。 -->
             <Setter Property="Stroke" Value="{DynamicResource ToolBarForegroundBrush}"/>
         </Style>
         <Style x:Key="PlacementToolBarKeyLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource ToolBarKeyLabelStyle}">
