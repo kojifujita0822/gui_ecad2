@@ -185,6 +185,30 @@ DragHandleTexture確認）は、自動検証手法が本パネルで信頼でき
 実機目視での確認待ちとし、忍者にはこれ以上の自動検証手法の深追いをさせない方針とした。新規発見6
 （シートパネル・部品選択パネルの一瞬ライトモード化）は別のDockingManager（左パレット側）が
 対象で本問題の影響を受けないため、通常どおり検証継続してよいと判断。
+**【重大】隠密2が真の根本原因（有力仮説）を特定（2026-07-17、殿直接指示「根本的な実装も疑って
+調査せよ」による棚卸し調査、`docs/ecad2-t099-tanaoroshi-shinsou-chousa-onmitsu2.md`）**：終日
+追ってきた「外部トリガーで直る謎」は的外れで、真因は**T-099 PoC自身が追加したDataTrigger**
+（`MainWindow.xaml:151-153`、HeaderPanelをドッキング時`Visibility="Collapsed"`化）だった公算が
+極めて高い。5段の因果を一次ソース（dotnet/wpf `UIElement.cs`/`Panel.cs`/`TabControl.cs`、
+AvalonDock`LayoutAnchorablePaneControl.cs`）で裏取り：(1)Collapsed要素はMeasure()が早期return
+(2)ItemsHostパネルのTabItemコンテナ生成はパネル初回Measure時の`InternalChildren`アクセスでのみ
+発火 (3)パネルが測定されなければコンテナは永遠に生成されない (4)`TabControl`の初期選択・
+`SelectedContent`解決はコンテナ生成完了が前提、AvalonDock側にも選択を救う別バインドなし
+(5)よって`SelectedContent=null`のまま2段目全体が潰れる。外部UIA FindAll・メニュー開閉が偶然
+コンテナ生成を誘発し「一度直れば恒久回復」という観測とも整合。**本日の実測10件全てと無矛盾**
+（WM_SIZE不発・`IsVirtualizingAnchorable=False`不発・Peer走査不発の3不発も単一原因で説明）。
+**確証は安価**（5分診断＝ContentRendered時にコンテナ生成状態をログ、または即効テスト＝
+DataTrigger一時除去でクリーン観測起動）。**確証できれば根本修正＝HeaderPanel自体でなく
+TabItemコンテナ側のVisibilityで制御する形へ置き換え**（既存Items.Count=1トリガーを
+`Model.IsDirectlyHostedInFloatingWindow`条件のDataTriggerへ置換）——対症療法・
+`IsVirtualizingAnchorable="False"`は全撤去可能、T-099要件(1)もこの形で直接実現される見込み。
+**着手（2026-07-17、家老裁量・技術検証の範疇のため殿確認なしで進行）**：侍へ確証・根本修正の
+実装を最優先割込みで采配。
+**【報告・殿お戻り後の確認事項】**：根本修正案ではフロート時にタブが表示される（要件2どおり）が、
+フロートウィンドウ自体のタイトルバーとタブが二重表示に見える可能性があり実機での見え方確認を
+推奨（隠密2所見）。また選択タブの`Background="White"`固定（AvalonDock既定コピー由来、
+`MainWindow.xaml:183`）はフロート時ダークモードで白浮きの見込み、根本修正時に併せて
+DynamicResource化を検討中。
 
 ### T-089 ボタン押下状態の視覚的明示化 — Approved（gated、殿直接指示2026-07-14、P-091起票）
 
