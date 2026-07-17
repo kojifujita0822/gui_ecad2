@@ -381,6 +381,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedConnectionDot = null;
             // T-064: 画像も同様に扱う。
             SelectedImage = null;
+            // T-067: 枠(GroupFrame)も同様に扱う。
+            SelectedFrame = null;
             // T-088隠密静的レビュー指摘(findings2): 要素のドラッグ中状態(_draggingElement)も同様に
             // クリアする。SelectedElementはSelectedCellからの算出プロパティで専用setterを持たない
             // ため、他のSelected*と異なりここで明示的に呼ぶ必要がある。SetCurrentSheetIndexCore・
@@ -401,6 +403,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 要因での残留防止)。CancelImageInsertDraftは「記入中でなければ何もしない」構造のため
             // ClearConnectorDraftIfAny等と同様にそのまま呼べる。
             CancelImageInsertDraft();
+            // T-067: 枠の記入中状態(_frameDraft)も同型でクリアする(P-080=3種ドラフトクリア責務
+            // 分散への対応、4種目として同じ箇所へ追加)。
+            ClearFrameDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -1189,8 +1194,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool HasSelectedImage => SelectedImage is not null;
 
     /// <summary>右パネルのプロパティ領域で「要素を選択してください」プレースホルダを表示するか
-    /// (T-064: 画像選択の追加に伴い、要素・画像いずれも無選択の場合のみプレースホルダを表示する)。</summary>
-    public bool HasNoPropertySelection => !HasSelectedElement && !HasSelectedImage;
+    /// (T-064: 画像選択の追加に伴い、要素・画像いずれも無選択の場合のみプレースホルダを表示する。
+    /// T-067: 枠選択も同様に扱う)。</summary>
+    public bool HasNoPropertySelection => !HasSelectedElement && !HasSelectedImage && !HasSelectedFrame;
 
     /// <summary>SelectedImageのトレース用下絵トグル(T-064、プロパティパネルのCheckBox用)。殿裁定
     /// (画像操作は全てUndo対象、他要素との非対称は許容)によりRecordSnapshotを実行直前に呼ぶ。</summary>
@@ -1356,6 +1362,176 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void CancelDragImage()
         => CancelDrag(ref _draggingImage,
             image => { image.XMm = _dragImageOrigXMm; image.YMm = _dragImageOrigYMm; });
+
+    // T-067: GroupFrame(グループ枠)の選択状態(SelectedImageと同型の排他制御——SelectedCellの
+    // setterが常時クリアする)。単一選択のみ。殿裁定=配置単位はグリッドセル単位(Visual*Mm不使用、
+    // P-050は構造的に非該当)。
+    private GroupFrame? _selectedFrame;
+
+    public GroupFrame? SelectedFrame
+    {
+        get => _selectedFrame;
+        set
+        {
+            ForceCancelDragFrameIfAny();
+            SetProperty(ref _selectedFrame, value);
+            OnPropertyChanged(nameof(HasSelectedFrame));
+            OnPropertyChanged(nameof(HasNoPropertySelection));
+        }
+    }
+
+    /// <summary>右パネル下段のプロパティ表示切替に使う(選択中の枠があるか)。</summary>
+    public bool HasSelectedFrame => SelectedFrame is not null;
+
+    /// <summary>SelectedFrameを削除する(T-067、DeleteSelectedImageと同型)。戻り値は実際に
+    /// 削除したか。</summary>
+    public bool DeleteSelectedFrame()
+    {
+        if (CurrentSheet is not Sheet sheet || SelectedFrame is not GroupFrame frame || !sheet.Frames.Contains(frame))
+            return false;
+        UndoManager.RecordSnapshot(Document);
+        sheet.Frames.Remove(frame);
+        MarkDirty();
+        SelectedFrame = null;
+        return true;
+    }
+
+    /// <summary>SelectedFrameのラベルを変更する(T-067、P-071対応=UpdateSourceTrigger=Explicitな
+    /// ラベル編集欄から、選択状態を変更する前に呼ぶ確定処理)。値が変化した場合のみUndo対象として
+    /// RecordSnapshotする。戻り値は実際に変更したか。</summary>
+    public bool RenameSelectedFrame(string newLabel)
+    {
+        if (SelectedFrame is not GroupFrame frame || frame.Label == newLabel) return false;
+        UndoManager.RecordSnapshot(Document);
+        frame.Label = newLabel;
+        MarkDirty();
+        return true;
+    }
+
+    // T-067: GroupFrameのドラッグ移動(BeginDragElementと同型、GridPos単位)。他要素との重複は
+    // 許容する(GroupFrameはグルーピング表示のため占有判定の対象外、境界チェックのみ)。
+    private GroupFrame? _draggingFrame;
+    private GridPos _dragFrameOrigTopLeft;
+
+    /// <summary>枠をドラッグ中か。</summary>
+    public bool IsDraggingFrame => _draggingFrame is not null;
+
+    /// <summary>ドラッグ中の枠を外部要因により強制的にキャンセルする(ForceCancelDragElementIfAnyと
+    /// 同型)。</summary>
+    private void ForceCancelDragFrameIfAny()
+        => ForceCancelIfAny(
+            () => _draggingFrame is not null,
+            CancelDragFrame,
+            () => OnPropertyChanged(nameof(IsDraggingFrame)));
+
+    /// <summary>枠のドラッグ(移動)を開始する(T-067)。</summary>
+    public void BeginDragFrame(GroupFrame frame)
+    {
+        _draggingFrame = frame;
+        _dragFrameOrigTopLeft = frame.TopLeft;
+    }
+
+    /// <summary>ドラッグ中のマウス位置(グリッド座標)に応じて枠の位置を更新する(T-067)。境界内
+    /// (IsFrameWithinGridBounds)を満たす場合のみ位置更新する(満たさなければその場に留まる、
+    /// UpdateDragElement踏襲の挙動)。</summary>
+    public void UpdateDragFrame(GridPos topLeft)
+    {
+        if (_draggingFrame is not GroupFrame frame || CurrentSheet is not Sheet sheet) return;
+        if (IsFrameWithinGridBounds(topLeft, frame.Width, frame.Height, sheet))
+            frame.TopLeft = topLeft;
+    }
+
+    /// <summary>枠のドラッグを確定する(T-067、ConfirmDragElementと同型。開始時から実際に位置が
+    /// 変化していれば、一旦開始時位置へ戻してRecordSnapshotを呼んでから確定値へ戻す)。</summary>
+    public void ConfirmDragFrame()
+    {
+        if (_draggingFrame is not GroupFrame frame) { _draggingFrame = null; return; }
+        if (frame.TopLeft != _dragFrameOrigTopLeft)
+        {
+            var confirmedPos = frame.TopLeft;
+            frame.TopLeft = _dragFrameOrigTopLeft;
+            UndoManager.RecordSnapshot(Document);
+            frame.TopLeft = confirmedPos;
+            MarkDirty();
+        }
+        _draggingFrame = null;
+    }
+
+    /// <summary>枠のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-067)。</summary>
+    public void CancelDragFrame()
+        => CancelDrag(ref _draggingFrame, frame => frame.TopLeft = _dragFrameOrigTopLeft);
+
+    // T-067: 枠の新規作成(キーボードステップ方式、_freeLineDraftと同型)。Anchorは左上セル固定
+    // (通常SelectedCell)、Width/Heightを1ずつ増減する(呼び出し元=View層がKeyを判定し、
+    // deltaWidth/deltaHeightとして渡す。MoveFreeLineDraftEndと同じくViewModel側はKey型に依存
+    // しない設計)。殿裁定=マウスドラッグ・キーボードステップ両対応のうち後者側(前者は次段階で
+    // View層に実装)。
+    private (GridPos Anchor, int Width, int Height)? _frameDraft;
+
+    /// <summary>記入中の枠のプレビュー形状(LadderCanvasの半透明描画用)。記入中でなければnull。</summary>
+    public GroupFrame? FrameDraftPreview
+    {
+        get
+        {
+            if (_frameDraft is not { } d) return null;
+            return new GroupFrame { Label = "", TopLeft = d.Anchor, Width = d.Width, Height = d.Height };
+        }
+    }
+
+    /// <summary>枠の記入(キーボードステップ方式)を開始する(T-067)。anchorは左上セル(通常
+    /// SelectedCell)。</summary>
+    public void BeginFrameDraft(GridPos anchor)
+    {
+        _frameDraft = (anchor, 1, 1);
+        Tool = new ToolState(ToolMode.PlaceFrame);
+        OnPropertyChanged(nameof(FrameDraftPreview));
+    }
+
+    /// <summary>記入中の枠のサイズを調整する(T-067)。deltaWidth/deltaHeightは1回の矢印キー入力
+    /// 分(例: Right→(1,0)、Left→(-1,0)、Down→(0,1)、Up→(0,-1))。最小1x1、グリッド境界
+    /// (IsFrameWithinGridBounds)を超える拡大は無視する。</summary>
+    public void AdjustFrameDraft(int deltaWidth, int deltaHeight)
+    {
+        if (_frameDraft is not { } d || CurrentSheet is not Sheet sheet) return;
+        int width = Math.Max(1, d.Width + deltaWidth);
+        int height = Math.Max(1, d.Height + deltaHeight);
+        if (IsFrameWithinGridBounds(d.Anchor, width, height, sheet))
+        {
+            _frameDraft = d with { Width = width, Height = height };
+            OnPropertyChanged(nameof(FrameDraftPreview));
+        }
+    }
+
+    /// <summary>記入中の枠を確定する(Enter、T-067)。殿裁定によりGroupFrame操作はUndo対象のため
+    /// RecordSnapshotを実行直前に呼ぶ。確定後は生成した枠を選択状態にする(画像挿入と同型)。
+    /// 戻り値は実際に確定したか。</summary>
+    public bool ConfirmFrameDraft()
+    {
+        if (_frameDraft is not { } d || CurrentSheet is not Sheet sheet) return false;
+        UndoManager.RecordSnapshot(Document);
+        var frame = new GroupFrame { Label = "", TopLeft = d.Anchor, Width = d.Width, Height = d.Height };
+        sheet.Frames.Add(frame);
+        MarkDirty();
+        CancelFrameDraft();
+        // T-064 ConfirmImageInsertDraft踏襲: SelectedCell=null→SelectedFrame=frameの順で呼び、
+        // 既存の他選択状態(SelectedCell等)と排他選択を成立させる。
+        SelectedCell = null;
+        SelectedFrame = frame;
+        return true;
+    }
+
+    /// <summary>記入中の枠を取消す(Esc、T-067)。何も生成せず選択モードへ戻す。</summary>
+    public void CancelFrameDraft()
+    {
+        if (_frameDraft is null) return;
+        _frameDraft = null;
+        Tool = ToolState.SelectDefault;
+        OnPropertyChanged(nameof(FrameDraftPreview));
+    }
+
+    /// <summary>記入中の枠状態を外部要因(シート切替等)によりクリアする(ClearFreeLineDraftIfAny・
+    /// CancelImageInsertDraftと同型、SelectedCellのsetterから呼ばれる)。</summary>
+    public void ClearFrameDraftIfAny() => CancelFrameDraft();
 
     // T-088: 基本図形(Element)のドラッグ移動(画像ドラッグと同型パターン、GridPos単位)。
     // GuiEcad踏襲(調査書docs/ecad2-element-move-feature-survey-onmitsu.md)だが、Undo方式は
@@ -2389,6 +2565,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static bool IsWithinGridBounds(GridPos pos, int cellWidth, Sheet sheet)
         => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
         && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
+
+    /// <summary>T-067: GroupFrameが指定TopLeft/Width/Heightでグリッド範囲内に収まるか判定する
+    /// (IsWithinGridBoundsの矩形版、複数行にまたがる点が要素と異なる)。GroupFrameは他要素との
+    /// 重複を許容する(グルーピング表示のため占有判定は対象外)。</summary>
+    private static bool IsFrameWithinGridBounds(GridPos topLeft, int width, int height, Sheet sheet)
+        => topLeft.Row >= 0 && topLeft.Row + height - 1 < sheet.Grid.Rows
+        && topLeft.Column >= 0 && topLeft.Column + width - 1 < sheet.Grid.Columns;
 
     /// <summary>T-088: excludeを渡すと、その要素自身は占有判定の対象から除外する(移動時、元の
     /// セルに自分自身が居座っていることで「占有されている」と誤判定されるのを防ぐ)。新規配置時は
