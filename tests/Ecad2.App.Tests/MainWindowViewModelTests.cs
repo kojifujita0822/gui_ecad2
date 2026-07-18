@@ -798,6 +798,7 @@ public class MainWindowViewModelTests : ViewModelTestBase
     [InlineData("Connector")]
     [InlineData("FreeLine")]
     [InlineData("Image")]
+    [InlineData("Frame")]
     public void ToolbarButtonEquivalent_ClearsResidualDraft_BeforeSwitchingMode(string draftKind)
     {
         var vm = CreateViewModel();
@@ -816,6 +817,12 @@ public class MainWindowViewModelTests : ViewModelTestBase
             case "Image":
                 vm.BeginImageInsertDraft(@"C:\images\a.png", widthMm: 20, heightMm: 10, xMm: 5, yMm: 5);
                 break;
+            case "Frame":
+                // T-067基盤欠陥修正(隠密P-106点検、PR-01再発): CancelResidualDraftForToolSwitchが
+                // _frameDraftをクリアしていなかった(枠記入中に別ツール切替でFrameDraftPreviewが
+                // 幽霊表示され続ける)、着手前チェックが名指しで警告していた3箇所の1つ。
+                vm.BeginFrameDraft(new GridPos(2, 3));
+                break;
         }
         Assert.True(vm.HasAnyDraft);
 
@@ -828,9 +835,11 @@ public class MainWindowViewModelTests : ViewModelTestBase
         Assert.Null(vm.ConnectorDraftPreview);
         Assert.Null(vm.FreeLineDraftPreview);
         Assert.Null(vm.ImageInsertDraftPreview);
+        Assert.Null(vm.FrameDraftPreview);
         Assert.Empty(vm.CurrentSheet!.Connectors);
         Assert.Empty(vm.CurrentSheet!.FreeLines);
         Assert.Empty(vm.CurrentSheet!.Images);
+        Assert.Empty(vm.CurrentSheet!.Frames);
     }
 
     /// <summary>状態遷移表・有効域(対照ケース): ドラフトを持たない状態からの遷移は従来どおり

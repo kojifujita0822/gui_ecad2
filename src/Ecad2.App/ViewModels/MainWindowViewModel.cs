@@ -1879,6 +1879,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         CancelConnectorDraft();
         CancelFreeLineDraft();
         CancelImageInsertDraft();
+        // T-067: 枠(GroupFrame)の記入中状態も同様に扱う(PR-01再発、隠密P-106点検指摘。未クリアの
+        // ままだと別ツールへ切替えてもFrameDraftPreviewが幽霊表示され続ける、ClearFrameDraftIfAny
+        // 経由でCancelFrameDraft()を呼ぶ、記入中でなければ何もしないガード済み)。
+        ClearFrameDraftIfAny();
     }
 
     /// <summary>記入中の自由線のプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
