@@ -1866,7 +1866,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// ドラフト保護ガードを、静的なツールモード(Tool.Mode!=Select全般)ではなく実際にドラフトを
     /// 持つ状態のみへ絞り込むために使う。往復2周目のTool.Modeガードは、ドラフトを一切持たない
     /// PlaceElement(連続配置、T-021分岐A)等まで一律ブロックする過剰な副作用があった。</summary>
-    public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null;
+    public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null || _frameDraft is not null;
 
     /// <summary>T-069往復4周目修正1(隠密テスト設計書、殿裁可済み): ツールバーのツール切替ボタン
     /// (部品配置・自作パーツ選択)は、記入中ドラフト(縦コネクタ/自由線/画像挿入)を保持したまま
@@ -2880,6 +2880,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 無く、上の_selectedCellは直接代入(setterバイパス)のため自動クリアが効かない
         // (SelectedConnector等と同じ理由、ここだけ横展開漏れしていた)。
         SelectedImage = null;
+        // T-067: 枠(GroupFrame)も同様に旧文書の実体を持ち越さない(PR-01再発、隠密静的レビュー
+        // 指摘。上の_selectedCellは直接代入[setterバイパス]のためSelectedFrame=nullの自動クリアが
+        // 効かない、SelectedImage等と同じ理由でここだけ横展開漏れしていた)。
+        SelectedFrame = null;
         // T-088: 要素のドラッグ中状態(_draggingElement)も同様に旧文書の実体を持ち越さない。
         // SelectedElementはSelectedCellからの算出プロパティで専用setterが無いため、
         // SelectedImage等と異なりここで明示的に呼ぶ必要がある。
@@ -2897,6 +2901,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         // ImageInsertを返し続け、新文書上に幽霊プレビューが表示される(コード読解で確認、
         // CancelImageInsertDraft()呼び出し1箇所で両症状とも解消する)。
         CancelImageInsertDraft();
+        // T-067: 枠の記入中状態(_frameDraft)も同様に、旧文書の情報を持ち越さないようクリアする
+        // (PR-01再発、隠密静的レビュー指摘。未クリアのままだとHasAnyDraftが真のまま残留し直後の
+        // Undo/Redo・行削除が素通しになるほか、FrameDraftPreviewが新文書のグリッド範囲外座標のまま
+        // 幽霊プレビューを描画し続ける、CancelImageInsertDraftと同型の症状)。
+        ClearFrameDraftIfAny();
         // 隠密レビューfinding3: 旧値をOnPropertyChangedへ明示的に渡す(SetPropertyバイパスの
         // 直接代入経路でも旧値がnullにならないようにする、殿裁定「安くできる範囲」の範囲内)。
         OnPropertyChanged(nameof(Document), oldDocument);

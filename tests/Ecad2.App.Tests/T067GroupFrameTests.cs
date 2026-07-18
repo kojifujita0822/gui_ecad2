@@ -283,4 +283,48 @@ public class T067GroupFrameTests : ViewModelTestBase
 
         Assert.False(vm.HasNoPropertySelection);
     }
+
+    // T-067基盤欠陥修正(隠密静的レビュー、PR-01再発)の回帰テスト。ReplaceDocument(NewDocument経由)が
+    // 新設SelectedFrame/_frameDraftをクリアしていなかった問題(旧文書の枠実体が持ち越される)。
+
+    [Fact]
+    public void NewDocument_選択中の枠をクリアする()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        CreateAndSelectFrame(vm, 5, 5);
+        Assert.True(vm.HasSelectedFrame);
+
+        vm.NewDocument();
+
+        Assert.Null(vm.SelectedFrame);
+        Assert.False(vm.HasSelectedFrame);
+    }
+
+    [Fact]
+    public void NewDocument_記入中の枠をクリアする()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.BeginFrameDraft(new GridPos(3, 4));
+        vm.AdjustFrameDraft(1, 1);
+
+        vm.NewDocument();
+
+        Assert.Null(vm.FrameDraftPreview);
+    }
+
+    // T-067基盤欠陥修正(隠密静的レビュー、PR-01再発)の回帰テスト。HasAnyDraftが新設_frameDraftを
+    // 含んでおらず、枠記入中でもUndo/Redo・行削除コマンドが素通しになっていた問題。
+
+    [Fact]
+    public void HasAnyDraft_枠記入中はtrueになる()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.BeginFrameDraft(new GridPos(3, 4));
+
+        Assert.True(vm.HasAnyDraft);
+    }
 }
