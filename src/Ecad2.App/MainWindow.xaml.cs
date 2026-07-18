@@ -402,6 +402,9 @@ public partial class MainWindow : Window
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedConnectionDot)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedImage)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.ImageInsertDraftPreview)
+            // T-067(1)欠陥修正(忍者実機NG2026-07-18): SelectedFrameが列挙から漏れており、枠の
+            // クリック選択直後にハイライトが描画されなかった(他の再描画契機を挟むと現れる)。
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedFrame)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode))
             RedrawCanvas();
 

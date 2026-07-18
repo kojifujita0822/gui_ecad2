@@ -549,7 +549,11 @@ public sealed class LadderCanvas : FrameworkElement
         double y = frame.VisualYMm ?? (geo.YRow(frame.TopLeft.Row) - geo.CellMm * 0.4);
         double w = frame.VisualWidthMm ?? frame.Width * geo.CellMm;
         double h = frame.VisualHeightMm ?? frame.Height * geo.CellMm;
-        return new Rect(x, y, w, h);
+        // 隠密レビュー指摘(T-067(1)、2026-07-18): 旧ファイル互換のVisual*Mm・破損データ経由で
+        // 負値が入るとRectコンストラクタがArgumentExceptionを投げるため非負へクランプする
+        // (描画側DiagramRenderer.DrawFramesはIRenderer実装が負値を許容するため例外にならないが、
+        // Rect構築はWPF側の検証が働く)。
+        return new Rect(x, y, Math.Max(0, w), Math.Max(0, h));
     }
 
     /// <summary>GroupFrameの矩形をローカルDIP座標へ変換する(T-067、ImageRectDipと同型)。</summary>
