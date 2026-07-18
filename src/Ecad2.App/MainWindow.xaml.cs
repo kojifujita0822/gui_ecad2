@@ -70,6 +70,11 @@ public partial class MainWindow : Window
     private bool _elementDragStarted;
     private bool _elementDragConsumedByEscape;
 
+    // T-067(2): GroupFrame(枠)ドラッグの同種の状態(要素ドラッグと同型)。
+    private Point _frameDragPressPositionDip;
+    private bool _frameDragStarted;
+    private bool _frameDragConsumedByEscape;
+
     // T-061第三歩: テストモード中、押しボタンのモーメンタリ動作用に押下中のデバイス名を保持する
     // (MouseUp/LostMouseCaptureでOFFに戻す、他ドラッグ系のView状態保持と同じ設計)。
     private string? _testModePressedDevice;
@@ -495,6 +500,14 @@ public partial class MainWindow : Window
             if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
             _elementDragStarted = false;
             _elementDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.IsDraggingFrame) && !_viewModel.IsDraggingFrame)
+        {
+            // T-067(2): ForceCancelDragFrameIfAny(SelectedCellのsetter経由等の外部要因)による
+            // 強制キャンセルにView側の状態も追随させる(他ドラッグ系と同型)。
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _frameDragStarted = false;
+            _frameDragConsumedByEscape = false;
         }
     }
 
@@ -1154,6 +1167,19 @@ public partial class MainWindow : Window
                 _elementDragStarted = false;
             }
         }
+
+        // T-067(2): 選択中の枠(SelectedFrame)の境界線を押下したらドラッグ(移動)を開始する
+        // (要素ドラッグT-088と同型パターン、殿裁定④=移動はドラッグ)。掴む判定はヒットテストと
+        // 同じ境界線近傍(HitTestFrame)——枠は塗りつぶしが無いため内部クリックでは掴まない。
+        if (_viewModel.SelectedFrame is Ecad2.Model.GroupFrame dragFrame
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet frameDragSheet
+            && LadderCanvasHost.HitTestFrame(position, frameDragSheet) == dragFrame)
+        {
+            _viewModel.BeginDragFrame(dragFrame);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragFrame(); return; }
+            _frameDragPressPositionDip = position;
+            _frameDragStarted = false;
+        }
     }
 
     // T-041増分7: ドラッグ中(キャプチャ中)のみ処理する。しきい値未満の移動はクリックとの区別のため
@@ -1264,6 +1290,18 @@ public partial class MainWindow : Window
             }
             _viewModel.UpdateDragElement(LadderCanvasHost.ToGridPos(position));
             RedrawCanvas();
+            return;
+        }
+
+        if (_viewModel.IsDraggingFrame)
+        {
+            if (!_frameDragStarted)
+            {
+                if ((position - _frameDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _frameDragStarted = true;
+            }
+            _viewModel.UpdateDragFrame(LadderCanvasHost.ToGridPos(position));
+            RedrawCanvas();
         }
     }
 
@@ -1289,7 +1327,7 @@ public partial class MainWindow : Window
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
         if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
             || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape
-            || _elementDragConsumedByEscape)
+            || _elementDragConsumedByEscape || _frameDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
@@ -1299,6 +1337,7 @@ public partial class MainWindow : Window
             _imageDragConsumedByEscape = false;
             _imageResizeConsumedByEscape = false;
             _elementDragConsumedByEscape = false;
+            _frameDragConsumedByEscape = false;
             return;
         }
 
@@ -1363,6 +1402,14 @@ public partial class MainWindow : Window
             _viewModel.ConfirmDragElement();
             LadderCanvasHost.ReleaseMouseCapture();
             _elementDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsDraggingFrame)
+        {
+            _viewModel.ConfirmDragFrame();
+            LadderCanvasHost.ReleaseMouseCapture();
+            _frameDragStarted = false;
             RedrawCanvas();
             return;
         }
@@ -1701,6 +1748,12 @@ public partial class MainWindow : Window
             _elementDragStarted = false;
             RedrawCanvas();
         }
+        if (_viewModel.IsDraggingFrame)
+        {
+            _viewModel.CancelDragFrame();
+            _frameDragStarted = false;
+            RedrawCanvas();
+        }
         _connectorDragConsumedByEscape = false;
         _wireBreakDragConsumedByEscape = false;
         _freeLineDragConsumedByEscape = false;
@@ -1708,6 +1761,7 @@ public partial class MainWindow : Window
         _imageDragConsumedByEscape = false;
         _imageResizeConsumedByEscape = false;
         _elementDragConsumedByEscape = false;
+        _frameDragConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -1872,6 +1926,17 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 }
+                if (_viewModel.IsDraggingFrame)
+                {
+                    // T-067(2): 枠ドラッグ中のEscも他ドラッグ系と同型の独立最優先層とする。
+                    _viewModel.CancelDragFrame();
+                    _frameDragStarted = false;
+                    _frameDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // T-036追加修正(殿裁定=Esc入力破棄、隠密レビュー指摘=Esc層消費): デバイス名編集中の
                 // Escは表示復元(UpdateTarget())+フォーカス復帰のみの独立した1層として消費し、
                 // 下記の層2/3/4処理(選択解除等)へは落とさない(T-021「1回のEscは1層だけ」の原則に
@@ -1918,13 +1983,15 @@ public partial class MainWindow : Window
                 }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
                     || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
-                    || _viewModel.SelectedConnectionDot is not null || _viewModel.SelectedImage is not null)
+                    || _viewModel.SelectedConnectionDot is not null || _viewModel.SelectedImage is not null
+                    || _viewModel.SelectedFrame is not null)
                 {
                     // 層3: 要素選択中・配線プリミティブ選択中(T-041増分1/3/5)・画像選択中(T-064往復
                     // 1周目修正3、隠密レビュー指摘=条件リストにSelectedImageが漏れており画像単独
-                    // 選択時にEscで解除できなかった) → 選択解除のみ。SelectedCellのsetterが値変化の
-                    // 有無に関わらず全ての配線プリミティブ選択・SelectedImageも常にクリアするため
-                    // (隠密レビュー指摘、MainWindowViewModel.SelectedCell参照)、1行で足りる。
+                    // 選択時にEscで解除できなかった)・枠選択中(T-067(2)、同型横展開) → 選択解除のみ。
+                    // SelectedCellのsetterが値変化の有無に関わらず全ての配線プリミティブ選択・
+                    // SelectedImage・SelectedFrameも常にクリアするため(隠密レビュー指摘、
+                    // MainWindowViewModel.SelectedCell参照)、1行で足りる。
                     _viewModel.SelectedCell = null;
                 }
                 // 層4: 何もなし → 無視(キャンバスフォーカス維持のみ)。
@@ -2117,7 +2184,8 @@ public partial class MainWindow : Window
                 // 統合)。クリック時点でいずれも排他的にしか選択されない設計だが、優先順位を明記しておく。
                 if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
                     || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
-                    || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage())
+                    || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage()
+                    || _viewModel.DeleteSelectedFrame())
                     RedrawCanvas();
                 e.Handled = true;
                 break;
@@ -2281,7 +2349,8 @@ public partial class MainWindow : Window
         CommitDeviceNameEdit();
         if (_viewModel.DeleteSelectedElement() || _viewModel.DeleteSelectedConnector()
             || _viewModel.DeleteSelectedWireBreak() || _viewModel.DeleteSelectedFreeLine()
-            || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage())
+            || _viewModel.DeleteSelectedConnectionDot() || _viewModel.DeleteSelectedImage()
+            || _viewModel.DeleteSelectedFrame())
             RedrawCanvas();
     }
 
