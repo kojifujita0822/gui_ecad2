@@ -552,7 +552,8 @@ public partial class MainWindow : Window
             LadderCanvasHost.Draw(sheet, _viewModel.PartLibrary, _viewModel.SelectedCell, _viewModel.SelectedConnector,
                 _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
                 _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
-                _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.CurrentTestSession?.State);
+                _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.SelectedFrame,
+                _viewModel.CurrentTestSession?.State);
         else
             LadderCanvasHost.Clear();
     }
@@ -1396,6 +1397,14 @@ public partial class MainWindow : Window
             {
                 _viewModel.SelectedCell = null;
                 _viewModel.SelectedConnector = connector;
+                return;
+            }
+            // T-067: GroupFrame(グループ枠)の選択。GuiEcad優先順位(要素→縦コネクタ→枠→点…)に倣い
+            // Connectorの直後に置く。同じ排他クリア順序(SelectedCell=null→SelectedFrame=frame)に倣う。
+            if (LadderCanvasHost.HitTestFrame(position, sheet) is Ecad2.Model.GroupFrame frame)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedFrame = frame;
                 return;
             }
             // T-041増分3: 配線分断(WireBreak)の選択。SelectedConnectorと同じ排他クリア順序

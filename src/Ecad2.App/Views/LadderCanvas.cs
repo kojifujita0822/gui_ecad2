@@ -129,6 +129,15 @@ public sealed class LadderCanvas : FrameworkElement
     private static readonly Pen SelectedImagePen = new(Brushes.OrangeRed, 2.0);
     private const double ImageResizeHandleSizeDip = 8.0;
 
+    // 選択中のGroupFrame(グループ枠)のハイライト枠(T-067、SelectedImagePen等と同型)。
+    private static readonly Pen SelectedFramePen = new(Brushes.OrangeRed, 2.0);
+
+    // GroupFrameのヒットテスト許容誤差上限(mm、T-067)。GuiEcad原本(MainPage.xaml.cs.HitTestFrame)の
+    // margin = Math.Min(CellMm * 0.15, 3.0) をそのまま移植。枠は塗りつぶし無し(点線境界のみ)のため、
+    // HitTestImageのような内部全域ヒットではなく、境界線近傍のみをヒット対象とする
+    // (GuiEcad側コメント「画像は矩形塗りつぶし相当…枠のように境界のみではない」参照)。
+    private const double FrameHitMarginMaxMm = 3.0;
+
     // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。確定済み画像との
     // 区別のため半透明の塗り+破線枠にする(ConnectorDraftPen等と同系統の表現)。
     private static readonly Brush ImageDraftFillBrush = CreateImageDraftFillBrush();
@@ -158,6 +167,7 @@ public sealed class LadderCanvas : FrameworkElement
         WireBreak? selectedWireBreak = null, FreeLine? selectedFreeLine = null,
         FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null,
         ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null,
+        GroupFrame? selectedFrame = null,
         SimState? sim = null)
     {
         _lastSheet = sheet;
@@ -250,6 +260,12 @@ public sealed class LadderCanvas : FrameworkElement
                         new Rect(corner.X - ImageResizeHandleSizeDip / 2, corner.Y - ImageResizeHandleSizeDip / 2,
                             ImageResizeHandleSizeDip, ImageResizeHandleSizeDip));
             }
+
+            // 選択中のGroupFrame(グループ枠)のハイライト(T-067)。DiagramRenderer.DrawFramesと
+            // 同じ矩形位置(FrameRectDip)を専用Penで上書き再描画する(画像等と同型パターン、次段階
+            // (2)〜(5)=キーボード配線・ドラッグ作成・ラベル編集・右クリックメニューは未実装)。
+            if (selectedFrame is { } frame)
+                dc.DrawRectangle(null, SelectedFramePen, FrameRectDip(frame));
 
             // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。半透明の塗り+
             // 破線枠で配置枠を示す(実画像内容の描画は行わない、シンプルさ優先)。
@@ -520,6 +536,56 @@ public sealed class LadderCanvas : FrameworkElement
     /// <summary>ImageInsertの矩形(mm実座標)をローカルDIP座標へ変換する(T-064)。</summary>
     private static Rect ImageRectDip(ImageInsert image)
         => new(image.XMm * MmToDip, image.YMm * MmToDip, image.WidthMm * MmToDip, image.HeightMm * MmToDip);
+
+    /// <summary>GroupFrameの矩形をmm実座標で返す(T-067)。DiagramRenderer.DrawFramesと同じ計算式
+    /// (Visual*Mm優先、無ければTopLeft/Width/Height由来)をView側で再現する(HitTestConnector等の
+    /// 既存パターン踏襲、Core層描画ロジックの重複はやむを得ない設計)。殿裁定=配置単位はグリッド
+    /// セル単位のため新規作成の枠はVisual*Mmが常にnullだが、旧ファイル互換で値が入っている場合も
+    /// 描画位置とヒットテスト位置を一致させるため描画側と同じフォールバック式を用いる。</summary>
+    private Rect FrameRectMm(GroupFrame frame)
+    {
+        var geo = _renderer.Geometry;
+        double x = frame.VisualXMm ?? geo.X(frame.TopLeft.Column);
+        double y = frame.VisualYMm ?? (geo.YRow(frame.TopLeft.Row) - geo.CellMm * 0.4);
+        double w = frame.VisualWidthMm ?? frame.Width * geo.CellMm;
+        double h = frame.VisualHeightMm ?? frame.Height * geo.CellMm;
+        return new Rect(x, y, w, h);
+    }
+
+    /// <summary>GroupFrameの矩形をローカルDIP座標へ変換する(T-067、ImageRectDipと同型)。</summary>
+    private Rect FrameRectDip(GroupFrame frame)
+    {
+        var mm = FrameRectMm(frame);
+        return new Rect(mm.X * MmToDip, mm.Y * MmToDip, mm.Width * MmToDip, mm.Height * MmToDip);
+    }
+
+    /// <summary>クリック位置(ローカルDIP座標)にヒットするGroupFrame(グループ枠)を探す(T-067)。
+    /// GuiEcad原本(MainPage.xaml.cs.HitTestFrame)を移植: 枠は塗りつぶし無し(点線境界のみ)のため
+    /// 内部全域ではなく境界線近傍(margin付き)のみをヒット対象とする。margin込みの矩形内かつ、
+    /// いずれかの辺の近傍(onBorderX/onBorderY)であることを要求する。複数該当時は面積最小(入れ子の
+    /// 枠がある場合に内側の小さい枠を優先)を返す。</summary>
+    internal GroupFrame? HitTestFrame(Point localPositionDip, Sheet sheet)
+    {
+        (double xMm, double yMm) = ToMm(localPositionDip);
+        var geo = _renderer.Geometry;
+        double margin = Math.Min(geo.CellMm * 0.15, FrameHitMarginMaxMm);
+
+        GroupFrame? best = null;
+        double bestArea = double.MaxValue;
+        foreach (var f in sheet.Frames)
+        {
+            var rect = FrameRectMm(f);
+            bool insideX = xMm >= rect.X - margin && xMm <= rect.Right + margin;
+            bool insideY = yMm >= rect.Y - margin && yMm <= rect.Bottom + margin;
+            bool onBorderX = xMm <= rect.X + margin || xMm >= rect.Right - margin;
+            bool onBorderY = yMm <= rect.Y + margin || yMm >= rect.Bottom - margin;
+            if (!insideX || !insideY || !(onBorderX || onBorderY)) continue;
+
+            double area = (double)f.Width * f.Height;
+            if (area < bestArea) { best = f; bestArea = area; }
+        }
+        return best;
+    }
 
     /// <summary>描画内容を消去する(T-019: Document.Sheets.Count==0の空状態で使う。
     /// 前回シートの残像を残さない)。</summary>
