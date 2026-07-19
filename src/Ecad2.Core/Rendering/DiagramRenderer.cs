@@ -487,11 +487,23 @@ public sealed class DiagramRenderer
         return best;
     }
 
-    // 末尾要素の右母線延長区間 [rb, columns) にある分岐点のうち最も内側(左寄り)の境界。
-    // なければ null（母線まで延ばす）。rb 自身にある場合は rb を返し、横線は描かれない。
-    // LeftTerminatorと同様、BottomRow側の行のみを対象にする。
+    // 末尾要素の右母線延長区間 [rb, columns) にある分岐点の境界。なければ null（母線まで延ばす）。
+    // rb 自身にある場合は rb を返し、横線は描かれない。
+    // T-044修正(2026-07-19、隠密設計・殿裁定=自動結線方針への転換): row を起点(TopRow)とする
+    // 下流分岐(row から先の行へ伸びる縦コネクタ)が [rb, columns) にあれば、その最も遠い(右寄りの)
+    // 列まで延ばす(下流分岐まで線を到達させる)。無ければ従来通り、BottomRow側(この行より上流から
+    // 降りてきて row で終わる縦コネクタ)のうち最も内側(左寄り)の境界へフォールバックする
+    // (既存の単純ケースは無改修)。旧実装はBottomRow側のみを見ており、row 自身が下流分岐の起点に
+    // なるケースを無視していたため、横線が下流分岐の手前で短く終わっていた
+    // (docs/todo.md T-044「線番2まで自動で結線して欲しい」殿指摘)。
     private static double? RightTerminator(Sheet sheet, int row, int rb, int columns)
     {
+        double? downstream = null;
+        foreach (var c in sheet.Connectors)
+            if (c.TopRow == row && c.Column >= rb && c.Column < columns)
+                downstream = downstream is null ? c.Column : Math.Max(downstream.Value, c.Column);
+        if (downstream is not null) return downstream;
+
         double? best = null;
         foreach (var c in sheet.Connectors)
             if (c.BottomRow == row && c.Column >= rb && c.Column < columns)

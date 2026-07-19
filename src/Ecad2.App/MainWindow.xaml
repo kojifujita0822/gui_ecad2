@@ -26,11 +26,19 @@
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
              アイコンの絵柄は段階3では簡易プレースホルダ(Path Geometry)。本格意匠はT-013。 -->
-        <Style x:Key="ToolBarButtonStyle" TargetType="Button">
+        <!-- T-089(家老采配2026-07-17): 押下フィードバック叩き台をアプリ全体へ波及させるため
+             App.xamlの暗黙的スタイル(TargetType=Button)をBasedOnする(構造変更、調査書の結論通り)。 -->
+        <Style x:Key="ToolBarButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="42"/>
             <Setter Property="Margin" Value="1"/>
             <Setter Property="Padding" Value="0"/>
+            <!-- T-089回帰修正(2026-07-18、忍者実機確認): App.xaml暗黙的スタイルの既定Background
+                 (Button.Static.Background=Aero2固定ライトグレー)がツールバー上で明灰色の塊として
+                 浮く回帰。従来のフラット表示(下地のToolBar背景が透ける)へ戻すため、ツールバー系
+                 スタイル側でTransparentを明示する(ダイアログ等の通常ボタンは標準の明灰色のまま)。 -->
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <!-- T-047殿新注文その2(2026-07-09): 単純図形(縦線・横線等)のボタンはグレー化だけでは
                  活性/無効の判別が難しいとの殿目視所見。IsEnabled=false時にボタン全体を半透明化する
                  (殿選定=Windows標準的な無効表現・濃度差で単純図形でも判別可・実装最小)。基底
@@ -39,6 +47,13 @@
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.35"/>
+                    <!-- T-089回帰(2)完治(2026-07-18): 基底(App.xaml暗黙的スタイル)のIsEnabled
+                         トリガーがBackground=Button.Disabled.Background(明灰色)を与えるため、
+                         ツールバー上ではダークモードで無効ボタン群が明灰色の塊として浮く。
+                         派生側トリガーで同プロパティを上書きしフラット表示(透過+Opacityのみ)を
+                         維持する。 -->
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -58,23 +73,52 @@
             <Setter Property="FontSize" Value="9"/>
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="Margin" Value="0,1,0,0"/>
+            <!-- T-083(2026-07-18、忍者実機確認NG確定=docs-notes/ecad2-t083-toolbar1-label-color-verify-ninja.md):
+                 ツールバー1段目のラベル文字色がダークモードで明色化されない。2段目
+                 PlacementToolBarKeyLabelStyle(T-083増分6)と同型でForeground明示指定を追加する
+                 (ToolBar.Foreground継承には頼らない)。 -->
+            <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
         </Style>
 
         <!-- T-061(殿裁定(4)=ツールバーToggleButton+背景色変化、GuiEcad踏襲): ButtonとToggleButtonは
              ButtonBaseの兄弟クラスでBasedOnによる型混在継承ができないため、ToolBarButtonStyleと
-             同じ寸法・無効化表現を独立定義し、IsChecked時の背景色変化のみ追加する。 -->
-        <Style x:Key="TestModeToolBarButtonStyle" TargetType="ToggleButton">
+             同じ寸法・無効化表現を独立定義し、IsChecked時の背景色変化のみ追加する。
+             T-089(家老采配2026-07-17): App.xamlの暗黙的スタイル(TargetType=ToggleButton)を
+             BasedOnし、押下フィードバックを継承する。既存IsCheckedトリガーとの競合(押下中の
+             テストモードONボタン)はMultiTriggerで個別対応する(着手前調査書の指摘通り)。 -->
+        <Style x:Key="TestModeToolBarButtonStyle" TargetType="ToggleButton" BasedOn="{StaticResource {x:Type ToggleButton}}">
             <Setter Property="Width" Value="46"/>
             <Setter Property="Height" Value="42"/>
             <Setter Property="Margin" Value="1"/>
             <Setter Property="Padding" Value="0"/>
+            <!-- T-089回帰修正(2026-07-18): ToolBarButtonStyle側と同じ理由でTransparentを明示。 -->
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
             <Style.Triggers>
                 <Trigger Property="IsEnabled" Value="False">
                     <Setter Property="Opacity" Value="0.35"/>
+                    <!-- T-089回帰(2)完治: ToolBarButtonStyle側と同じ理由でTransparent上書き。 -->
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
                 <Trigger Property="IsChecked" Value="True">
                     <Setter Property="Background" Value="{StaticResource TestModeActiveBrush}"/>
+                    <!-- T-089(2026-07-18): 基底(App.xaml)のIsCheckedトリガーがBorderBrush=
+                         Button.Checked.Border(青)を与えるため、フラット維持にTransparentで上書き。 -->
+                    <Setter Property="BorderBrush" Value="Transparent"/>
                 </Trigger>
+                <!-- 複合状態(押下中+チェック済み): TestModeActiveBrushを暗くした専用色で
+                     「押されている」ことも分かるようにする(基底スタイルのIsPressedトリガーのみだと
+                     Style.Triggers宣言順によりIsChecked=Trueが最終的に勝ち、押下フィードバックが
+                     テストモード色に埋もれて見えなくなるため)。 -->
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsPressed" Value="True"/>
+                        <Condition Property="IsChecked" Value="True"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="#CC5A2E00"/>
+                    <Setter Property="BorderBrush" Value="Transparent"/>
+                </MultiTrigger>
             </Style.Triggers>
         </Style>
 
@@ -105,16 +149,25 @@
             <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
         </Style>
 
-        <!-- T-099 PoC(家老采配2026-07-17、殿直接指示): 配置ツールバー2段目(PlacementToolBarDockingManager)
-             のみを対象に、ドッキング時はドックタグ(タブストリップ)を非表示、フローティング時は表示する。
-             AvalonDock既定のAnchorablePaneControlStyle(AvalonDock/Themes/generic.xaml、v4.74.1一次ソース
-             で実取得・確認済み)をコピーし、HeaderPanel(タブストリップ本体)のVisibilityへ
+        <!-- T-099根本修正(隠密2仮説確定・家老采配2026-07-17): 配置ツールバー2段目
+             (PlacementToolBarDockingManager)のみを対象に、ドッキング時はドックタグ(タブストリップ)
+             を非表示、フローティング時は表示する。AvalonDock既定のAnchorablePaneControlStyle
+             (AvalonDock/Themes/generic.xaml、v4.74.1一次ソースで実取得・確認済み)をコピーした派生
+             スタイル。
+             【経緯】当初HeaderPanel(ItemsHost、Grid.Row="1")自体をDataTriggerでVisibility=Collapsed
+             にする案(PoC)を試みたが、WPFではCollapsed要素はMeasure()が早期returnし子孫が測定
+             されない→ItemsHostパネルのTabItemコンテナ生成(InternalChildren初回アクセス時に発火)が
+             永遠にブロックされる→TabControlの初期選択(SelectedIndex=0)もSelectedContent解決も
+             コンテナ生成完了が前提のため不成立→起動直後SelectedContent=nullで2段目全体が潰れる、
+             という副作用を招いた(隠密2一次ソース確認済み、dotnet/wpf UIElement.cs/Panel.cs/
+             TabControl.cs)。ItemContainerStyle側でTabItem単位のVisibility制御に切り替えれば、
+             HeaderPanel自体は常にVisible(コンテナ生成は正常に走る)ため同型バグを回避できる。
              Model.IsDirectlyHostedInFloatingWindow(LayoutAnchorablePane.cs、PropertyChanged通知あり
-             動的追従可能・一次ソース確認済み)をバインドするDataTriggerのみ追加した派生スタイル。
-             DockingManager.AnchorablePaneControlStyleへローカル値として設定することで適用範囲を
-             このDockingManagerのみに限定する(他パネル=左パレット/出力/右パネルには一切影響しない、
-             殿確認済みの対象範囲)。要件3(パネル幅の動的フィット)は本PoCの範囲外、忍者確認後の
-             次段階で対応する。 -->
+             動的追従可能・一次ソース確認済み)をItemContainerStyleのDataTriggerで判定する
+             (下記ItemContainerStyle定義を参照)。DockingManager.AnchorablePaneControlStyleへ
+             ローカル値として設定することで適用範囲をこのDockingManagerのみに限定する(他パネル=
+             左パレット/出力/右パネルには一切影響しない、殿確認済みの対象範囲)。要件3(パネル幅の
+             動的フィット)は本修正の範囲外、忍者確認後の次段階で対応する。 -->
         <Style x:Key="PlacementToolBarPaneControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
             <Setter Property="Foreground" Value="{Binding Model.Root.Manager.Foreground, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Background" Value="{Binding Model.Root.Manager.Background, RelativeSource={RelativeSource Self}}"/>
@@ -149,11 +202,6 @@
                             <Trigger Property="IsEnabled" Value="false">
                                 <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
                             </Trigger>
-                            <!-- T-099 PoC本体: フローティングウィンドウに直接ホストされていない
-                                 (=ドッキング状態の)時、タブストリップを非表示にする。 -->
-                            <DataTrigger Binding="{Binding Model.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource Self}}" Value="False">
-                                <Setter TargetName="HeaderPanel" Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -173,17 +221,37 @@
                                             Background="{TemplateBinding Background}"
                                             BorderBrush="{TemplateBinding BorderBrush}"
                                             BorderThickness="1,0,1,1">
-                                            <ContentPresenter x:Name="Content"
-                                                HorizontalAlignment="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
-                                                VerticalAlignment="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
-                                                ContentSource="Header"
-                                                RecognizesAccessKey="True"
-                                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                            <Grid>
+                                                <ContentPresenter x:Name="Content"
+                                                    HorizontalAlignment="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                                    VerticalAlignment="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                                                    ContentSource="Header"
+                                                    RecognizesAccessKey="True"
+                                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                                <!-- T-099要件(2)(殿裁定案a、家老采配2026-07-18): ドッキング時はラベルの代わりに
+                                                     細い帯(ドラッグ起点)を表示する。T-100で除去したのはDragHandleTexture
+                                                     (ハッチング模様、意匠のみ)であり、帯自体の当たり判定は残す方針のため
+                                                     矛盾しない(AnchorablePaneTitleNoDragHandleStyleと同じ
+                                                     ToolWindowCaptionInactiveGripキーを流用、ハッチング模様は使わない
+                                                     単色の帯)。既定Collapsed、ドッキング時のみ下記DataTriggerで表示する。 -->
+                                                <Rectangle x:Name="DockedDragHandle"
+                                                    Height="5" MinWidth="20" Margin="4,0,2,0"
+                                                    VerticalAlignment="Center"
+                                                    Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveGrip}}"
+                                                    Visibility="Collapsed"/>
+                                            </Grid>
                                         </Border>
                                     </Grid>
                                     <ControlTemplate.Triggers>
+                                        <DataTrigger Binding="{Binding Model.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource AncestorType={x:Type avalonDock:LayoutAnchorablePaneControl}}}" Value="False">
+                                            <Setter TargetName="Content" Property="Visibility" Value="Collapsed"/>
+                                            <Setter TargetName="DockedDragHandle" Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
                                         <Trigger Property="Selector.IsSelected" Value="true">
-                                            <Setter Property="Background" Value="White"/>
+                                            <!-- T-099根本修正派生対応(隠密2指摘): フロート時にタブが
+                                                 可視化されるとダークモードで白浮きするため
+                                                 DynamicResource化(コンテンツ領域と同色に統一)。 -->
+                                            <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
                                             <Setter Property="Panel.ZIndex" Value="1"/>
                                             <Setter Property="Margin" Value="0,-1,-1,-2"/>
                                         </Trigger>
@@ -203,11 +271,10 @@
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count, FallbackValue=1}" Value="1">
-                                <Setter Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
-                        </Style.Triggers>
+                        <!-- T-099要件(1)本体は上記ControlTemplate.Triggers内のDataTriggerへ移設
+                             (TabItem自体は常時Visibleのまま、Content/DockedDragHandleの表示を
+                             切り替える形に変更。要件2=帯によるドラッグ起点確保のため、TabItem全体を
+                             Collapsedにする従来方式では帯自体も消えてしまい両立しないため置換)。 -->
                     </Style>
                 </Setter.Value>
             </Setter>
@@ -695,9 +762,24 @@
         <!-- T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化): 独立DockingManager方式
              (増分1〜4と同型パターン踏襲)。ボタン群自体(Style/Command/ToolTip等)は無改修、
              配置場所のみ移動。 -->
-        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Row="1"
-                                   AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}"
-                                   IsVirtualizingAnchorable="False">
+        <!-- T-099要件(3)(殿直接指示=幅の動的フィット、余白解消): DockingManagerをAuto+Star列の
+             Gridで包み、Auto列の無限幅測定によりマネージャ自身をコンテンツ要求幅まで縮める。
+             LayoutAnchorablePaneのDockWidth(Auto/絶対値とも)は本構成では効かない——AvalonDockの
+             LayoutPanelControl.OnFixChildrenDockLengths(v4.74.1、55-66行)が、水平LayoutPanelの
+             子孫にLayoutDocumentPaneが1つも無い場合、初回描画時に全子のDockWidthをStar(1*)へ
+             強制上書きする仕様(旧Xceed時代からの既知問題、一次ソース確認済み2026-07-18。
+             診断ログ+UIA実測でもAuto/530設定済みでToolBar実幅1244pxを確認)。ゆえにペイン側で
+             なくマネージャ側を縮める方式を採る(Star列でも無限測定下ではコンテンツ要求幅に
+             収束するため、これで足りる)。 -->
+        <!-- 背景=ペイン右側の空き領域(Star列)がダークモードで白浮きしないようテーマ連動させる
+             (1段目ToolBarTrayと同じブラシ、従来この帯はDockingManager全幅で覆われていた)。 -->
+        <Grid Grid.Row="1" Background="{DynamicResource ToolBarBackgroundBrush}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Column="0"
+                                   AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}">
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
                     <avalonDock:LayoutAnchorablePane>
@@ -853,6 +935,23 @@
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="F10"/>
                     </StackPanel>
                 </Button>
+                <!-- T-067(3)(家老采配2026-07-19): GroupFrame(グループ枠)新規作成ツール。押下で
+                     ToolMode.PlaceFrameへ遷移し、キャンバス上のマウスドラッグ(左上セルから右下方向、
+                     グリッドセル単位スナップ)で矩形範囲を指定、離した位置で確定する(殿裁定=作成操作
+                     方法は両方対応・配置単位はグリッドセル単位、詳細はToolButtonPreviewKeyDown配線と
+                     同型)。キーボードショートカットは既存F5〜F11が埋まっているため今回は未割当
+                     (範囲外、必要になれば別途家老へ上申)。シート種別の制限はGuiEcad原本・Core層とも
+                     無いためCanEditDiagramのみでガードする。 -->
+                <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="グループ枠記入"
+                        AutomationProperties.Name="グループ枠記入"
+                        Click="FrameToolButton_Click"
+                        PreviewKeyDown="ToolButtonPreviewKeyDown"
+                        IsEnabled="{Binding CanEditDiagram}">
+                    <StackPanel>
+                        <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,2 L16,2 L16,16 L2,16 Z"/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text=""/>
+                    </StackPanel>
+                </Button>
                 <Separator/>
                 <!-- 家老采配(2026-07-15、表記漏れ修正): F11ショートカットが実在する
                      (MainWindow.xaml.cs、ActivateAndFocusPartSelection)にもかかわらずToolTip/
@@ -873,6 +972,7 @@
                 </avalonDock:LayoutPanel>
             </avalonDock:LayoutRoot>
         </avalonDock:DockingManager>
+        </Grid>
         </Grid>
 
         <!-- メイン作業域: 左パレット / 中央キャンバス / 右パネル -->
@@ -1302,14 +1402,17 @@
                      機能未定のため押下無反応(Clickハンドラ未配線、増分3の拡張表示ボタンと同種の扱い)。
                      グリフ自体に意味は無く、将来タスクで機能定義される想定。恒久的に非機能のため、
                      GridSplitterと同じくKeyboardNavigation.IsTabStop="False"でタブオーダーから除外する
-                     (隠密レビューCONFIRMED、押しても何も起きないボタンへのTab迷い込み防止)。 -->
+                     (隠密レビューCONFIRMED、押しても何も起きないボタンへのTab迷い込み防止)。
+                     T-089(殿裁定2026-07-14): 未配線プレースホルダは押下フィードバックの対象外
+                     ("押せそうに見えて実際は無反応"の誤解助長を避けるため)。Style="{x:Null}"で
+                     App.xamlの暗黙的スタイルを明示的に無効化しWPF既定のまま据え置く。 -->
                 <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,4,0"
-                        AutomationProperties.Name="(未定アイコン1)" KeyboardNavigation.IsTabStop="False">
+                        AutomationProperties.Name="(未定アイコン1)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M3,3 L13,3 L13,9 L3,9 Z M5,3 L5,1 L11,1 L11,3 M6,9 L6,12 L10,12 L10,9"/>
                 </Button>
                 <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,8,0"
-                        AutomationProperties.Name="(未定アイコン2)" KeyboardNavigation.IsTabStop="False">
+                        AutomationProperties.Name="(未定アイコン2)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M2,3 L12,3 L12,9 L7,9 L4,13 L4,9 L2,9 Z"/>
                 </Button>
@@ -1363,9 +1466,11 @@
                      Tab順(殿裁定、隠密実機検証後の修正): 当初は侍技術裁量でTabオーダーに含めていたが、
                      隠密実機検証で「本ボタンにフォーカス中にEnterを押してもOK確定が発火しない」実害が
                      確認されたため、安全側としてKeyboardNavigation.IsTabStop="False"で除外する。T-028で
-                     詳細画面機能を実装する際にTabオーダーへ復帰させること。 -->
+                     詳細画面機能を実装する際にTabオーダーへ復帰させること。
+                     T-089(殿裁定2026-07-14): 未配線のため押下フィードバックの対象外、Style="{x:Null}"で
+                     暗黙的スタイルを無効化(左端の小アイコン類と同様の扱い)。 -->
                 <Button Content="拡張表示" VerticalAlignment="Center" AutomationProperties.Name="拡張表示"
-                        KeyboardNavigation.IsTabStop="False"/>
+                        KeyboardNavigation.IsTabStop="False" Style="{x:Null}"/>
             </StackPanel>
         </Border>
 

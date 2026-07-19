@@ -75,6 +75,10 @@ public partial class MainWindow : Window
     private bool _frameDragStarted;
     private bool _frameDragConsumedByEscape;
 
+    // T-067(3): GroupFrame新規作成(マウスドラッグ)中のEscape消費フラグ。しきい値判定は不要
+    // (クリックのみでも1x1の枠として有効なため、他ドラッグ系と異なり*Started相当の状態は持たない)。
+    private bool _frameCreateDragConsumedByEscape;
+
     // T-061第三歩: テストモード中、押しボタンのモーメンタリ動作用に押下中のデバイス名を保持する
     // (MouseUp/LostMouseCaptureでOFFに戻す、他ドラッグ系のView状態保持と同じ設計)。
     private string? _testModePressedDevice;
@@ -191,27 +195,6 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
-        // T-099対症療法(家老采配2026-07-17、隠密調査打ち切り確定): 配置ツールバー2段目
-        // (PlacementToolBarDockingManager、IsVirtualizingAnchorable="False")のSelectedContentが
-        // 起動直後は初期解決されず潰れる現象。真因はWM_SIZE経由ではなく、診断ログ実測(WM_SIZE
-        // なしでUIA FindAll直後に正常化)により別経路と判明したが、文書化されておらず特定不能の
-        // ため根本解明は打ち切り。ファイルメニューを時間差で一瞬開閉する操作(Popup生成に伴う
-        // 何らかの副次効果)が対症療法として機能することを実機確認済み。副作用(操作後もファイル
-        // メニューのハイライトが残留する)対策として、IsSubmenuOpen=false直後にキャンバスへ
-        // 明示的にKeyboard.Focus()する(隠密提案、Keyboard.ClearFocus()だけでは
-        // MenuItem.IsHighlightedが解除されなかったため)。
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            if (MenuBarArea.Items.Count > 0 && MenuBarArea.Items[0] is MenuItem firstMenuItem)
-            {
-                firstMenuItem.IsSubmenuOpen = true;
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    firstMenuItem.IsSubmenuOpen = false;
-                    Keyboard.Focus(LadderCanvasHost);
-                }), DispatcherPriority.ContextIdle);
-            }
-        }), DispatcherPriority.ContextIdle);
     }
 
     private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -446,6 +429,12 @@ public partial class MainWindow : Window
             // T-083増分2(家老采配2026-07-16): UIクローム(メニュー・ツールバー本体・シート0件時
             // キャンバス色等)のテーマ切替。WPF標準のMergedDictionaries差替え方式(新規外部依存なし)。
             ApplyUiChromeTheme(_viewModel.IsDarkMode);
+
+            // T-083新規発見5(家老采配2026-07-17): 部品選択パネルのサムネイルはビットマップ事前
+            // レンダリングのためブラシ差替えで追従できず、テーマ切替時に全件再生成する。
+            _viewModel.PartPalette.RefreshThumbnails(_viewModel.IsDarkMode
+                ? Ecad2.Rendering.DrawingTheme.Dark.Foreground
+                : Ecad2.Rendering.DrawingTheme.Default.Foreground);
         }
 
         // T-058増分3: 右パネル下段タイトルの状況依存切替(UpdateRightPanelBottomTitle参照)。
@@ -508,6 +497,16 @@ public partial class MainWindow : Window
             if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
             _frameDragStarted = false;
             _frameDragConsumedByEscape = false;
+        }
+        if (e.PropertyName == nameof(ViewModels.MainWindowViewModel.FrameDraftPreview) && _viewModel.FrameDraftPreview is null)
+        {
+            // T-067(3): ClearFrameDraftIfAny(CancelResidualDraftForToolSwitch/ReplaceDocument等の
+            // 外部要因)による強制クリアにView側のキャプチャ・Escape消費フラグを追随させる。
+            // _frameDraftはBegin/Confirm/Cancel全経路で明示的にOnPropertyChangedを発火する設計
+            // (IsDraggingXxx系のForceCancel限定とは異なる)ため、通常のMouseUp確定時にも本ブロックが
+            // 発火するが、非キャプチャ状態へのReleaseMouseCaptureは無害なため実害はない。
+            if (LadderCanvasHost.IsMouseCaptured) LadderCanvasHost.ReleaseMouseCapture();
+            _frameCreateDragConsumedByEscape = false;
         }
     }
 
@@ -1058,6 +1057,24 @@ public partial class MainWindow : Window
             return;
         }
 
+        // T-067(3): 枠配置モード中のキャンバス押下は新規作成ドラッグの開始(GuiEcad原本移植、
+        // グリッドセル単位スナップに翻案)。Tool.Mode!=Selectの早期returnより前で扱う必要がある
+        // 理由はPlaceImageと同じ(でないと本モード中は常に無視されてしまう)。押下セルがグリッド
+        // 範囲外なら何もしない(既存要素配置と同じく範囲外クリックは無視)。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.CurrentSheet is Ecad2.Model.Sheet frameCreateSheet)
+        {
+            var anchor = LadderCanvasHost.ToGridPos(position);
+            if (anchor.Row >= 0 && anchor.Row < frameCreateSheet.Grid.Rows
+                && anchor.Column >= 0 && anchor.Column < frameCreateSheet.Grid.Columns)
+            {
+                _viewModel.BeginFrameDraft(anchor);
+                if (!LadderCanvasHost.CaptureMouse()) _viewModel.CancelFrameDraft();
+                RedrawCanvas();
+            }
+            e.Handled = true;
+            return;
+        }
+
         if (_viewModel.Tool.Mode != ViewModels.ToolMode.Select) return;
 
         // T-041増分7隠密レビュー所見C対応: CaptureMouse()の戻り値を確認する。何らかの理由(既に
@@ -1302,6 +1319,21 @@ public partial class MainWindow : Window
             }
             _viewModel.UpdateDragFrame(LadderCanvasHost.ToGridPos(position));
             RedrawCanvas();
+            return;
+        }
+
+        // T-067(3): 枠新規作成ドラッグ中(FrameDraftPreview!=null)、現在のマウス位置のセルまで
+        // 右下方向へ矩形を伸縮する(Anchor=左上固定、GuiEcad原本のドラッグ追従を翻案)。
+        // AdjustFrameDraftは差分方式のため、目標サイズとの差分を都度計算して渡す
+        // (グリッド範囲外へ伸ばそうとした場合はAdjustFrameDraft内部のIsFrameWithinGridBoundsで
+        // 無視される、キーボードステップ方式と共通のガード)。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.FrameDraftPreview is Ecad2.Model.GroupFrame framePreview)
+        {
+            var current = LadderCanvasHost.ToGridPos(position);
+            int targetWidth = Math.Max(1, current.Column - framePreview.TopLeft.Column + 1);
+            int targetHeight = Math.Max(1, current.Row - framePreview.TopLeft.Row + 1);
+            _viewModel.AdjustFrameDraft(targetWidth - framePreview.Width, targetHeight - framePreview.Height);
+            RedrawCanvas();
         }
     }
 
@@ -1327,7 +1359,7 @@ public partial class MainWindow : Window
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
         if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
             || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape
-            || _elementDragConsumedByEscape || _frameDragConsumedByEscape)
+            || _elementDragConsumedByEscape || _frameDragConsumedByEscape || _frameCreateDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
@@ -1338,6 +1370,7 @@ public partial class MainWindow : Window
             _imageResizeConsumedByEscape = false;
             _elementDragConsumedByEscape = false;
             _frameDragConsumedByEscape = false;
+            _frameCreateDragConsumedByEscape = false;
             return;
         }
 
@@ -1410,6 +1443,16 @@ public partial class MainWindow : Window
             _viewModel.ConfirmDragFrame();
             LadderCanvasHost.ReleaseMouseCapture();
             _frameDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        // T-067(3): 枠新規作成ドラッグの確定。しきい値未満(実質クリックのみ)でも1x1の枠として
+        // 有効に成立させる(GuiEcad原本の「半セル未満は無視」はmm連続座標ゆえの措置で、グリッド
+        // セル単位のecad2では1x1が最小単位として意味を持つため踏襲しない、殿裁定②の帰結)。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.FrameDraftPreview is not null)
+        {
+            _viewModel.ConfirmFrameDraft();
+            LadderCanvasHost.ReleaseMouseCapture();
             RedrawCanvas();
             return;
         }
@@ -1754,6 +1797,13 @@ public partial class MainWindow : Window
             _frameDragStarted = false;
             RedrawCanvas();
         }
+        // T-067(3): 枠新規作成ドラッグ中にキャプチャを失った場合(Alt+Tab等)もドラフトを破棄する
+        // (他ドラッグ系と同型の安全網)。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.FrameDraftPreview is not null)
+        {
+            _viewModel.CancelFrameDraft();
+            RedrawCanvas();
+        }
         _connectorDragConsumedByEscape = false;
         _wireBreakDragConsumedByEscape = false;
         _freeLineDragConsumedByEscape = false;
@@ -1762,6 +1812,7 @@ public partial class MainWindow : Window
         _imageResizeConsumedByEscape = false;
         _elementDragConsumedByEscape = false;
         _frameDragConsumedByEscape = false;
+        _frameCreateDragConsumedByEscape = false;
     }
 
     // アクティブな配置ツール(Tool.Mode==PlaceElement && Tool.PartId)の要素を、現在の選択セルへ配置する。
@@ -1937,6 +1988,19 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     break;
                 }
+                // T-067(3): 枠新規作成ドラッグ中(マウスキャプチャ中、FrameDraftPreview!=null)のEscも
+                // 独立最優先層とする。新規作成はドラフト自体を丸ごと破棄する(既存要素移動ドラッグと
+                // 異なり「元の位置」という概念が無いため)。指がまだ押されたままの想定でキャプチャは
+                // 維持し、他ドラッグ系と同じくMouseUp側で後始末する。
+                if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.FrameDraftPreview is not null)
+                {
+                    _viewModel.CancelFrameDraft();
+                    _frameCreateDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
                 // T-036追加修正(殿裁定=Esc入力破棄、隠密レビュー指摘=Esc層消費): デバイス名編集中の
                 // Escは表示復元(UpdateTarget())+フォーカス復帰のみの独立した1層として消費し、
                 // 下記の層2/3/4処理(選択解除等)へは落とさない(T-021「1回のEscは1層だけ」の原則に
@@ -1980,6 +2044,12 @@ public partial class MainWindow : Window
                 {
                     // 層2'''(T-064): 画像挿入の配置待機中 → 取消して選択モードへ戻す。何も生成しない。
                     _viewModel.CancelImageInsertDraft();
+                }
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame)
+                {
+                    // 層2''''(T-067(3)): 枠配置モード中(ドラッグ未開始、FrameDraftPreview==nullは
+                    // 上記最優先層で処理済みのためここには到達しない) → 選択モードへ戻す。
+                    _viewModel.Tool = ViewModels.ToolState.SelectDefault;
                 }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
                     || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
@@ -2876,6 +2946,17 @@ public partial class MainWindow : Window
     private void WireBreakButton_Click(object sender, RoutedEventArgs e)
     {
         TryPlaceWireBreak();
+        ConsumeToolButtonFocusRestore(sender);
+    }
+
+    // T-067(3): GroupFrame新規作成ツールへの入口。ActivateBuiltinTool(PlaceElement)と同型——
+    // ここではツールモードの切替のみ行い、実際の枠生成はキャンバス上のマウスドラッグ確定時
+    // (LadderCanvasHost_PreviewMouseLeftButtonUp)で行う。
+    private void FrameToolButton_Click(object sender, RoutedEventArgs e)
+    {
+        _viewModel.CancelResidualDraftForToolSwitch();
+        _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceFrame);
+        _viewModel.StatusMessage = "キャンバス上でドラッグして枠の範囲を指定してください";
         ConsumeToolButtonFocusRestore(sender);
     }
 

@@ -70,6 +70,183 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- T-089叩き台(家老采配2026-07-17、着手前調査書=docs/ecad2-t089-button-style-survey-onmitsu.md):
+                 ボタン押下状態の視覚的明示化。App.xamlのApplication.Resourcesへ暗黙的スタイル
+                 (TargetType=Button/ToggleButton)を新設し、MainWindow.xamlの既存3スタイルを
+                 BasedOnさせる構成に変更(構造変更、調査書の結論通り)。これによりMainWindow内の
+                 名前付きスタイル使用ボタン(23個)だけでなく、ダイアログ6ファイル・MainWindow内の
+                 スタイル指定なしボタン(計30個超)にも自動的に反映される。
+                 押下時の具体的な視覚表現はUI/UX分岐のため殿確認が必須(T-089節、T-048と同型の
+                 進め方)。本スタイルは【案A: 半透明オーバーレイ型】——IsPressed=True時に
+                 半透明の黒(#33000000)をBackgroundへ重ねる。テーマ非依存(Light/Dark双方の
+                 既存背景色の上で自然に暗くなる)で、Material Design等で一般的な「状態レイヤー」
+                 の簡易版。 -->
+            <!-- T-089対処(2026-07-18、隠密一次ソース調査確定=docs/ecad2-t089-button-pressed-feedback-investigation-onmitsu.md):
+                 上記Style.Triggers方式は原理的に対処不能と判明。既定Aero2 ControlTemplate
+                 (dotnet/wpf Button.xaml BaseButtonStyle、TargetType=ButtonBase)内の
+                 ControlTemplate.Triggers(TargetName="border"直接Setter、WPF依存関係プロパティ値
+                 優先順位で4位)が、Style.Triggers(6位)を完全に握り潰すため(公式ドキュメントが
+                 同型の罠を明記=PR-20(3))、増分7(SubMenuBorder)と同型のアプローチ=既定
+                 ControlTemplateをコピーし、専用オーバーレイ矩形(PressedOverlay)を追加する方式へ
+                 変更。既存の色変化ロジック(MouseOver/Pressed/Checked/Disabled、TargetName="border"
+                 のBackground/BorderBrush Setter)自体は元のStaticResourceキー参照のまま温存し、
+                 押下時のみ半透明黒(#33000000)を追加で重ねる(案Aの意図=既存背景色の上に暗くする、
+                 を保つ)。 -->
+            <!-- T-089 Stack overflow修正(2026-07-18、忍者crash.log+隠密キー調査の突合で確定):
+                 真因は2段構え——(1)本テンプレートが参照するButton.*キー7種はWPF Aero2テーマDLL内部
+                 のリソースであり、アプリのリソース検索スコープからは解決できない(ControlTemplate
+                 .Triggers内のStaticResourceは遅延解決のため、ビルド時・XAML解析時エラーにならず
+                 トリガー発火時にUnsetValueとして現れる) (2)暗黙的StyleがテーマStyleを置き換えた
+                 ことで、テーマStyle側が持っていたBackground/BorderBrush等の既定値Setterも失われ、
+                 TemplateBinding経由でBorder要素へUnsetValueが渡る。起動直後はHasProject=falseで
+                 多数のボタンがIsEnabled=falseトリガーを発火させるため即クラッシュに至った
+                 (Border.ArrangeOverride内InvalidOperationException→OnDispatcherUnhandledException
+                 のMessageBox.Show→UpdateLayout→再発の無限ループ→Stack overflow)。
+                 対処=7キーをecad2側で明示定義(色値はdotnet/wpf main「Button.xaml」Aero2.NormalColor
+                 の既定値を転記)し、Style既定値Setter群(テーマStyle相当)も併せて定義する。 -->
+            <SolidColorBrush x:Key="Button.Static.Background" Color="#FFDDDDDD"/>
+            <SolidColorBrush x:Key="Button.Static.Border" Color="#FF707070"/>
+            <SolidColorBrush x:Key="Button.MouseOver.Background" Color="#FFBEE6FD"/>
+            <SolidColorBrush x:Key="Button.MouseOver.Border" Color="#FF3C7FB1"/>
+            <SolidColorBrush x:Key="Button.Pressed.Background" Color="#FFC4E5F6"/>
+            <SolidColorBrush x:Key="Button.Pressed.Border" Color="#FF2C628B"/>
+            <SolidColorBrush x:Key="Button.Checked.Background" Color="#FFBCDDEE"/>
+            <SolidColorBrush x:Key="Button.Checked.Border" Color="#FF245A83"/>
+            <SolidColorBrush x:Key="Button.Disabled.Background" Color="#FFF4F4F4"/>
+            <SolidColorBrush x:Key="Button.Disabled.Border" Color="#FFADB2B5"/>
+
+            <Style TargetType="{x:Type Button}">
+                <Setter Property="Background" Value="{StaticResource Button.Static.Background}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource Button.Static.Border}"/>
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Padding" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Button}">
+                            <Border x:Name="border"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                SnapsToDevicePixels="true">
+                                <Grid>
+                                    <ContentPresenter x:Name="contentPresenter"
+                                        Focusable="False"
+                                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        Margin="{TemplateBinding Padding}"
+                                        RecognizesAccessKey="True"
+                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                    <Rectangle x:Name="PressedOverlay" Fill="#33000000" IsHitTestVisible="False" Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <!-- 状態別の背景/枠線はすべてStyle.Triggers側(下記)へ移設(T-089、
+                                     2026-07-18): ControlTemplate.Triggers(優先度4位)に置くと
+                                     ツールバー系派生スタイルのStyle.Triggers(6位)を握り潰す罠が
+                                     IsEnabled(無効ボタン明灰色)・IsChecked(テストモードON色化け)で
+                                     2連続再発したため、テンプレートには構造のみ(PressedOverlay
+                                     表示・無効文字色=TargetName必須のもの)を残す。 -->
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter Property="Visibility" Value="Visible" TargetName="PressedOverlay"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" TargetName="contentPresenter"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <!-- 状態別の背景/枠線(優先度6位=派生スタイルで上書き可能)。順序はAero2既定に
+                     倣いIsDefaulted→MouseOver→Pressed→Disabled(後勝ちのため無効表示が最優先)。 -->
+                <Style.Triggers>
+                    <Trigger Property="Button.IsDefaulted" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
+                    </Trigger>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Button.MouseOver.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Button.Pressed.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.Pressed.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Background" Value="{StaticResource Button.Disabled.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.Disabled.Border}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+            <Style TargetType="{x:Type ToggleButton}">
+                <!-- T-089 Stack overflow修正(2026-07-18、Button側と同根): テーマStyle置き換えに伴い
+                     失われた既定値Setter群を明示定義する(上記Button側コメント参照)。 -->
+                <Setter Property="Background" Value="{StaticResource Button.Static.Background}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource Button.Static.Border}"/>
+                <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Padding" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ToggleButton}">
+                            <Border x:Name="border"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                SnapsToDevicePixels="true">
+                                <Grid>
+                                    <ContentPresenter x:Name="contentPresenter"
+                                        Focusable="False"
+                                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                        Margin="{TemplateBinding Padding}"
+                                        RecognizesAccessKey="True"
+                                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                                    <Rectangle x:Name="PressedOverlay" Fill="#33000000" IsHitTestVisible="False" Visibility="Collapsed"/>
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <!-- Button側と同じく、状態別の背景/枠線はすべてStyle.Triggers側へ
+                                     移設(T-089忍者実機NG 2026-07-18: テンプレート側に置くと優先度
+                                     4位となりTestModeToolBarButtonStyleのIsCheckedトリガー
+                                     [TestModeActiveBrush、優先度6位]を握り潰し、テストモードON色が
+                                     水色#BCDDEEに化けた)。テンプレートには構造のみ残す。 -->
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter Property="Visibility" Value="Visible" TargetName="PressedOverlay"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}" TargetName="contentPresenter"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <!-- Button側と同じ理由(派生スタイルによる上書き可能化)でStyle.Triggersに置く。
+                     順序はMouseOver→Pressed→Checked→Disabled(Aero2既定に倣う。後勝ちのため
+                     無効表示が最優先、チェック済みはホバー/押下より優先)。 -->
+                <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Button.MouseOver.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsPressed" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Button.Pressed.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.Pressed.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsChecked" Value="True">
+                        <Setter Property="Background" Value="{StaticResource Button.Checked.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.Checked.Border}"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Background" Value="{StaticResource Button.Disabled.Background}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource Button.Disabled.Border}"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- T-083増分7(家老采配2026-07-17、隠密調査書=docs/ecad2-t083-zoubun7-menu-dark-redesign-survey-onmitsu.md):
                  ドロップダウンメニューのダーク対応。根本原因はWPF既定(Aero2)MenuItemテンプレート内
                  SubMenuBorder(ポップアップ全体の背景)がStaticResource参照のためDynamicResource
