@@ -1,0 +1,135 @@
+11:32:40.521 T044 RedrawCanvas #83 caller=CommitDeviceNameEdit hasSheet=True
+11:34:35.368 T044 RedrawCanvas #84 caller=ViewModel_PropertyChanged hasSheet=True
+11:34:35.370 T044 RedrawCanvas #85 caller=ViewModel_PropertyChanged hasSheet=True
+11:35:38.452 T044 RedrawCanvas #86 caller=ViewModel_PropertyChanged hasSheet=True
+11:36:32.632 T044 RedrawCanvas #87 caller=CommitDeviceNameEdit hasSheet=True
+11:36:32.634 T044 RedrawCanvas #88 caller=ViewModel_PropertyChanged hasSheet=True
+11:36:32.634 T044 RedrawCanvas #89 caller=ViewModel_PropertyChanged hasSheet=True
+11:37:58.586 T044 RedrawCanvas #90 caller=ViewModel_PropertyChanged hasSheet=True
+11:38:35.034 T044 RedrawCanvas #91 caller=PlacementOkButton_Click hasSheet=True
+11:38:35.038 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:38:35.038 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:38:35.039 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:38:35.040 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+11:38:35.041 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:39:05.031 T044 RedrawCanvas #92 caller=ViewModel_PropertyChanged hasSheet=True
+11:39:05.032 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:39:05.032 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:39:05.033 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:39:05.033 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+11:39:05.033 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:39:05.662 T044 RedrawCanvas #93 caller=ViewModel_PropertyChanged hasSheet=True
+11:39:05.664 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:39:05.665 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:39:05.665 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:39:05.665 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+11:39:05.665 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:39:20.532 T044 RedrawCanvas #94 caller=ViewModel_PropertyChanged hasSheet=True
+11:39:20.534 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:39:20.534 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:39:20.534 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:39:20.535 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+11:39:20.535 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:39:55.693 T044 RedrawCanvas #95 caller=ViewModel_PropertyChanged hasSheet=True
+11:39:55.695 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:39:55.695 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:39:55.696 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:39:55.696 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+11:39:55.696 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:08.254 T044 OR-wiring: pos=(3,5) baseRow=0 basePos=(0,5) leftColumn=5 rightColumn=6 connectors=[]
+11:40:08.255 T044 NothingBetweenRailAndColumn(row=3, column=5): elemBlock=False connBlock=False result=True
+11:40:08.255 T044 NothingBetweenRailAndColumn(row=0, column=5): elemBlock=False connBlock=False result=True
+11:40:08.255 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+11:40:08.256 T044 RedrawCanvas #96 caller=PlacementOkButton_Click hasSheet=True
+11:40:08.258 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:08.258 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:08.258 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:08.258 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:08.259 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:08.259 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:08.259 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:08.259 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:08.259 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:08.260 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:25.361 T044 RedrawCanvas #97 caller=ViewModel_PropertyChanged hasSheet=True
+11:40:25.362 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:25.363 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:25.363 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:25.363 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:25.363 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:25.363 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:25.363 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:25.363 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:25.364 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:25.364 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:25.957 T044 RedrawCanvas #98 caller=ViewModel_PropertyChanged hasSheet=True
+11:40:25.958 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:25.958 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:25.958 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:25.959 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:25.959 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:25.959 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:25.959 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:25.959 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:25.959 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:25.959 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:32.761 T044 RedrawCanvas #99 caller=ViewModel_PropertyChanged hasSheet=True
+11:40:32.763 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:32.763 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:32.764 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:32.764 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:32.764 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:32.765 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:32.765 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:32.765 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:32.765 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:32.766 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:36.600 T044 RedrawCanvas #100 caller=ViewModel_PropertyChanged hasSheet=True
+11:40:36.601 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:36.601 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:36.602 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:36.602 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:36.602 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:36.602 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:36.602 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:36.602 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:36.602 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:36.602 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:47.803 T044 OR-wiring: pos=(7,3) baseRow=3 basePos=(3,5) leftColumn=3 rightColumn=6 connectors=[col6:r0-3]
+11:40:47.803 T044 NothingBetweenRailAndColumn(row=7, column=3): elemBlock=False connBlock=False result=True
+11:40:47.804 T044 NothingBetweenRailAndColumn(row=3, column=3): elemBlock=False connBlock=False result=True
+11:40:47.804 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+11:40:47.804 T044 RedrawCanvas #101 caller=PlacementOkButton_Click hasSheet=True
+11:40:47.805 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:40:47.805 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:40:47.805 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:40:47.805 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:40:47.805 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:40:47.805 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:40:47.806 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:40:47.806 T044 LeftTerminator(row=7, lb=3) -> null(母線まで延ばす)
+11:40:47.806 T044 k==0: row=7 lb=3 lt=null LeftBusX=15.50 X(lb)=47.00 y=87.50
+11:40:47.806 T044 DrawWire: (15.50,87.50)-(47.00,87.50) net=0
+11:40:47.806 T044 DrawWire: (56.00,87.50)-(74.00,87.50) net=2
+11:40:47.806 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:40:47.806 T044 DrawConnectors: col=6 topRow=3 bottomRow=7 x=74.00 yTop=51.50 yBot=87.50
+11:40:47.806 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:40:47.806 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:40:47.807 T044 DrawElement: row=7 col=3 lb=3 rb=4 origin=(47.00,87.50) width=9.00 Cell=9.00 bgFill=null
+11:41:24.864 T044 RedrawCanvas #102 caller=ViewModel_PropertyChanged hasSheet=True
+11:41:24.865 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+11:41:24.865 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+11:41:24.865 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+11:41:24.866 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+11:41:24.866 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+11:41:24.866 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+11:41:24.866 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+11:41:24.866 T044 LeftTerminator(row=7, lb=3) -> null(母線まで延ばす)
+11:41:24.867 T044 k==0: row=7 lb=3 lt=null LeftBusX=15.50 X(lb)=47.00 y=87.50
+11:41:24.867 T044 DrawWire: (15.50,87.50)-(47.00,87.50) net=0
+11:41:24.867 T044 DrawWire: (56.00,87.50)-(74.00,87.50) net=2
+11:41:24.867 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+11:41:24.867 T044 DrawConnectors: col=6 topRow=3 bottomRow=7 x=74.00 yTop=51.50 yBot=87.50
+11:41:24.868 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+11:41:24.868 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+11:41:24.868 T044 DrawElement: row=7 col=3 lb=3 rb=4 origin=(47.00,87.50) width=9.00 Cell=9.00 bgFill=null
