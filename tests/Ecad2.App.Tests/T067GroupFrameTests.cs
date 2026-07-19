@@ -160,6 +160,48 @@ public class T067GroupFrameTests : ViewModelTestBase
         Assert.False(renamedAgain);
     }
 
+    [Theory]
+    [InlineData(LineStyle.Solid)]
+    [InlineData(LineStyle.Dashed)]
+    [InlineData(LineStyle.Dotted)]
+    public void SetSelectedFrameBorderStyle_変更しUndo可能になる(LineStyle style)
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var frame = CreateAndSelectFrame(vm, 5, 5);
+
+        bool changed = vm.SetSelectedFrameBorderStyle(style);
+
+        Assert.True(changed);
+        Assert.Equal(style, frame.BorderStyle);
+        Assert.True(vm.UndoCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void SetSelectedFrameBorderStyle_同じ値では変更扱いにしない()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var frame = CreateAndSelectFrame(vm, 5, 5);
+        vm.SetSelectedFrameBorderStyle(LineStyle.Dashed);
+
+        bool changedAgain = vm.SetSelectedFrameBorderStyle(LineStyle.Dashed);
+
+        Assert.False(changedAgain);
+        Assert.Equal(LineStyle.Dashed, frame.BorderStyle);
+    }
+
+    [Fact]
+    public void SetSelectedFrameBorderStyle_未選択時はfalseを返す()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        bool changed = vm.SetSelectedFrameBorderStyle(LineStyle.Solid);
+
+        Assert.False(changed);
+    }
+
     [Fact]
     public void BeginDragFrame_UpdateDragFrame_ConfirmDragFrame_移動しUndo記録される()
     {

@@ -195,6 +195,16 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
+        // T-099(c)一時診断ログ(家老采配2026-07-19、原因確定後に削除): MinWidth="100"指定が
+        // フロート化直後の縮小に対し実際に効いているか(忍者実測でUIA上88pxを観測、疑義あり)を
+        // 裏取りする。SizeChangedはサイズが実際に変化した時のみ発火するため、フロート化に伴う
+        // 縮小推移をそのまま追跡できる。
+        PlacementToolBarDockingManager.SizeChanged += PlacementToolBarDockingManager_SizeChanged;
+    }
+
+    private void PlacementToolBarDockingManager_SizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        AppendDiagLog($"PlacementToolBarDockingManager_SizeChanged: ActualWidth={PlacementToolBarDockingManager.ActualWidth}, ActualHeight={PlacementToolBarDockingManager.ActualHeight}, MinWidth={PlacementToolBarDockingManager.MinWidth}");
     }
 
     private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -582,12 +592,16 @@ public partial class MainWindow : Window
         // 各DockingManager.Resourcesへ直接キー登録して優先させる(ローカルエントリはMergedDictionaries
         // より優先解決される)。
         var anchorablePaneTitleStyle = (Style)FindResource("AnchorablePaneTitleNoDragHandleStyle");
+        // T-099要件(1)(2)追加対応(隠密設計、家老采配2026-07-19): 配置ツールバーのみ、ドッキング時は
+        // 上段(AnchorablePaneTitle自体)を非表示にする専用スタイル。他パネルには適用しない。
+        var placementToolBarTitleStyle = (Style)FindResource("PlacementToolBarAnchorablePaneTitleStyle");
         foreach (var manager in AllDockingManagers)
         {
             manager.Theme = isDarkMode
                 ? new AvalonDock.Themes.Vs2013DarkTheme()
                 : new AvalonDock.Themes.Vs2013LightTheme();
-            manager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] = anchorablePaneTitleStyle;
+            manager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] =
+                manager == PlacementToolBarDockingManager ? placementToolBarTitleStyle : anchorablePaneTitleStyle;
         }
     }
 
@@ -1041,6 +1055,16 @@ public partial class MainWindow : Window
             && ShouldOpenRungCommentEditor(e.ClickCount, LadderCanvasHost.HitTestRungCommentRow(position, rcSheet)) is int rcRow)
         {
             OpenRungCommentEditor(rcRow, rcSheet);
+            return;
+        }
+
+        // T-067(4): 枠ラベルのダブルクリック編集(GuiEcad踏襲、RungCommentEditorと同型パターン)。
+        // ツールモードを問わず優先判定する(RungCommentと同じ方針)。HitTestFrameは境界線近傍のみ
+        // ヒットする(選択と同じ判定を再利用)。
+        if (e.ClickCount == 2 && _viewModel.CurrentSheet is Ecad2.Model.Sheet flblSheet
+            && LadderCanvasHost.HitTestFrame(position, flblSheet) is Ecad2.Model.GroupFrame flblFrame)
+        {
+            OpenFrameLabelEditor(flblFrame);
             return;
         }
 
@@ -1580,7 +1604,13 @@ public partial class MainWindow : Window
         // テストより先に置くと、範囲外にある画像は右クリックメニューが一切出ず、行範囲チェックの
         // 無い左クリックとの対称性が崩れる(修正5で意図した対称性回復が未達成だった)。画像がヒット
         // しない場合のみ、従来どおり行範囲外で打ち切る。
-        if (!rowInRange && LadderCanvasHost.HitTestImage(position, sheet) is null) return;
+        // T-067(5)修正(隠密机上検証、家老采配2026-07-19): GroupFrameもHitTestFrameの境界線マージン
+        // 判定がToGridPos(position)由来のpos.Rowと独立している(境界線の物理位置とグリッドセル
+        // 判定がズレる)ため、最下行付近の枠は下辺境界ヒット帯の大半がrowInRange=falseと判定され
+        // 右クリックがほぼ不能になっていた(当初「殿裁定によりグリッドセル単位固定だからConnector
+        // と同じでよい」と判断したが誤りだった、画像と同じくrowInRangeガードの対象外にする)。
+        if (!rowInRange && LadderCanvasHost.HitTestImage(position, sheet) is null
+            && LadderCanvasHost.HitTestFrame(position, sheet) is null) return;
 
         var menu = new ContextMenu();
 
@@ -1611,6 +1641,21 @@ public partial class MainWindow : Window
             var deleteConnectorItem = new MenuItem { Header = "縦コネクタ削除" };
             deleteConnectorItem.Click += DeleteMenuItem_Click;
             menu.Items.Add(deleteConnectorItem);
+        }
+        // T-067(5): GroupFrame(グループ枠)の右クリックメニュー。左クリックのヒットテスト優先順位
+        // (T-067実装コメント「要素→縦コネクタ→枠→…」)に倣い、要素・縦コネクタの直後に置く。
+        // Connectorと同じくヒットテストが返すのはGroupFrame参照そのもの(位置正規化の問題が無い)
+        // ため、要素分岐と異なりメニュー表示時点で即座に選択状態を切り替えてよい(Connector/Imageと
+        // 同型)。【2026-07-19訂正】当初「グリッドセル単位固定だからConnectorと同じrowInRange
+        // ガード対象でよい」と判断したが誤り——HitTestFrameの境界線マージン判定はpos.Row由来の
+        // rowInRangeとは独立した物理座標ベースのため、最下行付近の枠は右クリックがほぼ不能になる
+        // 実害があった(隠密机上検証で確定)。画像と同じくrowInRangeガードの対象外にする。
+        else if (LadderCanvasHost.HitTestFrame(position, sheet) is Ecad2.Model.GroupFrame hitFrame)
+        {
+            CommitDeviceNameEdit();
+            _viewModel.SelectedCell = null;
+            _viewModel.SelectedFrame = hitFrame;
+            BuildFrameContextMenuItems(menu);
         }
         // T-064往復1周目修正5(隠密レビュー指摘): 右クリックのヒットテストチェーンにHitTestImageが
         // 無く、左クリック(LadderCanvasHost_PreviewMouseLeftButtonUp)とは対称性が崩れていた
@@ -1733,6 +1778,45 @@ public partial class MainWindow : Window
             };
             menu.Items.Add(commentItem);
         }
+    }
+
+    // T-067(5): GroupFrame(グループ枠)上での右クリックメニュー項目(線種変更/削除、GuiEcad
+    // 「線種」サブメニュー(実線/破線/点線)+「削除」踏襲、docs/ecad2-t067-groupframe-design-
+    // onmitsu2.md参照)。呼び出し元(LadderCanvasHost_PreviewMouseRightButtonDown)で既に
+    // SelectedFrameへ切り替え済みのため、要素分岐のような位置正規化は不要(Connector/Imageと同型)。
+    // 削除は既存DeleteMenuItem_Click(DeleteSelectedFrameを含むOR連鎖)をそのまま流用する。
+    private void BuildFrameContextMenuItems(ContextMenu menu)
+    {
+        var lineStyleItem = new MenuItem { Header = "線種" };
+        foreach (var (label, style) in new (string, Ecad2.Model.LineStyle)[]
+        {
+            ("実線", Ecad2.Model.LineStyle.Solid),
+            ("破線", Ecad2.Model.LineStyle.Dashed),
+            ("点線", Ecad2.Model.LineStyle.Dotted),
+        })
+        {
+            var styleItem = new MenuItem { Header = label };
+            styleItem.Click += (_, _) =>
+            {
+                // T-067(5)往復1周目修正(忍者実機NG=docs-notes/ecad2-t067-5-contextmenu-
+                // verification-ninja.md): 削除(DeleteMenuItem_Click)はSelectedFrame=null経由の
+                // PropertyChanged(ViewModel_PropertyChanged)でもRedrawCanvasが発火するため、
+                // クリックハンドラ内の直接呼び出しと合わせて同期的に2回再描画される。線種変更は
+                // SelectedFrame自体を変更しないためPropertyChanged非発火・直接呼び出し1回のみで、
+                // ContextMenuが閉じる処理と競合し画面へ反映されなかった(内部モデルは正しく変更
+                // 済み、Undo後の再描画では正しく表示されることを忍者が確認済み)。ContextMenuの
+                // クローズ処理完了後まで再描画をDispatcher.BeginInvokeで遅延させる(既存の
+                // Focus()遅延パターン[3103行等]と同型の対処)。
+                if (_viewModel.SetSelectedFrameBorderStyle(style))
+                    Dispatcher.BeginInvoke(new Action(RedrawCanvas), DispatcherPriority.Background);
+            };
+            lineStyleItem.Items.Add(styleItem);
+        }
+        menu.Items.Add(lineStyleItem);
+
+        var deleteFrameItem = new MenuItem { Header = "削除" };
+        deleteFrameItem.Click += DeleteMenuItem_Click;
+        menu.Items.Add(deleteFrameItem);
     }
 
     // T-041増分7隠密レビュー所見C対応: Alt+Tab等の外的要因でマウスキャプチャが失われた場合、
@@ -1870,6 +1954,10 @@ public partial class MainWindow : Window
         // 到達させる必要がある(本ハンドラはTunnelingでRungCommentBoxより先に発火するため、
         // ここで早期returnしないとEscape等が意図せず消費されてしまう)。
         if (_rungCommentEditingRow is not null) return;
+
+        // T-067(4): 枠ラベルエディタ編集中も同じ理由(RungCommentEditorと同型)でグローバル
+        // ショートカットを無効化する。
+        if (_frameLabelEditingFrame is not null) return;
 
         if (e.Key == Key.Tab && Keyboard.Modifiers == ModifierKeys.Shift)
         {
@@ -3206,6 +3294,112 @@ public partial class MainWindow : Window
     private void RungCommentBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
     {
         if (_rungCommentEditingRow is not null) CommitRungCommentEditor(restoreFocus: false);
+    }
+
+    // T-067(4): 枠ラベル編集中の対象(_rungCommentEditingRowと同型パターン、GroupFrameは参照型
+    // ゆえ行番号でなくオブジェクト自体を保持する)。
+    private Ecad2.Model.GroupFrame? _frameLabelEditingFrame;
+
+    // 一時診断ログ(家老采配2026-07-19、docs-notes/roles/ninja.md「診断ログ連携」節の標準形踏襲、
+    // 原因確定後に削除する)。%TEMP%\ecad2-diag.log(固定・追記式)。複数スレッドからの同時書込に
+    // 備えlockで排他制御する(feedback: 一時計装は最初からlock標準装備、T-044教訓)。
+    // 【2026-07-19追記】当初T-067(4)フォーカスロスト確定調査用に導入したが、殿裁定によりT-067(4)は
+    // 修正不要(T-080既確定仕様と同根)と決着したため該当計装は除去済み。現在はT-099(c)観点1
+    // (PlacementToolBarDockingManagerのMinWidth/MinHeight実測)の計装のみが本ヘルパーを使用している。
+    private static readonly object _diagLogLock = new();
+    private static void AppendDiagLog(string message)
+    {
+        lock (_diagLogLock)
+        {
+            try
+            {
+                string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
+                File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}\n");
+            }
+            catch
+            {
+                // ベストエフォート: 診断ログの書込失敗が本来の処理を道連れにしてはならない。
+            }
+        }
+    }
+
+    // 枠ラベルエディタを開く(枠のダブルクリック、RungCommentEditorのOpenRungCommentEditorと同型)。
+    // SelectedFrameを編集対象へ更新することで、確定処理(RenameSelectedFrame、P-071対応の受け皿)を
+    // そのまま使える。編集ボックス表示中はIsMainContentEnabled経由でキャンバス操作がブロックされる
+    // ため、編集中にSelectedFrameが他へ変化する心配はない(RungCommentと同じ設計)。
+    private void OpenFrameLabelEditor(Ecad2.Model.GroupFrame frame)
+    {
+        _frameLabelEditingFrame = frame;
+        _viewModel.SelectedFrame = frame;
+        FrameLabelBox.Text = frame.Label;
+        _viewModel.IsFrameLabelEditorVisible = true;
+        PositionFrameLabelEditor(frame);
+        RedrawCanvas();
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            FrameLabelBox.Focus();
+            FrameLabelBox.SelectAll();
+        }), DispatcherPriority.Loaded);
+    }
+
+    // 枠ラベルエディタの位置決め(PositionRungCommentEditorと同型のTranslatePoint方式)。
+    private void PositionFrameLabelEditor(Ecad2.Model.GroupFrame frame)
+    {
+        var inputPoint = LadderCanvasHost.FrameLabelAnchorDip(frame);
+        var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
+        var canvasAreaOrigin = CanvasArea.TranslatePoint(new Point(0, 0), RootLayoutGrid);
+
+        FrameLabelEditor.Margin = new Thickness(0);
+        FrameLabelEditor.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Size barSize = FrameLabelEditor.DesiredSize;
+
+        Point clamped = ClampToViewport(topLeft, canvasAreaOrigin, CanvasArea.ActualWidth, CanvasArea.ActualHeight, barSize);
+
+        FrameLabelEditor.Margin = new Thickness(clamped.X, clamped.Y, 0, 0);
+    }
+
+    // 確定(Enter/Tab/フォーカスロスト、GuiEcad踏襲)。RenameSelectedFrame(P-071の確定処理受け皿)を
+    // ここで実配線する。値未変更ならRenameSelectedFrame内でMarkDirty()しない(同値ガード規約)ため、
+    // 無変更のまま確定しても無害。
+    private void CommitFrameLabelEditor(bool restoreFocus)
+    {
+        if (_frameLabelEditingFrame is null) return;
+        _viewModel.RenameSelectedFrame(FrameLabelBox.Text);
+        CloseFrameLabelEditor(restoreFocus);
+        RedrawCanvas();
+    }
+
+    private void CancelFrameLabelEditor() => CloseFrameLabelEditor(restoreFocus: true);
+
+    // restoreFocus=false: フォーカスロスト確定経路(CloseRungCommentEditorと同じ非対称の理由、
+    // ユーザーがマウスで移した先からフォーカスを奪い返さない)。
+    private void CloseFrameLabelEditor(bool restoreFocus)
+    {
+        _frameLabelEditingFrame = null;
+        _viewModel.IsFrameLabelEditorVisible = false;
+        if (restoreFocus) FocusCanvas();
+    }
+
+    // Enter/Tab=確定、Escape=取消(GuiEcad踏襲)。
+    private void FrameLabelBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter || e.Key == Key.Tab)
+        {
+            CommitFrameLabelEditor(restoreFocus: true);
+            e.Handled = true;
+        }
+        else if (e.Key == Key.Escape)
+        {
+            CancelFrameLabelEditor();
+            e.Handled = true;
+        }
+    }
+
+    // フォーカスロスト=確定扱い(キャンセルではない、GuiEcad踏襲)。RungCommentBox_LostKeyboardFocus
+    // と同型(_frameLabelEditingFrameを先にnull化するため多重確定にはならない)。
+    private void FrameLabelBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+    {
+        if (_frameLabelEditingFrame is not null) CommitFrameLabelEditor(restoreFocus: false);
     }
 
     // 分岐B(殿裁定=命名中Escは配置ごと原子的取消, T-021): 配置(PlaceElementAtSelectedCell)は

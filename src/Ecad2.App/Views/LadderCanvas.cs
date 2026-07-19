@@ -130,7 +130,30 @@ public sealed class LadderCanvas : FrameworkElement
     private const double ImageResizeHandleSizeDip = 8.0;
 
     // 選択中のGroupFrame(グループ枠)のハイライト枠(T-067、SelectedImagePen等と同型)。
-    private static readonly Pen SelectedFramePen = new(Brushes.OrangeRed, 2.0);
+    // T-067(5)修正(隠密所見、家老采配2026-07-19、docs-notes/ecad2-t067-5-contextmenu-
+    // verification-ninja.md): 固定Solidペンだと、選択中に線種変更してもDiagramRenderer.
+    // DrawFramesの線種描画と同一矩形に上塗りされ、変更後の線種が選択解除するまで画面上で常に
+    // 隠されて見えていた(削除→Undoで選択解除後は正しい線種が見えた、という忍者一次観測から
+    // 因果関係が確定)。BorderStyleに応じたDashStyle付きPenを動的に選択する(DrawingTheme.
+    // DashOn/DashOff等、WpfRenderer.Penと同じ倍数値で視覚言語を揃える)。
+    private static readonly Pen SelectedFrameSolidPen = new(Brushes.OrangeRed, 2.0);
+    private static readonly Pen SelectedFrameDashedPen = CreateSelectedFrameDashPen(DrawingTheme.DashOn, DrawingTheme.DashOff);
+    private static readonly Pen SelectedFrameDottedPen = CreateSelectedFrameDashPen(DrawingTheme.DotOn, DrawingTheme.DotOff);
+
+    private static Pen CreateSelectedFrameDashPen(double on, double off)
+    {
+        var pen = new Pen(Brushes.OrangeRed, 2.0) { DashStyle = new DashStyle(new double[] { on, off }, 0) };
+        pen.Freeze();
+        return pen;
+    }
+
+    // DiagramRenderer.DrawFrames(f.BorderStyle ?? LineStyle.Dashed)と同じフォールバック規約。
+    private static Pen SelectedFramePenFor(LineStyle? borderStyle) => (borderStyle ?? LineStyle.Dashed) switch
+    {
+        LineStyle.Solid => SelectedFrameSolidPen,
+        LineStyle.Dotted => SelectedFrameDottedPen,
+        _ => SelectedFrameDashedPen,
+    };
 
     // GroupFrameのヒットテスト許容誤差上限(mm、T-067)。GuiEcad原本(MainPage.xaml.cs.HitTestFrame)の
     // margin = Math.Min(CellMm * 0.15, 3.0) をそのまま移植。枠は塗りつぶし無し(点線境界のみ)のため、
@@ -265,7 +288,7 @@ public sealed class LadderCanvas : FrameworkElement
             // 同じ矩形位置(FrameRectDip)を専用Penで上書き再描画する(画像等と同型パターン、次段階
             // (2)〜(5)=キーボード配線・ドラッグ作成・ラベル編集・右クリックメニューは未実装)。
             if (selectedFrame is { } frame)
-                dc.DrawRectangle(null, SelectedFramePen, FrameRectDip(frame));
+                dc.DrawRectangle(null, SelectedFramePenFor(frame.BorderStyle), FrameRectDip(frame));
 
             // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。半透明の塗り+
             // 破線枠で配置枠を示す(実画像内容の描画は行わない、シンプルさ優先)。
@@ -561,6 +584,20 @@ public sealed class LadderCanvas : FrameworkElement
     {
         var mm = FrameRectMm(frame);
         return new Rect(mm.X * MmToDip, mm.Y * MmToDip, mm.Width * MmToDip, mm.Height * MmToDip);
+    }
+
+    /// <summary>枠ラベルエディタのアンカー位置をローカルDIP座標で返す(T-067(4))。X座標はDrawFramesの
+    /// 描画位置(枠左上+1.0mm)と同じ基準。Y座標は、描画側がVAlign.Bottom(アンカー=文字下端、文字は
+    /// 枠上辺から上方向へ展開)のため、枠上辺のラベル位置からフォント高さ相当
+    /// (DiagramRenderer.FrameLabelFontSizeMm)を差し引いた文字上端相当とする
+    /// (RungCommentAnchorDipと同型パターン)。</summary>
+    internal Point FrameLabelAnchorDip(GroupFrame frame)
+    {
+        var rect = FrameRectMm(frame);
+        double xMm = rect.X + 1.0;
+        double yMm = rect.Y - _renderer.Geometry.CellMm * DiagramRenderer.FrameLabelOffsetYCellRatio
+            - DiagramRenderer.FrameLabelFontSizeMm;
+        return new Point(xMm * MmToDip, yMm * MmToDip);
     }
 
     /// <summary>クリック位置(ローカルDIP座標)にヒットするGroupFrame(グループ枠)を探す(T-067)。

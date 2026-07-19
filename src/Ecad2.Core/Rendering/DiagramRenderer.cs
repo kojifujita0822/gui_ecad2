@@ -152,6 +152,15 @@ public sealed class DiagramRenderer
     /// 文字下端で文字は上方向へ展開)と編集ボックスのY位置補正(T-080往復1周目指摘E)で共有する。</summary>
     public const double RungCommentFontSizeMm = 3.0;
 
+    /// <summary>枠ラベルのフォントサイズ(mm)。描画(DrawFrames、VAlign.Bottom=アンカーYが文字下端で
+    /// 文字は上方向へ展開)とApp層の編集ボックス位置決め(LadderCanvas.FrameLabelAnchorDip)で共有する
+    /// (T-067(4)、RungCommentFontSizeMmと同型パターン)。</summary>
+    public const double FrameLabelFontSizeMm = 2.2;
+
+    /// <summary>枠ラベルの枠上辺からのYオフセット(セル比率、上方向)。DrawFramesの描画位置
+    /// (labelOffY = Cell * この値)とApp層の編集ボックス位置決めで共有する(T-067(4))。</summary>
+    public const double FrameLabelOffsetYCellRatio = 0.25;
+
     private const double TitleCompanyRowH = 6.0;                              // 社名欄の高さ (mm)
     private const double TitleDetailRowsH = 14.0;                             // 図面名称/図番/ページ行＋顧客等行の高さ (mm)
     private const double TitleBlockH = TitleCompanyRowH + TitleDetailRowsH;   // 表題欄全体の高さ (mm)
@@ -607,11 +616,11 @@ public sealed class DiagramRenderer
         var baseStroke = _theme.Get(StrokeRole.GroupFrame);
         var labelStyle = _theme.Text(TextRole.DeviceName) with
         {
-            FontSizeMm = 2.2,
+            FontSizeMm = FrameLabelFontSizeMm,
             VAlign = VAlign.Bottom,
             HAlign = HAlign.Left,
         };
-        double labelOffY = Cell * 0.25;   // ラベルを枠上辺より少し上に配置
+        double labelOffY = Cell * FrameLabelOffsetYCellRatio;   // ラベルを枠上辺より少し上に配置
 
         bool partialPage = rowStart > 0 || rowEnd < totalRows;
         if (partialPage)

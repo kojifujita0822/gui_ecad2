@@ -151,10 +151,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private bool _isFrameLabelEditorVisible;
+
+    /// <summary>T-067(4): 枠ラベルエディタの表示状態(IsRungCommentEditorVisibleと同じ「ViewModel
+    /// 単一の真実源」パターン)。表示中はIsMainContentEnabled経由でメインコンテンツを無効化する。</summary>
+    public bool IsFrameLabelEditorVisible
+    {
+        get => _isFrameLabelEditorVisible;
+        set
+        {
+            if (SetProperty(ref _isFrameLabelEditorVisible, value))
+                OnPropertyChanged(nameof(IsMainContentEnabled));
+        }
+    }
+
     /// <summary>メインコンテンツ(メニュー・ツールバー・メイン作業域・出力パネル)が操作可能か
     /// (MainWindow.xaml MainContentAreaのIsEnabledバインド先)。配置バー(T-033)・行コメント
-    /// エディタ(T-080往復1周目指摘F)のどちらかが表示中はfalse(現行モーダル同等の使用感)。</summary>
-    public bool IsMainContentEnabled => !IsPlacementBarVisible && !IsRungCommentEditorVisible;
+    /// エディタ(T-080往復1周目指摘F)・枠ラベルエディタ(T-067(4))のいずれかが表示中はfalse
+    /// (現行モーダル同等の使用感)。</summary>
+    public bool IsMainContentEnabled => !IsPlacementBarVisible && !IsRungCommentEditorVisible && !IsFrameLabelEditorVisible;
 
     private double _canvasScale = 1.0;
 
@@ -1404,6 +1419,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedFrame is not GroupFrame frame || frame.Label == newLabel) return false;
         UndoManager.RecordSnapshot(Document);
         frame.Label = newLabel;
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>SelectedFrameの枠線スタイルを変更する(T-067(5)、右クリックメニュー「線種」
+    /// サブメニュー、GuiEcad SetFrameBorderStyleCommand踏襲、RenameSelectedFrameと同型)。
+    /// 値が変化した場合のみUndo対象としてRecordSnapshotする。戻り値は実際に変更したか。</summary>
+    public bool SetSelectedFrameBorderStyle(LineStyle style)
+    {
+        if (SelectedFrame is not GroupFrame frame || frame.BorderStyle == style) return false;
+        UndoManager.RecordSnapshot(Document);
+        frame.BorderStyle = style;
         MarkDirty();
         return true;
     }
