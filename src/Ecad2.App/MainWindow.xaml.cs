@@ -112,6 +112,10 @@ public partial class MainWindow : Window
     // 追加したため、レイアウトリセットは複数DockingManagerをまとめて処理できるよう汎用化する。
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
     private readonly Dictionary<DockingManager, string> _defaultDockingLayoutXmlByManager = new();
+    // 家老采配2026-07-19(T-099(c)復旧作業で発覚、%AppData%配下の永続化レイアウトXML破損対策):
+    // manager単位で「本来存在すべきContentIdの集合」をXAML初期状態(RegisterDockingContents呼出時点)
+    // からキャプチャしておく。HasExpectedContentでの破損検出に使う。
+    private readonly Dictionary<DockingManager, HashSet<string>> _expectedContentIdsByManager = new();
 
     // T-058増分5: PlacementToolBarDockingManagerを追加。RegisterDockingContents/
     // SerializeDefaultDockingLayouts/ResetDockingLayoutToDefault/LoadDockingLayoutFromFileIfExists
@@ -195,16 +199,59 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
-        // T-099(c)一時診断ログ(家老采配2026-07-19、原因確定後に削除): MinWidth="100"指定が
-        // フロート化直後の縮小に対し実際に効いているか(忍者実測でUIA上88pxを観測、疑義あり)を
-        // 裏取りする。SizeChangedはサイズが実際に変化した時のみ発火するため、フロート化に伴う
-        // 縮小推移をそのまま追跡できる。
-        PlacementToolBarDockingManager.SizeChanged += PlacementToolBarDockingManager_SizeChanged;
+        // T-099(c)案Y(殿裁定2026-07-19、隠密設計書docs/ecad2-t099-c-dock-restore-by-default-xml-
+        // design-onmitsu.md): AvalonDock標準Dock()はecad2特有の単一ペイン・独立DockingManager構成
+        // でタブ自己複製バグ(InternalDockフォールバック探索のフロートウィンドウ除外フィルタ漏れ)を
+        // 誘発するため、ContentDockingイベント(Dock実行前、キャンセル可能、一次ソース
+        // DockingManager.cs:2334-2337で確認済み)をCancel=trueで止め、ハードコード既定レイアウト
+        // XMLのDeserialize(Ctrl+Alt+Rと同じ実証済み機構の単一Manager版)でドッキング済み既定状態へ
+        // 戻す。自前のモデル手術(ツリー再接続・Children.Add・CollectGarbage等)は全廃——AvalonDock
+        // の隠れた不変条件(RootPanelのnull時自動補完等)と直すたび衝突するモグラ叩きに陥った
+        // 3周の教訓により、モデルの整合はAvalonDock自身の正規機構(Layout差し替え)に全部任せる。
+        PlacementToolBarDockingManager.ContentDocking += PlacementToolBarDockingManager_ContentDocking;
+        // T-099(c)調査5(b、同上): メニュー「フローティング」経由のFloat()はドラッグ経路と異なり
+        // FloatingLeft/Topの位置補正(ドラッグ経路のInternalOnActivated相当)を経ないため、既定
+        // 0.0のままプライマリモニタ原点(0,0)にフロートウィンドウが生成される(一次ソース
+        // DockingManager.cs:3281-3287で確認済み)。ContentFloatingイベント(Float実行前、一次ソース
+        // DockingManager.cs:2313-2328)で配置ツールバー自身の現在スクリーン座標を設定しておくことで、
+        // Float()内のウィンドウ生成がこの値をそのまま使う。
+        PlacementToolBarDockingManager.ContentFloating += PlacementToolBarDockingManager_ContentFloating;
     }
 
-    private void PlacementToolBarDockingManager_SizeChanged(object sender, SizeChangedEventArgs e)
+    private void PlacementToolBarDockingManager_ContentDocking(object? sender, ContentDockingEventArgs e)
     {
-        AppendDiagLog($"PlacementToolBarDockingManager_SizeChanged: ActualWidth={PlacementToolBarDockingManager.ActualWidth}, ActualHeight={PlacementToolBarDockingManager.ActualHeight}, MinWidth={PlacementToolBarDockingManager.MinWidth}");
+        if (e.Content is not LayoutAnchorable anchorable || anchorable.ContentId != "PlacementToolBar") return;
+        e.Cancel = true;
+        ResetPlacementToolBarLayoutToDefault();
+    }
+
+    // T-099(c)案Y: 配置ツールバーのレイアウトをハードコード既定(XAML初期状態の自己Serialize)へ
+    // 戻す。ContentDockingハンドラからの「確実なドッキング復帰」専用。保存済みファイル
+    // (TryReadSavedDockingLayoutXml)は意図的に参照しない——ユーザー保存レイアウトがフロート状態
+    // だった場合、「ドッキングせよ」という操作意図と矛盾する状態を復元してしまうため、
+    // 本経路は常にドッキング済みの既定状態へ戻す。既存フロートウィンドウの後始末は
+    // DockingManager.OnLayoutChangedの正規機構(InternalClose+KeepContentVisibleOnClose、
+    // 一次ソースDockingManager.cs:434-448)が担い、幽霊ウィンドウは構造上残らない(設計書5節)。
+    private void ResetPlacementToolBarLayoutToDefault()
+    {
+        if (_defaultDockingLayoutXmlByManager.TryGetValue(PlacementToolBarDockingManager, out var defaultXml)
+            && TryDeserializeDockingLayout(PlacementToolBarDockingManager, defaultXml))
+            return;
+        // defaultXmlは起動時の自己Serialize産のため実質失敗しないが、万一失敗しても
+        // 何もしない(現状維持=フロートのまま)。モデルを中途半端に触らないことが3周の教訓。
+        _viewModel.StatusMessage = "配置ツールバーのドッキングに失敗しました";
+    }
+
+    private void PlacementToolBarDockingManager_ContentFloating(object? sender, ContentFloatingEventArgs e)
+    {
+        if (e.Content.ContentId != "PlacementToolBar") return;
+        // 隠密レビュー指摘: PointToScreenは物理ピクセル座標を返すが、FloatingLeft/TopはDIP消費の
+        // ため、DPI拡大率が100%でない環境ではズレる。VisualTreeHelper.GetDpiのDpiScaleX/Yで
+        // 物理ピクセルからDIPへ変換する。
+        var topLeft = PlacementToolBarDockingManager.PointToScreen(new Point(0, 0));
+        var dpi = VisualTreeHelper.GetDpi(PlacementToolBarDockingManager);
+        e.Content.FloatingLeft = topLeft.X / dpi.DpiScaleX;
+        e.Content.FloatingTop = topLeft.Y / dpi.DpiScaleY;
     }
 
     private void Find_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -240,15 +287,34 @@ public partial class MainWindow : Window
     {
         foreach (var manager in AllDockingManagers)
         {
+            var expectedIds = new HashSet<string>();
             foreach (var anchorable in manager.Layout.Descendents().OfType<LayoutAnchorable>())
             {
                 _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
+                expectedIds.Add(anchorable.ContentId);
             }
             foreach (var document in manager.Layout.Descendents().OfType<LayoutDocument>())
             {
                 _dockingContentRegistry[document.ContentId] = document.Content;
+                expectedIds.Add(document.ContentId);
             }
+            _expectedContentIdsByManager[manager] = expectedIds;
         }
+    }
+
+    // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContentId要素はあるが
+    // 実体(Content)が欠落した壊れたXMLを検出する(RebindDockingContentが_dockingContentRegistryに
+    // 該当ContentIdを見つけられずContentがnullのまま残るケース、およびXMLからLayoutContent要素
+    // 自体が丸ごと消えているケースの両方を拾う)。今回のT-099(c)復旧作業で発覚した%AppData%配下
+    // 永続化XML汚染(配置ツールの実体が完全欠落)の再発防止。
+    private bool HasExpectedContent(DockingManager manager)
+    {
+        if (!_expectedContentIdsByManager.TryGetValue(manager, out var expectedIds)) return true;
+        var presentIds = manager.Layout.Descendents().OfType<LayoutContent>()
+            .Where(c => c.Content != null && c.ContentId != null)
+            .Select(c => c.ContentId)
+            .ToHashSet();
+        return expectedIds.All(id => presentIds.Contains(id));
     }
 
     private void SerializeDefaultDockingLayouts()
@@ -276,10 +342,19 @@ public partial class MainWindow : Window
     // T-058増分4(殿裁定=保存タイミング両方): アプリ終了時(Window_Closing)・明示コマンド
     // (SaveDockingLayoutMenuItem_Click)の双方から呼ばれる単一の保存メソッド。書込失敗
     // (権限/容量等)はクラッシュさせずステータスメッセージのみに留める(殿裁定(5)フォールバック)。
+    // 家老采配2026-07-19(保存側防御): 実体欠落状態(フロート化処理中の過渡状態等)のレイアウトを
+    // 誤って既定として焼き付けてしまうと、今回のT-099(c)復旧作業のような%AppData%汚染の再発源に
+    // なる。保存前にHasExpectedContentで検証し、いずれかのDockingManagerが欠落状態なら保存自体を
+    // スキップする(読込側防御と対になる二重の備え)。
     private void SaveDockingLayoutAsDefault()
     {
         try
         {
+            if (AllDockingManagers.Any(m => !HasExpectedContent(m)))
+            {
+                _viewModel.StatusMessage = "パネルレイアウトが不完全な状態のため保存をスキップしました";
+                return;
+            }
             Directory.CreateDirectory(DockingLayoutDirectory);
             foreach (var manager in AllDockingManagers)
             {
@@ -300,25 +375,24 @@ public partial class MainWindow : Window
     // DockingManagerはXAML初期状態のまま起動を継続する(殿裁定(5)フォールバック)。
     // 家老裁可(2026-07-15): 破損ファイル等で読込に失敗した場合は沈黙のフォールバックを避け、
     // ステータスメッセージで一言知らせる(GCADのようなバージョン管理を持たない代わりの透明性確保)。
+    // 家老采配2026-07-19(読込側防御・本丸): 従来はXML構文検証のみのTryDeserializeDockingLayoutを
+    // 経由せず自前でDeserializeしており、ResetDockingLayoutToDefault()と非対称にContent実体欠落
+    // (今回のT-099(c)復旧作業で発覚した%AppData%汚染XMLの症状)を検出できなかった。
+    // TryReadSavedDockingLayoutXml→TryDeserializeDockingLayoutの二段フォールバック構造へ統合し、
+    // ResetDockingLayoutToDefault()と同じ保護(IO/XML構文/Content実体欠落の3層)を持たせる。
     private void LoadDockingLayoutFromFileIfExists()
     {
         bool anyLoadFailed = false;
         foreach (var manager in AllDockingManagers)
         {
-            var path = GetDockingLayoutFilePath(manager);
-            if (!File.Exists(path)) continue;
-            try
-            {
-                var serializer = new XmlLayoutSerializer(manager);
-                serializer.LayoutSerializationCallback += RebindDockingContent;
-                using var reader = new StreamReader(path);
-                serializer.Deserialize(reader);
-            }
-            catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Xml.XmlException)
-            {
-                // 破損ファイル等はハードコード既定(XAML初期状態)のまま起動を継続する。
-                anyLoadFailed = true;
-            }
+            string? savedXml = TryReadSavedDockingLayoutXml(manager);
+            if (savedXml is null) continue;
+            if (TryDeserializeDockingLayout(manager, savedXml)) continue;
+
+            // 破損ファイル等はハードコード既定(XAML初期状態)へ二段フォールバックする。
+            anyLoadFailed = true;
+            if (_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var defaultXml))
+                TryDeserializeDockingLayout(manager, defaultXml);
         }
         if (anyLoadFailed)
             _viewModel.StatusMessage = "保存済みレイアウトの読込に失敗したため既定で起動しました";
@@ -380,7 +454,9 @@ public partial class MainWindow : Window
             serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
-            return true;
+            // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContent実体が
+            // 欠落した壊れたXMLをここで検出する(HasExpectedContent参照)。
+            return HasExpectedContent(manager);
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Xml.XmlException)
         {
@@ -3299,29 +3375,6 @@ public partial class MainWindow : Window
     // T-067(4): 枠ラベル編集中の対象(_rungCommentEditingRowと同型パターン、GroupFrameは参照型
     // ゆえ行番号でなくオブジェクト自体を保持する)。
     private Ecad2.Model.GroupFrame? _frameLabelEditingFrame;
-
-    // 一時診断ログ(家老采配2026-07-19、docs-notes/roles/ninja.md「診断ログ連携」節の標準形踏襲、
-    // 原因確定後に削除する)。%TEMP%\ecad2-diag.log(固定・追記式)。複数スレッドからの同時書込に
-    // 備えlockで排他制御する(feedback: 一時計装は最初からlock標準装備、T-044教訓)。
-    // 【2026-07-19追記】当初T-067(4)フォーカスロスト確定調査用に導入したが、殿裁定によりT-067(4)は
-    // 修正不要(T-080既確定仕様と同根)と決着したため該当計装は除去済み。現在はT-099(c)観点1
-    // (PlacementToolBarDockingManagerのMinWidth/MinHeight実測)の計装のみが本ヘルパーを使用している。
-    private static readonly object _diagLogLock = new();
-    private static void AppendDiagLog(string message)
-    {
-        lock (_diagLogLock)
-        {
-            try
-            {
-                string path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
-                File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}\n");
-            }
-            catch
-            {
-                // ベストエフォート: 診断ログの書込失敗が本来の処理を道連れにしてはならない。
-            }
-        }
-    }
 
     // 枠ラベルエディタを開く(枠のダブルクリック、RungCommentEditorのOpenRungCommentEditorと同型)。
     // SelectedFrameを編集対象へ更新することで、確定処理(RenameSelectedFrame、P-071対応の受け皿)を
