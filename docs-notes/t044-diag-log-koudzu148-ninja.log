@@ -1,0 +1,17 @@
+20:45:07.812 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+20:45:09.164 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+20:45:20.596 T044 OR-wiring: pos=(3,5) baseRow=0 basePos=(0,5) leftColumn=5 rightColumn=6 connectors=[]
+20:45:20.596 T044 NothingBetweenRailAndColumn(row=3, column=5): elemBlock=False connBlock=False result=True
+20:45:20.596 T044 NothingBetweenRailAndColumn(row=0, column=5): elemBlock=False connBlock=False result=True
+20:45:20.597 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+20:45:20.597 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+20:45:20.598 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+20:45:21.940 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+20:45:21.941 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+20:45:34.155 T044 OR-wiring: pos=(7,3) baseRow=3 basePos=(3,5) leftColumn=3 rightColumn=6 connectors=[col6:r0-3]
+20:45:34.155 T044 NothingBetweenRailAndColumn(row=7, column=3): elemBlock=False connBlock=False result=True
+20:45:34.156 T044 NothingBetweenRailAndColumn(row=3, column=3): elemBlock=False connBlock=False result=True
+20:45:34.156 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+20:45:34.157 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+20:45:34.157 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+20:45:34.157 T044 LeftTerminator(row=7, lb=3) -> null(母線まで延ばす)

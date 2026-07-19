@@ -1,0 +1,54 @@
+07:23:38.476 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+07:23:38.479 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+07:23:38.480 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+07:23:38.481 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+07:23:38.482 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+07:23:39.822 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+07:23:39.823 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+07:23:39.823 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+07:23:39.824 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=1
+07:23:39.824 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+07:23:51.135 T044 OR-wiring: pos=(3,5) baseRow=0 basePos=(0,5) leftColumn=5 rightColumn=6 connectors=[]
+07:23:51.135 T044 NothingBetweenRailAndColumn(row=3, column=5): elemBlock=False connBlock=False result=True
+07:23:51.136 T044 NothingBetweenRailAndColumn(row=0, column=5): elemBlock=False connBlock=False result=True
+07:23:51.136 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+07:23:51.138 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+07:23:51.138 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+07:23:51.138 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+07:23:51.138 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+07:23:51.139 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+07:23:51.139 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+07:23:51.139 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+07:23:51.139 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+07:23:51.139 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+07:23:51.140 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+07:23:52.513 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+07:23:52.513 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+07:23:52.513 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+07:23:52.514 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+07:23:52.514 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+07:23:52.514 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+07:23:52.514 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+07:23:52.514 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+07:23:52.514 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+07:23:52.514 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+07:24:03.252 T044 OR-wiring: pos=(7,3) baseRow=3 basePos=(3,5) leftColumn=3 rightColumn=6 connectors=[col6:r0-3]
+07:24:03.253 T044 NothingBetweenRailAndColumn(row=7, column=3): elemBlock=False connBlock=False result=True
+07:24:03.254 T044 NothingBetweenRailAndColumn(row=3, column=3): elemBlock=False connBlock=False result=True
+07:24:03.254 T044 OR-wiring: skipAtPlacedRow=True skipAtBaseRow=True -> leftConnectorAdded=False
+07:24:03.255 T044 LeftTerminator(row=0, lb=5) -> null(母線まで延ばす)
+07:24:03.255 T044 k==0: row=0 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=24.50
+07:24:03.255 T044 DrawWire: (15.50,24.50)-(65.00,24.50) net=0
+07:24:03.255 T044 DrawWire: (74.00,24.50)-(204.50,24.50) net=2
+07:24:03.255 T044 LeftTerminator(row=3, lb=5) -> null(母線まで延ばす)
+07:24:03.255 T044 k==0: row=3 lb=5 lt=null LeftBusX=15.50 X(lb)=65.00 y=51.50
+07:24:03.256 T044 DrawWire: (15.50,51.50)-(65.00,51.50) net=0
+07:24:03.256 T044 LeftTerminator(row=7, lb=3) -> null(母線まで延ばす)
+07:24:03.256 T044 k==0: row=7 lb=3 lt=null LeftBusX=15.50 X(lb)=47.00 y=87.50
+07:24:03.256 T044 DrawWire: (15.50,87.50)-(47.00,87.50) net=0
+07:24:03.256 T044 DrawWire: (56.00,87.50)-(74.00,87.50) net=2
+07:24:03.256 T044 DrawConnectors: col=6 topRow=0 bottomRow=3 x=74.00 yTop=24.50 yBot=51.50
+07:24:03.256 T044 DrawConnectors: col=6 topRow=3 bottomRow=7 x=74.00 yTop=51.50 yBot=87.50
+07:24:03.257 T044 DrawElement: row=0 col=5 lb=5 rb=6 origin=(65.00,24.50) width=9.00 Cell=9.00 bgFill=null
+07:24:03.257 T044 DrawElement: row=3 col=5 lb=5 rb=6 origin=(65.00,51.50) width=9.00 Cell=9.00 bgFill=null
+07:24:03.257 T044 DrawElement: row=7 col=3 lb=3 rb=4 origin=(47.00,87.50) width=9.00 Cell=9.00 bgFill=null
