@@ -156,32 +156,6 @@ public partial class MainWindow : Window
     static MainWindow()
     {
         EventManager.RegisterClassHandler(typeof(Window), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalDockingLayoutShortcut));
-        // T-104増分1 DoD(4)診断(2026-07-20、家老采配、一時計装・コミット対象外): PlacementToolBar
-        // の2タブ間でTab(前進)がメインウィンドウへ抜けてしまう原因調査。FocusManagerのGotFocusを
-        // クラスハンドラで捕捉しフォーカス遷移を記録、Tabキー押下直前のフォーカス位置と併せて
-        // 原因特定の手がかりとする(隠密の一次ソース調査・侍のAnchorablePaneTabPanel.cs確認とも
-        // 手がかりなしのため実測へ切替、docs/ecad2-t104-canfloat-tabnav-root-cause-survey-
-        // onmitsu.md参照)。
-        EventManager.RegisterClassHandler(typeof(FrameworkElement), GotFocusEvent, new RoutedEventHandler(OnGlobalGotFocusDiag));
-        EventManager.RegisterClassHandler(typeof(FrameworkElement), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalTabKeyDiag));
-    }
-
-    private static void OnGlobalGotFocusDiag(object sender, RoutedEventArgs e)
-    {
-        var element = e.OriginalSource as FrameworkElement;
-        var name = element?.Name;
-        var typeName = element?.GetType().Name ?? e.OriginalSource?.GetType().Name ?? "不明";
-        var automationName = element != null ? System.Windows.Automation.AutomationProperties.GetName(element) : null;
-        AppendDiagLog($"T104 GotFocus: type={typeName} name={name} automationName={automationName}");
-    }
-
-    private static void OnGlobalTabKeyDiag(object sender, KeyEventArgs e)
-    {
-        if (e.Key != Key.Tab) return;
-        var focused = Keyboard.FocusedElement as FrameworkElement;
-        var name = focused?.Name;
-        var typeName = focused?.GetType().Name ?? Keyboard.FocusedElement?.GetType().Name ?? "不明";
-        AppendDiagLog($"T104 PreviewKeyDown Tab: shift={Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)} focusedBefore.type={typeName} focusedBefore.name={name}");
     }
 
     private static void OnGlobalDockingLayoutShortcut(object sender, KeyEventArgs e)
@@ -283,22 +257,6 @@ public partial class MainWindow : Window
     // フロートウィンドウはドラッグのたび新規生成されるため、このフィールドは常に「現在フロート中の
     // 配置ツールバーウィンドウに紐づくフック」1つのみを保持する(複数同時フロートは構成上あり得ない)。
     private HwndSourceHook? _placementToolBarFloatingWindowHook;
-
-    // T-103 PoC 一時計装(2026-07-20、実機確認前の自己検証用): 二重実行ガード(handled=trueで
-    // AvalonDock標準DragService.Dropをスキップする設計、一次ソース検証止まりで実機未実証)を
-    // 忍者実機確認で一発検証できるようにするための診断ログ。ninja.md「診断ログ連携」節の標準形
-    // (%TEMP%\ecad2-diag.log、追記式、lock排他制御)に従う。原因確定・検証完了後に必ず除去する
-    // (コミットには含めない)。
-    private static readonly object DiagLogLock = new();
-
-    private static void AppendDiagLog(string message)
-    {
-        lock (DiagLogLock)
-        {
-            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
-            System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
-        }
-    }
 
     private const int WM_EXITSIZEMOVE = 0x0232;
 
