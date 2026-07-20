@@ -1,10 +1,12 @@
 ﻿using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
@@ -154,6 +156,32 @@ public partial class MainWindow : Window
     static MainWindow()
     {
         EventManager.RegisterClassHandler(typeof(Window), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalDockingLayoutShortcut));
+        // T-104増分1 DoD(4)診断(2026-07-20、家老采配、一時計装・コミット対象外): PlacementToolBar
+        // の2タブ間でTab(前進)がメインウィンドウへ抜けてしまう原因調査。FocusManagerのGotFocusを
+        // クラスハンドラで捕捉しフォーカス遷移を記録、Tabキー押下直前のフォーカス位置と併せて
+        // 原因特定の手がかりとする(隠密の一次ソース調査・侍のAnchorablePaneTabPanel.cs確認とも
+        // 手がかりなしのため実測へ切替、docs/ecad2-t104-canfloat-tabnav-root-cause-survey-
+        // onmitsu.md参照)。
+        EventManager.RegisterClassHandler(typeof(FrameworkElement), GotFocusEvent, new RoutedEventHandler(OnGlobalGotFocusDiag));
+        EventManager.RegisterClassHandler(typeof(FrameworkElement), PreviewKeyDownEvent, new KeyEventHandler(OnGlobalTabKeyDiag));
+    }
+
+    private static void OnGlobalGotFocusDiag(object sender, RoutedEventArgs e)
+    {
+        var element = e.OriginalSource as FrameworkElement;
+        var name = element?.Name;
+        var typeName = element?.GetType().Name ?? e.OriginalSource?.GetType().Name ?? "不明";
+        var automationName = element != null ? System.Windows.Automation.AutomationProperties.GetName(element) : null;
+        AppendDiagLog($"T104 GotFocus: type={typeName} name={name} automationName={automationName}");
+    }
+
+    private static void OnGlobalTabKeyDiag(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Tab) return;
+        var focused = Keyboard.FocusedElement as FrameworkElement;
+        var name = focused?.Name;
+        var typeName = focused?.GetType().Name ?? Keyboard.FocusedElement?.GetType().Name ?? "不明";
+        AppendDiagLog($"T104 PreviewKeyDown Tab: shift={Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)} focusedBefore.type={typeName} focusedBefore.name={name}");
     }
 
     private static void OnGlobalDockingLayoutShortcut(object sender, KeyEventArgs e)
@@ -216,6 +244,11 @@ public partial class MainWindow : Window
         // DockingManager.cs:2313-2328)で配置ツールバー自身の現在スクリーン座標を設定しておくことで、
         // Float()内のウィンドウ生成がこの値をそのまま使う。
         PlacementToolBarDockingManager.ContentFloating += PlacementToolBarDockingManager_ContentFloating;
+        // T-103 PoC(家老采配2026-07-20、侍提案、docs/todo.md T-103節): AvalonDock標準の
+        // OverlayWindow/DropTarget(位置ズレバグ)に依存しない独自ドロップ枠方式。フロートウィンドウ
+        // 生成直後(Show前)に発火するこのイベントでLoaded後フックの登録を仕込む
+        // (docs/ecad2-t103-drag-message-path-and-guard-survey-samurai.md参照)。
+        PlacementToolBarDockingManager.LayoutFloatingWindowControlCreated += PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated;
     }
 
     private void PlacementToolBarDockingManager_ContentDocking(object? sender, ContentDockingEventArgs e)
@@ -223,6 +256,10 @@ public partial class MainWindow : Window
         if (e.Content is not LayoutAnchorable anchorable || anchorable.ContentId != "PlacementToolBar") return;
         e.Cancel = true;
         ResetPlacementToolBarLayoutToDefault();
+        // T-103 PoC: AvalonDock標準ドロップ(枠外へのドロップ、Inside判定成立)経由でここへ来た
+        // 場合の後始末。独自枠経由(handled=true)の場合はPlacementToolBarFloatingWindowFilterMessage
+        // 側で既に非表示化済みだが、冪等な代入のため無害。
+        PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed;
     }
 
     // T-099(c)案Y: 配置ツールバーのレイアウトをハードコード既定(XAML初期状態の自己Serialize)へ
@@ -240,6 +277,99 @@ public partial class MainWindow : Window
         // defaultXmlは起動時の自己Serialize産のため実質失敗しないが、万一失敗しても
         // 何もしない(現状維持=フロートのまま)。モデルを中途半端に触らないことが3周の教訓。
         _viewModel.StatusMessage = "配置ツールバーのドッキングに失敗しました";
+    }
+
+    // T-103 PoC(家老采配2026-07-20、侍提案): 独自ドロップ枠のヒットテスト用フック。
+    // フロートウィンドウはドラッグのたび新規生成されるため、このフィールドは常に「現在フロート中の
+    // 配置ツールバーウィンドウに紐づくフック」1つのみを保持する(複数同時フロートは構成上あり得ない)。
+    private HwndSourceHook? _placementToolBarFloatingWindowHook;
+
+    // T-103 PoC 一時計装(2026-07-20、実機確認前の自己検証用): 二重実行ガード(handled=trueで
+    // AvalonDock標準DragService.Dropをスキップする設計、一次ソース検証止まりで実機未実証)を
+    // 忍者実機確認で一発検証できるようにするための診断ログ。ninja.md「診断ログ連携」節の標準形
+    // (%TEMP%\ecad2-diag.log、追記式、lock排他制御)に従う。原因確定・検証完了後に必ず除去する
+    // (コミットには含めない)。
+    private static readonly object DiagLogLock = new();
+
+    private static void AppendDiagLog(string message)
+    {
+        lock (DiagLogLock)
+        {
+            var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
+            System.IO.File.AppendAllText(path, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+    }
+
+    private const int WM_EXITSIZEMOVE = 0x0232;
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetCursorPos(out Win32Point point);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Win32Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    // T-103 PoC: フロートウィンドウ生成直後(Show前)に発火。ここでLoaded後フックの登録を仕込む
+    // (docs/ecad2-t103-drag-message-path-and-guard-survey-samurai.md「二重実行ガードの設計確定」参照
+    // ——AvalonDock自身のOnLoaded→AddHookより後にこちら側がAddHookすれば、HwndSourceのフック走査は
+    // LIFOのためWM_EXITSIZEMOVE受信時にこちらが先に呼ばれ、handled=trueで返すとAvalonDock標準の
+    // DragService.Drop()を丸ごとスキップできる)。
+    private void PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated(object? sender, LayoutFloatingWindowControlCreatedEventArgs e)
+    {
+        var fwc = e.LayoutFloatingWindowControl;
+        var isPlacementToolBar = fwc.Model.Descendents().OfType<LayoutAnchorable>().Any(a => a.ContentId == "PlacementToolBar");
+        if (!isPlacementToolBar) return;
+
+        PlacementToolBarDropZoneOverlay.Visibility = Visibility.Visible;
+        fwc.Loaded += PlacementToolBarFloatingWindow_Loaded;
+        fwc.Closed += PlacementToolBarFloatingWindow_Closed;
+    }
+
+    private void PlacementToolBarFloatingWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        var fwc = (Window)sender;
+        fwc.Loaded -= PlacementToolBarFloatingWindow_Loaded;
+        if (PresentationSource.FromVisual(fwc) is not HwndSource hwndSource) return;
+        _placementToolBarFloatingWindowHook = PlacementToolBarFloatingWindowFilterMessage;
+        hwndSource.AddHook(_placementToolBarFloatingWindowHook);
+    }
+
+    private void PlacementToolBarFloatingWindow_Closed(object? sender, EventArgs e)
+    {
+        var fwc = (Window)sender!;
+        fwc.Closed -= PlacementToolBarFloatingWindow_Closed;
+        PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed;
+        if (_placementToolBarFloatingWindowHook == null) return;
+        if (PresentationSource.FromVisual(fwc) is HwndSource hwndSource)
+            hwndSource.RemoveHook(_placementToolBarFloatingWindowHook);
+        _placementToolBarFloatingWindowHook = null;
+    }
+
+    // T-103 PoC: GetCursorPos(物理ピクセル座標)と枠(PlacementToolBarDropZoneOverlay)のスクリーン
+    // 矩形(PointToScreenも物理ピクセル座標を返す、既存PlacementToolBarDockingManager_ContentFloating
+    // と同じ座標系の扱い)を突き合わせる自前ヒットテスト。ActualWidth/HeightはDIPのためDPI倍率で
+    // 物理ピクセルへ変換する。
+    private IntPtr PlacementToolBarFloatingWindowFilterMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg != WM_EXITSIZEMOVE) return IntPtr.Zero;
+        if (!GetCursorPos(out var cursor)) return IntPtr.Zero;
+
+        var topLeft = PlacementToolBarDropZoneOverlay.PointToScreen(new Point(0, 0));
+        var dpi = VisualTreeHelper.GetDpi(PlacementToolBarDropZoneOverlay);
+        var dropZone = new Rect(
+            topLeft.X, topLeft.Y,
+            PlacementToolBarDropZoneOverlay.ActualWidth * dpi.DpiScaleX,
+            PlacementToolBarDropZoneOverlay.ActualHeight * dpi.DpiScaleY);
+
+        if (!dropZone.Contains(cursor.X, cursor.Y)) return IntPtr.Zero;
+
+        handled = true;
+        ResetPlacementToolBarLayoutToDefault();
+        return IntPtr.Zero;
     }
 
     private void PlacementToolBarDockingManager_ContentFloating(object? sender, ContentFloatingEventArgs e)

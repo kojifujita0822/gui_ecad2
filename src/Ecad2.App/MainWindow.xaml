@@ -228,25 +228,10 @@
                                                     ContentSource="Header"
                                                     RecognizesAccessKey="True"
                                                     SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                                                <!-- T-099要件(2)(殿裁定案a、家老采配2026-07-18): ドッキング時はラベルの代わりに
-                                                     細い帯(ドラッグ起点)を表示する。T-100で除去したのはDragHandleTexture
-                                                     (ハッチング模様、意匠のみ)であり、帯自体の当たり判定は残す方針のため
-                                                     矛盾しない(AnchorablePaneTitleNoDragHandleStyleと同じ
-                                                     ToolWindowCaptionInactiveGripキーを流用、ハッチング模様は使わない
-                                                     単色の帯)。既定Collapsed、ドッキング時のみ下記DataTriggerで表示する。 -->
-                                                <Rectangle x:Name="DockedDragHandle"
-                                                    Height="5" MinWidth="20" Margin="4,0,2,0"
-                                                    VerticalAlignment="Center"
-                                                    Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveGrip}}"
-                                                    Visibility="Collapsed"/>
                                             </Grid>
                                         </Border>
                                     </Grid>
                                     <ControlTemplate.Triggers>
-                                        <DataTrigger Binding="{Binding Model.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource AncestorType={x:Type avalonDock:LayoutAnchorablePaneControl}}}" Value="False">
-                                            <Setter TargetName="Content" Property="Visibility" Value="Collapsed"/>
-                                            <Setter TargetName="DockedDragHandle" Property="Visibility" Value="Visible"/>
-                                        </DataTrigger>
                                         <Trigger Property="Selector.IsSelected" Value="true">
                                             <!-- T-099根本修正派生対応(隠密2指摘): フロート時にタブが
                                                  可視化されるとダークモードで白浮きするため
@@ -271,10 +256,12 @@
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
-                        <!-- T-099要件(1)本体は上記ControlTemplate.Triggers内のDataTriggerへ移設
-                             (TabItem自体は常時Visibleのまま、Content/DockedDragHandleの表示を
-                             切り替える形に変更。要件2=帯によるドラッグ起点確保のため、TabItem全体を
-                             Collapsedにする従来方式では帯自体も消えてしまい両立しないため置換)。 -->
+                        <!-- T-104増分1派生(殿裁定2026-07-20): T-099要件(2)のドッキング時ラベル
+                             Collapsed+細帯(DockedDragHandle)表示化は、2タブ構成でタブ切替の目印
+                             (ラベル文字)自体が常時見える必要が生じたため撤廃し、常時ラベル表示へ
+                             戻す。帯はラベル自体が通常のTabItemクリック領域として機能するため
+                             不要と判断し併せて削除(通常のタブヘッダーと同様、ラベルがドラッグ
+                             起点になる)。 -->
                     </Style>
                 </Setter.Value>
             </Setter>
@@ -1061,11 +1048,20 @@
              戻らず(初期93より25px不足)ボタン列が潰れて見える、という非対称な問題が判明。
              MinWidthと同じ理屈で、MinHeightを初期ActualHeightの実測値(93)に合わせて追加する。 -->
         <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Column="0"
-                                   MinWidth="100" MinHeight="93"
+                                   MinWidth="100" MinHeight="123"
                                    AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}">
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
                     <avalonDock:LayoutAnchorablePane>
+                        <!-- T-104増分1(PoC、家老采配2026-07-20): AvalonDock標準マルチタブ機構
+                             (LayoutAnchorablePane.SelectedContentIndex)の動作検証用ダミータブ。
+                             設計書docs/ecad2-t104-toolbar-tabswitch-design-onmitsu.md §4-5参照。
+                             CanFloat="False"はT-099(c)案YのContentDockingガードがContentId限定
+                             (PlacementToolBarのみ)で本タブには不適用のため、フロート化自体を
+                             構造的に禁止しリスクを回避する設計(同設計書§3)。 -->
+                        <avalonDock:LayoutAnchorable Title="基本機能" ContentId="MainToolBar" CanClose="False" CanFloat="False">
+                            <TextBlock Text="基本機能タブ(T-104増分1 PoC・ダミー表示)" Margin="8"/>
+                        </avalonDock:LayoutAnchorable>
                         <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False">
                             <!-- T-083増分6(家老采配2026-07-16、殿指摘): パネル中身(ToolBar本体)の
                                  配色をDynamicResource化(層C扱い)。1段目ToolBarAreaと同型パターン。
@@ -1255,6 +1251,19 @@
                 </avalonDock:LayoutPanel>
             </avalonDock:LayoutRoot>
         </avalonDock:DockingManager>
+        <!-- T-103 PoC(家老采配2026-07-20、侍提案、docs/todo.md T-103節): フロート化中のみStar列
+             (空き領域、Grid.Column="1")に破線枠+案内文言を表示し、自前ヒットテスト(GetCursorPos+
+             枠矩形、コードビハインド側)によるドロップ判定の目印とする。標準AvalonDock
+             OverlayWindow/DropTarget(位置ズレバグ、docs/ecad2-t099-c-overlaywindow-position-drift-
+             survey-onmitsu.md)には一切依存しない独自方式。意匠(線種・色・太さ・文言)は仮実装
+             (最小PoC、後日殿プレビューで複数案から確定、UI/UX分岐)。 -->
+        <Grid x:Name="PlacementToolBarDropZoneOverlay" Grid.Column="1" Visibility="Collapsed"
+              IsHitTestVisible="False" Margin="8">
+            <Rectangle Stroke="{DynamicResource ToolBarForegroundBrush}" StrokeThickness="2"
+                       StrokeDashArray="4 2" RadiusX="4" RadiusY="4"/>
+            <TextBlock Text="ここへドラッグしてドッキング" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource ToolBarForegroundBrush}"/>
+        </Grid>
         </Grid>
         </Grid>
 
