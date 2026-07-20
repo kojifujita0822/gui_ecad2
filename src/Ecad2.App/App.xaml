@@ -24,13 +24,99 @@
                 <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
                 <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
             </Style>
+            <!-- T-083見落とし修正(家老采配2026-07-19、殿報告=ライトモードで新規シート名が
+                 白背景×白文字で視認不能): 既定ListBoxItemのControlTemplate(Aero2、
+                 dotnet/wpf一次ソース確認済み)はIsSelected=True時、Selector.IsSelectionActive
+                 (フォーカスの有無)で異なるBackground(TargetName="Bd"指定Setter、優先度4位)を
+                 出し分けるMultiTriggerを持つ。旧実装のStyle.TriggersのBackground Setter
+                 (TargetName無し、優先度6位)はこれに常に負けるため、フォーカス無し選択時
+                 (モーダルダイアログ経由のシート追加・リネーム直後等)は既定の非アクティブ選択色
+                 (薄いグレー系)にフォールバックしていた。一方Foreground(コントロール自身の
+                 プロパティ、既定テンプレート側は変更しない)はStyle.Trigger側がそのまま効くため、
+                 フォーカス無し選択時に「薄い背景×選択用の明るい文字色」という組み合わせになり、
+                 ライトモードでは実質視認不能になっていた(PR-20型(3)と同型の罠、T-089と同じ
+                 「既定コピー+標的差し替え」手法で対処する)。IsSelectionActiveの2つのMultiTrigger
+                 を、フォーカスの有無を問わないIsSelected単一トリガーへ統合し、Background/
+                 Foregroundとも常にPanelContentSelected*Brushへ揃える(ecad2の配色方針として、
+                 フォーカス有無による選択色の使い分けは行わない)。
+                 【往復2周目(隠密静的レビュー指摘、家老采配2026-07-19)】PR-21確定(2件目)への追補:
+                 旧実装は暗黙的スタイルがTemplate未設定ゆえ、Aero2テーマ既定のStyle本体Setter群と
+                 テンプレート内MouseOverトリガーが下位優先度で生きていた(「存在しなかった」は誤認)。
+                 Template新設で消えた分を一次ソース(dotnet/wpf Aero2.NormalColor.xaml 2581-2635行)
+                 どおり移植する: (a)MouseOverトリガー(色は既定テーマの実値#1F26A0DA/#a826A0Da、
+                 従来の見た目の完全復元。選択トリガーより前に置き、選択中は選択背景が勝つ既定の
+                 優先順位を保つ) (b)Style本体の既定値Setter群(SnapsToDevicePixels/Padding/
+                 両ContentAlignment Binding/BorderThickness/FocusVisualStyle。FocusVisualStyleの
+                 参照先は既定テーマの難読化キーゆえ直接参照できず、同内容を
+                 ListBoxItemFocusVisualStyleとして複製定義)。 -->
+            <Style x:Key="ListBoxItemFocusVisualStyle">
+                <Setter Property="Control.Template">
+                    <Setter.Value>
+                        <ControlTemplate>
+                            <Rectangle Margin="2" SnapsToDevicePixels="true" Stroke="{DynamicResource {x:Static SystemColors.ControlTextBrushKey}}" StrokeThickness="1" StrokeDashArray="1 2"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
             <Style TargetType="{x:Type ListBoxItem}">
-                <Style.Triggers>
-                    <Trigger Property="IsSelected" Value="True">
-                        <Setter Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
-                        <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
-                    </Trigger>
-                </Style.Triggers>
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="Padding" Value="4,1"/>
+                <Setter Property="HorizontalContentAlignment" Value="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>
+                <Setter Property="VerticalContentAlignment" Value="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"/>
+                <!-- 往復3周目(殿裁可): Background未設定だと余白部分がヒットテストをすり抜け
+                     クリックが背後へ届く(WPF既知の仕様、Transparent明示でヒットテスト有効)。
+                     一次ソース2586-2587行どおり移植。 -->
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FocusVisualStyle" Value="{StaticResource ListBoxItemFocusVisualStyle}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ListBoxItem}">
+                            <Border x:Name="Bd"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="true">
+                                <ContentPresenter
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsMouseOver" Value="True"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="Bd" Property="Background" Value="#1F26A0DA"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="#a826A0Da"/>
+                                </MultiTrigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
+                                </Trigger>
+                                <!-- 新規発見(2026-07-20、殿発見バグ・忍者実測・隠密俯瞰評価): 一次ソース
+                                     (dotnet/wpf Aero2.NormalColor.xaml 2628-2630行)のIsEnabled=Falseトリガーは
+                                     TargetName="Bd"(内側Border)へTextElement.Foregroundを設定するが、Aero2本体は
+                                     選択時にForegroundを変更しない(Background/BorderBrushのみ)ため矛盾しない。
+                                     ecad2は選択項目の視認性向上のため独自にIsSelectedトリガーへForeground変更
+                                     (TargetName無し=ListBoxItem自身)を追加しており、両トリガーが同時に真の場合、
+                                     依存関係プロパティの継承則により内側(Bd)の設定が外側(ListBoxItem自身)より
+                                     優先されグレー文字が勝ってしまっていた(選択操作中に配置ダイアログ表示等で
+                                     MainContentArea全体が無効化されると発生)。殿裁定=選択中は無効化時も文字を
+                                     見やすいまま保つ、によりMultiTrigger化しIsSelected=Trueの場合を除外する。 -->
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsEnabled" Value="False"/>
+                                        <Condition Property="IsSelected" Value="False"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter TargetName="Bd" Property="TextElement.Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
             <Style TargetType="{x:Type DataGrid}">
                 <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>

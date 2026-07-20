@@ -249,9 +249,19 @@
                                             <Setter Property="BorderBrush" Value="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"/>
                                             <Setter Property="Panel.ZIndex" Value="0"/>
                                         </MultiTrigger>
-                                        <Trigger Property="IsEnabled" Value="false">
+                                        <!-- 新規発見(2026-07-20、殿発見バグ・忍者実測・隠密俯瞰評価、docs/ecad2-
+                                             newbug-place-operation-graytext-reproduction-ninja.md): 選択中タブが
+                                             配置操作等でMainContentArea全体ごと無効化されると、選択中の視認性
+                                             (背景色維持)は保たれる一方、文字だけグレー化し低コントラストになる。
+                                             殿裁定=選択中は無効化時も文字を見やすいまま保つ、によりMultiTrigger化し
+                                             IsSelected=Trueの場合を除外する(App.xaml ListBoxItemと同一方針)。 -->
+                                        <MultiTrigger>
+                                            <MultiTrigger.Conditions>
+                                                <Condition Property="IsEnabled" Value="false"/>
+                                                <Condition Property="Selector.IsSelected" Value="false"/>
+                                            </MultiTrigger.Conditions>
                                             <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
-                                        </Trigger>
+                                        </MultiTrigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
                             </Setter.Value>
