@@ -1060,6 +1060,19 @@
         <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Column="0"
                                    MinWidth="100" MinHeight="123"
                                    AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}">
+            <avalonDock:DockingManager.Resources>
+                <!-- T-104増分1 DoD(4)対策(家老采配2026-07-20、隠密設計): Tab前進がAutoHideサイド
+                     領域(LayoutAnchorSideControl、4方向、通常時は空でも常にビジュアルツリーに
+                     存在する)を巡回するのみでタブヘッダー間(基本機能⇔配置ツール)へ到達しない
+                     問題(docs/ecad2-t104-canfloat-tabnav-root-cause-survey-onmitsu.md)への対処。
+                     暗黙的スタイル(x:Keyなし)はビジュアルツリー最近傍のリソーススコープを優先
+                     するため、このDockingManager配下(4方向AutoHideサイド領域)にのみ適用され、
+                     他DockingManager(左パレット/出力/右パネル)には無影響。 -->
+                <Style TargetType="{x:Type avalonDock:LayoutAnchorSideControl}">
+                    <Setter Property="Focusable" Value="False"/>
+                    <Setter Property="KeyboardNavigation.IsTabStop" Value="False"/>
+                </Style>
+            </avalonDock:DockingManager.Resources>
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
                     <avalonDock:LayoutAnchorablePane>

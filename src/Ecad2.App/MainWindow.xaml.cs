@@ -223,6 +223,42 @@ public partial class MainWindow : Window
         // 生成直後(Show前)に発火するこのイベントでLoaded後フックの登録を仕込む
         // (docs/ecad2-t103-drag-message-path-and-guard-survey-samurai.md参照)。
         PlacementToolBarDockingManager.LayoutFloatingWindowControlCreated += PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated;
+        // T-104増分1 DoD(4)対策・案2(家老采配2026-07-20、隠密設計、往復2周目=計画的深掘り):
+        // 1段階目(暗黙的StyleでLayoutAnchorSideControl自体をFocusable=False化)は不十分と判明
+        // ——Focusableはローカル値・非継承プロパティのため、AnchorSideTemplate内の名前なし
+        // ItemsControl(一次ソースgeneric.xaml:382、AvalonDock標準テンプレート)には伝播しない
+        // (WPF仕様通りの帰結)。VisualTreeHelperでこのItemsControlインスタンスを直接検索し
+        // Focusable/IsTabStopを設定する、より確実性の高い方式へ切替える。
+        PlacementToolBarDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
+    }
+
+    private void PlacementToolBarDockingManager_Loaded(object sender, RoutedEventArgs e)
+    {
+        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.LeftSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.TopSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.RightSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.BottomSidePanel);
+    }
+
+    private static void DisableFocusOnAutoHideSideItemsControl(AvalonDock.Controls.LayoutAnchorSideControl? sideControl)
+    {
+        if (sideControl == null) return;
+        sideControl.ApplyTemplate();
+        if (FindVisualChild<ItemsControl>(sideControl) is not ItemsControl itemsControl) return;
+        itemsControl.Focusable = false;
+        KeyboardNavigation.SetIsTabStop(itemsControl, false);
+    }
+
+    private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild) return typedChild;
+            if (FindVisualChild<T>(child) is T found) return found;
+        }
+        return null;
     }
 
     private void PlacementToolBarDockingManager_ContentDocking(object? sender, ContentDockingEventArgs e)
