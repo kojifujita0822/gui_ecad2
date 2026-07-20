@@ -916,119 +916,9 @@
             </MenuItem>
         </Menu>
 
-        <!-- ツールバー: 2段構成(GX Works3同様。1段目=汎用操作、2段目=ラダー編集用途別コマンド)
-             T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化、1段目は現行ToolBarTray固定維持):
-             既存Grid.Row="1"を内側Auto/Auto2行のラッパーGridへ差し替え、外側MainContentAreaの
-             RowDefinitions・以降のGrid.Row参照(メイン作業域等)は無改修で済ませる(T-059の
-             GridSplitter追加時と同型の「ラッパー内で行を増やす」手法、設計叩き台2節)。 -->
-        <Grid Grid.Row="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
-        <!-- T-083増分2: 1段目ツールバー本体の配色をDynamicResource化(層C=UIクローム基盤)。
-             2段目(配置ツール)はAvalonDock管轄(層B、PlacementToolBarDockingManager)のため対象外。 -->
-        <ToolBarTray x:Name="ToolBarArea" Grid.Row="0" IsLocked="True"
-                     Background="{DynamicResource ToolBarBackgroundBrush}">
-            <ToolBar Band="0" BandIndex="0" ToolBarTray.IsLocked="True"
-                     Background="{DynamicResource ToolBarBackgroundBrush}"
-                     Foreground="{DynamicResource ToolBarForegroundBrush}">
-                <!-- T-095(殿裁定2026-07-15、方針転換): ラベル表示をショートカット表示から機能名表示へ
-                     変更。ショートカットは既存ToolTip("機能名 (ショートカット)"形式)へマウスオーバー時
-                     表示済みのためそのまま流用。機能名表記は簡潔化案(殿裁定=案2)を採用。 -->
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
-                        AutomationProperties.Name="新規作成 (Ctrl+N)" Click="NewButton_Click">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="新規"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)"
-                        AutomationProperties.Name="開く (Ctrl+O)" Click="OpenButton_Click">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="開く"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)"
-                        AutomationProperties.Name="上書き保存 (Ctrl+S)" Click="SaveButton_Click"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="保存"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)"
-                        AutomationProperties.Name="元に戻す (Ctrl+Z)" Command="{Binding UndoCommand}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="戻す"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)"
-                        AutomationProperties.Name="やり直し (Ctrl+Y)" Command="{Binding RedoCommand}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="再実行"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)"
-                        AutomationProperties.Name="PDF出力 (Ctrl+P)" Click="PdfExportMenuItem_Click"
-                        IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="PDF出力"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を追加 (Ctrl+Shift+Up)"
-                        AutomationProperties.Name="行を追加 (Ctrl+Shift+Up)"
-                        Command="{Binding AddRowCommand}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M13,7 L13,13 M10,10 L16,10"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行追加"/>
-                    </StackPanel>
-                </Button>
-                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を削除 (Ctrl+Shift+Down)"
-                        AutomationProperties.Name="行を削除 (Ctrl+Shift+Down)"
-                        Command="{Binding DeleteRowCommand}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M10,10 L16,10"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行削除"/>
-                    </StackPanel>
-                </Button>
-                <Separator/>
-                <!-- T-061(殿裁定(2)(4)): テストモード切替。上位enum(AppMode)一元管理、ツールバー
-                     ToggleButton+背景色変化(GuiEcad踏襲)。T-087でCtrl+Tショートカットが新設された
-                     (MainWindow.xaml.cs、IsTestModeトグル)ため、他ボタンと同様ToolTip/
-                     AutomationProperties.Nameへ併記する(表記漏れ修正、家老采配2026-07-15)。 -->
-                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード (Ctrl+T)"
-                              AutomationProperties.Name="テストモード (Ctrl+T)"
-                              IsChecked="{Binding IsTestMode}"
-                              IsEnabled="{Binding HasProject}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M4,3 L4,15 L14,9 Z"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="テスト"/>
-                    </StackPanel>
-                </ToggleButton>
-                <!-- T-061第五歩: 実時間タイマパネル(GuiEcad TimerPauseBtn踏襲)。テストモード中のみ
-                     有効化する(タイマ命令を使わない回路では無害、殿裁定=段階導入5段階を今回スコープに含める)。 -->
-                <ToggleButton x:Name="TimerPauseButton" Style="{StaticResource TestModeToolBarButtonStyle}"
-                              ToolTip="タイマ一時停止" AutomationProperties.Name="タイマ一時停止"
-                              Click="TimerPauseToggleButton_Click"
-                              IsEnabled="{Binding IsTestMode}">
-                    <StackPanel>
-                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M6,4 L6,14 M12,4 L12,14"/>
-                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="一時停止"/>
-                    </StackPanel>
-                </ToggleButton>
-            </ToolBar>
-        </ToolBarTray>
-        <!-- T-058増分5(殿裁定=2段目のみAvalonDock管轄内で可動化): 独立DockingManager方式
-             (増分1〜4と同型パターン踏襲)。ボタン群自体(Style/Command/ToolTip等)は無改修、
-             配置場所のみ移動。 -->
+        <!-- T-104増分2(家老采配2026-07-20、殿裁定): メインツールバー(旧1段目固定領域)は
+             「基本機能」タブ(下記PlacementToolBarDockingManager内)へ移設済み。従来の
+             2段ラッパーGrid(Auto/Auto)は1段構造化し不要になったため撤去(設計書§4記載どおり)。 -->
         <!-- T-099要件(3)(殿直接指示=幅の動的フィット、余白解消): DockingManagerをAuto+Star列の
              Gridで包み、Auto列の無限幅測定によりマネージャ自身をコンテンツ要求幅まで縮める。
              LayoutAnchorablePaneのDockWidth(Auto/絶対値とも)は本構成では効かない——AvalonDockの
@@ -1075,7 +965,10 @@
             </avalonDock:DockingManager.Resources>
             <avalonDock:LayoutRoot>
                 <avalonDock:LayoutPanel Orientation="Horizontal">
-                    <avalonDock:LayoutAnchorablePane>
+                    <avalonDock:LayoutAnchorablePane SelectedContentIndex="1">
+                        <!-- T-104増分2(殿裁定2026-07-20、案A採用): 既定選択タブは「配置ツール」
+                             (SelectedContentIndex=1、0番目=基本機能・1番目=配置ツール)。従来の
+                             主要作業画面(ラダー編集)をそのまま初期表示し視覚的一貫性を保つ方針。 -->
                         <!-- T-104増分1(PoC、家老采配2026-07-20): AvalonDock標準マルチタブ機構
                              (LayoutAnchorablePane.SelectedContentIndex)の動作検証用ダミータブ。
                              設計書docs/ecad2-t104-toolbar-tabswitch-design-onmitsu.md §4-5参照。
@@ -1083,7 +976,95 @@
                              (PlacementToolBarのみ)で本タブには不適用のため、フロート化自体を
                              構造的に禁止しリスクを回避する設計(同設計書§3)。 -->
                         <avalonDock:LayoutAnchorable Title="基本機能" ContentId="MainToolBar" CanClose="False" CanFloat="False">
-                            <TextBlock Text="基本機能タブ(T-104増分1 PoC・ダミー表示)" Margin="8"/>
+                            <!-- T-104増分2(家老采配2026-07-20、設計書docs/ecad2-t104-toolbar-tabswitch-
+                                 design-onmitsu.md §4骨子どおり): 現行ToolBarArea(1段目固定領域)から
+                                 移設。ボタン群自体(Style/Command/ToolTip等)は無改修、配置場所のみ移動
+                                 (T-058増分5と同型パターン踏襲)。TimerPause(タイマ一時停止)は殿裁定に
+                                 より代替経路が無いため機能自体を削除(移設対象から除外)。 -->
+                            <ToolBar Band="0" BandIndex="0"
+                                     Background="{DynamicResource ToolBarBackgroundBrush}"
+                                     Foreground="{DynamicResource ToolBarForegroundBrush}">
+                                <!-- T-095(殿裁定2026-07-15、方針転換): ラベル表示をショートカット表示から機能名表示へ
+                                     変更。ショートカットは既存ToolTip("機能名 (ショートカット)"形式)へマウスオーバー時
+                                     表示済みのためそのまま流用。機能名表記は簡潔化案(殿裁定=案2)を採用。 -->
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="新規作成 (Ctrl+N)"
+                                        AutomationProperties.Name="新規作成 (Ctrl+N)" Click="NewButton_Click">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L14,16 L2,16 Z M2,2 L2,16 M14,2 L2,14"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="新規"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="開く (Ctrl+O)"
+                                        AutomationProperties.Name="開く (Ctrl+O)" Click="OpenButton_Click">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M1,4 L6,4 L8,6 L17,6 L17,15 L1,15 Z"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="開く"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="上書き保存 (Ctrl+S)"
+                                        AutomationProperties.Name="上書き保存 (Ctrl+S)" Click="SaveButton_Click"
+                                        IsEnabled="{Binding HasProject}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,2 L14,2 L17,5 L17,17 L2,17 Z M5,2 L5,7 L13,7 L13,2 M5,17 L5,11 L13,11 L13,17"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="保存"/>
+                                    </StackPanel>
+                                </Button>
+                                <Separator/>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="元に戻す (Ctrl+Z)"
+                                        AutomationProperties.Name="元に戻す (Ctrl+Z)" Command="{Binding UndoCommand}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M15,9 A6,6 0 1 1 9,3 M9,3 L9,7 M9,3 L13,4"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="戻す"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="やり直し (Ctrl+Y)"
+                                        AutomationProperties.Name="やり直し (Ctrl+Y)" Command="{Binding RedoCommand}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,9 A6,6 0 1 0 9,3 M9,3 L9,7 M9,3 L5,4"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="再実行"/>
+                                    </StackPanel>
+                                </Button>
+                                <Separator/>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="PDF出力 (Ctrl+P)"
+                                        AutomationProperties.Name="PDF出力 (Ctrl+P)" Click="PdfExportMenuItem_Click"
+                                        IsEnabled="{Binding HasProject}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M3,1 L11,1 L15,5 L15,17 L3,17 Z M11,1 L11,5 L15,5 M6,10 L12,10 M6,13 L10,13"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="PDF出力"/>
+                                    </StackPanel>
+                                </Button>
+                                <Separator/>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を追加 (Ctrl+Shift+Up)"
+                                        AutomationProperties.Name="行を追加 (Ctrl+Shift+Up)"
+                                        Command="{Binding AddRowCommand}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M13,7 L13,13 M10,10 L16,10"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行追加"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource ToolBarButtonStyle}" ToolTip="行を削除 (Ctrl+Shift+Down)"
+                                        AutomationProperties.Name="行を削除 (Ctrl+Shift+Down)"
+                                        Command="{Binding DeleteRowCommand}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M2,4 L11,4 M2,8 L11,8 M2,12 L11,12 M10,10 L16,10"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="行削除"/>
+                                    </StackPanel>
+                                </Button>
+                                <Separator/>
+                                <!-- T-061(殿裁定(2)(4)): テストモード切替。上位enum(AppMode)一元管理、ツールバー
+                                     ToggleButton+背景色変化(GuiEcad踏襲)。T-087でCtrl+Tショートカットが新設された
+                                     (MainWindow.xaml.cs、IsTestModeトグル)ため、他ボタンと同様ToolTip/
+                                     AutomationProperties.Nameへ併記する(表記漏れ修正、家老采配2026-07-15)。 -->
+                                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード (Ctrl+T)"
+                                              AutomationProperties.Name="テストモード (Ctrl+T)"
+                                              IsChecked="{Binding IsTestMode}"
+                                              IsEnabled="{Binding HasProject}">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M4,3 L4,15 L14,9 Z"/>
+                                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="テスト"/>
+                                    </StackPanel>
+                                </ToggleButton>
+                            </ToolBar>
                         </avalonDock:LayoutAnchorable>
                         <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False">
                             <!-- T-083増分6(家老采配2026-07-16、殿指摘): パネル中身(ToolBar本体)の
@@ -1286,7 +1267,6 @@
                        StrokeDashArray="4 2" RadiusX="4" RadiusY="4"/>
             <TextBlock Text="ここへドラッグしてドッキング" HorizontalAlignment="Center" VerticalAlignment="Center"
                        Foreground="{DynamicResource ToolBarForegroundBrush}"/>
-        </Grid>
         </Grid>
         </Grid>
 

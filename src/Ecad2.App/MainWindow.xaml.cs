@@ -96,7 +96,6 @@ public partial class MainWindow : Window
     private DispatcherTimer? _realtimeTimer;
     private readonly System.Diagnostics.Stopwatch _realtimeClock = new();
     private long _lastTickMs;
-    private bool _timerPaused;
 
     // T-082: シートナビゲーション(SheetNavList)のドラッグ&ドロップ並び替え用状態。キャンバス要素の
     // ドラッグ(マウスキャプチャ方式)とは対象が異なりWPFネイティブDragDrop APIを使う(Explore調査で
@@ -519,7 +518,12 @@ public partial class MainWindow : Window
                 TryDeserializeDockingLayout(manager, defaultXml);
         }
         if (anyLoadFailed)
-            _viewModel.StatusMessage = "保存済みレイアウトの読込に失敗したため既定で起動しました";
+            // T-104増分2(3)(家老采配2026-07-20、殿裁定=文言変更): 旧文言「保存済みレイアウトの
+            // 読込に失敗したため既定で起動しました」は、実際には破損以外にバージョンアップに伴う
+            // レイアウト構成変更(今回のタブ新設等)でも同じ経路を通るため、毎回「失敗」という
+            // 強い表現でユーザーに不安を与えていた。原因を問わず前向きに伝わる文言へ変更(叩き台、
+            // 最終確定は殿)。
+            _viewModel.StatusMessage = "レイアウトを既定の状態に更新しました";
     }
 
     // Ctrl+Alt+Rハンドラから呼ばれる。T-058増分4(殿裁定(4)): 保存済みファイルがあればそちらを
@@ -723,8 +727,6 @@ public partial class MainWindow : Window
     // T-061第五歩: テストモード中、タイマ経過を実時間で進める(GuiEcad MainPage.xaml.cs全文移植)。
     private void StartRealtimeTimer()
     {
-        _timerPaused = false;
-        TimerPauseButton.IsChecked = false;
         _realtimeClock.Restart();
         _lastTickMs = 0;
         _realtimeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
@@ -749,23 +751,6 @@ public partial class MainWindow : Window
         if (dt <= 0) return;
         session.Tick(dt);
         RedrawCanvas();
-    }
-
-    // 一時停止/再開: 実時間カウントを止める。再開時は経過の起点をリセットして時間飛びを防ぐ
-    // (GuiEcad OnTimerPauseToggle踏襲。Stopwatch自体は一時停止中も動き続け、再開時に_lastTickMsを
-    // その時点の経過時間へ合わせることで一時停止中の経過をdtに含めない)。
-    private void TimerPauseToggleButton_Click(object sender, RoutedEventArgs e)
-    {
-        _timerPaused = sender is System.Windows.Controls.Primitives.ToggleButton { IsChecked: true };
-        if (_timerPaused)
-        {
-            _realtimeTimer?.Stop();
-        }
-        else if (_viewModel.Mode == ViewModels.AppMode.Test)
-        {
-            _lastTickMs = _realtimeClock.ElapsedMilliseconds;
-            _realtimeTimer?.Start();
-        }
     }
 
     // T-019: Document.Sheets.Count==0(新規直後の暫定挙動)の間はCurrentSheetがnullになる。
