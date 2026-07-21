@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- T-110増分0(家老采配): t058 PoCと異なりVS2013テーマパッケージを必須で追加する。
+         (d)アクティブ色一元化・(e)スタイルContentId分岐の実証にVS2013テーマの
+         ResourceKeys(ToolWindowCaptionActiveBackground等)が必要なため。 -->
+    <PackageReference Include="Dirkster.AvalonDock" Version="4.74.1" />
+    <PackageReference Include="Dirkster.AvalonDock.Themes.VS2013" Version="4.74.1" />
+  </ItemGroup>
+
+</Project>

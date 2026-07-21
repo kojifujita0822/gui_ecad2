@@ -1,0 +1,8 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!-- 本実装(src/Ecad2.App/Themes/Theme.Dark.xaml)のキー名・値を踏襲した最小版 -->
+    <SolidColorBrush x:Key="PanelHeaderBackgroundBrush" Color="#FF3E3E42"/>
+    <SolidColorBrush x:Key="PanelHeaderForegroundBrush" Color="#FFF0F0F0"/>
+    <SolidColorBrush x:Key="PanelContentBackgroundBrush" Color="#FF2D2D30"/>
+</ResourceDictionary>
