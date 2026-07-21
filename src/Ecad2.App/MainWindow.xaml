@@ -239,6 +239,17 @@
                         <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}"/>
                         <Setter Property="IsEnabled" Value="{Binding IsEnabled}"/>
                         <Setter Property="ToolTip" Value="{Binding ToolTip}"/>
+                        <!-- T-106(殿裁定2026-07-21、忍者画素採取実測=docs/proposed.md P-112):
+                             非選択時Backgroundは下記ControlTemplateのBorderがTemplateBinding止まり
+                             (このStyle本体に既定値が無いため既定色に固定)、Foregroundは選択/非選択
+                             問わずDynamicResource未指定(常時黒)だった。既存PanelHeaderBackground/
+                             ForegroundBrush(DataGridColumnHeader等と同じ「パネルヘッダー領域」の
+                             意味、App.xaml参照)をここでも流用しDynamicResource化する。選択中の
+                             BackgroundはControlTemplate.Triggers側で別途PanelContentBackgroundBrush
+                             (コンテンツ領域と同色)に上書きされる(既存、T-099根本修正派生対応)ため
+                             ここでは非選択時の値として機能する。 -->
+                        <Setter Property="Background" Value="{DynamicResource PanelHeaderBackgroundBrush}"/>
+                        <Setter Property="Foreground" Value="{DynamicResource PanelHeaderForegroundBrush}"/>
                         <Setter Property="Template">
                             <Setter.Value>
                                 <ControlTemplate TargetType="{x:Type TabItem}">
