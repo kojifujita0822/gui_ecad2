@@ -20,9 +20,59 @@
                  対象コントロールはMainWindow.xaml内5箇所(SheetNavList/DeviceTableGrid/
                  FindResultsGrid/OutputGrid/PartSelectionList)のみ(Explore確認済み)。
                  既存ItemContainerStyle/RowStyleを個別指定済みの箇所はBasedOnで継承する。 -->
+            <!-- T-100新規発見6対応(殿裁定2026-07-21、方式1=ControlTemplate差し替え、
+                 docs/ecad2-t100-shinki6-root-cause-onmitsu.md): 上記暗黙的スタイルはTemplate
+                 未設定のためWPF既定Aero2 ControlTemplateをそのまま継承していたが、既定テンプレート
+                 の`IsEnabled=false`トリガーがBackground/BorderBrushを白固定色(StaticResource、
+                 PR-20パターン1と同型)へ強制上書きするため、配置バー表示中等(MainContentArea無効化)
+                 にSheetNavList/PartSelectionListが持続的に白化していた。Template新設(一次ソース
+                 dotnet/wpf Aero2.NormalColor.xaml 2524-2565行のBorder+ScrollViewer+ItemsPresenter
+                 構造を踏襲)し、IsEnabled=falseトリガーのBackground/BorderBrushを通常時と同じ
+                 DynamicResourceへ差し替える(無効化時も見た目を保つ、殿裁定の主旨)。Template新設に
+                 伴い失われるStyle本体の既定値Setter群(BorderBrush/BorderThickness/ScrollViewer.*/
+                 Stylus.IsFlicksEnabled/VerticalContentAlignment)も一次ソースどおり移植する
+                 (PR-21の教訓、T-089/T-106踏襲)。BorderBrushは既存DataGrid系と一貫させ
+                 PanelGridLineBrushを採用(新規キー追加を避ける)。 -->
             <Style TargetType="{x:Type ListBox}">
                 <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
                 <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PanelGridLineBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
+                <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
+                <Setter Property="ScrollViewer.CanContentScroll" Value="true"/>
+                <Setter Property="ScrollViewer.PanningMode" Value="Both"/>
+                <Setter Property="Stylus.IsFlicksEnabled" Value="False"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ListBox}">
+                            <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="true"
+                                Padding="1">
+                                <ScrollViewer Padding="{TemplateBinding Padding}" Focusable="false">
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </ScrollViewer>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource PanelGridLineBrush}"/>
+                                </Trigger>
+                                <MultiTrigger>
+                                    <MultiTrigger.Conditions>
+                                        <Condition Property="IsGrouping" Value="true"/>
+                                        <Condition Property="VirtualizingPanel.IsVirtualizingWhenGrouping" Value="false"/>
+                                    </MultiTrigger.Conditions>
+                                    <Setter Property="ScrollViewer.CanContentScroll" Value="false"/>
+                                </MultiTrigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
             </Style>
             <!-- T-083見落とし修正(家老采配2026-07-19、殿報告=ライトモードで新規シート名が
                  白背景×白文字で視認不能): 既定ListBoxItemのControlTemplate(Aero2、
