@@ -27,7 +27,7 @@ T-075（殿裁定、2026-07-11起票）体系の第5号、第3弾。実装コー
 
 | クラス | 役割 |
 |---|---|
-| `ElementInstance`（`Element.cs:44-71`） | `Id`/`Kind`(既定値のみ)/`Pos`/`CellWidth`(常に1)/`DeviceName`/`PartId`/`Params`/`Comment` |
+| `ElementInstance`（`Element.cs:44-71`） | `Id`/`Kind`(既定値のみ)/`Pos`/`CellWidth`(常に1)/`DeviceName`/`PartId`/`Params` |
 | `PartDefinition`（`PartDefinition.cs:36-51`） | `Id`/`Name`/`WidthCells`/`HeightCells`/`Role`(PartRole)/`IsOrEligible`/`Ports`/`Primitives` |
 | `ElementCatalog` | `Kind`ベースの既定値表。`PartId`未設定の特殊種別（Motor/Breaker3P等）専用 |
 | `PartResolver` | `PartId`優先、フォールバックで`ElementCatalog`という統一解決ロジック |
