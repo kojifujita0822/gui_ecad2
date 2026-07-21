@@ -12,9 +12,18 @@
                  Background="{DynamicResource InputBackgroundBrush}"
                  Foreground="{DynamicResource InputForegroundBrush}"/>
         <TextBlock Text="種別:" Margin="0,0,0,4"/>
+        <!-- T-108(殿指摘2026-07-21): WPF既定Aero2テーマのRadioButtonはStyle本体(ControlTemplate.
+             Triggersではない)がForegroundを{DynamicResource SystemColors.ControlTextBrushKey}
+             (OS設定準拠、通常黒固定)で明示Setterしており(一次ソースdotnet/wpf Aero2.NormalColor.xaml
+             4513-4578行で確認済み)、Window側のForeground継承(優先度で劣る)より優先されてしまう。
+             ecad2側にRadioButton用の暗黙的スタイルが無いため既定Setterがそのまま生きていた。
+             個別にローカル値でDialogForegroundBrushを指定すれば優先度で確実に上書きできる
+             (ControlTemplate優先順位問題=PR-20/21型ではなく、単純な個別指定で解決する型と判明)。 -->
         <RadioButton x:Name="ControlCircuitRadio" Content="制御回路" GroupName="SheetType"
+                     Foreground="{DynamicResource DialogForegroundBrush}"
                      IsChecked="True" Margin="0,0,0,4"/>
         <RadioButton x:Name="MainCircuitRadio" Content="主回路" GroupName="SheetType"
+                     Foreground="{DynamicResource DialogForegroundBrush}"
                      Margin="0,0,0,12"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
             <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
