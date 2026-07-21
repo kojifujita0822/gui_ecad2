@@ -66,4 +66,9 @@
          確保し、枠線は不透明ではっきり示す(MenuItemAccentBackgroundBrush/Borderと同系の設計)。 -->
     <SolidColorBrush x:Key="PlacementToolActiveBackgroundBrush" Color="#4D0078D7"/>
     <SolidColorBrush x:Key="PlacementToolActiveBorderBrush" Color="#FF0078D7"/>
+
+    <!-- T-106(7)新規(殿裁定2026-07-21): ScrollBar用。Aero2既定値をそのまま踏襲。 -->
+    <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#FFCDCDCD"/>
+    <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#FFA6A6A6"/>
+    <SolidColorBrush x:Key="ScrollBarButtonHoverBrush" Color="#FFDADADA"/>
 </ResourceDictionary>

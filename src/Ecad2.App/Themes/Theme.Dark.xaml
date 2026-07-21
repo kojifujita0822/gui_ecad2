@@ -56,4 +56,10 @@
          (#FF0E639C)と同系色。 -->
     <SolidColorBrush x:Key="PlacementToolActiveBackgroundBrush" Color="#4D3399FF"/>
     <SolidColorBrush x:Key="PlacementToolActiveBorderBrush" Color="#FF3399FF"/>
+
+    <!-- T-106(7)新規(殿裁定2026-07-21): ScrollBar用。ToolBarBackgroundBrush(#FF2D2D30)背景上で
+         視認できる明るめのグレー系。 -->
+    <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#FF686868"/>
+    <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#FF8A8A8A"/>
+    <SolidColorBrush x:Key="ScrollBarButtonHoverBrush" Color="#FF505050"/>
 </ResourceDictionary>

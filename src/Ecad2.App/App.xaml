@@ -333,6 +333,287 @@
                 </Style.Triggers>
             </Style>
 
+            <!-- T-106(5)スコープ拡大(殿裁定2026-07-21、docs/todo.md T-106節): 種別選択ドロップダウン
+                 (PlacementPartComboBox)がApp.xaml側にComboBox専用の暗黙的スタイルが存在せずWPF既定
+                 Aero2テーマそのままでダークモード非対応だった欠落を修正する。既定Aero2 ComboBox
+                 (dotnet/wpf Themes/XAML/ComboBox.xaml、Aero2.NormalColorセクション)のControlTemplate
+                 構造を踏襲しつつ、色のみDynamicResource化する(T-089/T-099と同型の「既定コピー+
+                 標的差し替え」手法)。MouseOver/Pressed/Disabled色は既存Button.*(本ファイル上部、
+                 テーマ非依存のツールバー配色)を流用し新規キー追加を避ける。DropShadowChrome
+                 (ドロップシャドウ演出)・OpaqueRect(半透明背景対策、DropDownBorderに不透明色を
+                 明示指定済みのため不要)は意匠の細部のため簡略化して省く。 -->
+            <Style x:Key="EcadComboBoxToggleButton" TargetType="{x:Type ToggleButton}">
+                <Setter Property="OverridesDefaultStyle" Value="true"/>
+                <Setter Property="IsTabStop" Value="false"/>
+                <Setter Property="Focusable" Value="false"/>
+                <Setter Property="ClickMode" Value="Press"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ToggleButton}">
+                            <Border x:Name="templateRoot" SnapsToDevicePixels="true"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                Background="{TemplateBinding Background}">
+                                <Border x:Name="splitBorder" HorizontalAlignment="Right"
+                                    Width="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"
+                                    Margin="0">
+                                    <Path x:Name="Arrow" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Fill="{DynamicResource ToolBarForegroundBrush}"
+                                        Data="M 0,0 L 3.5,4 L 7,0 Z"/>
+                                </Border>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="templateRoot" Property="Background" Value="{StaticResource Button.MouseOver.Background}"/>
+                                    <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter TargetName="templateRoot" Property="Background" Value="{StaticResource Button.Pressed.Background}"/>
+                                    <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource Button.Pressed.Border}"/>
+                                </Trigger>
+                                <Trigger Property="IsEnabled" Value="false">
+                                    <Setter TargetName="templateRoot" Property="Background" Value="{StaticResource Button.Disabled.Background}"/>
+                                    <Setter TargetName="templateRoot" Property="BorderBrush" Value="{StaticResource Button.Disabled.Border}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <ControlTemplate x:Key="EcadComboBoxTemplate" TargetType="{x:Type ComboBox}">
+                <Grid x:Name="templateRoot" SnapsToDevicePixels="true">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition MinWidth="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}" Width="0"/>
+                    </Grid.ColumnDefinitions>
+                    <Popup x:Name="PART_Popup" AllowsTransparency="true" Margin="1" Placement="Bottom" Grid.ColumnSpan="2"
+                        IsOpen="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                        PopupAnimation="{DynamicResource {x:Static SystemParameters.ComboBoxPopupAnimationKey}}">
+                        <Border x:Name="DropDownBorder"
+                            MinWidth="{Binding ActualWidth, ElementName=templateRoot}"
+                            MaxHeight="{TemplateBinding MaxDropDownHeight}"
+                            BorderBrush="{DynamicResource DialogBorderBrush}"
+                            Background="{DynamicResource PanelContentBackgroundBrush}"
+                            BorderThickness="1">
+                            <ScrollViewer Name="DropDownScrollViewer">
+                                <ItemsPresenter Name="ItemsPresenter" KeyboardNavigation.DirectionalNavigation="Contained"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Popup>
+                    <ToggleButton x:Name="toggleButton"
+                        BorderBrush="{TemplateBinding BorderBrush}"
+                        Background="{TemplateBinding Background}"
+                        BorderThickness="{TemplateBinding BorderThickness}"
+                        IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                        Style="{StaticResource EcadComboBoxToggleButton}"
+                        Grid.ColumnSpan="2" />
+                    <ContentPresenter x:Name="contentPresenter"
+                        Content="{TemplateBinding SelectionBoxItem}"
+                        ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
+                        ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}"
+                        ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                        IsHitTestVisible="false"
+                        Margin="{TemplateBinding Padding}"
+                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"
+                        HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                        VerticalAlignment="{TemplateBinding VerticalContentAlignment}"/>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="HasItems" Value="false">
+                        <Setter TargetName="DropDownBorder" Property="MinHeight" Value="20"/>
+                    </Trigger>
+                    <Trigger Property="IsEnabled" Value="false">
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"/>
+                    </Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate>
+
+            <Style TargetType="{x:Type ComboBox}">
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
+                <Setter Property="BorderBrush" Value="{StaticResource Button.Static.Border}"/>
+                <Setter Property="Foreground" Value="{DynamicResource InputForegroundBrush}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Padding" Value="6,3,5,3"/>
+                <Setter Property="Template" Value="{StaticResource EcadComboBoxTemplate}"/>
+            </Style>
+
+            <Style TargetType="{x:Type ComboBoxItem}">
+                <Setter Property="SnapsToDevicePixels" Value="True"/>
+                <Setter Property="Padding" Value="4,1"/>
+                <Setter Property="Background" Value="Transparent"/>
+                <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
+                <Setter Property="BorderBrush" Value="Transparent"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ComboBoxItem}">
+                            <Border x:Name="Bd"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                SnapsToDevicePixels="true">
+                                <ContentPresenter
+                                    HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                    VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                    SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{StaticResource Button.MouseOver.Background}"/>
+                                    <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Button.MouseOver.Border}"/>
+                                </Trigger>
+                                <Trigger Property="IsSelected" Value="True">
+                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource PanelContentSelectedBackgroundBrush}"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource PanelContentSelectedForegroundBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- T-106(7)スコープ再拡大(殿裁定2026-07-21、docs/todo.md T-106節): スクロールバー全般が
+                 App.xaml側にScrollBar専用の暗黙的スタイルが存在せずWPF既定Aero2テーマそのままで
+                 ダークモード非対応だった欠落を修正する(通常WPFコントロール=シートパネル一覧・
+                 DataGrid等のScrollBarが対象、AvalonDock/VS2013テーマ側で別途対応済みの箇所は対象外)。
+                 既定Aero2 ScrollBar(RepeatButton×2+Track+Thumb)のControlTemplate構造を踏襲しつつ、
+                 色のみDynamicResource化する。矢印の押下フィードバック(黒/白切替)・Thumbの
+                 MouseOver/Dragging別色等、意匠の細部はダークモード対応の主旨に対して過剰なため
+                 単純化する(矢印色は固定・Thumbの2状態は1色に統合)。 -->
+            <Style x:Key="EcadScrollBarLineButton" TargetType="{x:Type RepeatButton}">
+                <Setter Property="Focusable" Value="false"/>
+                <Setter Property="IsTabStop" Value="false"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                            <Border x:Name="border" Background="Transparent" SnapsToDevicePixels="true">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource ScrollBarButtonHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="true">
+                                    <Setter TargetName="border" Property="Background" Value="{DynamicResource ScrollBarButtonHoverBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="EcadScrollBarPageButton" TargetType="{x:Type RepeatButton}">
+                <Setter Property="OverridesDefaultStyle" Value="true"/>
+                <Setter Property="Focusable" Value="false"/>
+                <Setter Property="IsTabStop" Value="false"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type RepeatButton}">
+                            <Rectangle Fill="Transparent"/>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style x:Key="EcadScrollBarThumb" TargetType="{x:Type Thumb}">
+                <Setter Property="IsTabStop" Value="false"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type Thumb}">
+                            <Rectangle x:Name="rectangle" SnapsToDevicePixels="True"
+                                Fill="{DynamicResource ScrollBarThumbBrush}"
+                                Height="{TemplateBinding Height}" Width="{TemplateBinding Width}"/>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="true">
+                                    <Setter TargetName="rectangle" Property="Fill" Value="{DynamicResource ScrollBarThumbHoverBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsDragging" Value="true">
+                                    <Setter TargetName="rectangle" Property="Fill" Value="{DynamicResource ScrollBarThumbHoverBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+            <Style TargetType="{x:Type ScrollBar}">
+                <Setter Property="Stylus.IsFlicksEnabled" Value="false"/>
+                <Setter Property="Background" Value="{DynamicResource ToolBarBackgroundBrush}"/>
+                <Setter Property="Width" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
+                <Setter Property="MinWidth" Value="{DynamicResource {x:Static SystemParameters.VerticalScrollBarWidthKey}}"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="{x:Type ScrollBar}">
+                            <Grid SnapsToDevicePixels="true">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
+                                    <RowDefinition Height="0.00001*"/>
+                                    <RowDefinition MaxHeight="{DynamicResource {x:Static SystemParameters.VerticalScrollBarButtonHeightKey}}"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="1" Background="{TemplateBinding Background}"/>
+                                <RepeatButton Command="{x:Static ScrollBar.LineUpCommand}" Style="{StaticResource EcadScrollBarLineButton}">
+                                    <Path Data="M 0,4 L 3.5,0.5 L 7,4" Stretch="Uniform" Width="7" Height="4" Margin="3" Fill="{DynamicResource ToolBarForegroundBrush}"/>
+                                </RepeatButton>
+                                <Track x:Name="PART_Track" IsDirectionReversed="true" Grid.Row="1">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource EcadScrollBarPageButton}"/>
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource EcadScrollBarPageButton}"/>
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb Style="{StaticResource EcadScrollBarThumb}"/>
+                                    </Track.Thumb>
+                                </Track>
+                                <RepeatButton Grid.Row="2" Command="{x:Static ScrollBar.LineDownCommand}" Style="{StaticResource EcadScrollBarLineButton}">
+                                    <Path Data="M 0,0 L 3.5,4 L 7,0" Stretch="Uniform" Width="7" Height="4" Margin="3" Fill="{DynamicResource ToolBarForegroundBrush}"/>
+                                </RepeatButton>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+                <Style.Triggers>
+                    <Trigger Property="Orientation" Value="Horizontal">
+                        <Setter Property="Width" Value="Auto"/>
+                        <Setter Property="MinWidth" Value="0"/>
+                        <Setter Property="Height" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
+                        <Setter Property="MinHeight" Value="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarHeightKey}}"/>
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type ScrollBar}">
+                                    <Grid SnapsToDevicePixels="true">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
+                                            <ColumnDefinition Width="0.00001*"/>
+                                            <ColumnDefinition MaxWidth="{DynamicResource {x:Static SystemParameters.HorizontalScrollBarButtonWidthKey}}"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="1" Background="{TemplateBinding Background}"/>
+                                        <RepeatButton Command="{x:Static ScrollBar.LineLeftCommand}" Style="{StaticResource EcadScrollBarLineButton}">
+                                            <Path Data="M 5,0 L 0,3.5 L 5,7" Stretch="Uniform" Width="5" Height="7" Margin="3" Fill="{DynamicResource ToolBarForegroundBrush}"/>
+                                        </RepeatButton>
+                                        <Track x:Name="PART_Track" Grid.Column="1">
+                                            <Track.DecreaseRepeatButton>
+                                                <RepeatButton Command="{x:Static ScrollBar.PageLeftCommand}" Style="{StaticResource EcadScrollBarPageButton}"/>
+                                            </Track.DecreaseRepeatButton>
+                                            <Track.IncreaseRepeatButton>
+                                                <RepeatButton Command="{x:Static ScrollBar.PageRightCommand}" Style="{StaticResource EcadScrollBarPageButton}"/>
+                                            </Track.IncreaseRepeatButton>
+                                            <Track.Thumb>
+                                                <Thumb Style="{StaticResource EcadScrollBarThumb}"/>
+                                            </Track.Thumb>
+                                        </Track>
+                                        <RepeatButton Grid.Column="2" Command="{x:Static ScrollBar.LineRightCommand}" Style="{StaticResource EcadScrollBarLineButton}">
+                                            <Path Data="M 0,0 L 5,3.5 L 0,7" Stretch="Uniform" Width="5" Height="7" Margin="3" Fill="{DynamicResource ToolBarForegroundBrush}"/>
+                                        </RepeatButton>
+                                    </Grid>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
             <!-- T-083増分7(家老采配2026-07-17、隠密調査書=docs/ecad2-t083-zoubun7-menu-dark-redesign-survey-onmitsu.md):
                  ドロップダウンメニューのダーク対応。根本原因はWPF既定(Aero2)MenuItemテンプレート内
                  SubMenuBorder(ポップアップ全体の背景)がStaticResource参照のためDynamicResource

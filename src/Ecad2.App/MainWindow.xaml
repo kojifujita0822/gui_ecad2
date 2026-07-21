@@ -1739,13 +1739,18 @@
                      T-089(殿裁定2026-07-14): 未配線プレースホルダは押下フィードバックの対象外
                      ("押せそうに見えて実際は無反応"の誤解助長を避けるため)。Style="{x:Null}"で
                      App.xamlの暗黙的スタイルを明示的に無効化しWPF既定のまま据え置く。 -->
+                <!-- T-106(7)スコープ拡大(殿裁定2026-07-21): Style="{x:Null}"のまま(機能・押下
+                     フィードバック対象外の既存扱いは変更しない)、背景色のみWPF既定のライト固定色
+                     からDynamicResource化する。 -->
                 <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,4,0"
-                        AutomationProperties.Name="(未定アイコン1)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}">
+                        AutomationProperties.Name="(未定アイコン1)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}"
+                        Background="{DynamicResource ToolBarBackgroundBrush}">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M3,3 L13,3 L13,9 L3,9 Z M5,3 L5,1 L11,1 L11,3 M6,9 L6,12 L10,12 L10,9"/>
                 </Button>
                 <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,8,0"
-                        AutomationProperties.Name="(未定アイコン2)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}">
+                        AutomationProperties.Name="(未定アイコン2)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}"
+                        Background="{DynamicResource ToolBarBackgroundBrush}">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M2,3 L12,3 L12,9 L7,9 L4,13 L4,9 L2,9 Z"/>
                 </Button>
@@ -1770,7 +1775,10 @@
                         </DataTemplate>
                     </ComboBox.ItemTemplate>
                     <ComboBox.ItemContainerStyle>
-                        <Style TargetType="ComboBoxItem">
+                        <!-- T-106(5)スコープ拡大(殿裁定2026-07-21): BasedOnを付けないとApp.xaml
+                             暗黙的スタイル(TargetType=ComboBoxItem)を継承せずWPF既定のまま
+                             (ダークモード非対応)に戻ってしまうため明示的に継承する。 -->
+                        <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
                             <Setter Property="ToolTip" Value="{Binding DisplayName}"/>
                             <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
                         </Style>
