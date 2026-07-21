@@ -92,6 +92,11 @@
 - **内容**: 隠密プラン§2.2案1トポロジへの統合（4Manager撤去→単一Manager+LayoutDocumentPane）、
   永続化単一ファイル化、`ApplyDockingManagerThemes`単一化+統合タイトルスタイル、T-099(c)案Y
   代替（PoC確定方式）、T-103再配線、T-104タブナビ再確認、既存テスト追随修正。
+  **裁2（ドキュメントタブ非表示）の実装は`ShowHeader="False"`属性方式を採用**（增分0静的レビューで
+  判明、`docs/ecad2-t110-poc-review-onmitsu.md`§3——`LayoutDocumentPane.ShowHeader`は公開プロパティ
+  でテーマ既定テンプレートが対応済み、DocumentPaneControlStyleのテンプレートコピー約60行が不要に
+  なる。ライブラリ正規機構ゆえ将来のAvalonDock更新にも強い）。残課題＝`DockAsDocument`経路で
+  生成される新規ペインの`ShowHeader`封止要否は増分1で要検討（同文書§3残課題1件）。
 - **DoD**: 隠密プラン§5増分1の忍者確認項目全て（起動・全ペイン表示・リサイズ・保存/復元・
   Ctrl+Alt+R・ダークモード切替・Float/Dock往復・Tab巡回・ElementPlacementBar位置）が正常。
 - **検証観点**: 高リスク領域（`AnchorablePaneControlStyle`系）ゆえ、侍実装→隠密静的レビュー
