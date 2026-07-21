@@ -67,9 +67,11 @@ XAML冒頭コメント：「design-brief 4節#6『モード可視化の多重化
 ## 3. ツール名表示ロジック
 
 **コンバータは存在しない**。`Tool.Mode`（`ToolMode` enum：`Select`/`PlaceElement`/
-`PlaceConnector`/`PlaceFrame`/`PlaceLine`/`PlaceDot`/`PlaceWireBreak`）は`StringFormat`のみで直接
-文字列化される。**「ツール: 」の接頭辞のみ日本語化されており、値部分は英語enum名がそのまま表示
-される**（例：「ツール: Select」「ツール: PlaceConnector」）——日本語変換ロジックは存在しない。
+`PlaceConnector`/`PlaceFrame`/`PlaceLine`/`PlaceDot`/`PlaceWireBreak`/`PlaceImage`、
+`ToolState.cs`12行）は`StringFormat`のみで直接文字列化される。**「ツール: 」の接頭辞のみ
+日本語化されており、値部分は英語enum名がそのまま表示される**（例：「ツール: Select」
+「ツール: PlaceConnector」）——日本語変換ロジックは存在しない。**（2026-07-21追記）旧版は
+`PlaceImage`（T-064、画像挿入機能、2026-07-13追加）が列挙から漏れていた（欠落）。**
 
 ---
 
