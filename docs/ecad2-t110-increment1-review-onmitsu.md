@@ -245,6 +245,55 @@ feedback_temp_instrumentation_removal_discipline）にも適合——T-038由来
   **ライブラリ自身の`HideOverlayWindow`メソッドを呼び出す**（正規5操作がそのまま実行され
   状態整合の再実装が不要、案Aより安全）。ただし依然internal依存ゆえ案D成立なら不要。
 
+---
+
+# 追補4: 案D実装コミット5123eb3のレビュー（2026-07-22）
+
+## 結論（先出し）
+
+**5123eb3自体は正**（`CanDock="False"`はルートLayoutPanel＝`DragService.cs:282`が読む
+`Layout.RootPanel`当体に正しく配置、コメントも正確）。**ただし指2（必須・1行）を追加で要する**
+——このままでは**次回起動時に修正が無音で無効化される**罠が既に発動可能な状態にある。
+
+## 指2（必須）: 保存済みレイアウトXMLによる案Dの無効化——実ファイルで確認済み
+
+- `%AppData%\Ecad2\docking-layout\main-layout.xml`が**既に存在する**（2026-07-22 03:24、
+  忍者の切り分け実験（メニュー経由保存）の産物＝**5123eb3より前の保存**）。
+- 実ファイル検分: `<RootPanel Orientation="Vertical">`——**CanDock属性なし**（grepの
+  "CanDock"6ヒットは全て指1の`CanDockAsTabbedDocument`の部分一致）。
+- `LayoutPanel.ReadXml`は属性が無ければ既定値`CanDock=true`のまま（`LayoutPanel.cs:97-101`）。
+  起動時`LoadDockingLayoutFromFileIfExists`がこのファイルをDeserializeすると**Layout全体が
+  置き換わり、XAMLの`CanDock="False"`は消滅**——案Dは無音で無効化され、忍者の最終確認は
+  「十字型がまた出る」を観測する（3周目の偽再発を踏む）。さらに以後の保存はモデルの
+  `CanDock=true`を焼き付け続け、恒久的に修正が効かない。
+- **推奨修正（1行）**: `TryDeserializeDockingLayout`内、`Deserialize`成功直後へ
+  `MainDockingManager.Layout.RootPanel.CanDock = false;`（`LayoutRoot.RootPanel`・
+  `LayoutPanel.CanDock`とも公開プロパティ、コンパイル可能性確認済み）。
+  呼出元3経路（起動時読込・Ctrl+Alt+R保存済み優先・同既定フォールバック）全てが本メソッドを
+  通るため、防御は1箇所で足りる。既定XML（XAML自己Serialize産）は`CanDock="False"`属性を
+  含む（WriteXmlはFalse時に書き出す）ため本質的リスクは外部永続化ファイルのみだが、
+  コード強制なら旧版ファイル・手動編集・将来の版差全てに耐える（読込3層防御と同思想の
+  第4の防御）。適用後は次回保存でファイル側も自然に正規化される。
+- ※旧4ファイルと同様、既存main-layout.xmlの削除は不要（rm禁止・コード強制で無害化される）。
+
+## 増分1全体の最終通し確認
+
+累積5コミット（a78b802→e1c8f73→c83dc2a→e45d8b8→5123eb3）の整合を通しで再確認:
+永続化単一化・裁1〜裁4・指1・(2)修正・読込ガード復元・A-3撤去・T-103再配線・案D、相互矛盾なし。
+build/test全合格（侍申告923件）。**指2反映を条件に忍者最終実機確認へ進んでよい**。
+
+## 忍者最終確認項目（指2反映後）
+
+1. フロート後のドラッグで十字型OverlayWindowが一切表示されないこと（案Dの本旨）
+2. ドラッグ再ドック（T-103枠内ドロップ）・メニュー経由ドッキングとも機能すること
+3. **既存main-layout.xml（CanDock属性なし）が存在する状態で起動→ドラッグしても十字型が
+   出ないこと**（指2の実証、最重要——現に03:24産の実ファイルがその条件を満たしている）
+4. Ctrl+Alt+R・保存/復元の往復後も十字型不出現が維持されること（round-trip）
+5. 保存後のmain-layout.xmlに`CanDock="False"`属性が書かれていること（正規化の確認）
+6. 起動直後の配置ツールバーのアクティブ色（追補2(c)観察事項）
+7. 増分1の主要回帰（アクティブ色一元化・起動時選択タブ・ElementPlacementBar位置）の
+   スポット再確認
+
 ## 追補2出典
 
 - コミット`e45d8b8`/`c83dc2a`全差分＋現物（.cs:226-251/500現況確認）
