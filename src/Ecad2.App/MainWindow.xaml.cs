@@ -564,6 +564,12 @@ public partial class MainWindow : Window
             serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
+            // T-110增分1対策(家老采配2026-07-22、隠密案D第4防御): 5123eb3より前に保存された
+            // main-layout.xml等、RootPanelにCanDock属性が無いXMLを読み込むとLayoutPanel.ReadXml
+            // は既定値trueへ復元し、XAML側のCanDock="False"が上書き消滅する(「十字型が再発する」
+            // という偽の再発を招く)。Deserialize成功直後に強制Falseへ戻すことで無害化する
+            // (次回保存時には正規化されたXMLが書き出される)。
+            MainDockingManager.Layout.RootPanel.CanDock = false;
             // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContent実体が
             // 欠落した壊れたXMLをここで検出する(HasExpectedContent参照)。
             return HasExpectedContent();
