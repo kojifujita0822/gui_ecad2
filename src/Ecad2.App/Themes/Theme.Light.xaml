@@ -60,4 +60,10 @@
     <SolidColorBrush x:Key="MenuItemAccentBorderBrush" Color="#FF26A0DA"/>
     <SolidColorBrush x:Key="MenuItemHighlightDisabledBackgroundBrush" Color="#0A000000"/>
     <SolidColorBrush x:Key="MenuItemHighlightDisabledBorderBrush" Color="#21000000"/>
+
+    <!-- T-101新規(殿裁定2026-07-21): 配置ツールバー恒久ハイライト用。PanelContentSelectedBackgroundBrush
+         (#FF0078D7)と同系色で選択系統の統一感を保ちつつ、背景は半透明にしてアイコンの視認性を
+         確保し、枠線は不透明ではっきり示す(MenuItemAccentBackgroundBrush/Borderと同系の設計)。 -->
+    <SolidColorBrush x:Key="PlacementToolActiveBackgroundBrush" Color="#4D0078D7"/>
+    <SolidColorBrush x:Key="PlacementToolActiveBorderBrush" Color="#FF0078D7"/>
 </ResourceDictionary>

@@ -22,6 +22,7 @@
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
+        <converters:StringEqualsMultiConverter x:Key="StringEqualsMultiConverter"/>
 
         <!-- ツールバーボタン共通スタイル: アイコン(Path)+F-key/ショートカット表示を縦積みにする
              (GX Works3実機調査T-012: マウス操作とキーボードショートカットの視覚的一体案内)。
@@ -127,6 +128,32 @@
         <Style x:Key="PlacementToolBarButtonStyle" TargetType="Button" BasedOn="{StaticResource ToolBarButtonStyle}">
             <Setter Property="Width" Value="36"/>
             <Setter Property="Height" Value="36"/>
+            <!-- T-101(殿裁定2026-07-21、視覚表現=背景色+枠線の併用): 現在有効なツール
+                 (ViewModel.Tool)に対応するボタンをカーソル位置に依存せず恒久ハイライトする
+                 (従来はMouseOver/Pressedの一時的な色変化のみで、カーソルを離すと選択中でも
+                 通常色に戻っていた=T-101起票の欠落)。ActiveToolTag(ViewModel算出プロパティ)と
+                 ボタン自身のTagが一致する場合に発火する。Styleは全PlacementToolBarButtonStyle
+                 ボタンで共有されるため、ConverterParameterではなくMultiBinding+
+                 RelativeSource Selfでボタンごとに異なるDataContext.ActiveToolTag/Tagを個別
+                 評価する。派生Style側のTriggerは基底(ToolBarButtonStyle→App.xaml暗黙的
+                 Buttonスタイル)のMouseOver/Pressedトリガー(いずれもStyle.Triggers、優先度6位
+                 同士だが派生が後勝ち)より優先されるため、選択中は常時ハイライトを維持する
+                 (T-089 IsEnabled上書きの実証パターンと同型)。Tag未設定のボタン(接続点記入・
+                 配線分断記入=即時実行でTool.Modeを変更しないツール)はActiveToolTag側にも
+                 対応する値が無いため恒久ハイライトの対象外(常にfalse)。 -->
+            <Style.Triggers>
+                <DataTrigger Value="True">
+                    <DataTrigger.Binding>
+                        <MultiBinding Converter="{StaticResource StringEqualsMultiConverter}">
+                            <Binding Path="DataContext.ActiveToolTag" RelativeSource="{RelativeSource Self}"/>
+                            <Binding Path="Tag" RelativeSource="{RelativeSource Self}"/>
+                        </MultiBinding>
+                    </DataTrigger.Binding>
+                    <Setter Property="Background" Value="{DynamicResource PlacementToolActiveBackgroundBrush}"/>
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlacementToolActiveBorderBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="PlacementToolBarIconStyle" TargetType="Path" BasedOn="{StaticResource ToolBarIconStyle}">
             <Setter Property="Width" Value="14"/>
@@ -1089,7 +1116,7 @@
                      揃えている(隠密申し送り、F5/sF5=x2-16,y4-14・F6/sF6/F8=x2-16,y3-15)。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="選択ツール (Esc)"
                         AutomationProperties.Name="選択ツール (Esc)"
-                        Click="SelectDefaultButton_Click"
+                        Tag="Select" Click="SelectDefaultButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding HasProject}">
                     <StackPanel>
@@ -1170,7 +1197,7 @@
                      縦線+下向き矢じり]・配線分断=はさみ形[sample/F10_sample])。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自由線(横線)記入 (F9)"
                         AutomationProperties.Name="自由線(横線)記入 (F9)"
-                        Click="FreeLineHorizontalButton_Click"
+                        Tag="FreeLineH" Click="FreeLineHorizontalButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanPlaceOnMainCircuit}">
                     <StackPanel>
@@ -1180,7 +1207,7 @@
                 </Button>
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自由線(縦線)記入 (Shift+F9)"
                         AutomationProperties.Name="自由線(縦線)記入 (Shift+F9)"
-                        Click="FreeLineVerticalButton_Click"
+                        Tag="FreeLineV" Click="FreeLineVerticalButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanPlaceOnMainCircuit}">
                     <StackPanel>
@@ -1190,7 +1217,7 @@
                 </Button>
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="縦分岐線記入 (Shift+F9)"
                         AutomationProperties.Name="縦分岐線記入 (Shift+F9)"
-                        Click="VerticalConnectorButton_Click"
+                        Tag="VerticalConnector" Click="VerticalConnectorButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanPlaceOnControlCircuit}">
                     <StackPanel>
@@ -1227,7 +1254,7 @@
                      無いためCanEditDiagramのみでガードする。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="グループ枠記入"
                         AutomationProperties.Name="グループ枠記入"
-                        Click="FrameToolButton_Click"
+                        Tag="Frame" Click="FrameToolButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>
@@ -1241,7 +1268,7 @@
                      AutomationProperties.Nameに未併記だったため、他ボタンと同様の形式へ揃える。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="自作パーツ (F11)"
                         AutomationProperties.Name="自作パーツ (F11)"
-                        Click="OpenPartSelectionButton_Click"
+                        Tag="PartSelection" Click="OpenPartSelectionButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown"
                         IsEnabled="{Binding CanEditDiagram}">
                     <StackPanel>

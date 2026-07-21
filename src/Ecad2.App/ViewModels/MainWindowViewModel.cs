@@ -42,7 +42,34 @@ public sealed class MainWindowViewModel : ViewModelBase
             _tool = value;
             OnPropertyChanged(nameof(Tool), oldValue);
             OnPropertyChanged(nameof(IsPartSelectionVisible));
+            OnPropertyChanged(nameof(ActiveToolTag));
         }
+    }
+
+    /// <summary>
+    /// T-101: 現在有効なツール(Tool)に対応する配置ツールボタンの識別子。MainWindow.xamlの
+    /// PlacementToolBarButtonStyle適用ボタン群は、既存のBuiltinPlaceButton_Click用Tag
+    /// ("a接点"/"OR:a接点"等)と同じ文字列体系で恒久ハイライトの照合に使う(ボタン側は
+    /// RelativeSource Selfで自身のTagとこのプロパティを比較する、MainWindow.xaml参照)。
+    /// 一致するボタンが無い場合(接続点記入・配線分断記入等、即時実行でTool.Modeを変更しない
+    /// ツール)はnullを返し、いずれのボタンもハイライトされない。
+    /// </summary>
+    public string? ActiveToolTag => Tool.Mode switch
+    {
+        ToolMode.Select => "Select",
+        ToolMode.PlaceFrame => "Frame",
+        ToolMode.PlaceConnector => "VerticalConnector",
+        ToolMode.PlaceLine => IsFreeLineDraftHorizontal ? "FreeLineH" : "FreeLineV",
+        ToolMode.PlaceElement => ResolvePlacementToolTag(),
+        _ => null,
+    };
+
+    private string? ResolvePlacementToolTag()
+    {
+        if (Tool.PartId is not string partId) return "PartSelection";
+        var entry = PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Id == partId);
+        if (entry is null) return null;
+        return Tool.IsOr ? $"OR:{entry.Definition.Name}" : entry.Definition.Name;
     }
 
     /// <summary>

@@ -51,4 +51,9 @@
     <SolidColorBrush x:Key="MenuItemAccentBorderBrush" Color="#FF3399FF"/>
     <SolidColorBrush x:Key="MenuItemHighlightDisabledBackgroundBrush" Color="#0AFFFFFF"/>
     <SolidColorBrush x:Key="MenuItemHighlightDisabledBorderBrush" Color="#21FFFFFF"/>
+
+    <!-- T-101新規(殿裁定2026-07-21、詳細はTheme.Light.xaml参照)。PanelContentSelectedBackgroundBrush
+         (#FF0E639C)と同系色。 -->
+    <SolidColorBrush x:Key="PlacementToolActiveBackgroundBrush" Color="#4D3399FF"/>
+    <SolidColorBrush x:Key="PlacementToolActiveBorderBrush" Color="#FF3399FF"/>
 </ResourceDictionary>
