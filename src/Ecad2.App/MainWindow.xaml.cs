@@ -109,40 +109,29 @@ public partial class MainWindow : Window
     // 復旧不能になる致命的UXが忍者実機確認で確定したため、全パネル共通のレイアウトリセット機能
     // (Ctrl+Alt+R)を新設する。起動直後の既定レイアウトをXmlLayoutSerializerで文字列として保持し、
     // リセット時にDeserializeし直す(PoC実証済み手法の流用)。
-    // T-058増分2(家老裁可・案C): 出力パネルは左パレットとは独立した2つ目のDockingManagerとして
-    // 追加したため、レイアウトリセットは複数DockingManagerをまとめて処理できるよう汎用化する。
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
-    private readonly Dictionary<DockingManager, string> _defaultDockingLayoutXmlByManager = new();
+    // T-110增分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴い、Manager単位の
+    // Dictionaryを単一値へ縮退する。
+    private string? _defaultDockingLayoutXml;
     // 家老采配2026-07-19(T-099(c)復旧作業で発覚、%AppData%配下の永続化レイアウトXML破損対策):
-    // manager単位で「本来存在すべきContentIdの集合」をXAML初期状態(RegisterDockingContents呼出時点)
-    // からキャプチャしておく。HasExpectedContentでの破損検出に使う。
-    private readonly Dictionary<DockingManager, HashSet<string>> _expectedContentIdsByManager = new();
-
-    // T-058増分5: PlacementToolBarDockingManagerを追加。RegisterDockingContents/
-    // SerializeDefaultDockingLayouts/ResetDockingLayoutToDefault/LoadDockingLayoutFromFileIfExists
-    // はいずれもAllDockingManagersを汎用的に回っているため、この1行の追加のみで横展開される。
-    private IEnumerable<DockingManager> AllDockingManagers => new[] { LeftPaletteDockingManager, OutputPanelDockingManager, RightPanelDockingManager, PlacementToolBarDockingManager };
+    // 「本来存在すべきContentIdの集合」をXAML初期状態(RegisterDockingContents呼出時点)から
+    // キャプチャしておく。HasExpectedContentでの破損検出に使う。
+    private HashSet<string> _expectedContentIds = new();
 
     // T-058増分4(殿裁定=保存タイミング両方・保存先アプリ共通設定): 明示保存済みの既定レイアウトを
-    // %AppData%配下へDockingManager単位の個別XMLとして永続化する。_defaultDockingLayoutXmlByManager
+    // %AppData%配下へ単一ファイルとして永続化する。_defaultDockingLayoutXml
     // (起動直後にキャプチャする出荷時ハードコード既定、メモリ上・不変)とは独立した別層であり、
     // Ctrl+Alt+Rはファイルが存在すればそちらを優先する(4-4節)。
     private string DockingLayoutDirectory =>
         System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Ecad2", "docking-layout");
 
-    private string GetDockingLayoutFilePath(DockingManager manager) =>
-        System.IO.Path.Combine(DockingLayoutDirectory, GetDockingLayoutFileName(manager.Name));
+    // T-110增分1(家老采配2026-07-22、B-1): 4分割時代の4分岐(GetDockingLayoutFileName)を単一
+    // ファイル名へ縮退。旧4ファイル(left-palette.xml等)は放置する(rm禁止・裁3=移行ロジック無し、
+    // 新ファイル名は旧ファイルを参照しないため既定フォールバックで無害)。
+    internal const string DockingLayoutFileName = "main-layout.xml";
 
-    /// <summary>DockingManagerのx:Name(FrameworkElement.Name)から保存ファイル名を導出する純粋関数
-    /// (単体テスト可能化のためinternal static、T-058増分4設計叩き台4節)。</summary>
-    internal static string GetDockingLayoutFileName(string managerName) => managerName switch
-    {
-        nameof(LeftPaletteDockingManager) => "left-palette.xml",
-        nameof(OutputPanelDockingManager) => "output-panel.xml",
-        nameof(RightPanelDockingManager) => "right-panel.xml",
-        nameof(PlacementToolBarDockingManager) => "placement-toolbar.xml",
-        _ => throw new ArgumentOutOfRangeException(nameof(managerName), managerName, "未知のDockingManager"),
-    };
+    private string DockingLayoutFilePath =>
+        System.IO.Path.Combine(DockingLayoutDirectory, DockingLayoutFileName);
 
     // 殿実機確認で発覚(重要): フロート化したパネル自体にフォーカスがある間はメインウィンドウの
     // PreviewKeyDownが発火せず復旧不能のままだった——AvalonDockはフロート化したLayoutAnchorableを
@@ -200,43 +189,46 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
-        // T-099(c)案Y(殿裁定2026-07-19、隠密設計書docs/ecad2-t099-c-dock-restore-by-default-xml-
-        // design-onmitsu.md): AvalonDock標準Dock()はecad2特有の単一ペイン・独立DockingManager構成
-        // でタブ自己複製バグ(InternalDockフォールバック探索のフロートウィンドウ除外フィルタ漏れ)を
-        // 誘発するため、ContentDockingイベント(Dock実行前、キャンセル可能、一次ソース
-        // DockingManager.cs:2334-2337で確認済み)をCancel=trueで止め、ハードコード既定レイアウト
-        // XMLのDeserialize(Ctrl+Alt+Rと同じ実証済み機構の単一Manager版)でドッキング済み既定状態へ
-        // 戻す。自前のモデル手術(ツリー再接続・Children.Add・CollectGarbage等)は全廃——AvalonDock
-        // の隠れた不変条件(RootPanelのnull時自動補完等)と直すたび衝突するモグラ叩きに陥った
-        // 3周の教訓により、モデルの整合はAvalonDock自身の正規機構(Layout差し替え)に全部任せる。
-        PlacementToolBarDockingManager.ContentDocking += PlacementToolBarDockingManager_ContentDocking;
-        // T-099(c)調査5(b、同上): メニュー「フローティング」経由のFloat()はドラッグ経路と異なり
+        // T-110增分1(家老采配2026-07-22、A-3=候補a確定): T-099(c)案Y(ContentDockingをCancelし
+        // ハードコード既定XMLへDeserializeする機構)は撤去する。增分0のPoCで標準Dock()を5周検証し
+        // タブ自己複製・縦長化・空白化いずれも再現しなかったため、統合トポロジではバグの前提
+        // (PreviousContainer解決の文脈)自体が変わり再現しないと確定した(忍者実機確認
+        // docs/ecad2-t110-poc-verification-ninja.md)。ContentDockingイベント購読・
+        // ResetPlacementToolBarLayoutToDefaultは撤去(標準Dock()に任せる)。
+        // T-099(c)調査5(b): メニュー「フローティング」経由のFloat()はドラッグ経路と異なり
         // FloatingLeft/Topの位置補正(ドラッグ経路のInternalOnActivated相当)を経ないため、既定
         // 0.0のままプライマリモニタ原点(0,0)にフロートウィンドウが生成される(一次ソース
         // DockingManager.cs:3281-3287で確認済み)。ContentFloatingイベント(Float実行前、一次ソース
         // DockingManager.cs:2313-2328)で配置ツールバー自身の現在スクリーン座標を設定しておくことで、
-        // Float()内のウィンドウ生成がこの値をそのまま使う。
-        PlacementToolBarDockingManager.ContentFloating += PlacementToolBarDockingManager_ContentFloating;
+        // Float()内のウィンドウ生成がこの値をそのまま使う。T-110增分1: 単一Manager化に伴い
+        // MainDockingManagerへ購読先変更(ロジック自体はContentId=="PlacementToolBar"チェック済みの
+        // ため無改修)。
+        MainDockingManager.ContentFloating += PlacementToolBarDockingManager_ContentFloating;
         // T-103 PoC(家老采配2026-07-20、侍提案、docs/todo.md T-103節): AvalonDock標準の
         // OverlayWindow/DropTarget(位置ズレバグ)に依存しない独自ドロップ枠方式。フロートウィンドウ
         // 生成直後(Show前)に発火するこのイベントでLoaded後フックの登録を仕込む
         // (docs/ecad2-t103-drag-message-path-and-guard-survey-samurai.md参照)。
-        PlacementToolBarDockingManager.LayoutFloatingWindowControlCreated += PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated;
+        // T-110增分1(隠密プランC-1、着手前チェックC-1): 単一Manager化で本イベントは全ペインの
+        // フロートで発火するようになるため、ハンドラ内のContentIdフィルタ(isPlacementToolBar判定、
+        // 既存実装済み)が防御として機能する。購読先をMainDockingManagerへ変更。
+        MainDockingManager.LayoutFloatingWindowControlCreated += PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated;
         // T-104増分1 DoD(4)対策・案2(家老采配2026-07-20、隠密設計、往復2周目=計画的深掘り):
         // 1段階目(暗黙的StyleでLayoutAnchorSideControl自体をFocusable=False化)は不十分と判明
         // ——Focusableはローカル値・非継承プロパティのため、AnchorSideTemplate内の名前なし
         // ItemsControl(一次ソースgeneric.xaml:382、AvalonDock標準テンプレート)には伝播しない
         // (WPF仕様通りの帰結)。VisualTreeHelperでこのItemsControlインスタンスを直接検索し
         // Focusable/IsTabStopを設定する、より確実性の高い方式へ切替える。
-        PlacementToolBarDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
+        // T-110增分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
+        // ウィンドウ全域に及ぶため、本対処が全ペイン共通で有効になる。
+        MainDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
     }
 
     private void PlacementToolBarDockingManager_Loaded(object sender, RoutedEventArgs e)
     {
-        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.LeftSidePanel);
-        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.TopSidePanel);
-        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.RightSidePanel);
-        DisableFocusOnAutoHideSideItemsControl(PlacementToolBarDockingManager.BottomSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(MainDockingManager.LeftSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(MainDockingManager.TopSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(MainDockingManager.RightSidePanel);
+        DisableFocusOnAutoHideSideItemsControl(MainDockingManager.BottomSidePanel);
     }
 
     private static void DisableFocusOnAutoHideSideItemsControl(AvalonDock.Controls.LayoutAnchorSideControl? sideControl)
@@ -260,33 +252,13 @@ public partial class MainWindow : Window
         return null;
     }
 
-    private void PlacementToolBarDockingManager_ContentDocking(object? sender, ContentDockingEventArgs e)
-    {
-        if (e.Content is not LayoutAnchorable anchorable || anchorable.ContentId != "PlacementToolBar") return;
-        e.Cancel = true;
-        ResetPlacementToolBarLayoutToDefault();
-        // T-103 PoC: AvalonDock標準ドロップ(枠外へのドロップ、Inside判定成立)経由でここへ来た
-        // 場合の後始末。独自枠経由(handled=true)の場合はPlacementToolBarFloatingWindowFilterMessage
-        // 側で既に非表示化済みだが、冪等な代入のため無害。
-        PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed;
-    }
-
-    // T-099(c)案Y: 配置ツールバーのレイアウトをハードコード既定(XAML初期状態の自己Serialize)へ
-    // 戻す。ContentDockingハンドラからの「確実なドッキング復帰」専用。保存済みファイル
-    // (TryReadSavedDockingLayoutXml)は意図的に参照しない——ユーザー保存レイアウトがフロート状態
-    // だった場合、「ドッキングせよ」という操作意図と矛盾する状態を復元してしまうため、
-    // 本経路は常にドッキング済みの既定状態へ戻す。既存フロートウィンドウの後始末は
-    // DockingManager.OnLayoutChangedの正規機構(InternalClose+KeepContentVisibleOnClose、
-    // 一次ソースDockingManager.cs:434-448)が担い、幽霊ウィンドウは構造上残らない(設計書5節)。
-    private void ResetPlacementToolBarLayoutToDefault()
-    {
-        if (_defaultDockingLayoutXmlByManager.TryGetValue(PlacementToolBarDockingManager, out var defaultXml)
-            && TryDeserializeDockingLayout(PlacementToolBarDockingManager, defaultXml))
-            return;
-        // defaultXmlは起動時の自己Serialize産のため実質失敗しないが、万一失敗しても
-        // 何もしない(現状維持=フロートのまま)。モデルを中途半端に触らないことが3周の教訓。
-        _viewModel.StatusMessage = "配置ツールバーのドッキングに失敗しました";
-    }
+    // T-110增分1(家老采配2026-07-22、A-3=候補a確定): 旧PlacementToolBarDockingManager_ContentDocking・
+    // ResetPlacementToolBarLayoutToDefault(T-099(c)案Y、ContentDockingをCancelしハードコード既定XML
+    // Deserializeで復帰する機構)は撤去した。增分0のPoCで標準Dock()を5周検証しタブ自己複製・
+    // 縦長化・空白化いずれも再現しなかったため(忍者実機確認docs/ecad2-t110-poc-verification-
+    // ninja.md)、統合トポロジではバグの前提(PreviousContainer解決の文脈)自体が変わり再現しないと
+    // 確定した。撤去に伴い_defaultDockingLayoutXmlByManagerへの旧参照(PlacementToolBarDockingManager
+    // キー)も消滅、孤立参照は残らない(隠密着手前チェックA-3確認事項)。
 
     // T-103 PoC(家老采配2026-07-20、侍提案): 独自ドロップ枠のヒットテスト用フック。
     // フロートウィンドウはドラッグのたび新規生成されるため、このフィールドは常に「現在フロート中の
@@ -361,7 +333,12 @@ public partial class MainWindow : Window
         if (!dropZone.Contains(cursor.X, cursor.Y)) return IntPtr.Zero;
 
         handled = true;
-        ResetPlacementToolBarLayoutToDefault();
+        // T-110增分1(A-3=候補a確定に伴う派生対応): ハードコード既定XMLへの強制Deserialize
+        // (ResetPlacementToolBarLayoutToDefault、撤去済み)ではなく、標準のDock()を呼ぶ形に変更する。
+        // 「標準Dock()に任せる」方針(A-3)と一貫させるため。
+        var anchorableToDock = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == "PlacementToolBar");
+        anchorableToDock?.Dock();
         return IntPtr.Zero;
     }
 
@@ -371,8 +348,8 @@ public partial class MainWindow : Window
         // 隠密レビュー指摘: PointToScreenは物理ピクセル座標を返すが、FloatingLeft/TopはDIP消費の
         // ため、DPI拡大率が100%でない環境ではズレる。VisualTreeHelper.GetDpiのDpiScaleX/Yで
         // 物理ピクセルからDIPへ変換する。
-        var topLeft = PlacementToolBarDockingManager.PointToScreen(new Point(0, 0));
-        var dpi = VisualTreeHelper.GetDpi(PlacementToolBarDockingManager);
+        var topLeft = MainDockingManager.PointToScreen(new Point(0, 0));
+        var dpi = VisualTreeHelper.GetDpi(MainDockingManager);
         e.Content.FloatingLeft = topLeft.X / dpi.DpiScaleX;
         e.Content.FloatingTop = topLeft.Y / dpi.DpiScaleY;
     }
@@ -385,7 +362,7 @@ public partial class MainWindow : Window
 
     private void UpdateOutputPanelTitle()
     {
-        var outputAnchorable = OutputPanelDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+        var outputAnchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
             .FirstOrDefault(a => a.ContentId == "OutputPanel");
         if (outputAnchorable != null)
         {
@@ -398,7 +375,7 @@ public partial class MainWindow : Window
     // 「プロパティ」⇔「部品選択」を直接更新する(AvalonDockのオフツリー構造ゆえBinding不可)。
     private void UpdateRightPanelBottomTitle()
     {
-        var bottomAnchorable = RightPanelDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+        var bottomAnchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
             .FirstOrDefault(a => a.ContentId == "RightPanelBottom");
         if (bottomAnchorable != null)
         {
@@ -406,23 +383,23 @@ public partial class MainWindow : Window
         }
     }
 
+    // T-110增分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴いforeachを撤去。
+    // B-2: LayoutDocument走査により、キャンバスDocumentのContentId("Canvas")も期待集合へ
+    // 自然に含まれる(既存のLayoutAnchorable/LayoutDocument両方の走査ロジックを維持するだけで足りる)。
     private void RegisterDockingContents()
     {
-        foreach (var manager in AllDockingManagers)
+        var expectedIds = new HashSet<string>();
+        foreach (var anchorable in MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>())
         {
-            var expectedIds = new HashSet<string>();
-            foreach (var anchorable in manager.Layout.Descendents().OfType<LayoutAnchorable>())
-            {
-                _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
-                expectedIds.Add(anchorable.ContentId);
-            }
-            foreach (var document in manager.Layout.Descendents().OfType<LayoutDocument>())
-            {
-                _dockingContentRegistry[document.ContentId] = document.Content;
-                expectedIds.Add(document.ContentId);
-            }
-            _expectedContentIdsByManager[manager] = expectedIds;
+            _dockingContentRegistry[anchorable.ContentId] = anchorable.Content;
+            expectedIds.Add(anchorable.ContentId);
         }
+        foreach (var document in MainDockingManager.Layout.Descendents().OfType<LayoutDocument>())
+        {
+            _dockingContentRegistry[document.ContentId] = document.Content;
+            expectedIds.Add(document.ContentId);
+        }
+        _expectedContentIds = expectedIds;
     }
 
     // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContentId要素はあるが
@@ -430,25 +407,21 @@ public partial class MainWindow : Window
     // 該当ContentIdを見つけられずContentがnullのまま残るケース、およびXMLからLayoutContent要素
     // 自体が丸ごと消えているケースの両方を拾う)。今回のT-099(c)復旧作業で発覚した%AppData%配下
     // 永続化XML汚染(配置ツールの実体が完全欠落)の再発防止。
-    private bool HasExpectedContent(DockingManager manager)
+    private bool HasExpectedContent()
     {
-        if (!_expectedContentIdsByManager.TryGetValue(manager, out var expectedIds)) return true;
-        var presentIds = manager.Layout.Descendents().OfType<LayoutContent>()
+        var presentIds = MainDockingManager.Layout.Descendents().OfType<LayoutContent>()
             .Where(c => c.Content != null && c.ContentId != null)
             .Select(c => c.ContentId)
             .ToHashSet();
-        return expectedIds.All(id => presentIds.Contains(id));
+        return _expectedContentIds.All(id => presentIds.Contains(id));
     }
 
     private void SerializeDefaultDockingLayouts()
     {
-        foreach (var manager in AllDockingManagers)
-        {
-            var serializer = new XmlLayoutSerializer(manager);
-            using var writer = new StringWriter();
-            serializer.Serialize(writer);
-            _defaultDockingLayoutXmlByManager[manager] = writer.ToString();
-        }
+        var serializer = new XmlLayoutSerializer(MainDockingManager);
+        using var writer = new StringWriter();
+        serializer.Serialize(writer);
+        _defaultDockingLayoutXml = writer.ToString();
     }
 
     // T-058増分4: ResetDockingLayoutToDefault()の既存ラムダと同一ロジックのため共通化する
@@ -467,24 +440,21 @@ public partial class MainWindow : Window
     // (権限/容量等)はクラッシュさせずステータスメッセージのみに留める(殿裁定(5)フォールバック)。
     // 家老采配2026-07-19(保存側防御): 実体欠落状態(フロート化処理中の過渡状態等)のレイアウトを
     // 誤って既定として焼き付けてしまうと、今回のT-099(c)復旧作業のような%AppData%汚染の再発源に
-    // なる。保存前にHasExpectedContentで検証し、いずれかのDockingManagerが欠落状態なら保存自体を
-    // スキップする(読込側防御と対になる二重の備え)。
+    // なる。保存前にHasExpectedContentで検証し、欠落状態なら保存自体をスキップする
+    // (読込側防御と対になる二重の備え)。
     private void SaveDockingLayoutAsDefault()
     {
         try
         {
-            if (AllDockingManagers.Any(m => !HasExpectedContent(m)))
+            if (!HasExpectedContent())
             {
                 _viewModel.StatusMessage = "パネルレイアウトが不完全な状態のため保存をスキップしました";
                 return;
             }
             Directory.CreateDirectory(DockingLayoutDirectory);
-            foreach (var manager in AllDockingManagers)
-            {
-                var serializer = new XmlLayoutSerializer(manager);
-                using var writer = new StreamWriter(GetDockingLayoutFilePath(manager));
-                serializer.Serialize(writer);
-            }
+            var serializer = new XmlLayoutSerializer(MainDockingManager);
+            using var writer = new StreamWriter(DockingLayoutFilePath);
+            serializer.Serialize(writer);
             _viewModel.StatusMessage = "現在のパネルレイアウトを既定として保存しました";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -494,30 +464,27 @@ public partial class MainWindow : Window
     }
 
     // T-058増分4: 起動時、保存済みファイルがあれば適用する(SerializeDefaultDockingLayouts()の
-    // 直後から呼ぶこと、コンストラクタ参照)。ファイル無し/破損いずれもクラッシュさせず、その
-    // DockingManagerはXAML初期状態のまま起動を継続する(殿裁定(5)フォールバック)。
+    // 直後から呼ぶこと、コンストラクタ参照)。ファイル無し/破損いずれもクラッシュさせず、
+    // XAML初期状態のまま起動を継続する(殿裁定(5)フォールバック)。
     // 家老裁可(2026-07-15): 破損ファイル等で読込に失敗した場合は沈黙のフォールバックを避け、
     // ステータスメッセージで一言知らせる(GCADのようなバージョン管理を持たない代わりの透明性確保)。
-    // 家老采配2026-07-19(読込側防御・本丸): 従来はXML構文検証のみのTryDeserializeDockingLayoutを
-    // 経由せず自前でDeserializeしており、ResetDockingLayoutToDefault()と非対称にContent実体欠落
-    // (今回のT-099(c)復旧作業で発覚した%AppData%汚染XMLの症状)を検出できなかった。
-    // TryReadSavedDockingLayoutXml→TryDeserializeDockingLayoutの二段フォールバック構造へ統合し、
-    // ResetDockingLayoutToDefault()と同じ保護(IO/XML構文/Content実体欠落の3層)を持たせる。
+    // 家老采配2026-07-19(読込側防御・本丸): TryReadSavedDockingLayoutXml→TryDeserializeDockingLayout
+    // の二段フォールバック構造で、ResetDockingLayoutToDefault()と同じ保護(IO/XML構文/Content実体
+    // 欠落の3層)を持たせる。
+    // T-110增分1(裁3、殿裁可済み): 旧4ファイル(left-palette.xml等)は新ファイル名
+    // (main-layout.xml)からは参照されないため、既存ユーザーは全員この既定フォールバック経路を
+    // 通る(保存カスタムレイアウト喪失は許容、移行ロジックは作らない)。
     private void LoadDockingLayoutFromFileIfExists()
     {
-        bool anyLoadFailed = false;
-        foreach (var manager in AllDockingManagers)
-        {
-            string? savedXml = TryReadSavedDockingLayoutXml(manager);
-            if (savedXml is null) continue;
-            if (TryDeserializeDockingLayout(manager, savedXml)) continue;
+        string? savedXml = TryReadSavedDockingLayoutXml();
+        if (savedXml is not null && TryDeserializeDockingLayout(savedXml)) return;
 
-            // 破損ファイル等はハードコード既定(XAML初期状態)へ二段フォールバックする。
-            anyLoadFailed = true;
-            if (_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var defaultXml))
-                TryDeserializeDockingLayout(manager, defaultXml);
-        }
-        if (anyLoadFailed)
+        bool loadFailed = savedXml is not null;
+        // 破損ファイル等はハードコード既定(XAML初期状態)へ二段フォールバックする。
+        if (_defaultDockingLayoutXml is not null)
+            TryDeserializeDockingLayout(_defaultDockingLayoutXml);
+
+        if (loadFailed)
             // T-104増分2(3)(家老采配2026-07-20、殿裁定=文言変更): 旧文言「保存済みレイアウトの
             // 読込に失敗したため既定で起動しました」は、実際には破損以外にバージョンアップに伴う
             // レイアウト構成変更(今回のタブ新設等)でも同じ経路を通るため、毎回「失敗」という
@@ -527,8 +494,7 @@ public partial class MainWindow : Window
     }
 
     // Ctrl+Alt+Rハンドラから呼ばれる。T-058増分4(殿裁定(4)): 保存済みファイルがあればそちらを
-    // 優先し、無ければ従来どおりハードコード既定(_defaultDockingLayoutXmlByManager)へ戻す。
-    // 複数DockingManager(左パレット・出力パネル・右パネル)をまとめてリセットする(家老申し送り)。
+    // 優先し、無ければ従来どおりハードコード既定(_defaultDockingLayoutXml)へ戻す。
     // 隠密静的レビュー指摘(CONFIRMED、severity中〜高、2026-07-15): 保存済みファイルはIO面は
     // TryReadSavedDockingLayoutXmlで保護済みだが、読めても中身のXML構文が壊れているケース
     // (手動編集ミス・アプリクラッシュ時の中途半端な書込み等)ではDeserialize自体が例外を投げ、
@@ -537,13 +503,11 @@ public partial class MainWindow : Window
     // Deserialize自体も保護し、失敗時はハードコード既定側へ二段フォールバックする。
     private void ResetDockingLayoutToDefault()
     {
-        foreach (var manager in AllDockingManagers)
+        string? savedXml = TryReadSavedDockingLayoutXml();
+        if (savedXml is null || !TryDeserializeDockingLayout(savedXml))
         {
-            string? savedXml = TryReadSavedDockingLayoutXml(manager);
-            if (savedXml is not null && TryDeserializeDockingLayout(manager, savedXml)) continue;
-
-            if (_defaultDockingLayoutXmlByManager.TryGetValue(manager, out var defaultXml))
-                TryDeserializeDockingLayout(manager, defaultXml);
+            if (_defaultDockingLayoutXml is not null)
+                TryDeserializeDockingLayout(_defaultDockingLayoutXml);
         }
         // T-058増分3隠密静的レビュー指摘1(CONFIRMED、増分2から持ち越しの既存欠陥の複製):
         // Deserialize直後のLayoutAnchorable.Titleは既定レイアウトXML焼き付け時点の初期値
@@ -557,13 +521,12 @@ public partial class MainWindow : Window
 
     // T-058増分4: 保存済みファイルの読込に失敗(破損等)した場合はnullを返し、呼び出し元で
     // ハードコード既定へフォールバックさせる(殿裁定(5))。
-    private string? TryReadSavedDockingLayoutXml(DockingManager manager)
+    private string? TryReadSavedDockingLayoutXml()
     {
-        var path = GetDockingLayoutFilePath(manager);
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(DockingLayoutFilePath)) return null;
         try
         {
-            return File.ReadAllText(path);
+            return File.ReadAllText(DockingLayoutFilePath);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -574,17 +537,17 @@ public partial class MainWindow : Window
     // 隠密静的レビュー指摘対応(2026-07-15): XmlLayoutSerializer.Deserialize自体(XML構文エラー等)
     // をtry-catchで保護する。LayoutSerializationCallbackでContentIdをキーに元のコンテンツを
     // 再バインドする(Deserialize直後は新規生成インスタンスのためContentが失われる、PoC実証済みの対処)。
-    private bool TryDeserializeDockingLayout(DockingManager manager, string xml)
+    private bool TryDeserializeDockingLayout(string xml)
     {
         try
         {
-            var serializer = new XmlLayoutSerializer(manager);
+            var serializer = new XmlLayoutSerializer(MainDockingManager);
             serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
             // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContent実体が
             // 欠落した壊れたXMLをここで検出する(HasExpectedContent参照)。
-            return HasExpectedContent(manager);
+            return HasExpectedContent();
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException or System.Xml.XmlException)
         {
@@ -768,26 +731,20 @@ public partial class MainWindow : Window
             LadderCanvasHost.Clear();
     }
 
-    // T-083増分1: 全DockingManager(AllDockingManagers、T-058増分5で確立済みの横展開防止機構)へ
-    // 同一のVS2013テーマを設定する(隠密指摘により置換2026-07-16、往復2周目)。
+    // T-110增分1(家老采配2026-07-22、C-3): 単一MainDockingManagerへの統合に伴い、旧4Manager出し
+    // 分け(manager identity判定)を撤去する。統合タイトルスタイル(UnifiedAnchorablePaneTitleStyle、
+    // Model.ContentId分岐を内包)を1つだけ登録すればよい。
     private void ApplyDockingManagerThemes(bool isDarkMode)
     {
         // T-100(家老采配2026-07-17): VS2013テーマ(Theme設定でMergedDictionaries経由追加される)側の
         // AnchorablePaneTitle暗黙的スタイルはハッチング模様(DragHandleTexture)を含むため、
-        // 各DockingManager.Resourcesへ直接キー登録して優先させる(ローカルエントリはMergedDictionaries
+        // DockingManager.Resourcesへ直接キー登録して優先させる(ローカルエントリはMergedDictionaries
         // より優先解決される)。
-        var anchorablePaneTitleStyle = (Style)FindResource("AnchorablePaneTitleNoDragHandleStyle");
-        // T-099要件(1)(2)追加対応(隠密設計、家老采配2026-07-19): 配置ツールバーのみ、ドッキング時は
-        // 上段(AnchorablePaneTitle自体)を非表示にする専用スタイル。他パネルには適用しない。
-        var placementToolBarTitleStyle = (Style)FindResource("PlacementToolBarAnchorablePaneTitleStyle");
-        foreach (var manager in AllDockingManagers)
-        {
-            manager.Theme = isDarkMode
-                ? new AvalonDock.Themes.Vs2013DarkTheme()
-                : new AvalonDock.Themes.Vs2013LightTheme();
-            manager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] =
-                manager == PlacementToolBarDockingManager ? placementToolBarTitleStyle : anchorablePaneTitleStyle;
-        }
+        var unifiedAnchorablePaneTitleStyle = (Style)FindResource("UnifiedAnchorablePaneTitleStyle");
+        MainDockingManager.Theme = isDarkMode
+            ? new AvalonDock.Themes.Vs2013DarkTheme()
+            : new AvalonDock.Themes.Vs2013LightTheme();
+        MainDockingManager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] = unifiedAnchorablePaneTitleStyle;
     }
 
     // T-083増分2(層C=UIクローム基盤): Application.Resourcesのテーマ辞書(Theme.Light.xaml/
@@ -3373,12 +3330,14 @@ public partial class MainWindow : Window
     // (PointToScreenと同じ変換機構、SymbolAutomationPeer.GetBoundingRectangleCore参照)。
     //
     // 隠密レビューCONFIRMED(T-033増分2位置バグ、`docs/ecad2-t033-review-onmitsu-3.md`観点a):
-    // ElementPlacementBarはRootLayoutGrid直下(Grid.Row="2"、ラッパーMainContentAreaの外)にあるため、
-    // Marginの基準はRootLayoutGrid座標系でなければならない。旧実装はMainWorkAreaGrid基準の座標を
-    // そのまま流用しており、MainContentAreaのRowSpan導入でルートのAuto行(メニュー/ツールバー等)が
-    // 実質0に潰れる副作用と相まって、両者の原点が食い違っていた(バーが恒常的に上へ表示される原因)。
-    // 変換先をRootLayoutGridへ揃え、クランプ基準もMainWorkAreaGridの原点をRootLayoutGrid座標系へ
-    // 変換した値(workAreaOrigin)から算出することで、原点の食い違いを解消する。
+    // ElementPlacementBarはRootLayoutGrid直下(Grid.Row="1"、ラッパーMainContentAreaの外)にあるため、
+    // Marginの基準はRootLayoutGrid座標系でなければならない。
+    //
+    // T-110增分1(家老采配2026-07-22、C-4): GridSplitter撤去・MainWorkAreaGrid撤去に伴い、
+    // クランプ基準をキャンバスDocument内包コンテナ(CanvasDocumentGrid、LayoutDocument直下の
+    // Grid)へ変更する。旧MainWorkAreaGrid(左パレット+キャンバス+右パネル全体)よりも狭い
+    // 範囲(キャンバス領域のみ)でのクランプになるが、配置バーは常にキャンバス上のセル近くに
+    // 表示されるものであり、意味的にはより自然な基準になる(忍者実機確認で挙動を確認)。
     //
     // バーの実サイズはVisibility=Visible反映後でないと取得できない(WPF仕様: Collapsed中の
     // Measure()はDesiredSizeを強制的に0,0にする)。呼び出し元でIsPlacementBarVisible=trueを
@@ -3388,7 +3347,7 @@ public partial class MainWindow : Window
         var localRect = LadderCanvasHost.CellRectDip(cell);
         var inputPoint = new Point(localRect.X, localRect.Bottom);
         var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
-        var workAreaOrigin = MainWorkAreaGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
+        var workAreaOrigin = CanvasDocumentGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
 
         // 診断ログ一次パスCONFIRMED(docs-notes/ecad2-t033-diag-pass1-diagnosis-samurai.md): 前回呼び出し
         // 終了時のMarginが残留したままMeasure()すると、WPF仕様(DesiredSize=content+Margin)により前回の
@@ -3397,9 +3356,9 @@ public partial class MainWindow : Window
         ElementPlacementBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = ElementPlacementBar.DesiredSize;
 
-        // 画面端クランプ(殿注文2): 右端・下端でバーがMainWorkAreaGridの外へはみ出さないようにする。
-        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + MainWorkAreaGrid.ActualWidth - barSize.Width);
-        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + MainWorkAreaGrid.ActualHeight - barSize.Height);
+        // 画面端クランプ(殿注文2): 右端・下端でバーがCanvasDocumentGridの外へはみ出さないようにする。
+        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + CanvasDocumentGrid.ActualWidth - barSize.Width);
+        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + CanvasDocumentGrid.ActualHeight - barSize.Height);
         double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
         double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
 

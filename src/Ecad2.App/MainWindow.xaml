@@ -192,11 +192,13 @@
              HeaderPanel自体は常にVisible(コンテナ生成は正常に走る)ため同型バグを回避できる。
              Model.IsDirectlyHostedInFloatingWindow(LayoutAnchorablePane.cs、PropertyChanged通知あり
              動的追従可能・一次ソース確認済み)をItemContainerStyleのDataTriggerで判定する
-             (下記ItemContainerStyle定義を参照)。DockingManager.AnchorablePaneControlStyleへ
-             ローカル値として設定することで適用範囲をこのDockingManagerのみに限定する(他パネル=
-             左パレット/出力/右パネルには一切影響しない、殿確認済みの対象範囲)。要件3(パネル幅の
-             動的フィット)は本修正の範囲外、忍者確認後の次段階で対応する。 -->
-        <Style x:Key="PlacementToolBarPaneControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
+             (下記ItemContainerStyle定義を参照)。
+             T-110增分1(家老采配2026-07-22): 単一DockingManagerへの統合に伴い、本スタイルは
+             Manager全体のAnchorablePaneControlStyle(全アンカラブルペイン共通)へ昇格。
+             単一ペイン(シート/機器表/プロパティ/出力)ではItems.Count==1トリガー(增分0修2で
+             追加、VS2013テーマ標準Generic.xaml:536-540どおり)によりTabItem自体がCollapseされ
+             冗長タブは出ない(增分0実機確認済み)。 -->
+        <Style x:Key="UnifiedAnchorablePaneControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
             <Setter Property="Foreground" Value="{Binding Model.Root.Manager.Foreground, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Background" Value="{Binding Model.Root.Manager.Background, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="TabStripPlacement" Value="Bottom"/>
@@ -311,6 +313,16 @@
                              戻す。帯はラベル自体が通常のTabItemクリック領域として機能するため
                              不要と判断し併せて削除(通常のタブヘッダーと同様、ラベルがドラッグ
                              起点になる)。 -->
+                        <!-- T-110增分1(增分0修2の本実装反映): VS2013テーマ標準の「Items.Count==1で
+                             TabItem自体をCollapse」トリガー(一次ソースGeneric.xaml:536-540)。従来の
+                             2タブ固定ペイン専用スタイルでは死文だったため省かれていたが、全ペイン
+                             共通スタイルへの昇格に伴い、単一ペイン4領域(シート/機器表/プロパティ/
+                             出力)に冗長な下タブが常時表示されるのを防ぐため必須となる。 -->
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count}" Value="1">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
                 </Setter.Value>
             </Setter>
@@ -348,10 +360,26 @@
              解決できないためDynamicResourceへ変更。ToolTip文字列(x:Static
              avalonDockProperties:Resources.*)は増分7・旧T-100同様、AvalonDock.Properties名前空間が
              XmlnsDefinition未公開のため固定の日本語文字列に置換(機能に影響なし、補助説明のみ)。
-             MainWindow.xaml.csのApplyDockingManagerThemesから、Theme適用直後に各DockingManagerの
+             MainWindow.xaml.csのApplyDockingManagerThemesから、Theme適用直後にDockingManagerの
              Resources[typeof(AnchorablePaneTitle)]へ本スタイルを直接登録し、VS2013テーマの
-             MergedDictionaries経由スタイルより優先させる。 -->
-        <Style x:Key="AnchorablePaneTitleNoDragHandleStyle" TargetType="{x:Type avalonDock:AnchorablePaneTitle}">
+             MergedDictionaries経由スタイルより優先させる。
+             T-110增分1(家老采配2026-07-22、增分0(e)実証済み方式): 単一DockingManager統合に伴い、
+             旧PlacementToolBarAnchorablePaneTitleStyle(T-099(c)案E、配置ツールバーのみラベル
+             非表示)を本スタイルへ統合する。4Manager出し分け(旧ApplyDockingManagerThemesの
+             manager identity判定)は成立しなくなるため、Model.ContentId分岐(下記
+             ControlTemplate.Triggers末尾)へ置き換える。案E原典の条件
+             (Model.Parent.IsDirectlyHostedInFloatingWindow=False=ドッキング時のみ)はそのまま
+             MultiDataTriggerとして維持する(增分0 PoCレビュー軽1指摘=忠実形採用)。
+             【A-6/E-3再判断(隠密着手前チェック、忍者PoC実機確認申し送り2.5)】本実装の
+             PlacementToolBarDockingManagerは常時2タブ(基本機能/配置ツール)構成のためドッキング中は
+             タブUI(UnifiedAnchorablePaneControlStyle)がホストしAnchorablePaneTitle自体は使われず、
+             フロート時もAvalonDock標準の別コンテナ(SinglePaneContextMenu系)が使われるため、
+             忍者PoC操作範囲では本分岐が発火する場面は無かった。しかし配置ツールタブをドラッグで
+             他ペイン位置へ再ドッキングし単独ペイン化する操作(CanFloat="False"はフロートのみ封止、
+             ペイン間移動自体は封じていない)を完全に排除できないため、削除はリスクに対し得るものが
+             小さいと判断し残置する(発火しない場合の実害はゼロ、削除しても既存の1トリガー分の
+             コード削減にとどまる)。 -->
+        <Style x:Key="UnifiedAnchorablePaneTitleStyle" TargetType="{x:Type avalonDock:AnchorablePaneTitle}">
             <Setter Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveBackground}}"/>
             <Setter Property="Foreground" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveText}}"/>
             <Setter Property="Template">
@@ -586,276 +614,17 @@
                                 <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
                                 <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
                             </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- T-099(c)最終形(殿裁定=案E、隠密設計2026-07-19、
-             docs/ecad2-t099-c-paneltitle-label-only-hide-design-onmitsu.md):
-             [経緯] コントロール全体のVisibility=Collapsed→フロート化不成立(コントロール自身が
-             持つドラッグ開始マウスイベント処理ごと死ぬ)、次いでOpacity=0+Height=1/5→ドラッグ
-             領域が実用に足りず再ドッキング不安定、という2度の試行錯誤を経て方式を刷新する。
-             [新方式] AnchorablePaneTitleNoDragHandleStyle(T-100、上記)のControlTemplateを
-             完全コピーし、ラベル実体のContentPresenter(x:Name="Header")のみドッキング時に
-             Collapsedにする。MenuDropDownButton等のボタン列は無変更で常時表示・操作可能に残し、
-             標準メニューのFloat項目経由で確実なフロート化経路を確保するのが本件の主目的。
-             BasedOn+Style.Triggersの軽量方式ではSetterにTargetNameを指定できない(WPF仕様、
-             TargetNameはControlTemplate.Triggers内でのみ有効)ため、Header単体を狙うには
-             テンプレート完全コピーが必須(T-100と同じ「既定コピー+標的差し替え」手法)。
-             HeaderはContentPresenter(表示専用要素)でマウスイベント処理を内包せず、タイトル
-             バー全体のヒットテストは背景Border(Background=TemplateBinding、非null維持)が
-             担うため、過去のCollapse化事故(コントロール全体を消しヒットテストごと殺した)とは
-             対象階層が異なり同型の機能喪失は起きない設計(実機確認で最終確認)。副作用として
-             Header内のDropDownControlArea(右クリックメニュー)は中身が無くなり実質操作不能に
-             なるが、MenuDropDownButton経由で同一メニューへ到達できるため機能喪失にはならない
-             (意図的に許容)。高さはHeight指定撤回により自然高さへ戻る(自然高さの支配要素は
-             MenuDropDownButton、約21px前後の見積り、要件(1)の省スペース化のうち高さ面の効果は
-             ほぼ失われるトレードオフを殿裁定で織り込み済み)。他パネル(左パレット/出力/右パネル)
-             には適用しない(ApplyDockingManagerThemesでPlacementToolBarDockingManagerのみへ
-             登録、コード側は変更不要)。 -->
-        <Style x:Key="PlacementToolBarAnchorablePaneTitleStyle" TargetType="{x:Type avalonDock:AnchorablePaneTitle}">
-            <Setter Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveBackground}}"/>
-            <Setter Property="Foreground" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveText}}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate>
-                        <Border
-                            Background="{TemplateBinding Background}"
-                            BorderBrush="{TemplateBinding BorderBrush}"
-                            BorderThickness="{TemplateBinding BorderThickness}">
-                            <Grid Margin="2,2,3,3">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Rectangle
-                                    x:Name="DragHandleGeometryPlaceholder"
-                                    Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionInactiveGrip}}"
-                                    Visibility="Collapsed"/>
-                                <DockPanel>
-                                    <Border
-                                        Padding="2,0,4,0"
-                                        HorizontalAlignment="Left"
-                                        Background="{TemplateBinding Background}">
-                                        <avalonDock:DropDownControlArea
-                                            DropDownContextMenu="{Binding Model.Root.Manager.AnchorableContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
-                                            DropDownContextMenuDataContext="{Binding Path=LayoutItem, RelativeSource={RelativeSource TemplatedParent}}"
-                                            Style="{DynamicResource DropDownControlArea}">
-                                            <ContentPresenter
-                                                x:Name="Header"
-                                                Content="{Binding Model, RelativeSource={RelativeSource TemplatedParent}}"
-                                                ContentTemplate="{Binding Model.Root.Manager.AnchorableTitleTemplate, RelativeSource={RelativeSource TemplatedParent}}"
-                                                ContentTemplateSelector="{Binding Model.Root.Manager.AnchorableTitleTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}"
-                                                TextElement.Foreground="{TemplateBinding Foreground}"/>
-                                        </avalonDock:DropDownControlArea>
-                                    </Border>
-                                    <!-- T-100本体: ハッチング模様の実体(DrawingBrush市松模様)を非表示化 -->
-                                    <Rectangle
-                                        x:Name="DragHandleTexture"
-                                        Height="5"
-                                        Margin="4,0,2,0"
-                                        VerticalAlignment="Center"
-                                        UseLayoutRounding="True"
-                                        RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                        Visibility="Collapsed">
-                                        <Rectangle.Fill>
-                                            <DrawingBrush
-                                                TileMode="Tile"
-                                                Viewbox="0,0,4,4"
-                                                ViewboxUnits="Absolute"
-                                                Viewport="0,0,4,4"
-                                                ViewportUnits="Absolute">
-                                                <DrawingBrush.Drawing>
-                                                    <GeometryDrawing Brush="{Binding Fill, ElementName=DragHandleGeometryPlaceholder, Mode=OneWay, Converter={avalonDock:NullToDoNothingConverter}}">
-                                                        <GeometryDrawing.Geometry>
-                                                            <GeometryGroup>
-                                                                <GeometryGroup.Children>
-                                                                    <RectangleGeometry Rect="0,0,1,1"/>
-                                                                    <RectangleGeometry Rect="2,2,1,1"/>
-                                                                </GeometryGroup.Children>
-                                                            </GeometryGroup>
-                                                        </GeometryDrawing.Geometry>
-                                                    </GeometryDrawing>
-                                                </DrawingBrush.Drawing>
-                                            </DrawingBrush>
-                                        </Rectangle.Fill>
-                                    </Rectangle>
-                                </DockPanel>
-                                <avalonDock:DropDownButton
-                                    x:Name="MenuDropDownButton"
-                                    Grid.Column="1"
-                                    Margin="1,1,1,0"
-                                    Width="15"
-                                    Height="15"
-                                    VerticalAlignment="Center"
-                                    DropDownContextMenu="{Binding Model.Root.Manager.AnchorableContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
-                                    DropDownContextMenuDataContext="{Binding Path=LayoutItem, RelativeSource={RelativeSource TemplatedParent}}"
-                                    Focusable="False"
-                                    Style="{DynamicResource AvalonDockThemeVs2013ToolButtonStyle}"
-                                    ToolTip="メニュー">
-                                    <Path
-                                        x:Name="PART_ImgMenuPin"
-                                        Margin="0,0,0,1"
-                                        Width="8"
-                                        Height="8"
-                                        Data="{DynamicResource PinMenu}"
-                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
-                                        Stretch="Uniform"/>
-                                </avalonDock:DropDownButton>
-                                <Button
-                                    x:Name="PART_AutoHidePin"
-                                    Grid.Column="2"
-                                    Margin="1,1,1,0"
-                                    Width="15"
-                                    Height="15"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding Path=LayoutItem.AutoHideCommand, RelativeSource={RelativeSource TemplatedParent}}"
-                                    Focusable="False"
-                                    Style="{DynamicResource AvalonDockThemeVs2013ButtonStyle}"
-                                    ToolTip="自動的に隠す"
-                                    Visibility="{Binding Path=IsEnabled, RelativeSource={RelativeSource Self}, Mode=OneWay, Converter={avalonDock:BoolToVisibilityConverter}}">
-                                    <Path
-                                        x:Name="PART_ImgAutoHidePin"
-                                        UseLayoutRounding="True"
-                                        RenderOptions.BitmapScalingMode="NearestNeighbor"
-                                        Width="11"
-                                        Height="11"
-                                        Data="{DynamicResource PinAutoHide}"
-                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
-                                        Stretch="Uniform"/>
-                                </Button>
-                                <Button
-                                    x:Name="PART_HidePin"
-                                    Grid.Column="3"
-                                    Margin="0,1,1,0"
-                                    Width="15"
-                                    Height="15"
-                                    HorizontalAlignment="Center"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding Path=LayoutItem.HideCommand, RelativeSource={RelativeSource TemplatedParent}}"
-                                    Focusable="False"
-                                    Style="{DynamicResource AvalonDockThemeVs2013ButtonStyle}"
-                                    ToolTip="閉じる"
-                                    Visibility="{Binding Path=IsEnabled, RelativeSource={RelativeSource Self}, Mode=OneWay, Converter={avalonDock:BoolToVisibilityConverter}}">
-                                    <Path
-                                        x:Name="PART_ImgHidePin"
-                                        Width="10"
-                                        Height="10"
-                                        Margin="1,0,0,1"
-                                        VerticalAlignment="Center"
-                                        Data="{DynamicResource PinClose}"
-                                        Fill="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveGlyph}}"
-                                        Stretch="Uniform"/>
-                                </Button>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <DataTrigger Binding="{Binding Model.IsAutoHidden, RelativeSource={RelativeSource Mode=Self}}" Value="True">
-                                <Setter TargetName="PART_AutoHidePin" Property="LayoutTransform">
-                                    <Setter.Value>
-                                        <RotateTransform Angle="90"/>
-                                    </Setter.Value>
-                                </Setter>
-                            </DataTrigger>
-                            <DataTrigger Binding="{Binding Model.CanClose, RelativeSource={RelativeSource Mode=Self}}" Value="True">
-                                <Setter TargetName="PART_HidePin" Property="Command" Value="{Binding Path=LayoutItem.CloseCommand, RelativeSource={RelativeSource TemplatedParent}}"/>
-                                <Setter TargetName="PART_HidePin" Property="ToolTip" Value="閉じる"/>
-                            </DataTrigger>
-                            <!-- Tool Window : Caption / Active -->
-                            <DataTrigger Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True">
-                                <Setter Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveBackground}}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveText}}"/>
-                                <Setter TargetName="DragHandleGeometryPlaceholder" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionActiveGrip}}"/>
-                            </DataTrigger>
-                            <!-- Tool Window : Caption : Button / Active -->
-                            <DataTrigger Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True">
-                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
-                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
-                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveGlyph}}"/>
-                            </DataTrigger>
-                            <!-- Tool Window : Caption : Button / Active, hovered -->
+                            <!-- T-110增分1(旧PlacementToolBarAnchorablePaneTitleStyle統合、T-099(c)案E踏襲):
+                                 ドッキング時、配置ツールバー(ContentId="PlacementToolBar")のみラベル
+                                 (Header)を非表示にする。MenuDropDownButton等のボタン列は無変更で
+                                 常時表示・操作可能に残す(案E原典どおり)。 -->
                             <MultiDataTrigger>
                                 <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=MenuDropDownButton}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
+                                    <Condition Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Mode=Self}}" Value="PlacementToolBar"/>
+                                    <Condition Binding="{Binding Model.Parent.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
                                 </MultiDataTrigger.Conditions>
-                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
-                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_AutoHidePin}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
-                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_HidePin}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="True"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBackground}}"/>
-                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <!-- Tool Window : Caption : Button / Inactive, hovered -->
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=MenuDropDownButton}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
-                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_AutoHidePin}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
-                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <MultiDataTrigger>
-                                <MultiDataTrigger.Conditions>
-                                    <Condition Binding="{Binding IsMouseOver, ElementName=PART_HidePin}" Value="True"/>
-                                    <Condition Binding="{Binding Model.IsActive, RelativeSource={RelativeSource Mode=Self}}" Value="False"/>
-                                </MultiDataTrigger.Conditions>
-                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBackground}}"/>
-                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredBorder}}"/>
-                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonInactiveHoveredGlyph}}"/>
-                            </MultiDataTrigger>
-                            <!-- Tool Window : Caption : Button / Active / Inactive, pressed -->
-                            <Trigger SourceName="MenuDropDownButton" Property="IsChecked" Value="True">
-                                <Setter TargetName="MenuDropDownButton" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
-                                <Setter TargetName="MenuDropDownButton" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
-                                <Setter TargetName="PART_ImgMenuPin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
-                            </Trigger>
-                            <Trigger SourceName="PART_AutoHidePin" Property="IsMouseCaptured" Value="True">
-                                <Setter TargetName="PART_AutoHidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
-                                <Setter TargetName="PART_AutoHidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
-                                <Setter TargetName="PART_ImgAutoHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
-                            </Trigger>
-                            <Trigger SourceName="PART_HidePin" Property="IsMouseCaptured" Value="True">
-                                <Setter TargetName="PART_HidePin" Property="Background" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBackground}}"/>
-                                <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
-                                <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
-                            </Trigger>
-                            <!-- T-099(c)最終形(殿裁定=案E): ドッキング時はラベル(Header)のみ非表示。
-                                 MenuDropDownButton(標準メニュー、Float項目でAttachDragガードを回避した
-                                 確実なフロート化が可能)は常時表示のまま残す。 -->
-                            <DataTrigger Binding="{Binding Model.Parent.IsDirectlyHostedInFloatingWindow, RelativeSource={RelativeSource Mode=Self}}" Value="False">
                                 <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
-                            </DataTrigger>
+                            </MultiDataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -866,35 +635,31 @@
     <Grid x:Name="RootLayoutGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>  <!-- メニューバー -->
-            <RowDefinition Height="Auto"/>  <!-- ツールバー(2段構成) -->
-            <RowDefinition Height="*"/>     <!-- メイン作業域 -->
-            <RowDefinition Height="Auto"/>  <!-- 下部出力パネル -->
+            <RowDefinition Height="*"/>     <!-- 単一DockingManager(旧ツールバー/メイン作業域/出力パネルを内包) -->
             <RowDefinition Height="Auto"/>  <!-- ステータスバー -->
         </Grid.RowDefinitions>
 
-        <!-- T-033増分2(隠密再レビュー改善事項): Menu/ToolBarTray/メイン作業域/OutputPanelAreaの
-             IsEnabledバインドを本ラッパーGrid一箇所へ一元化(従来は4箇所個別バインド)。ルートGridの
-             行0-3(メニュー〜出力パネル)をRowSpanでそのまま束ね、内部に同じ行構成(Auto/Auto/*/Auto)
-             を持たせる。配置バー(ElementPlacementBar)・ステータスバーはこのラッパーの外に残し、
-             常時有効のままとする(殿裁定=バー自身とステータスバーはグレーアウト対象外)。
-             注意(隠密レビューCONFIRMED、T-033増分2位置バグ): 本ラッパーのRowSpanにより、ルートGrid
-             の行0/1/3(Auto)はそれを単独専有する子要素を失い、WPF Gridの仕様上これらAuto行の実測
-             サイズは実質0に潰れる。結果、ルートGrid自身の座標系(RootLayoutGrid基準)ではMainWorkAreaGrid
-             の原点はラッパー経由で不変ではなくなる(ズレる)。PositionPlacementBarはこれを踏まえ、
-             TranslatePointの変換先をRootLayoutGridへ揃えることで整合させている。
-             T-059(出力パネル高さドラッグ調整、殿直接指示2026-07-11): 本ラッパー内部にGridSplitter用の
-             行を1行追加(Auto/Auto/*/Auto/Auto、旧index3=OutputPanelAreaはindex4へ繰り下げ)。ラッパー
-             自身のGrid.RowSpan=4・ルートGrid(RootLayoutGrid)の行構成(5行)は不変——本ラッパー内部専用の
-             細分化のため、ラッパー外にあるStatusBarArea(Grid.Row="4"、RootLayoutGrid基準)の値には
-             影響しない。 -->
-        <Grid x:Name="MainContentArea" Grid.Row="0" Grid.RowSpan="4"
+        <!-- T-033増分2(隠密再レビュー改善事項): Menu/単一DockingManagerのIsEnabledバインドを
+             本ラッパーGrid一箇所へ一元化。ルートGridの行0-1(メニュー〜単一DockingManager)を
+             RowSpanでそのまま束ね、内部に同じ行構成(Auto/*)を持たせる。配置バー
+             (ElementPlacementBar)・ステータスバーはこのラッパーの外に残し、常時有効のままとする
+             (殿裁定=バー自身とステータスバーはグレーアウト対象外)。
+             T-110增分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
+             出力パネル)を単一MainDockingManagerへ統合したことに伴い、旧5行構成
+             (Auto/Auto/*(Min200)/Auto/160(Min80)、ツールバー段・メイン作業域・GridSplitter・
+             出力パネル段を個別行として持っていた)をAuto(メニューバー)/*(単一DockingManager、
+             Min200維持)の2行へ単純化する。GridSplitter4本は全廃(AvalonDock内蔵リサイザーへ委譲)。
+             ラッパー自身のGrid.RowSpanは4→2、ルートGrid(RootLayoutGrid)自体も5行→3行(メニュー/
+             単一DockingManager/ステータスバー)。旧注意書き(T-033増分2位置バグ、RowSpanによる
+             Auto行潰れとMainWorkAreaGrid原点ズレ)は、MainWorkAreaGrid自体が撤去され単一
+             DockingManagerに置き換わったため実害の対象が消滅している——ElementPlacementBar等の
+             座標変換(PositionPlacementBar)は新設のCanvasDocumentGrid(キャンバスDocument内包
+             コンテナ)基準へ書き換える(下記参照)。 -->
+        <Grid x:Name="MainContentArea" Grid.Row="0" Grid.RowSpan="2"
               IsEnabled="{Binding IsMainContentEnabled}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*" MinHeight="200"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="160" MinHeight="80"/>
             </Grid.RowDefinitions>
 
         <!-- メニューバー: 最小限の項目構成(GX Works3同様のクラシックメニュー) -->
@@ -957,56 +722,33 @@
             </MenuItem>
         </Menu>
 
-        <!-- T-104増分2(家老采配2026-07-20、殿裁定): メインツールバー(旧1段目固定領域)は
-             「基本機能」タブ(下記PlacementToolBarDockingManager内)へ移設済み。従来の
-             2段ラッパーGrid(Auto/Auto)は1段構造化し不要になったため撤去(設計書§4記載どおり)。 -->
-        <!-- T-099要件(3)(殿直接指示=幅の動的フィット、余白解消): DockingManagerをAuto+Star列の
-             Gridで包み、Auto列の無限幅測定によりマネージャ自身をコンテンツ要求幅まで縮める。
-             LayoutAnchorablePaneのDockWidth(Auto/絶対値とも)は本構成では効かない——AvalonDockの
-             LayoutPanelControl.OnFixChildrenDockLengths(v4.74.1、55-66行)が、水平LayoutPanelの
-             子孫にLayoutDocumentPaneが1つも無い場合、初回描画時に全子のDockWidthをStar(1*)へ
-             強制上書きする仕様(旧Xceed時代からの既知問題、一次ソース確認済み2026-07-18。
-             診断ログ+UIA実測でもAuto/530設定済みでToolBar実幅1244pxを確認)。ゆえにペイン側で
-             なくマネージャ側を縮める方式を採る(Star列でも無限測定下ではコンテンツ要求幅に
-             収束するため、これで足りる)。 -->
-        <!-- 背景=ペイン右側の空き領域(Star列)がダークモードで白浮きしないようテーマ連動させる
-             (1段目ToolBarTrayと同じブラシ、従来この帯はDockingManager全幅で覆われていた)。 -->
-        <Grid Grid.Row="1" Background="{DynamicResource ToolBarBackgroundBrush}">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-        <!-- T-099再ドック修正(隠密設計・CONFIRMED、docs/ecad2-t099-redock-failure-root-cause-onmitsu.md):
-             フロート化でペインが空になると、Auto列の無限幅測定(要件3)によりDockingManager自身の
-             ActualWidthが実測25px程度まで縮み、AvalonDock DragServiceのヒットテスト矩形が
-             極小化して再ドックが成立しなくなる。MinWidthは下限保証としてのみ働き、通常時
-             (コンテンツ要求幅523px実測済み)のフィット動作には影響しない(523px>MinWidthのため無風)。
-             具体的な最小成立値は机上調査では確定できないため、目安100pxから開始し忍者の実機検証で
-             確認する。
-             【2026-07-19追記・T-099(c)観点1】忍者のSizeChanged実測(診断ログ、家老采配)により、
-             MinWidthは意図通り機能(フロート化直後ActualWidth=100で下限保証OK)している一方、
-             縦方向には同等の制約が無くActualHeightが93→18まで大きく縮小、再ドック後も68までしか
-             戻らず(初期93より25px不足)ボタン列が潰れて見える、という非対称な問題が判明。
-             MinWidthと同じ理屈で、MinHeightを初期ActualHeightの実測値(93)に合わせて追加する。 -->
-        <avalonDock:DockingManager x:Name="PlacementToolBarDockingManager" Grid.Column="0"
-                                   MinWidth="100" MinHeight="123"
-                                   AnchorablePaneControlStyle="{StaticResource PlacementToolBarPaneControlStyle}">
+        <!-- T-110增分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
+             出力パネル)を単一MainDockingManagerへ統合(隠密プラン§2.2案1トポロジ)。キャンバス
+             (LadderCanvas)をLayoutDocumentPaneとして内包し、Manager全体でRootLayoutGrid行1(*行)を
+             占める。旧4Manager個別のGridSplitter・Auto+Star列包み(T-099要件3の回避策、無限幅測定で
+             マネージャ自身をコンテンツ要求幅まで縮める手法)・MainWorkAreaGrid等は全廃。AvalonDock
+             標準の寸法管理(LayoutPanelControl.OnFixChildrenDockLengths、水平LayoutPanelの子孫に
+             LayoutDocumentPaneが存在する場合は文書側をStar化し非文書側の固定DockWidthを尊重する
+             仕様、v4.74.1一次ソース確認済み)に委ねることで、この回避策自体が不要になる
+             (隠密プラン§2.2根拠)。 -->
+        <Grid Grid.Row="1">
+        <avalonDock:DockingManager x:Name="MainDockingManager"
+                                   AnchorablePaneControlStyle="{StaticResource UnifiedAnchorablePaneControlStyle}">
             <avalonDock:DockingManager.Resources>
                 <!-- T-104増分1 DoD(4)対策(家老采配2026-07-20、隠密設計): Tab前進がAutoHideサイド
                      領域(LayoutAnchorSideControl、4方向、通常時は空でも常にビジュアルツリーに
                      存在する)を巡回するのみでタブヘッダー間(基本機能⇔配置ツール)へ到達しない
                      問題(docs/ecad2-t104-canfloat-tabnav-root-cause-survey-onmitsu.md)への対処。
-                     暗黙的スタイル(x:Keyなし)はビジュアルツリー最近傍のリソーススコープを優先
-                     するため、このDockingManager配下(4方向AutoHideサイド領域)にのみ適用され、
-                     他DockingManager(左パレット/出力/右パネル)には無影響。 -->
+                     T-110增分1: 単一Manager化によりAutoHideサイド領域はウィンドウ全域に及ぶため、
+                     本対処が全ペイン共通で有効になる(隠密プラン§3.5、望ましい方向)。 -->
                 <Style TargetType="{x:Type avalonDock:LayoutAnchorSideControl}">
                     <Setter Property="Focusable" Value="False"/>
                     <Setter Property="KeyboardNavigation.IsTabStop" Value="False"/>
                 </Style>
             </avalonDock:DockingManager.Resources>
             <avalonDock:LayoutRoot>
-                <avalonDock:LayoutPanel Orientation="Horizontal">
-                    <avalonDock:LayoutAnchorablePane SelectedContentIndex="1">
+                <avalonDock:LayoutPanel Orientation="Vertical">
+                    <avalonDock:LayoutAnchorablePane DockHeight="123" SelectedContentIndex="1">
                         <!-- T-104増分2(殿裁定2026-07-20、案A採用): 既定選択タブは「配置ツール」
                              (SelectedContentIndex=1、0番目=基本機能・1番目=配置ツール)。従来の
                              主要作業画面(ラダー編集)をそのまま初期表示し視覚的一貫性を保つ方針。 -->
@@ -1293,50 +1035,18 @@
                             </ToolBar>
                         </avalonDock:LayoutAnchorable>
                     </avalonDock:LayoutAnchorablePane>
-                </avalonDock:LayoutPanel>
-            </avalonDock:LayoutRoot>
-        </avalonDock:DockingManager>
-        <!-- T-103 PoC(家老采配2026-07-20、侍提案、docs/todo.md T-103節): フロート化中のみStar列
-             (空き領域、Grid.Column="1")に破線枠+案内文言を表示し、自前ヒットテスト(GetCursorPos+
-             枠矩形、コードビハインド側)によるドロップ判定の目印とする。標準AvalonDock
-             OverlayWindow/DropTarget(位置ズレバグ、docs/ecad2-t099-c-overlaywindow-position-drift-
-             survey-onmitsu.md)には一切依存しない独自方式。意匠(線種・色・太さ・文言)は仮実装
-             (最小PoC、後日殿プレビューで複数案から確定、UI/UX分岐)。 -->
-        <Grid x:Name="PlacementToolBarDropZoneOverlay" Grid.Column="1" Visibility="Collapsed"
-              IsHitTestVisible="False" Margin="8">
-            <Rectangle Stroke="{DynamicResource ToolBarForegroundBrush}" StrokeThickness="2"
-                       StrokeDashArray="4 2" RadiusX="4" RadiusY="4"/>
-            <TextBlock Text="ここへドラッグしてドッキング" HorizontalAlignment="Center" VerticalAlignment="Center"
-                       Foreground="{DynamicResource ToolBarForegroundBrush}"/>
-        </Grid>
-        </Grid>
 
-        <!-- メイン作業域: 左パレット / 中央キャンバス / 右パネル -->
-        <Grid x:Name="MainWorkAreaGrid" Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="LeftPaletteColumn" Width="220"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition x:Name="RightPanelColumn" Width="280"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- 左パレット: シートナビゲーション(T-026)。GuiEcadのナビツリー調査結果を踏襲し、
-                 実質フラットリスト(1シート=1ノード、階層なし)とする。部品選択は右パネルへ移設予定
-                 (T-026段階4、案B=状況依存切替)。
-                 T-058増分1: AvalonDock導入。DockingManagerは当面この列(左パレット)のみを管理し、
-                 増分2/3で出力パネル・右パネルを順次このDockingManagerへ追加していく土台とする
-                 (キャンバス列のFindBarオーバーレイ座標系への影響を避けるため、案Aを一段絞った設計、
-                 家老裁可済み)。既存のDockPanel中身(シート追加/削除/名前変更/設定ボタン・
-                 D&D並び替え対応ListBox)はそのままLayoutAnchorableへ移植。 -->
-            <avalonDock:DockingManager x:Name="LeftPaletteDockingManager" Grid.Column="0">
-                <avalonDock:LayoutRoot>
-                    <!-- LayoutRoot.RootPanelはLayoutPanel型必須(LayoutAnchorablePaneを直接子には
-                         できない、実機確認で発覚したXamlParseException)。単一ペインでも
-                         LayoutPanelで包む。 -->
                     <avalonDock:LayoutPanel Orientation="Horizontal">
-                        <avalonDock:LayoutAnchorablePane>
-                            <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False">
+
+                        <!-- 左パレット: シートナビゲーション(T-026)。GuiEcadのナビツリー調査結果を踏襲し、
+                             実質フラットリスト(1シート=1ノード、階層なし)とする。部品選択は右パネルへ移設予定
+                             (T-026段階4、案B=状況依存切替)。
+                             T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる
+                             (配置ツールバーのみフロート可を維持)。既存のDockPanel中身(シート追加/削除/
+                             名前変更/設定ボタン・D&D並び替え対応ListBox)は無改修でLayoutAnchorablePaneの
+                             直下へ移植。 -->
+                        <avalonDock:LayoutAnchorablePane DockWidth="220">
+                            <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False" CanFloat="False">
                                 <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitle="シート"を
                                      表示するため、旧実装の手動タイトルTextBlockは二重表示になっていた。削除。 -->
                                 <DockPanel>
@@ -1364,107 +1074,114 @@
                                 </DockPanel>
                             </avalonDock:LayoutAnchorable>
                         </avalonDock:LayoutAnchorablePane>
-                    </avalonDock:LayoutPanel>
-                </avalonDock:LayoutRoot>
-            </avalonDock:DockingManager>
 
-            <!-- IsTabStop=Falseはタブオーダーからの除外のみ(懸念4の迷い込み先解消、T-021設計集約
-                 プラン根拠4)。Focusable自体は既定のtrueのまま残し矢印キーでのリサイズは温存する。 -->
-            <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
+                        <!-- 中央キャンバス: 図面描画。T-110增分1(裁1、隠密プラン§2.2案1トポロジ):
+                             キャンバスをLayoutDocumentPaneへ内包する(統合の幾何学的必然、キャンバスは
+                             どのManagerにも属さない現状の4分割構成では単一統合が不可能だったため)。
+                             裁2(ドキュメントタブ非表示)はLayoutDocumentPane.ShowHeader="False"属性1つで
+                             足りる(增分0(f)重大バグ・隠密PoCレビュー追補で判明、DocumentPaneControlStyleの
+                             テンプレートコピーは不要——ライブラリ正規機構のため将来のAvalonDock更新にも
+                             強い。ShowHeaderはLayoutDocumentPane側の公開プロパティであり、
+                             LayoutDocument側には存在しない点に注意)。CanClose="False"は必須
+                             (キャンバスを閉じられては困る)。
+                             FindBarオーバーレイ(旧キャンバス列にZIndex重ね)はDocument内コンテンツへ
+                             内包する(隠密プラン§2.5、座標系がDocument内で完結し単純化方向)。
+                             新設のCanvasDocumentGrid(x:Name)はElementPlacementBar等の座標変換
+                             (PositionPlacementBar参照)の新しい基準として使う。 -->
+                        <avalonDock:LayoutDocumentPane ShowHeader="False">
+                            <avalonDock:LayoutDocument Title="作図キャンバス" ContentId="Canvas" CanClose="False">
+                                <Grid x:Name="CanvasDocumentGrid">
+                                    <!-- 空状態(濃紺)⇔作業領域(白)の状態依存配色はHasProject
+                                         バインディング経由で切替わる(T-020、ScrollViewer.Style参照)。Ctrl+マウスホイールで
+                                         拡大縮小(ScaleTransform)。キーボードでのズーム操作は段階8(キーボード規約の全体配線)
+                                         でまとめて対応する。 -->
+                                    <ScrollViewer x:Name="CanvasArea"
+                                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                                  PreviewMouseWheel="CanvasArea_PreviewMouseWheel"
+                                                  FocusManager.IsFocusScope="True">
+                                        <ScrollViewer.Style>
+                                            <!-- 空状態(濃紺)⇔作業領域(白)の状態依存配色(T-020、殿裁定=GX Works3踏襲)。
+                                                 HasProject=falseの間(ドキュメント未作成)はEmptyStateBackgroundBrushに切替わる。
+                                                 起動直後はDocument.Sheets=0(HasProject=false)で開始し濃紺スタート(殿裁定
+                                                 2026-07-05)、新規/開くで白の作業領域へ遷移する(MainWindowViewModel.
+                                                 HasProject/NotifyHasProjectChanged参照)。 -->
+                                            <Style TargetType="ScrollViewer">
+                                                <Setter Property="Background" Value="{DynamicResource WorkAreaBackgroundBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding HasProject}" Value="False">
+                                                        <Setter Property="Background" Value="{DynamicResource EmptyStateBackgroundBrush}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </ScrollViewer.Style>
+                                        <views:LadderCanvas x:Name="LadderCanvasHost"
+                                                            PreviewMouseLeftButtonDown="LadderCanvasHost_PreviewMouseLeftButtonDown"
+                                                            PreviewMouseMove="LadderCanvasHost_PreviewMouseMove"
+                                                            PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp"
+                                                            PreviewMouseRightButtonDown="LadderCanvasHost_PreviewMouseRightButtonDown"
+                                                            LostMouseCapture="LadderCanvasHost_LostMouseCapture">
+                                            <views:LadderCanvas.LayoutTransform>
+                                                <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
+                                            </views:LadderCanvas.LayoutTransform>
+                                        </views:LadderCanvas>
+                                    </ScrollViewer>
 
-            <!-- 中央キャンバス: 図面描画。空状態(濃紺)⇔作業領域(白)の状態依存配色はHasProject
-                 バインディング経由で切替わる(T-020、ScrollViewer.Style参照)。Ctrl+マウスホイールで
-                 拡大縮小(ScaleTransform)。キーボードでのズーム操作は段階8(キーボード規約の全体配線)
-                 でまとめて対応する。 -->
-            <ScrollViewer x:Name="CanvasArea" Grid.Column="2"
-                          HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                          PreviewMouseWheel="CanvasArea_PreviewMouseWheel"
-                          FocusManager.IsFocusScope="True">
-                <ScrollViewer.Style>
-                    <!-- 空状態(濃紺)⇔作業領域(白)の状態依存配色(T-020、殿裁定=GX Works3踏襲)。
-                         HasProject=falseの間(ドキュメント未作成)はEmptyStateBackgroundBrushに切替わる。
-                         起動直後はDocument.Sheets=0(HasProject=false)で開始し濃紺スタート(殿裁定
-                         2026-07-05)、新規/開くで白の作業領域へ遷移する(MainWindowViewModel.
-                         HasProject/NotifyHasProjectChanged参照)。 -->
-                    <Style TargetType="ScrollViewer">
-                        <Setter Property="Background" Value="{DynamicResource WorkAreaBackgroundBrush}"/>
-                        <Style.Triggers>
-                            <DataTrigger Binding="{Binding HasProject}" Value="False">
-                                <Setter Property="Background" Value="{DynamicResource EmptyStateBackgroundBrush}"/>
-                            </DataTrigger>
-                        </Style.Triggers>
-                    </Style>
-                </ScrollViewer.Style>
-                <views:LadderCanvas x:Name="LadderCanvasHost"
-                                    PreviewMouseLeftButtonDown="LadderCanvasHost_PreviewMouseLeftButtonDown"
-                                    PreviewMouseMove="LadderCanvasHost_PreviewMouseMove"
-                                    PreviewMouseLeftButtonUp="LadderCanvasHost_PreviewMouseLeftButtonUp"
-                                    PreviewMouseRightButtonDown="LadderCanvasHost_PreviewMouseRightButtonDown"
-                                    LostMouseCapture="LadderCanvasHost_LostMouseCapture">
-                    <views:LadderCanvas.LayoutTransform>
-                        <ScaleTransform ScaleX="{Binding CanvasScale}" ScaleY="{Binding CanvasScale}"/>
-                    </views:LadderCanvas.LayoutTransform>
-                </views:LadderCanvas>
-            </ScrollViewer>
+                                    <!-- T-070(殿裁定(1)=上部バー、GuiEcad踏襲): 検索・置換オーバーレイ。Ctrl-Fでトグル表示。
+                                         作図エリアの上部に重ねる、ElementPlacementBarと同型の同一Window内
+                                         オーバーレイ設計。検索対象は機器名完全一致のみ(殿裁定(2))。 -->
+                                    <Border x:Name="FindBar" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
+                                            TextElement.Foreground="{DynamicResource DialogForegroundBrush}"
+                                            BorderThickness="1" Padding="6" HorizontalAlignment="Stretch" VerticalAlignment="Top"
+                                            Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
+                                            Panel.ZIndex="100">
+                                        <StackPanel Orientation="Horizontal">
+                                            <TextBlock Text="検索:" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                            <TextBox x:Name="FindQueryBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                     AutomationProperties.Name="検索"
+                                                     Background="{DynamicResource InputBackgroundBrush}"
+                                                     Foreground="{DynamicResource InputForegroundBrush}"
+                                                     Text="{Binding Find.Query, UpdateSourceTrigger=PropertyChanged}"
+                                                     PreviewKeyDown="FindQueryBox_PreviewKeyDown"/>
+                                            <TextBlock Text="{Binding Find.StatusText}" VerticalAlignment="Center" Width="60" Margin="0,0,4,0"/>
+                                            <Button Content="前" Width="32" VerticalAlignment="Center" Margin="0,0,2,0"
+                                                    AutomationProperties.Name="前へ" Command="{Binding Find.PrevCommand}"/>
+                                            <Button Content="次" Width="32" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                    AutomationProperties.Name="次へ" Command="{Binding Find.NextCommand}"/>
+                                            <Separator/>
+                                            <TextBlock Text="置換後:" VerticalAlignment="Center" Margin="8,0,4,0"/>
+                                            <TextBox x:Name="FindReplaceBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                     AutomationProperties.Name="置換後"
+                                                     Background="{DynamicResource InputBackgroundBrush}"
+                                                     Foreground="{DynamicResource InputForegroundBrush}"
+                                                     Text="{Binding Find.ReplaceWith, UpdateSourceTrigger=PropertyChanged}"/>
+                                            <Button Content="置換" Width="48" VerticalAlignment="Center" Margin="0,0,4,0"
+                                                    AutomationProperties.Name="置換" Command="{Binding Find.ReplaceOneCommand}"/>
+                                            <Button Content="全置換" Width="56" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                    AutomationProperties.Name="全置換" Command="{Binding Find.ReplaceAllCommand}"/>
+                                            <Button Content="閉じる" Width="56" VerticalAlignment="Center"
+                                                    AutomationProperties.Name="検索バーを閉じる" Click="FindCloseButton_Click"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </avalonDock:LayoutDocument>
+                        </avalonDock:LayoutDocumentPane>
 
-            <!-- T-070(殿裁定(1)=上部バー、GuiEcad踏襲): 検索・置換オーバーレイ。Ctrl-Fでトグル表示。
-                 作図エリア(Grid.Column="2")の上部に重ねる、ElementPlacementBarと同型の同一Window内
-                 オーバーレイ設計。検索対象は機器名完全一致のみ(殿裁定(2))。 -->
-            <Border x:Name="FindBar" Grid.Column="2" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
-                    TextElement.Foreground="{DynamicResource DialogForegroundBrush}"
-                    BorderThickness="1" Padding="6" HorizontalAlignment="Stretch" VerticalAlignment="Top"
-                    Visibility="{Binding Find.IsVisible, Converter={StaticResource BoolToVisibility}}"
-                    Panel.ZIndex="100">
-                <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="検索:" VerticalAlignment="Center" Margin="0,0,4,0"/>
-                    <TextBox x:Name="FindQueryBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
-                             AutomationProperties.Name="検索"
-                             Background="{DynamicResource InputBackgroundBrush}"
-                             Foreground="{DynamicResource InputForegroundBrush}"
-                             Text="{Binding Find.Query, UpdateSourceTrigger=PropertyChanged}"
-                             PreviewKeyDown="FindQueryBox_PreviewKeyDown"/>
-                    <TextBlock Text="{Binding Find.StatusText}" VerticalAlignment="Center" Width="60" Margin="0,0,4,0"/>
-                    <Button Content="前" Width="32" VerticalAlignment="Center" Margin="0,0,2,0"
-                            AutomationProperties.Name="前へ" Command="{Binding Find.PrevCommand}"/>
-                    <Button Content="次" Width="32" VerticalAlignment="Center" Margin="0,0,8,0"
-                            AutomationProperties.Name="次へ" Command="{Binding Find.NextCommand}"/>
-                    <Separator/>
-                    <TextBlock Text="置換後:" VerticalAlignment="Center" Margin="8,0,4,0"/>
-                    <TextBox x:Name="FindReplaceBox" Width="140" VerticalAlignment="Center" Margin="0,0,4,0"
-                             AutomationProperties.Name="置換後"
-                             Background="{DynamicResource InputBackgroundBrush}"
-                             Foreground="{DynamicResource InputForegroundBrush}"
-                             Text="{Binding Find.ReplaceWith, UpdateSourceTrigger=PropertyChanged}"/>
-                    <Button Content="置換" Width="48" VerticalAlignment="Center" Margin="0,0,4,0"
-                            AutomationProperties.Name="置換" Command="{Binding Find.ReplaceOneCommand}"/>
-                    <Button Content="全置換" Width="56" VerticalAlignment="Center" Margin="0,0,8,0"
-                            AutomationProperties.Name="全置換" Command="{Binding Find.ReplaceAllCommand}"/>
-                    <Button Content="閉じる" Width="56" VerticalAlignment="Center"
-                            AutomationProperties.Name="検索バーを閉じる" Click="FindCloseButton_Click"/>
-                </StackPanel>
-            </Border>
-
-            <GridSplitter Grid.Column="3" Width="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
-
-            <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
-                 上下2分割で常時同時参照可能にする(タブ切替不要)。
-                 T-058増分3: AvalonDock導入。左パレット・出力パネルと同様、独立したDockingManagerとして
-                 この列(右パネル)のみを管理する(案C踏襲、家老裁可済み)。上下分割はLayoutPanel
-                 (Orientation="Vertical")一つで実現(内蔵リサイザーに置き換わるため旧GridSplitterは削除)。
-                 下段(プロパティ⇔部品選択)のタイトルはAvalonDockのオフツリー構造ゆえBindingが機能せず
-                 (docs-notes/handover-next-session.md§3)、MainWindow.xaml.csでIsPartSelectionVisible変更を
-                 購読しTitleを直接更新する方式(UpdateRightPanelBottomTitle参照、増分2のUpdateOutputPanelTitle
-                 と同型)。手動タイトルTextBlockはAvalonDockタブヘッダーとの二重表示を避けるため削除
-                 (増分1/2の教訓)。 -->
-            <avalonDock:DockingManager x:Name="RightPanelDockingManager" Grid.Column="4">
-                <avalonDock:LayoutRoot>
-                    <avalonDock:LayoutPanel Orientation="Vertical">
+                        <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
+                             上下2分割で常時同時参照可能にする(タブ切替不要)。
+                             T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
+                             上下分割はLayoutPanel(Orientation="Vertical")一つで実現。
+                             下段(プロパティ⇔部品選択)のタイトルはAvalonDockのオフツリー構造ゆえBindingが機能せず
+                             (docs-notes/handover-next-session.md§3)、MainWindow.xaml.csでIsPartSelectionVisible変更を
+                             購読しTitleを直接更新する方式(UpdateRightPanelBottomTitle参照、増分2のUpdateOutputPanelTitle
+                             と同型)。手動タイトルTextBlockはAvalonDockタブヘッダーとの二重表示を避けるため削除
+                             (増分1/2の教訓)。 -->
+                        <avalonDock:LayoutPanel Orientation="Vertical" DockWidth="280">
                         <!-- T-058増分3範囲内欠陥修正(家老采配、忍者実機確認で実害確定): AvalonDock既定の
                              DockMinHeight(25px、隠密reflection実測)ではDataGridが完全に不可視(BoundingRectangle
                              =Empty)になるまで境界ドラッグで縮小可能だった。旧Grid実装時代のMinHeight="80"
                              (MainContentArea.RowDefinitions、既存T-059出力パネル領域と同値)を踏襲し明示指定する。 -->
                         <avalonDock:LayoutAnchorablePane DockMinHeight="80">
-                            <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False">
+                            <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False" CanFloat="False">
                                 <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
                                           HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
                                           CanUserAddRows="False" CanUserDeleteRows="False">
@@ -1483,7 +1200,7 @@
                                  プロパティ側はさらにHasSelectedElementで「要素を選択してください」
                                  プレースホルダと選択中要素の詳細表示を切替える(T-017)。Title初期値="プロパティ"
                                  (既定表示、UpdateRightPanelBottomTitleが以後の状況変化を追従)。 -->
-                            <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False">
+                            <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False" CanFloat="False">
                                 <Grid>
                                     <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
                                         <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
@@ -1594,28 +1311,18 @@
                                 </Grid>
                             </avalonDock:LayoutAnchorable>
                         </avalonDock:LayoutAnchorablePane>
+                        </avalonDock:LayoutPanel>
+
                     </avalonDock:LayoutPanel>
-                </avalonDock:LayoutRoot>
-            </avalonDock:DockingManager>
-        </Grid>
 
-        <!-- T-059(殿直接指示2026-07-11): メイン作業域⇔出力パネルの高さをドラッグ調整可能にする
-             (RightPanelArea、456行の上下分割と同一パターン)。 -->
-        <GridSplitter Grid.Row="3" Height="4" HorizontalAlignment="Stretch" KeyboardNavigation.IsTabStop="False"/>
-
-        <!-- 下部出力パネル: DesignRuleCheck(T-007移植済み)の結果を構造化DataGridで表示する(T-018、
-             殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
-             行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
-             (OutputPanelViewModel.SelectedDiagnostic参照)。高さはGridSplitterでドラッグ調整可能
-             (T-059、既定160・MinHeight=80はMainContentArea.RowDefinitions側で指定)。
-             T-058増分2: AvalonDock化。左パレット用DockingManagerとは独立した2つ目のインスタンスとして
-             この位置(MainContentArea.Row="4")のみを管理する(案C、家老裁可済み)。既存のT-059
-             GridSplitter(直前のGrid.Row="3")はDockingManager外側の境界リサイズ用としてそのまま維持する
-             (DockingManager自身が持つのは内部ペイン間のリサイザーのみ)。 -->
-        <avalonDock:DockingManager x:Name="OutputPanelDockingManager" Grid.Row="4">
-            <avalonDock:LayoutRoot>
-                <avalonDock:LayoutPanel Orientation="Horizontal">
-                    <avalonDock:LayoutAnchorablePane>
+                    <!-- 下部出力パネル: DesignRuleCheck(T-007移植済み)の結果を構造化DataGridで表示する(T-018、
+                         殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
+                         行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
+                         (OutputPanelViewModel.SelectedDiagnostic参照)。
+                         T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
+                         DockHeight="160"は旧MinHeight=80/既定160(MainContentArea.RowDefinitions側指定)を
+                         踏襲。 -->
+                    <avalonDock:LayoutAnchorablePane DockHeight="160">
                         <!-- 殿ご指摘(実機確認)による2周目修正: AvalonDockのタブヘッダー自体がTitleを表示する
                              ため、旧実装の手動タイトルTextBlock(出力/検索結果切替)は二重表示になっていた
                              (1周目で解消)。しかしTitleへの{Binding Find.IsVisible}は忍者実機確認で完全に
@@ -1624,7 +1331,7 @@
                              継承(Visual/Logical Tree経由)の対象外のため(GitHub一次ソース確認済み、
                              忍者の推測通り)。BindingではなくMainWindow.xaml.csでFind.PropertyChangedを
                              購読しTitleを直接更新する方式に切替える(UpdateOutputPanelTitle参照)。 -->
-                        <avalonDock:LayoutAnchorable Title="出力" ContentId="OutputPanel" CanClose="False">
+                        <avalonDock:LayoutAnchorable Title="出力" ContentId="OutputPanel" CanClose="False" CanFloat="False">
                             <DockPanel>
                                 <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
                                      受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり
@@ -1683,12 +1390,35 @@
                 </avalonDock:LayoutPanel>
             </avalonDock:LayoutRoot>
         </avalonDock:DockingManager>
+
+        <!-- T-103独自ドロップ枠(家老采配2026-07-20、侍提案、docs/todo.md T-103節): フロート化中のみ
+             破線枠+案内文言を表示し、自前ヒットテスト(GetCursorPos+枠矩形、コードビハインド側)による
+             ドロップ判定の目印とする。標準AvalonDock OverlayWindow/DropTarget(位置ズレバグ、
+             docs/ecad2-t099-c-overlaywindow-position-drift-survey-onmitsu.md)には一切依存しない
+             独自方式。意匠(線種・色・太さ・文言)は仮実装(最小PoC、後日殿プレビューで複数案から確定、
+             UI/UX分岐)。
+             T-110增分1(座標取得元の再配線、隠密プランC-1): 旧構成は配置ツールバー段の空き領域
+             (Star列)にのみ重ねていたが、単一統合後は列構成自体が消滅したためMainDockingManager
+             全体に重ねる形へ変更する。ヒットテスト(コードビハインド側、GetCursorPos+本オーバーレイの
+             スクリーン矩形)の対象範囲がツールバー段のみから全域へ広がるため、ドロップ枠として
+             ドッキング先を示す意味合いが変わる(「元の位置へ戻す」入り口が広がる方向、仮実装ゆえ
+             許容——T-103自体が意匠含め仮実装のスコープであることは元コメントのとおり)。 -->
+        <Grid x:Name="PlacementToolBarDropZoneOverlay" Visibility="Collapsed"
+              IsHitTestVisible="False" Margin="8">
+            <Rectangle Stroke="{DynamicResource ToolBarForegroundBrush}" StrokeThickness="2"
+                       StrokeDashArray="4 2" RadiusX="4" RadiusY="4"/>
+            <TextBlock Text="ここへドラッグしてドッキング" HorizontalAlignment="Center" VerticalAlignment="Center"
+                       Foreground="{DynamicResource ToolBarForegroundBrush}"/>
+        </Grid>
+        </Grid>
         </Grid>
 
         <!-- ステータスバー: design-brief 4節#6「モード可視化の多重化」。現在の配置ツールモードと
              ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
-             本実装向け機能に依存するため将来タスク。 -->
-        <StatusBar x:Name="StatusBarArea" Grid.Row="4">
+             本実装向け機能に依存するため将来タスク。
+             T-110增分1: RootLayoutGrid行構成の単純化(5行→3行: メニュー/単一DockingManager/
+             ステータスバー)に伴い、Grid.Row="4"→"2"へ変更。 -->
+        <StatusBar x:Name="StatusBarArea" Grid.Row="2">
             <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。 -->
             <StatusBarItem>
                 <TextBlock Text="{Binding Mode, StringFormat='モード: {0}'}"/>
@@ -1737,7 +1467,7 @@
              両経路を同時に無効化する(殿裁定=現行モーダル同等の使用感)。構想図左端[小アイコン類]は
              機能未定(殿裁定2026-07-07=見た目だけ構想図と一致させる、押下無反応のプレースホルダ)。
              末尾[拡張表示]は増分3で配置のみ実装(詳細画面はT-028で別途実装予定、本増分では押下無反応)。 -->
-        <Border x:Name="ElementPlacementBar" Grid.Row="2" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
+        <Border x:Name="ElementPlacementBar" Grid.Row="1" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
                 TextElement.Foreground="{DynamicResource DialogForegroundBrush}"
                 BorderThickness="1" Padding="6" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Visibility="{Binding IsPlacementBarVisible, Converter={StaticResource BoolToVisibility}}"
@@ -1834,7 +1564,7 @@
              表示状態はIsRungCommentEditorVisible(ViewModel単一の真実源、往復1周目指摘F)へバインドし、
              配置バーと同様にMainContentAreaのIsEnabled(IsMainContentEnabled)と連動させることで、
              編集中のキーボード(Window_PreviewKeyDown冒頭ガード)・マウスの両経路を同時に無効化する。 -->
-        <Border x:Name="RungCommentEditor" Grid.Row="2" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
+        <Border x:Name="RungCommentEditor" Grid.Row="1" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
                 TextElement.Foreground="{DynamicResource DialogForegroundBrush}"
                 BorderThickness="1" Padding="2" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Visibility="{Binding IsRungCommentEditorVisible, Converter={StaticResource BoolToVisibility}}"
@@ -1852,7 +1582,7 @@
              確定扱い。表示状態はIsFrameLabelEditorVisible(ViewModel単一の真実源)へバインドし、
              配置バー・行コメントエディタと同様にMainContentAreaのIsEnabled(IsMainContentEnabled)と
              連動させる。 -->
-        <Border x:Name="FrameLabelEditor" Grid.Row="2" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
+        <Border x:Name="FrameLabelEditor" Grid.Row="1" Background="{DynamicResource DialogBackgroundBrush}" BorderBrush="{DynamicResource DialogBorderBrush}"
                 TextElement.Foreground="{DynamicResource DialogForegroundBrush}"
                 BorderThickness="1" Padding="2" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Visibility="{Binding IsFrameLabelEditorVisible, Converter={StaticResource BoolToVisibility}}"
