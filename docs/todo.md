@@ -680,6 +680,16 @@ DynamicResource機構を`SetResourceReference`経由で適用。回帰テスト8
 表構文崩れも生Markdown記法のプレーンテキスト化のみで文字化け等の実害なしと確認。これにて
 T-077増分1完了。次は増分2（ナビゲーションUI・全11領域対応）。
 
+**増分2完了（2026-07-21、コミット`66a730e`、4ファイル/154insertions/15deletions）**：
+`UsageWindow`を左目次（ListBox、11領域）+GridSplitter+右コンテンツ（FlowDocumentScrollViewer）
+へ拡張、目次選択で増分1確立の`MarkdownFlowDocumentConverter`をそのまま流用しコンテンツ切替。
+全11領域（`ecad2-spec-*.md`）をEmbeddedResource同梱（原文のまま、平易版変換は増分3）。初期
+選択＝先頭「シート/ドキュメント管理」、並び順は侍判断（GX Works3的論理順序）。回帰テスト
+15件追加。隠密静的レビュー完了（指摘なし、T-100修正済みListBoxスタイルの適用範囲・
+GridSplitterダークモード対応とも確認済み）。忍者実機確認完了（`docs/ecad2-t077-zoubun2-verify-ninja.md`）：
+DoD(1)〜(6)全OK、画素採取もライト/ダーク両テーマで理論値と完全一致。これにてT-077増分2完了。
+次は増分3（`docs/spec`→ユーザー向け平易版への変換）。
+
 ### 実装順ロードマップ（2026-07-14家老改訂、T-087/T-088完了・T-058/T-083前倒しを反映）
 
 T-058/T-083前倒し（殿指示2026-07-14） → 小粒タスクの消化 → 大物の順（.NET 10移行=T-062は完了済み）。
