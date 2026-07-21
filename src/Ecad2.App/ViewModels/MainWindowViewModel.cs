@@ -2101,6 +2101,27 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>T-107: 選択中要素のコメント(Element.Comment、ラダー図上は機器シンボル直下に緑色で
+    /// 表示)。DeviceNameと異なり機器表(DeviceTable)には反映されない(クロスリファレンス表側で
+    /// CrossReferenceBuilderが再描画のたびに集約するため、ここでの追加反映は不要)。
+    /// SelectedElementNotchPosition/LampColor/LabelDy等と同型、値未変化ならRecordSnapshotしない。</summary>
+    public string SelectedElementComment
+    {
+        get => SelectedElement?.Comment ?? "";
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            string oldComment = el.Comment ?? "";
+            string newComment = value.Trim();
+            if (oldComment == newComment) return;
+
+            UndoManager.RecordSnapshot(Document);
+            el.Comment = newComment.Length > 0 ? newComment : null;
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementComment), oldComment);
+        }
+    }
+
     /// <summary>SelectedElementがセレクトSWか(T-086、プロパティパネルのノッチ位置入力欄表示制御用)。
     /// ResolveDeviceClassはT-061 A-1で確立済みの判定(自作パーツのSelectSwitch特殊判定込み)を
     /// 再利用する(rule of three回避)。</summary>

@@ -830,6 +830,15 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter) CommitDeviceNameEdit();
     }
 
+    // T-107: 機器コメント編集(DeviceNameBoxと同型のExplicit確定)。CommitDeviceNameEditが
+    // CommentBoxも併せて確定するため、専用のCommitメソッドは設けず既存を呼ぶ。
+    private void CommentBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
+
+    private void CommentBox_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key == Key.Enter) CommitDeviceNameEdit();
+    }
+
     // T-086: ノッチ位置編集(DeviceNameBoxと同型のExplicit確定)。CommitDeviceNameEditが
     // NotchPositionBoxも併せて確定するため、専用のCommitメソッドは設けず既存を呼ぶ。
     private void NotchPositionBox_LostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e) => CommitDeviceNameEdit();
@@ -887,6 +896,7 @@ public partial class MainWindow : Window
     // T-096: SetpointBoxも同型(IsSelectedElementTimerRelated=falseの間は?.で安全に扱う)。
     // T-097: LabelDyBoxも同型(全要素種別共通ゆえ種別限定Visibilityは無いが、HasSelectedElement=false
     // の間はBinding自体が無効なため同様に?.で安全に扱う)。
+    // T-107: CommentBoxも同型(LabelDyBoxと同じく全要素種別共通)。
     private void CommitDeviceNameEdit()
     {
         DeviceNameBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
@@ -894,6 +904,7 @@ public partial class MainWindow : Window
         LampColorBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         SetpointBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         LabelDyBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
+        CommentBox.GetBindingExpression(TextBox.TextProperty)?.UpdateSource();
         RedrawCanvas();
     }
 

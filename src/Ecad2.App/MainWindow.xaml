@@ -1499,6 +1499,14 @@
                                                      Background="{DynamicResource InputBackgroundBrush}"
                                                      Foreground="{DynamicResource InputForegroundBrush}"
                                                      LostKeyboardFocus="DeviceNameBox_LostKeyboardFocus" PreviewKeyDown="DeviceNameBox_PreviewKeyDown"/>
+                                            <!-- T-107(殿裁定): 機器コメント入力欄。DeviceNameBoxと同型の位置・
+                                                 Explicit確定パターン(P-086/T-097系の呼び忘れ再発防止のためCommitDeviceNameEditへ集約)。 -->
+                                            <TextBlock Text="コメント:" Margin="0,8,0,2" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
+                                            <TextBox x:Name="CommentBox" Text="{Binding SelectedElementComment, UpdateSourceTrigger=Explicit}"
+                                                     IsEnabled="{Binding CanEditDiagram}"
+                                                     Background="{DynamicResource InputBackgroundBrush}"
+                                                     Foreground="{DynamicResource InputForegroundBrush}"
+                                                     LostKeyboardFocus="CommentBox_LostKeyboardFocus" PreviewKeyDown="CommentBox_PreviewKeyDown"/>
                                             <!-- T-086: セレクトSW限定のノッチ位置入力欄。DeviceNameBoxと同型
                                                  (UpdateSourceTrigger=Explicit+LostKeyboardFocus/Enterで確定)。 -->
                                             <StackPanel Visibility="{Binding IsSelectedElementSelectSwitch, Converter={StaticResource BoolToVisibility}}">

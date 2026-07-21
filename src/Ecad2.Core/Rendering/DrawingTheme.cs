@@ -6,7 +6,7 @@ namespace Ecad2.Rendering;
 public enum StrokeRole { Wire, BusRail, SymbolOutline, GroupFrame, Grid }
 
 /// <summary>文字の役割。</summary>
-public enum TextRole { DeviceName, LineNumber, CrossRef, Title }
+public enum TextRole { DeviceName, LineNumber, CrossRef, Title, Comment }
 
 /// <summary>
 /// 役割ごとの線・文字プリセット（画面/PDF共通）。太さ・サイズは mm 固定。
@@ -33,6 +33,9 @@ public sealed class DrawingTheme
     // T-061(殿裁定(3)=LDmicro式): 通電=赤(Powered、既存)/非通電=グレー。テストモード中のみ使う
     // (作画モードでは従来どおりForegroundのまま、DiagramRenderer.DrawElement参照)。
     public static readonly Color NonEnergizedGray = new(255, 150, 150, 150);
+    // T-107(殿裁定=GX Works3同様の緑色): 機器コメント表示。ライト/ダーク両テーマで固定
+    // (背景とのコントラストのみ確認、色自体はテーマ非依存)。
+    public static readonly Color Comment = new(255, 0, 128, 0);
 
     // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
     public const double TableLineWidth = 0.18;
@@ -74,6 +77,9 @@ public sealed class DrawingTheme
         TextRole.LineNumber => new(FontFamily, 2.2, Foreground, HAlign: HAlign.Center, VAlign: VAlign.Bottom),
         TextRole.DeviceName => new(FontFamily, 2.0, Foreground, HAlign: HAlign.Center, VAlign: VAlign.Bottom),
         TextRole.Title => new(FontFamily, 4.0, Foreground, Bold: true, HAlign: HAlign.Left, VAlign: VAlign.Baseline),
+        // T-107: 機器シンボル直下(同一セル内)に表示するコメント。DeviceNameと対称に
+        // VAlign=Topでオリジン(記号下端)から下方向へ伸ばす。色はComment(意味色、テーマ非依存)固定。
+        TextRole.Comment => new(FontFamily, 2.0, Comment, HAlign: HAlign.Center, VAlign: VAlign.Top),
         _ => new(FontFamily, 2.5, Foreground, HAlign: HAlign.Left, VAlign: VAlign.Middle),
     };
 

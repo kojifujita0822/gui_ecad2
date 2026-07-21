@@ -82,6 +82,50 @@ public class DiagramRendererLabelTests
         double y002 = renderer.DrawnTextEntries.Single(t => t.Text == "Y002").Position.Y;
         Assert.Equal(y002, y001, precision: 6);
     }
+
+    /// <summary>T-107 DoD(1)(2): Element.Commentが設定されていれば緑色(DrawingTheme.Comment)で
+    /// 描画され、未設定(null/空文字)なら描画されないことを検証する。</summary>
+    [Theory]
+    [InlineData("負荷側過電流保護", true)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void Render_ElementComment_DrawsOnlyWhenPresent(string? comment, bool expectDrawn)
+    {
+        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001", Comment = comment };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(elem);
+
+        var renderer = new RecordingRenderer();
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());
+
+        if (expectDrawn)
+        {
+            var entry = renderer.DrawnTextEntries.Single(t => t.Text == comment);
+            Assert.Equal(DrawingTheme.Comment, entry.Style.Color);
+        }
+        else
+        {
+            Assert.DoesNotContain(renderer.DrawnTextEntries, t => t.Text == comment);
+        }
+    }
+
+    /// <summary>T-107 DoD(1): コメントは機器名(記号の上)と対称に記号の下へ描画される
+    /// (同一セル内で行を専有しない、上下2分割構造)。機器名ラベルのY座標より下(Y値が大きい)
+    /// になることを検証する。</summary>
+    [Fact]
+    public void Render_ElementWithCommentAndDeviceName_CommentIsBelowDeviceName()
+    {
+        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001", Comment = "手動リセット" };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(elem);
+
+        var renderer = new RecordingRenderer();
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());
+
+        double deviceNameY = renderer.DrawnTextEntries.Single(t => t.Text == "X001").Position.Y;
+        double commentY = renderer.DrawnTextEntries.Single(t => t.Text == "手動リセット").Position.Y;
+        Assert.True(commentY > deviceNameY, $"comment Y({commentY}) should be below device name Y({deviceNameY})");
+    }
 }
 
 /// <summary>DrawTextの呼び出し引数(text)のみを記録するIRendererのテストダブル。他の描画命令は
@@ -89,7 +133,7 @@ public class DiagramRendererLabelTests
 internal sealed class RecordingRenderer : IRenderer
 {
     public List<string> DrawnTexts { get; } = new();
-    public List<(string Text, Point2D Position)> DrawnTextEntries { get; } = new();
+    public List<(string Text, Point2D Position, TextStyle Style)> DrawnTextEntries { get; } = new();
 
     public void PushTransform(double translateX, double translateY, double scale = 1.0) { }
     public void PopTransform() { }
@@ -106,7 +150,7 @@ internal sealed class RecordingRenderer : IRenderer
     public void DrawText(string text, Point2D position, TextStyle style)
     {
         DrawnTexts.Add(text);
-        DrawnTextEntries.Add((text, position));
+        DrawnTextEntries.Add((text, position, style));
     }
     public Size2D MeasureText(string text, TextStyle style) => new(0, 0);
     public void DrawImage(string filePath, Rect2D bounds) { }

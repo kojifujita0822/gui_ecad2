@@ -1125,27 +1125,37 @@ public sealed class DiagramRenderer
 
     // 機器名ラベルを記号の上・中央に描く。
     // Params["LabelDy"] (mm, 正で上へ) で要素ごとに高さオフセットを調整できる（密集時の重なり回避）。
-    // コメントは図面には描かない（PDF の機器欄に記載する）。
+    // T-107(殿裁定): コメント(Element.Comment)は記号の下・中央に描く(GX3の上下2分割セル構造に
+    // 対応、機器名=上段/コメント=下段で同一セル内に収め行を専有しない)。
     private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width, ElementKind resolvedKind)
     {
         if (!_opt.ShowDeviceNames) return;
-        if (string.IsNullOrEmpty(e.DeviceName)) return;
 
         double cx = X(lb) + width / 2;
-        // 個別の LabelDy があればそれ、無ければ種別の既定オフセット。
-        double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
-            double.TryParse(s, System.Globalization.NumberStyles.Any,
-                System.Globalization.CultureInfo.InvariantCulture, out double v)
-            ? v : ElementCatalog.DefaultLabelDy(resolvedKind);
 
-        double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
-        r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
+        if (!string.IsNullOrEmpty(e.DeviceName))
+        {
+            // 個別の LabelDy があればそれ、無ければ種別の既定オフセット。
+            double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
+                double.TryParse(s, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out double v)
+                ? v : ElementCatalog.DefaultLabelDy(resolvedKind);
 
-        // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
-        // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。
-        if (TimerContactMark(resolvedKind) is string mark)
-            r.DrawText(mark, new(X(rb) + 0.3, yn),
-                _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
+            double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
+            r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
+
+            // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
+            // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。
+            if (TimerContactMark(resolvedKind) is string mark)
+                r.DrawText(mark, new(X(rb) + 0.3, yn),
+                    _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
+        }
+
+        if (!string.IsNullOrEmpty(e.Comment))
+        {
+            double yc = YRow(e.Pos.Row) + Cell * 0.50;   // 記号の下（機器名と対称）
+            r.DrawText(e.Comment!, new(cx, yc), _theme.Text(TextRole.Comment));
+        }
     }
 
     // タイマ接点の種別ミニラベル。タイマ以外の接点・要素は null（ラベル無し）。
