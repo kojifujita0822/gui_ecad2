@@ -95,4 +95,95 @@ public class T107CommentTests : ViewModelTestBase
 
         Assert.Equal("", vm.SelectedElementComment);
     }
+
+    /// <summary>
+    /// T-107修正差し戻し(隠密静的レビュー、T-079(P-058)同型の通知漏れ)DoD(8)(9)の回帰テスト。
+    /// SelectedCellのsetter(要素切替の主経路)でSelectedElementCommentのPropertyChangedが
+    /// 発火することを確認する。修正前は発火せずCommentBoxの表示が前の要素の値のまま残留し、
+    /// Enter/フォーカス外しで誤って別要素へコミットされる実害があった。
+    /// </summary>
+    [Fact]
+    public void SelectedCell_SwitchingToDifferentElement_RaisesSelectedElementCommentChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 0, 0, BasicPartTemplates.ContactNOId, "X001");
+        vm.SelectedElementComment = "要素Aのコメント";
+        PlaceAt(vm, 0, 5, BasicPartTemplates.ContactNOId, "X002");
+        vm.SelectedCell = new GridPos(0, 0);   // いったんAへ戻す(次の切替を検出可能にする前提)
+
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        vm.SelectedCell = new GridPos(0, 5);   // 要素Bへ選択切替
+
+        Assert.Contains(nameof(vm.SelectedElementComment), raised);
+    }
+
+    /// <summary>DoD(9)相当: 上記の切替後、SelectedElementCommentのgetterが実際に要素Bの値
+    /// (未設定なら空文字)を返すこと(表示更新の実効性、通知が発火するだけでなく値も正しいこと)。</summary>
+    [Fact]
+    public void SelectedCell_SwitchingToDifferentElement_CommentReflectsNewElement()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 0, 0, BasicPartTemplates.ContactNOId, "X001");
+        vm.SelectedElementComment = "要素Aのコメント";
+        PlaceAt(vm, 0, 5, BasicPartTemplates.ContactNOId, "X002");   // 要素Bはコメント未設定
+
+        vm.SelectedCell = new GridPos(0, 5);
+
+        Assert.Equal("", vm.SelectedElementComment);
+    }
+
+    /// <summary>DeleteSelectedElement内のSelectedElement系通知箇所への横展開確認。</summary>
+    [Fact]
+    public void DeleteSelectedElement_RaisesSelectedElementCommentChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 0, 0, BasicPartTemplates.ContactNOId, "X001");
+        vm.SelectedElementComment = "コメント";
+
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        vm.DeleteSelectedElement();
+
+        Assert.Contains(nameof(vm.SelectedElementComment), raised);
+    }
+
+    /// <summary>NotifySelectedElementChanged(共通メソッド)経由の横展開確認。PlaceElementAtSelectedCellが
+    /// T-079(P-058)修正で明示的にこれを呼ぶ既存パス(MainWindowViewModelTests.
+    /// PlaceElementAtSelectedCell_RaisesSelectedElementDeviceNameChangedと同型)。</summary>
+    [Fact]
+    public void PlaceElementAtSelectedCell_RaisesSelectedElementCommentChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 0);
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+
+        Assert.Contains(nameof(vm.SelectedElementComment), raised);
+    }
+
+    /// <summary>ReplaceDocument系(Document差し替え)経由の横展開確認。</summary>
+    [Fact]
+    public void NewDocument_RaisesSelectedElementCommentChanged()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        PlaceAt(vm, 0, 0, BasicPartTemplates.ContactNOId, "X001");
+        vm.SelectedElementComment = "コメント";
+
+        var raised = new List<string>();
+        vm.PropertyChanged += (_, e) => raised.Add(e.PropertyName!);
+
+        vm.NewDocument();
+
+        Assert.Contains(nameof(vm.SelectedElementComment), raised);
+    }
 }

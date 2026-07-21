@@ -466,6 +466,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedElementSetpoint));
                 OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
                 OnPropertyChanged(nameof(SelectedElementLabelDy));
+                OnPropertyChanged(nameof(SelectedElementComment));
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -2358,6 +2359,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         OnPropertyChanged(nameof(SelectedElementLabelDy));
+        OnPropertyChanged(nameof(SelectedElementComment));
         DeviceTable.Refresh();
         return true;
     }
@@ -2491,6 +2493,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         OnPropertyChanged(nameof(SelectedElementLabelDy));
+        OnPropertyChanged(nameof(SelectedElementComment));
     }
 
     private string _statusMessage = "";
@@ -3010,6 +3013,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementSetpoint));
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         OnPropertyChanged(nameof(SelectedElementLabelDy));
+        OnPropertyChanged(nameof(SelectedElementComment));
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから
