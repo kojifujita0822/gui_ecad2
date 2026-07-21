@@ -155,9 +155,16 @@ public partial class MainWindow : Window
         // メインウィンドウのレイアウトが無言リセットされていた。メインウィンドウ自身、または
         // AvalonDockが生成するフロートウィンドウ(LayoutFloatingWindowControl派生)からの
         // イベントのみを対象とし、それ以外(モーダルダイアログ)は無視する。
-        if (sender is not (MainWindow or AvalonDock.Controls.LayoutFloatingWindowControl)) return;
+        if (sender is not (MainWindow or AvalonDock.Controls.LayoutFloatingWindowControl))
+        {
+            // T-110增分1診断計装(隠密独立調査「候補B」の裏取り用、家老采配2026-07-22):
+            // 保存機構の静的欠陥調査で、本ゲートが無言でブロックしている可能性を切り分ける。
+            AppendDiagLog($"OnGlobalDockingLayoutShortcut BLOCKED sender={sender?.GetType().Name} key={e.Key}");
+            return;
+        }
         if (Application.Current.MainWindow is not MainWindow mainWindow) return;
 
+        AppendDiagLog($"OnGlobalDockingLayoutShortcut key={e.Key} sender={sender.GetType().Name}");
         if (e.Key == Key.R) mainWindow.ResetDockingLayoutToDefault();
         else mainWindow.SaveDockingLayoutAsDefault();
         e.Handled = true;
@@ -229,6 +236,16 @@ public partial class MainWindow : Window
         DisableFocusOnAutoHideSideItemsControl(MainDockingManager.TopSidePanel);
         DisableFocusOnAutoHideSideItemsControl(MainDockingManager.RightSidePanel);
         DisableFocusOnAutoHideSideItemsControl(MainDockingManager.BottomSidePanel);
+
+        // T-110增分1差し戻し(忍者实機確認(2)NG、家老采配2026-07-22): XAML宣言の
+        // SelectedContentIndex="1"(增分0のPoCでも同一現象を確認済み、E-1)が起動時に反映されず
+        // 「基本機能」(index0)が選択された状態で起動していた。Loaded後にContentIdベースで
+        // 対象LayoutAnchorableを検索しIsActiveを明示設定する(インデックス依存を避ける、
+        // AvalonDock標準のアクティブ化機構)。
+        var placementToolBarAnchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == "PlacementToolBar");
+        if (placementToolBarAnchorable is not null)
+            placementToolBarAnchorable.IsActive = true;
     }
 
     private static void DisableFocusOnAutoHideSideItemsControl(AvalonDock.Controls.LayoutAnchorSideControl? sideControl)
@@ -260,6 +277,24 @@ public partial class MainWindow : Window
     // 確定した。撤去に伴い_defaultDockingLayoutXmlByManagerへの旧参照(PlacementToolBarDockingManager
     // キー)も消滅、孤立参照は残らない(隠密着手前チェックA-3確認事項)。
 
+    // T-110增分1診断計装(家老采配2026-07-22、忍者所見=配置ツールバーFloat()後、メインウィンドウへ
+    // ドラッグで戻す操作で十字型ドロップターゲット(AvalonDock標準OverlayWindow)が残留するバグの
+    // 原因確認用)。一次ソース解析(DragService.cs:207-238のDrop()内_currentHost.HideOverlayWindow()、
+    // LayoutFloatingWindowControl.cs:372-384のAvalonDock自身のWM_EXITSIZEMOVEハンドラ)により、
+    // T-103独自フックのhandled=true成立がAvalonDock自身のWM_EXITSIZEMOVEハンドラ(=DragService.Drop()
+    // 呼び出し=OverlayWindow後始末の実行元)を丸ごとスキップさせる構造を確認済み(隠密仮説と一致)。
+    // 実測で裏取りするための一時計装。原因確定後、忍者再検証を経て除去する(コミットに含めない)。
+    private static readonly object DiagLogLock = new();
+    private static readonly string DiagLogPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ecad2-diag.log");
+
+    private static void AppendDiagLog(string message)
+    {
+        lock (DiagLogLock)
+        {
+            System.IO.File.AppendAllText(DiagLogPath, $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}");
+        }
+    }
+
     // T-103 PoC(家老采配2026-07-20、侍提案): 独自ドロップ枠のヒットテスト用フック。
     // フロートウィンドウはドラッグのたび新規生成されるため、このフィールドは常に「現在フロート中の
     // 配置ツールバーウィンドウに紐づくフック」1つのみを保持する(複数同時フロートは構成上あり得ない)。
@@ -287,9 +322,11 @@ public partial class MainWindow : Window
     {
         var fwc = e.LayoutFloatingWindowControl;
         var isPlacementToolBar = fwc.Model.Descendents().OfType<LayoutAnchorable>().Any(a => a.ContentId == "PlacementToolBar");
+        AppendDiagLog($"LayoutFloatingWindowControlCreated isPlacementToolBar={isPlacementToolBar}");
         if (!isPlacementToolBar) return;
 
         PlacementToolBarDropZoneOverlay.Visibility = Visibility.Visible;
+        AppendDiagLog("PlacementToolBarDropZoneOverlay -> Visible");
         fwc.Loaded += PlacementToolBarFloatingWindow_Loaded;
         fwc.Closed += PlacementToolBarFloatingWindow_Closed;
     }
@@ -301,13 +338,16 @@ public partial class MainWindow : Window
         if (PresentationSource.FromVisual(fwc) is not HwndSource hwndSource) return;
         _placementToolBarFloatingWindowHook = PlacementToolBarFloatingWindowFilterMessage;
         hwndSource.AddHook(_placementToolBarFloatingWindowHook);
+        AppendDiagLog("T-103 hook registered (after AvalonDock's own hook, LIFO means ours fires first)");
     }
 
     private void PlacementToolBarFloatingWindow_Closed(object? sender, EventArgs e)
     {
+        AppendDiagLog("PlacementToolBarFloatingWindow_Closed FIRED");
         var fwc = (Window)sender!;
         fwc.Closed -= PlacementToolBarFloatingWindow_Closed;
         PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed;
+        AppendDiagLog("PlacementToolBarDropZoneOverlay -> Collapsed (via Closed)");
         if (_placementToolBarFloatingWindowHook == null) return;
         if (PresentationSource.FromVisual(fwc) is HwndSource hwndSource)
             hwndSource.RemoveHook(_placementToolBarFloatingWindowHook);
@@ -321,6 +361,7 @@ public partial class MainWindow : Window
     private IntPtr PlacementToolBarFloatingWindowFilterMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg != WM_EXITSIZEMOVE) return IntPtr.Zero;
+        AppendDiagLog("T-103 hook received WM_EXITSIZEMOVE");
         if (!GetCursorPos(out var cursor)) return IntPtr.Zero;
 
         var topLeft = PlacementToolBarDropZoneOverlay.PointToScreen(new Point(0, 0));
@@ -330,15 +371,20 @@ public partial class MainWindow : Window
             PlacementToolBarDropZoneOverlay.ActualWidth * dpi.DpiScaleX,
             PlacementToolBarDropZoneOverlay.ActualHeight * dpi.DpiScaleY);
 
-        if (!dropZone.Contains(cursor.X, cursor.Y)) return IntPtr.Zero;
+        bool contains = dropZone.Contains(cursor.X, cursor.Y);
+        AppendDiagLog($"T-103 hittest cursor=({cursor.X},{cursor.Y}) dropZone=({dropZone.X},{dropZone.Y},{dropZone.Width},{dropZone.Height}) contains={contains}");
+        if (!contains) return IntPtr.Zero;
 
         handled = true;
+        AppendDiagLog("T-103 handled=true SET (AvalonDock's own WM_EXITSIZEMOVE handler & DragService.Drop()/HideOverlayWindow() will be SKIPPED per LayoutFloatingWindowControl.cs:372-384)");
         // T-110增分1(A-3=候補a確定に伴う派生対応): ハードコード既定XMLへの強制Deserialize
         // (ResetPlacementToolBarLayoutToDefault、撤去済み)ではなく、標準のDock()を呼ぶ形に変更する。
         // 「標準Dock()に任せる」方針(A-3)と一貫させるため。
         var anchorableToDock = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
             .FirstOrDefault(a => a.ContentId == "PlacementToolBar");
+        AppendDiagLog($"T-103 calling anchorable.Dock() found={anchorableToDock != null}");
         anchorableToDock?.Dock();
+        AppendDiagLog("T-103 anchorable.Dock() returned");
         return IntPtr.Zero;
     }
 
@@ -413,7 +459,13 @@ public partial class MainWindow : Window
             .Where(c => c.Content != null && c.ContentId != null)
             .Select(c => c.ContentId)
             .ToHashSet();
-        return _expectedContentIds.All(id => presentIds.Contains(id));
+        var missingIds = _expectedContentIds.Where(id => !presentIds.Contains(id)).ToList();
+        // T-110增分1診断計装(隠密独立調査「候補A」の裏取り用、家老采配2026-07-22): 保存機構が
+        // 静かにスキップされ続けるバグの原因候補=本判定の偽判定。偽の場合、欠落ContentIdを
+        // 実測ログへ残す。
+        if (missingIds.Count > 0)
+            AppendDiagLog($"HasExpectedContent FALSE missingIds=[{string.Join(",", missingIds)}] presentIds=[{string.Join(",", presentIds)}]");
+        return missingIds.Count == 0;
     }
 
     private void SerializeDefaultDockingLayouts()
@@ -444,10 +496,14 @@ public partial class MainWindow : Window
     // (読込側防御と対になる二重の備え)。
     private void SaveDockingLayoutAsDefault()
     {
+        // T-110增分1診断計装(隠密独立調査、家老采配2026-07-22): 保存機構の入口・分岐・書込結果を
+        // 実測ログへ残す。
+        AppendDiagLog("SaveDockingLayoutAsDefault ENTER");
         try
         {
             if (!HasExpectedContent())
             {
+                AppendDiagLog("SaveDockingLayoutAsDefault SKIPPED (HasExpectedContent=false)");
                 _viewModel.StatusMessage = "パネルレイアウトが不完全な状態のため保存をスキップしました";
                 return;
             }
@@ -455,10 +511,12 @@ public partial class MainWindow : Window
             var serializer = new XmlLayoutSerializer(MainDockingManager);
             using var writer = new StreamWriter(DockingLayoutFilePath);
             serializer.Serialize(writer);
+            AppendDiagLog($"SaveDockingLayoutAsDefault WROTE {DockingLayoutFilePath}");
             _viewModel.StatusMessage = "現在のパネルレイアウトを既定として保存しました";
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
+            AppendDiagLog($"SaveDockingLayoutAsDefault EXCEPTION {ex.GetType().Name}: {ex.Message}");
             _viewModel.StatusMessage = "パネルレイアウトの保存に失敗しました";
         }
     }
@@ -472,25 +530,29 @@ public partial class MainWindow : Window
     // の二段フォールバック構造で、ResetDockingLayoutToDefault()と同じ保護(IO/XML構文/Content実体
     // 欠落の3層)を持たせる。
     // T-110增分1(裁3、殿裁可済み): 旧4ファイル(left-palette.xml等)は新ファイル名
-    // (main-layout.xml)からは参照されないため、既存ユーザーは全員この既定フォールバック経路を
-    // 通る(保存カスタムレイアウト喪失は許容、移行ロジックは作らない)。
+    // (main-layout.xml)からは参照されないため、既存ユーザーは全員ファイル無し扱いとなり
+    // XAML初期状態のまま起動する(保存カスタムレイアウト喪失は許容、移行ロジックは作らない)。
+    // 隠密静的レビュー指摘(2026-07-22、副次所見・退行): 增分1实装時、ファイル無し(savedXml is
+    // null)の場合に即returnせずフォールスルーし、_defaultDockingLayoutXml(=起動直後のXAML初期
+    // 状態を自己Serializeしたもの)への無意味なDeserializeを毎回実行してしまっていた。
+    // XAML初期状態は起動時点で既に正しく構築済みのため、ファイル無し時は何もしない(旧実装の
+    // continue相当)のが正しく、自己参照的な再構築は不要な処理コストでしかない。ガードを復元する。
     private void LoadDockingLayoutFromFileIfExists()
     {
         string? savedXml = TryReadSavedDockingLayoutXml();
-        if (savedXml is not null && TryDeserializeDockingLayout(savedXml)) return;
+        if (savedXml is null) return;
+        if (TryDeserializeDockingLayout(savedXml)) return;
 
-        bool loadFailed = savedXml is not null;
         // 破損ファイル等はハードコード既定(XAML初期状態)へ二段フォールバックする。
         if (_defaultDockingLayoutXml is not null)
             TryDeserializeDockingLayout(_defaultDockingLayoutXml);
 
-        if (loadFailed)
-            // T-104増分2(3)(家老采配2026-07-20、殿裁定=文言変更): 旧文言「保存済みレイアウトの
-            // 読込に失敗したため既定で起動しました」は、実際には破損以外にバージョンアップに伴う
-            // レイアウト構成変更(今回のタブ新設等)でも同じ経路を通るため、毎回「失敗」という
-            // 強い表現でユーザーに不安を与えていた。原因を問わず前向きに伝わる文言へ変更(叩き台、
-            // 最終確定は殿)。
-            _viewModel.StatusMessage = "レイアウトを既定の状態に更新しました";
+        // T-104増分2(3)(家老采配2026-07-20、殿裁定=文言変更): 旧文言「保存済みレイアウトの
+        // 読込に失敗したため既定で起動しました」は、実際には破損以外にバージョンアップに伴う
+        // レイアウト構成変更(今回のタブ新設等)でも同じ経路を通るため、毎回「失敗」という
+        // 強い表現でユーザーに不安を与えていた。原因を問わず前向きに伝わる文言へ変更(叩き台、
+        // 最終確定は殿)。
+        _viewModel.StatusMessage = "レイアウトを既定の状態に更新しました";
     }
 
     // Ctrl+Alt+Rハンドラから呼ばれる。T-058増分4(殿裁定(4)): 保存済みファイルがあればそちらを
