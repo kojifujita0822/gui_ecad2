@@ -764,6 +764,20 @@ T-075完了1〜3日後の実装で以後放置）。これにて高リスク4領
 現状`docs/spec`原文をEmbeddedResource参照しているため、参照先を`docs/usage`平易版へ切替える
 実装（増分4）が必要。侍へ采配。
 
+**増分4完了（2026-07-21、コミット`f961c06`、3ファイル/60insertions/55deletions）**：csproj
+側EmbeddedResourceを`docs/spec`原文から`docs/usage`平易版（全11領域）へ切替、Topics定義の
+ResourceFileNameも更新。DisplayName（目次表示名）を平易版の実際の見出しに合わせ3件更新
+（undo-redo/drc-output/statusbar）。既存テスト15件を平易版に追従させ全件GREEN。隠密静的
+レビュー完了（軽微な指摘2点、いずれも実害なし・修正不要と判断）。忍者実機確認完了
+（`docs/ecad2-t077-zoubun4-verify-ninja.md`）：DoD(1)〜(5)全OK、全11領域とも平易版への
+切替・書式崩れなしを確認。これにてT-077增分1〜4完了。
+
+**表構文未対応の発覚・殿裁定（2026-07-21）**：`docs/usage`11領域中6領域（menu-toolbar・
+pdf-testmode・placement・sheet-document・statusbar・wiring）に表構文が含まれるが、増分1の
+PoC設計時点で表構文は`MarkdownFlowDocumentConverter`の対応範囲外（プレーンテキストのまま
+残る仕様）としていたため、可読性への影響が懸念事項として浮上。**殿裁定＝増分5として表構文の
+FlowDocument変換対応を追加する**。侍へ采配。
+
 ### 実装順ロードマップ（2026-07-14家老改訂、T-087/T-088完了・T-058/T-083前倒しを反映）
 
 T-058/T-083前倒し（殿指示2026-07-14） → 小粒タスクの消化 → 大物の順（.NET 10移行=T-062は完了済み）。
