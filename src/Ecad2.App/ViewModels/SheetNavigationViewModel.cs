@@ -55,6 +55,19 @@ public sealed class SheetNavigationViewModel : ViewModelBase
     internal static Sheet? DetermineOldSelectedSheetForAdd(int sheetsCountBeforeAdd, Sheet? currentSelectedSheet)
         => sheetsCountBeforeAdd == 0 ? null : currentSelectedSheet;
 
+    /// <summary>T-098(P-105起票、殿裁定2026-07-15): AddCommandが新規シートへ割り振るPageNumberを
+    /// 決定する純粋関数。旧実装はSheets.Count+1固定で、削除で欠番が生じた状態から追加すると
+    /// 歯抜けを埋める小さい番号が末尾シートに付き表示順序とPageNumber数値の対応が崩れていた。
+    /// 既存シートの最大PageNumber+1(シートが0枚なら1)を採番する方式へ変更する。
+    /// internalはIVT経由のテスト用(境界値0枚/欠番あり/欠番なしのRED先行証明)。</summary>
+    internal static int DetermineNextPageNumber(IEnumerable<Sheet> existingSheets)
+    {
+        int maxPageNumber = 0;
+        foreach (var sheet in existingSheets)
+            if (sheet.PageNumber > maxPageNumber) maxPageNumber = sheet.PageNumber;
+        return maxPageNumber + 1;
+    }
+
     /// <summary>CurrentSheetIndexが外部(DRC出力パネルのジャンプ等、T-018)から変更された際、
     /// SelectedSheetのバインディング(左パネルの選択ハイライト)を同期させるために呼ぶ。
     /// T-050修正(P-044): 旧値をnull化しないよう2引数版OnPropertyChangedへ置換。旧値はこのメソッド
@@ -98,7 +111,7 @@ public sealed class SheetNavigationViewModel : ViewModelBase
             // されるため、その時点でSelectedSheetのgetterを読むと追加済みの新シート自身を返し
             // old==newになる(隠密CONFIRMEDバグ)。追加前状態が残るこの時点で捕捉する必要がある。
             Sheet? oldSelectedSheet = DetermineOldSelectedSheetForAdd(_owner.Document.Sheets.Count, SelectedSheet);
-            int pageNumber = _owner.Document.Sheets.Count + 1;
+            int pageNumber = DetermineNextPageNumber(_owner.Document.Sheets);
             string name = rawName.Trim();
             if (name.Length == 0) name = $"シート{pageNumber}";
             var sheet = new Sheet

@@ -414,6 +414,108 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
             Assert.Same(current, result);
     }
 
+    // --- T-098(P-105起票、殿裁定2026-07-15): PageNumber採番方式見直し ---
+
+    private static Sheet MakeSheetWithPageNumber(int pageNumber)
+        => new() { PageNumber = pageNumber, Name = $"シート{pageNumber}", Grid = new GridSpec { Rows = 10, Columns = 20 } };
+
+    [Fact]
+    public void DetermineNextPageNumber_シートが0枚_1を返す()
+    {
+        var result = SheetNavigationViewModel.DetermineNextPageNumber(Array.Empty<Sheet>());
+
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public void DetermineNextPageNumber_欠番なし連番_最大PageNumberの次を返す()
+    {
+        var sheets = new[] { MakeSheetWithPageNumber(1), MakeSheetWithPageNumber(2), MakeSheetWithPageNumber(3) };
+
+        var result = SheetNavigationViewModel.DetermineNextPageNumber(sheets);
+
+        Assert.Equal(4, result);
+    }
+
+    /// <summary>
+    /// 旧実装(Sheets.Count+1固定)のバグ再現条件。シート1,3が残る(2が欠番)状態でSheets.Count+1を
+    /// 計算すると2+1=3となり、既存のPageNumber=3と重複してしまう。新実装は既存最大(3)+1=4を返す。
+    /// </summary>
+    [Fact]
+    public void DetermineNextPageNumber_削除で欠番がある状態_既存最大PageNumberの次を返す()
+    {
+        var sheets = new[] { MakeSheetWithPageNumber(1), MakeSheetWithPageNumber(3) };
+
+        var result = SheetNavigationViewModel.DetermineNextPageNumber(sheets);
+
+        Assert.Equal(4, result);
+    }
+
+    [Fact]
+    public void DetermineNextPageNumber_シートの列挙順序が入れ替わっていても最大を正しく検出する()
+    {
+        var sheets = new[] { MakeSheetWithPageNumber(3), MakeSheetWithPageNumber(1), MakeSheetWithPageNumber(2) };
+
+        var result = SheetNavigationViewModel.DetermineNextPageNumber(sheets);
+
+        Assert.Equal(4, result);
+    }
+
+    [Fact]
+    public void AddCommand_連続追加_欠番なし状態では従来どおり連番になる()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.SheetNavigation.AddCommand.Execute(("シート3", false));
+
+        Assert.Equal(new[] { 1, 2, 3 }, vm.Document.Sheets.Select(s => s.PageNumber));
+    }
+
+    /// <summary>
+    /// DoD1(殿裁定2026-07-15): 削除で欠番が生じた状態から新規追加した場合、既存最大PageNumber+1が
+    /// 付くこと。旧実装(Sheets.Count+1固定)ではシート1,3(2削除後)にシート2が3+1=... ではなく
+    /// Sheets.Count(2)+1=3を返し、既存のPageNumber=3と重複するバグがあった。
+    /// </summary>
+    [Fact]
+    public void AddCommand_削除で欠番が生じた状態から追加すると既存最大PageNumberの次が付く()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        AddSheet(vm, 3, "シート3");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、途中)を選択
+        vm.SheetNavigation.DeleteCommand.Execute(null);   // シート1,3が残り2が欠番になる
+
+        vm.SheetNavigation.AddCommand.Execute(("新シート", false));
+
+        var addedSheet = vm.Document.Sheets[^1];
+        Assert.Equal(4, addedSheet.PageNumber);
+        // 重複が生じていないことも明示的に確認する。
+        Assert.Equal(new[] { 1, 3, 4 }, vm.Document.Sheets.Select(s => s.PageNumber).OrderBy(n => n));
+    }
+
+    /// <summary>
+    /// DoD3(整合確認): T-084のDeleteCommand欠番警告ロジック(P-066)はPageNumberの値同士の比較のみで
+    /// AddCommandの採番方式に依存しないため、T-098修正後も継続して正しく機能する。本テストは
+    /// 新しい採番方式で追加したシートを削除した際も、欠番判定(P-066)が正しく動くことを確認する。
+    /// </summary>
+    [Fact]
+    public void DeleteCommand_T098新方式で追加したシートを末尾削除しても欠番警告は出ない()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.CurrentSheetIndex = 1;   // シート2(PageNumber=2、末尾)を選択
+        vm.StatusMessage = "既存の案内";
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.Equal("既存の案内", vm.StatusMessage);
+    }
+
     // --- T-082: シート並び替え(MoveSheetCommand) ---
 
     private static Sheet AddSheet(MainWindowViewModel vm, int pageNumber, string name)
