@@ -118,6 +118,74 @@ ShowHeader="False">`の**属性1つで足り、DocumentPaneControlStyleのテン
 10. **全ペインPaneControl適用の副作用**: 修2反映後、単一ペイン4領域に冗長タブが出ないこと・
     2タブペインのタブ表示が従来どおりであることを確認。
 
+---
+
+# 実機確認後の追補（2026-07-22、忍者検証`docs/ecad2-t110-poc-verification-ninja.md`を受けて）
+
+## 追1. (f)重大バグの真因確定と「ShowHeader方式なら構造的に発生し得ないか」への回答
+
+### 真因（一次ソースで確定、忍者推定と機序レベルで整合）
+
+テーマ既定`AvalonDockThemeVs2013DocumentPaneControlStyle`は`Template` Setterの後に
+**`ItemContainerStyle`・`ItemTemplate`・`ContentTemplate`のSetterを持つ**（Generic.xaml:307以降。
+`ContentTemplate`は`<avalonDockControls:LayoutDocumentControl Model="{Binding}"/>`——SelectedContent
+（LayoutDocumentモデル）を実ビューへ変換する要）。PoCの`DocumentTabHiddenPaneControlStyle`
+（MainWindow.xaml:371-430）は`BorderBrush`/`Background`/`Template`の3 Setterのみで、**この3本を
+転記漏れ**している。`ContentSource="SelectedContent"`のContentPresenterはTabControlの
+`ContentTemplate`（Style Setter由来）→`SelectedContentTemplate`の自動配線でモデルを実ビュー化する
+ため、Setter欠落によりLayoutDocumentモデルが素の`ToString()`表示になる——観測された
+"AvalonDock.Layout.LayoutDocument"文字列表示と完全に一致する。
+
+### ShowHeader方式での構造的回避可否——**言い切れる（本バグの型は発生し得ない）**
+
+根拠（いずれも一次ソース確認済み）:
+1. ShowHeader方式は`DocumentPaneControlStyle`を**一切置き換えない**。テーマ既定スタイルが
+   `ContentTemplate` Setterごとそのまま生きる。
+2. `ShowHeader`が既定テンプレートに作用する箇所は**2箇所のみ**——ヘッダー領域Gridの
+   `Visibility` Binding（Generic.xaml:212）と、`ShowHeader=False`時の`ContentPanel`
+   `BorderThickness=1`補正トリガー（Generic.xaml:300-302）。コンテンツ表示経路には触れない。
+3. 本バグの型は「丸ごとコピー時のSetter転記漏れ」であり、**コピーという行為自体が存在しない
+   ShowHeader方式では発生の前提が無い**。
+
+誠実な限定を1点添える: これは「ShowHeader方式に一切のリスクが無い」という意味ではない
+（本文§3残課題=実行時新規生成ペインの既定`ShowHeader=true`問題は別途存在する）。ただしそれは
+本バグとは別種の論点であり、増分1の検証パイプラインで確認すればよい。
+
+**帰結: PoC自体の(f)修正は不要**（増分1でShowHeader方式を採用する限り本バグは持ち込まれない）。
+PoCの(f)コピー方式実装は「コピー方式は転記漏れリスクが高い」という教訓を実証した形で、
+ShowHeader方式推奨（本文§3）の根拠をむしろ強化した。
+
+### パターン再発の記帳【MUST対応】
+
+本バグは**PR-21の3例目**（既定テーマスタイル丸ごと差し替え時のStyle本体Setter転記漏れ。
+T-089・シート名文字色に続く再発、`docs-notes/pattern-recurrence-log.md`PR-21行へ追記済み）。
+従来2例はBrush系既定値Setterの漏れ（見た目の後退）だったが、本例は機能Setter
+（ContentTemplate）の漏れで**機能喪失**に至ることを実証した。レビュー観点の教訓:
+転記確認は「既定値Setter群」に限らず**Style本体の全Setter**（ItemTemplate/ContentTemplate/
+ItemContainerStyle含む）を対象とすべし（`onmitsu.md`該当節の記述強化を家老へ提起）。
+
+## 追2. 忍者申し送り3件の記録（増分1設計・レビュー時の確認事項、即応不要）
+
+1. **SelectedContentIndex="1"が起動時に反映されない**（忍者2.3）: XAML記述と実機挙動の乖離。
+   増分1では初期選択タブ（殿裁定=配置ツール既定、T-104案A）の実現手段を実機で確認すること
+   （必要ならLoaded後のコード設定等の代替を検討）。静的レビューでは拾えない型（実行時挙動）で
+   あった点も踏まえ、増分1忍者確認項目へ「起動直後の選択タブ」を明示的に含める。
+2. **DataGridColumnHeaderの単体クリックではペインがアクティブ化しない**（忍者2.4）: 実害小の
+   見込みだが、増分1の(d)相当確認では「セル/行クリックでのアクティブ化」を基準とすること。
+3. **(e)のContentId分岐トリガーは、PoCの操作範囲では一度も発火する場面が無かった**（忍者2.5）:
+   フロート時は別のタイトル実装（`SinglePaneContextMenu`/`PART_PinMaximize`等）が使われ、
+   ドッキング時の観察でも発火場面が無かったとの由。**増分1設計時に「本実装で配置ツールバーが
+   単独ペインとしてドッキングされた状態（＝この分岐が効くべき場面）が実際に存在するか」を
+   隠密・侍で特定し、分岐の要否自体を再判断する**（本実装の現行T-104構造は常時2タブ同居のため、
+   案E相当のラベル非表示がどの層で効いているかの再確認を含む）。
+
+## 出典（追補分）
+
+- `docs/ecad2-t110-poc-verification-ninja.md`（忍者実機確認、2.1〜2.5）
+- AvalonDock v4.74.1一次ソース `Generic.xaml:212/300-302/307以降（ItemContainerStyle・ItemTemplate・ContentTemplate Setter群）`
+- `poc/.../MainWindow.xaml:371-430`（DocumentTabHiddenPaneControlStyleのSetter構成）
+- `docs-notes/pattern-recurrence-log.md` PR-21行（3例目追記済み）
+
 ## 出典
 
 - コミット`96d3164`全ファイル（`poc/t110-single-dockingmanager-poc/T110SingleDockingManagerPoc/`）
