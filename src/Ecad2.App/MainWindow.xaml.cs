@@ -763,7 +763,7 @@ public partial class MainWindow : Window
                 _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
                 _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
                 _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.SelectedFrame,
-                _viewModel.CurrentTestSession?.State);
+                _viewModel.CurrentTestSession?.State, _viewModel.Document.Devices);
         else
             LadderCanvasHost.Clear();
     }

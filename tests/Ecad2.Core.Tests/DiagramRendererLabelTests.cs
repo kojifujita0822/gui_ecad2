@@ -83,20 +83,29 @@ public class DiagramRendererLabelTests
         Assert.Equal(y002, y001, precision: 6);
     }
 
-    /// <summary>T-107 DoD(1)(2): Element.Commentが設定されていれば緑色(DrawingTheme.Comment)で
-    /// 描画され、未設定(null/空文字)なら描画されないことを検証する。</summary>
+    private static DeviceTable MakeDevices(string deviceName, string? comment)
+    {
+        var table = new DeviceTable();
+        table.ByName[deviceName] = new Device { Name = deviceName, Comment = comment };
+        return table;
+    }
+
+    /// <summary>T-107増分2(殿裁定=デバイス単位で共有、GX3準拠) DoD(1)(2)(3): Device.Commentが
+    /// 設定されていれば緑色(DrawingTheme.Comment)で描画され、未設定(null/空文字)・devices未指定・
+    /// DeviceTable未登録なら描画されないことを検証する。</summary>
     [Theory]
     [InlineData("負荷側過電流保護", true)]
     [InlineData("", false)]
     [InlineData(null, false)]
-    public void Render_ElementComment_DrawsOnlyWhenPresent(string? comment, bool expectDrawn)
+    public void Render_DeviceComment_DrawsOnlyWhenPresent(string? comment, bool expectDrawn)
     {
-        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001", Comment = comment };
+        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001" };
         var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         sheet.Elements.Add(elem);
+        var devices = MakeDevices("X001", comment);
 
         var renderer = new RecordingRenderer();
-        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary(), devices: devices);
 
         if (expectDrawn)
         {
@@ -109,18 +118,54 @@ public class DiagramRendererLabelTests
         }
     }
 
+    /// <summary>devicesを渡さない(null、既存呼び出し元がデフォルト省略した場合)呼び出しでは
+    /// コメントが一切描画されないことを確認する(後方互換性、DeviceName→Device解決ができないため)。
+    /// Device側にCommentが存在していても、Render呼び出しにdevicesを渡さなければ描画されない。</summary>
+    [Fact]
+    public void Render_WithoutDevicesParameter_DoesNotDrawComment()
+    {
+        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001" };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(elem);
+        MakeDevices("X001", "見えないはずのコメント");   // 作るだけでRenderには渡さない
+
+        var renderer = new RecordingRenderer();
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());   // devices省略
+
+        Assert.DoesNotContain(renderer.DrawnTexts, t => t == "見えないはずのコメント");
+    }
+
+    /// <summary>T-107増分2の主目的: 同一デバイス名を持つ複数要素間でコメントが共有される
+    /// (GX3準拠、Device単位で1つに定まる)ことを検証する。</summary>
+    [Fact]
+    public void Render_SameDeviceNameMultipleElements_ShareSameComment()
+    {
+        var elem1 = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "M1" };
+        var elem2 = new ElementInstance { Kind = ElementKind.ContactNC, Pos = new GridPos(0, 5), DeviceName = "M1" };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        sheet.Elements.Add(elem1);
+        sheet.Elements.Add(elem2);
+        var devices = MakeDevices("M1", "共有コメント");
+
+        var renderer = new RecordingRenderer();
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary(), devices: devices);
+
+        Assert.Equal(2, renderer.DrawnTexts.Count(t => t == "共有コメント"));
+    }
+
     /// <summary>T-107 DoD(1): コメントは機器名(記号の上)と対称に記号の下へ描画される
     /// (同一セル内で行を専有しない、上下2分割構造)。機器名ラベルのY座標より下(Y値が大きい)
     /// になることを検証する。</summary>
     [Fact]
     public void Render_ElementWithCommentAndDeviceName_CommentIsBelowDeviceName()
     {
-        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001", Comment = "手動リセット" };
+        var elem = new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 0), DeviceName = "X001" };
         var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         sheet.Elements.Add(elem);
+        var devices = MakeDevices("X001", "手動リセット");
 
         var renderer = new RecordingRenderer();
-        new DiagramRenderer().Render(renderer, sheet, CreateLibrary());
+        new DiagramRenderer().Render(renderer, sheet, CreateLibrary(), devices: devices);
 
         double deviceNameY = renderer.DrawnTextEntries.Single(t => t.Text == "X001").Position.Y;
         double commentY = renderer.DrawnTextEntries.Single(t => t.Text == "手動リセット").Position.Y;

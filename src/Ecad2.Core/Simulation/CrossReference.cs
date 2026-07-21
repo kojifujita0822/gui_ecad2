@@ -16,8 +16,9 @@ public sealed class CrossRefEntry
     public List<CircuitRef> Coils { get; } = new();
     /// <summary>接点が現れる箇所。</summary>
     public List<CircuitRef> Contacts { get; } = new();
-    /// <summary>この機器に付いたコメント（重複除去。複数要素にあれば登場順に保持）。</summary>
-    public List<string> Comments { get; } = new();
+    /// <summary>T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): この機器のコメント(Device.Comment)。
+    /// 同一デバイス名なら値は1つに定まるため、要素ごとの集約・重複除去は不要。</summary>
+    public string? Comment { get; set; }
 }
 
 /// <summary>
@@ -80,9 +81,10 @@ public static class CrossReferenceBuilder
                 else
                     entry.Contacts.Add(cref);
 
-                // コメントを機器単位で集約（空・重複は除外）。表の「コメント」列に出す。
-                if (!string.IsNullOrWhiteSpace(elem.Comment) && !entry.Comments.Contains(elem.Comment))
-                    entry.Comments.Add(elem.Comment);
+                // T-107増分2: コメントはDevice.Comment(デバイス単位で共有)を単純参照する。
+                // 要素側の集約・重複除去は不要(同一デバイス名なら値は1つに定まるため)。
+                if (entry.Comment is null && doc.Devices.ByName.TryGetValue(elem.DeviceName, out var device))
+                    entry.Comment = device.Comment;
             }
         }
 

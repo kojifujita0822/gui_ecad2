@@ -88,7 +88,7 @@ public partial class PdfPreviewDialog : Window
                                pageNumber: page.PageNumber, totalPages: page.TotalPages,
                                enableBorder: _enableBorder, pageRowStart: page.PageRowStart,
                                pageRowCount: _enableBorder ? _dr.RowsPerPage : int.MaxValue,
-                               pageScale: page.Scale);
+                               pageScale: page.Scale, devices: _document.Devices);
                     break;
                 case PdfPageKind.CrossRef:
                     _dr.RenderCrossRefPage(renderer, _xref, page.CrPageIndex);

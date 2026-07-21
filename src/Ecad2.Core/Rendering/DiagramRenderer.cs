@@ -33,6 +33,9 @@ public sealed class DiagramRenderer
     private readonly RenderOptions _opt;
     private readonly GridGeometry _geo;
     private PartLibrary? _lib;
+    // T-107増分2: Element.Comment廃止に伴い、DeviceName経由でDevice.Commentを引くための参照。
+    // PartLibrary(_lib)と同型の「Render呼び出し時に受け取りフィールドへ保持」パターン。
+    private DeviceTable? _devices;
 
     public DiagramRenderer(DrawingTheme? theme = null, RenderOptions? options = null)
     {
@@ -244,14 +247,17 @@ public sealed class DiagramRenderer
     /// 通電配線・励磁要素を通電色でハイライトする（画面のテストモード用）。
     /// <paramref name="xref"/> を渡すと図面下部にクロスリファレンス一覧表を描画する。
     /// <paramref name="info"/> を渡すと最下部に表題欄を描画する。
+    /// <paramref name="devices"/> を渡すと機器コメント(Device.Comment、T-107増分2)を描画する
+    /// (省略時はコメント非表示、DeviceName→Device解決ができないため)。
     /// </summary>
     public void Render(IRenderer r, Sheet sheet, PartLibrary? library = null, SimState? sim = null,
                        CrossReference? xref = null, DocumentInfo? info = null,
                        int pageNumber = 1, int totalPages = 1, bool enableBorder = false,
                        int pageRowStart = 0, int pageRowCount = int.MaxValue,
-                       double pageScale = 1.0)
+                       double pageScale = 1.0, DeviceTable? devices = null)
     {
         _lib = library;
+        _devices = devices;
         var netlist = NetlistBuilder.Build(sheet, library);
         var report = _opt.ConnectivityCheck ? ConnectivityChecker.Check(netlist) : null;
 
@@ -807,7 +813,7 @@ public sealed class DiagramRenderer
             DrawCellText(r, e.DeviceName, x0, yi, rh, pad, cellText);
             DrawCellText(r, FormatRefs(e.Coils), x1, yi, rh, pad, cellText);
             DrawCellText(r, FormatRefs(e.Contacts), x2, yi, rh, pad, cellText);
-            DrawCellText(r, string.Join(" / ", e.Comments), x3, yi, rh, pad, cellText);
+            DrawCellText(r, e.Comment ?? "", x3, yi, rh, pad, cellText);
         }
     }
 
@@ -1125,8 +1131,9 @@ public sealed class DiagramRenderer
 
     // 機器名ラベルを記号の上・中央に描く。
     // Params["LabelDy"] (mm, 正で上へ) で要素ごとに高さオフセットを調整できる（密集時の重なり回避）。
-    // T-107(殿裁定): コメント(Element.Comment)は記号の下・中央に描く(GX3の上下2分割セル構造に
-    // 対応、機器名=上段/コメント=下段で同一セル内に収め行を専有しない)。
+    // T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): コメントはDeviceName経由でDevice.Commentを
+    // 引いて記号の下・中央に描く(GX3の上下2分割セル構造に対応、機器名=上段/コメント=下段で
+    // 同一セル内に収め行を専有しない)。同一デバイス名の全要素で同じコメントが表示される。
     private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width, ElementKind resolvedKind)
     {
         if (!_opt.ShowDeviceNames) return;
@@ -1151,10 +1158,13 @@ public sealed class DiagramRenderer
                     _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
         }
 
-        if (!string.IsNullOrEmpty(e.Comment))
+        string? comment = e.DeviceName is string dn && dn.Length > 0
+            && _devices?.ByName.TryGetValue(dn, out var dev) == true
+            ? dev.Comment : null;
+        if (!string.IsNullOrEmpty(comment))
         {
             double yc = YRow(e.Pos.Row) + Cell * 0.50;   // 記号の下（機器名と対称）
-            r.DrawText(e.Comment!, new(cx, yc), _theme.Text(TextRole.Comment));
+            r.DrawText(comment!, new(cx, yc), _theme.Text(TextRole.Comment));
         }
     }
 

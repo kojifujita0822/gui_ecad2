@@ -191,7 +191,7 @@ public sealed class LadderCanvas : FrameworkElement
         FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null,
         ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null,
         GroupFrame? selectedFrame = null,
-        SimState? sim = null)
+        SimState? sim = null, DeviceTable? devices = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -217,7 +217,8 @@ public sealed class LadderCanvas : FrameworkElement
 
             var wpfRenderer = new WpfRenderer(dc);
             // T-061: sim(テストモード中のみ非null)を渡すと通電配線・励磁要素が通電色でハイライトされる。
-            _renderer.Render(wpfRenderer, sheet, library, sim);
+            // T-107増分2: devicesを渡すと機器コメント(Device.Comment)が描画される。
+            _renderer.Render(wpfRenderer, sheet, library, sim, devices: devices);
 
             if (selectedCell is { } cell)
                 dc.DrawRectangle(null, SelectedCellPen, CellRectDip(cell));

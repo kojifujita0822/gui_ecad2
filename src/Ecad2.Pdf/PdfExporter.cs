@@ -42,7 +42,7 @@ public static class PdfExporter
                               pageNumber: page.PageNumber, totalPages: page.TotalPages, enableBorder: enableBorder,
                               pageRowStart: page.PageRowStart,
                               pageRowCount: enableBorder ? dr.RowsPerPage : int.MaxValue,
-                              pageScale: page.Scale);
+                              pageScale: page.Scale, devices: devices);
                     surface.EndPage();
                     break;
                 case PdfPageKind.CrossRef:

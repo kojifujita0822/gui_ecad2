@@ -2102,22 +2102,26 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    /// <summary>T-107: 選択中要素のコメント(Element.Comment、ラダー図上は機器シンボル直下に緑色で
-    /// 表示)。DeviceNameと異なり機器表(DeviceTable)には反映されない(クロスリファレンス表側で
-    /// CrossReferenceBuilderが再描画のたびに集約するため、ここでの追加反映は不要)。
-    /// SelectedElementNotchPosition/LampColor/LabelDy等と同型、値未変化ならRecordSnapshotしない。</summary>
+    /// <summary>T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): 選択中要素のコメント
+    /// (Device.Comment、ラダー図上は機器シンボル直下に緑色で表示)。同一デバイス名の全要素間で
+    /// 共有される(Element側には持たない)。DeviceNameが未設定の要素は紐づくDeviceが無いため
+    /// 編集不可(getterは空文字、setterは無視)。SelectedElementNotchPosition/LampColor/LabelDy等と
+    /// 同型、値未変化ならRecordSnapshotしない。</summary>
     public string SelectedElementComment
     {
-        get => SelectedElement?.Comment ?? "";
+        get => SelectedElement?.DeviceName is string dn && dn.Length > 0
+            && Document.Devices.ByName.TryGetValue(dn, out var dev)
+            ? dev.Comment ?? "" : "";
         set
         {
-            if (SelectedElement is not ElementInstance el) return;
-            string oldComment = el.Comment ?? "";
+            if (SelectedElement?.DeviceName is not string dn || dn.Length == 0) return;
+            if (!Document.Devices.ByName.TryGetValue(dn, out var dev)) return;
+            string oldComment = dev.Comment ?? "";
             string newComment = value.Trim();
             if (oldComment == newComment) return;
 
             UndoManager.RecordSnapshot(Document);
-            el.Comment = newComment.Length > 0 ? newComment : null;
+            dev.Comment = newComment.Length > 0 ? newComment : null;
             MarkDirty();
             OnPropertyChanged(nameof(SelectedElementComment), oldComment);
         }

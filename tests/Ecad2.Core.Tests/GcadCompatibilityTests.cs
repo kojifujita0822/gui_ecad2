@@ -81,4 +81,32 @@ public class GcadCompatibilityTests
         const string json = """{ "schemaVersion": 999, "sheets": [] }""";
         Assert.Throws<NotSupportedException>(() => GcadSerializer.Deserialize(json));
     }
+
+    /// <summary>T-107増分2 DoD(5): Device.Comment(デバイス単位で共有するコメント)が
+    /// 保存・読込で正しく永続化されることを検証する。</summary>
+    [Fact]
+    public void GcadSerializer_Device_Commentが往復一致する()
+    {
+        var doc = new LadderDocument
+        {
+            Info = new DocumentInfo { Title = "T-107増分2永続化検証", CompanyName = "ecad2" },
+            Sheets =
+            {
+                new Sheet
+                {
+                    Name = "シート1",
+                    Elements =
+                    {
+                        new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(0, 1), DeviceName = "M1" },
+                    },
+                },
+            },
+        };
+        doc.Devices.ByName["M1"] = new Device { Name = "M1", Comment = "手動リセット" };
+
+        string json = GcadSerializer.Serialize(doc);
+        var restored = GcadSerializer.Deserialize(json);
+
+        Assert.Equal("手動リセット", restored.Devices.ByName["M1"].Comment);
+    }
 }

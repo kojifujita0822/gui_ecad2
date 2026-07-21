@@ -54,8 +54,6 @@ public sealed class ElementInstance
     public string? PartId { get; set; }
     /// <summary>色(G/R)・SW位置(閉/開)・ラベル等の付加情報。</summary>
     public Dictionary<string, string> Params { get; set; } = new();
-    /// <summary>注記テキスト。機器名ラベルの下に小フォントで表示される。</summary>
-    public string? Comment { get; set; }
 
     public ElementInstance DeepClone() => new()
     {
@@ -66,7 +64,6 @@ public sealed class ElementInstance
         DeviceName = DeviceName,
         PartId = PartId,
         Params = new Dictionary<string, string>(Params),
-        Comment = Comment,
     };
 }
 
