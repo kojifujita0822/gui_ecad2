@@ -291,6 +291,18 @@
                                 </ControlTemplate>
                             </Setter.Value>
                         </Setter>
+                        <!-- 修2(隠密静的レビュー差し戻し、2026-07-21): VS2013テーマ標準の
+                             「Items.Count==1でTabItem自体をCollapse」トリガー(一次ソース
+                             Generic.xaml:536-540)。本実装のPlacementToolBarPaneControlStyle
+                             自体に無く2タブ固定ペインでは死文だったため省略されていたが、
+                             全ペイン適用へ昇格すると単一ペイン4領域(シート/機器表/プロパティ/
+                             出力)に冗長な下タブが常時表示されてしまう。全ペインPaneControl
+                             適用の副作用確認(漏れ2)そのものの検出のため追加する。 -->
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count}" Value="1">
+                                <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </Style.Triggers>
                     </Style>
                 </Setter.Value>
             </Setter>

@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,6 +28,24 @@ public partial class MainWindow : Window
             ? new AvalonDock.Themes.Vs2013DarkTheme()
             : new AvalonDock.Themes.Vs2013LightTheme();
         MainDockingManager.Resources[typeof(AnchorablePaneTitle)] = (Style)FindResource("UnifiedAnchorablePaneTitleStyle");
+        ApplyUiChromeTheme(_isDarkMode);
+    }
+
+    // 修1(隠密静的レビュー差し戻し、2026-07-21): DockingManager.Themeの切替だけでは
+    // PanelHeaderBackgroundBrush等アプリ側のテーマ辞書(Theme.Light/Dark.xaml)が連動せず、
+    // (e)両テーマ確認・全ペインPaneControl適用検証で偽の副作用を観る恐れがあった。
+    // 本実装ApplyUiChromeTheme(src/Ecad2.App/MainWindow.xaml.cs:796-807)のミラー。
+    private void ApplyUiChromeTheme(bool isDarkMode)
+    {
+        var dictionaries = Application.Current.Resources.MergedDictionaries;
+        var themeUri = new Uri(isDarkMode ? "Themes/Theme.Dark.xaml" : "Themes/Theme.Light.xaml", UriKind.Relative);
+        var newTheme = new ResourceDictionary { Source = themeUri };
+
+        var existing = dictionaries.FirstOrDefault(d =>
+            d.Source is not null && (d.Source.OriginalString.EndsWith("Theme.Light.xaml") || d.Source.OriginalString.EndsWith("Theme.Dark.xaml")));
+        if (existing is not null) dictionaries.Remove(existing);
+
+        dictionaries.Add(newTheme);
     }
 
     private void LightTheme_Click(object sender, RoutedEventArgs e)
