@@ -62,4 +62,8 @@
     <SolidColorBrush x:Key="ScrollBarThumbBrush" Color="#FF686868"/>
     <SolidColorBrush x:Key="ScrollBarThumbHoverBrush" Color="#FF8A8A8A"/>
     <SolidColorBrush x:Key="ScrollBarButtonHoverBrush" Color="#FF505050"/>
+
+    <!-- T-111新規(殿指摘2026-07-22): ステータスバー警告文字色。ダークモード時はDarkRedが視認しづらい
+         ため、既存の選択ハイライト色OrangeRed(LadderCanvas.csのSelectedCellPen等)へ変更。 -->
+    <SolidColorBrush x:Key="WarningMessageBrush" Color="#FFFF4500"/>
 </ResourceDictionary>

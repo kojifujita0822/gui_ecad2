@@ -21,6 +21,7 @@
         <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:ToolModeToTextConverter x:Key="ToolModeToText"/>
+        <converters:AppModeToTextConverter x:Key="AppModeToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
         <converters:StringEqualsMultiConverter x:Key="StringEqualsMultiConverter"/>
@@ -1434,8 +1435,10 @@
              ステータスバー)に伴い、Grid.Row="4"→"2"へ変更。 -->
         <StatusBar x:Name="StatusBarArea" Grid.Row="2">
             <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。 -->
+            <!-- T-111: AppMode(enum)をAppModeToTextConverterで日本語表示に変換する
+                 (内部実装のenum自体は変更しない、表示専用。T-109のToolModeToTextConverterと同型)。 -->
             <StatusBarItem>
-                <TextBlock Text="{Binding Mode, StringFormat='モード: {0}'}"/>
+                <TextBlock Text="{Binding Mode, Converter={StaticResource AppModeToText}, StringFormat='モード: {0}'}"/>
             </StatusBarItem>
             <Separator/>
             <!-- T-109(殿裁定=訳語案B): Tool.Mode(enum)をToolModeToTextConverterで日本語表示に変換する
@@ -1465,8 +1468,11 @@
                 <TextBlock Text="行コメント編集中: Enterで確定・Escで取消"/>
             </StatusBarItem>
             <Separator Visibility="{Binding IsRungCommentEditorVisible, Converter={StaticResource BoolToVisibility}}"/>
+            <!-- T-111: ダークモード時の視認性向上のためWarningMessageBrush(DynamicResource)化。
+                 ライトモード=DarkRed維持・ダークモード=OrangeRed(選択ハイライト色、LadderCanvas.cs
+                 のSelectedCellPen等と同色)、Theme.Light.xaml/Theme.Dark.xaml双方で定義。 -->
             <StatusBarItem>
-                <TextBlock Text="{Binding StatusMessage}" Foreground="DarkRed"/>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="{DynamicResource WarningMessageBrush}"/>
             </StatusBarItem>
         </StatusBar>
 
