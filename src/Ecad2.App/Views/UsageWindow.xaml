@@ -1,8 +1,22 @@
 <Window x:Class="Ecad2.App.Views.UsageWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="使い方" Height="600" Width="800"
+        Title="使い方" Height="600" Width="900"
         Background="{DynamicResource DialogBackgroundBrush}"
         Foreground="{DynamicResource DialogForegroundBrush}">
-    <FlowDocumentScrollViewer x:Name="ContentViewer" Margin="12" VerticalScrollBarVisibility="Auto"/>
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220"/>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+        <!-- T-077増分2(家老采配2026-07-21、殿裁定=案1「左目次+右コンテンツ」): 11領域一覧、
+             DisplayMemberPathでUsageTopic.DisplayNameを表示する。 -->
+        <ListBox x:Name="TopicList" Grid.Column="0" Margin="8,8,4,8"
+                 DisplayMemberPath="DisplayName"
+                 SelectionChanged="TopicList_SelectionChanged"/>
+        <GridSplitter Grid.Column="1" Width="4" HorizontalAlignment="Stretch"
+                      Background="{DynamicResource PanelGridLineBrush}"/>
+        <FlowDocumentScrollViewer x:Name="ContentViewer" Grid.Column="2" Margin="4,12,12,12" VerticalScrollBarVisibility="Auto"/>
+    </Grid>
 </Window>
