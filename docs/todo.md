@@ -97,6 +97,9 @@ Bindingへ追加。`docs/usage/ecad2-usage-statusbar.md`の「英語表記のま
 構造的に実機で表示される機会が無いと判明**——両モードは即時配置処理のため`Tool.Mode`への
 代入が発生せず、T-041以来の既存設計に由来（T-109の実装バグではない）。コード上（Converter
 のswitch式）は隠密レビューで正しいと確認済みのため、実害なしと判断。
+
+### T-108 ダークモード対応漏れの全点検 — Done（2026-07-21、優先度高全件完了）
+
 **起票=殿直接指摘2026-07-21**（スクリーンショット添付）。「シート追加」ダイアログ
 （`AddSheetDialog`）で、ダークモード時に「制御回路」「主回路」ラジオボタンのラベル文字が
 黒のまま（背景はダークに追従済み）となっており視認困難。殿指摘：「この種類の設定抜けが
@@ -119,6 +122,42 @@ DialogForegroundBrush}"`を設定しているが、`RadioButton`（`ControlCircu
    棚卸しする
 3. 点検結果に基づき追加修正を侍へ采配、忍者が画素採取で実機確認
 4. 同種の再発防止（チェックリスト化・自動検出手段の要否）も点検完了後に検討
+
+**AddSheetDialog修正完了（2026-07-21、コミット`9c14b8b`、1ファイル/9insertions）**：一次ソース
+（`dotnet/wpf` `Aero2.NormalColor.xaml`4513-4578行）確認により、既定`RadioButton`の**Style
+本体**（`ControlTemplate.Triggers`ではない）がForegroundを`{DynamicResource
+SystemColors.ControlTextBrushKey}`で明示Setterしていることが原因と確定。ecad2側に
+`RadioButton`用の暗黙的スタイルが存在しないため既定Setterがそのまま生きていた。PR-20/21型
+（ControlTemplate.Triggers優先順位問題）ではなく、個別Foreground指定（ローカル値が優先度で
+Style Setterに勝つ）で解決する型と判明、RadioButton2箇所へ`DialogForegroundBrush`を個別
+指定して解決。隠密静的レビュー完了（指摘なし、一次ソース裏取り済み）。**新規パターンPR-24
+として確定**（`docs-notes/pattern-recurrence-log.md`、暗黙的スタイル不在によるAero2テーマ
+スタイル本体Setterの継承阻害、`onmitsu.md`「値は正しいが反映されない」系調査の早期
+エスカレーション節へ第4パターンとして制度化済み）。
+
+**全体点検、重大発見2件（優先度高）（2026-07-21、隠密、`docs/ecad2-t108-darkmode-audit-onmitsu.md`）**：
+1. `Views/PdfPreviewDialog.xaml`＝`Window`要素自体にBackground/Foreground指定が完全に欠落
+   （他の全ダイアログ6件は指定済み）。PDF出力プレビュー画面全体がダークモードでも常にライト
+   モード風のまま表示される。
+2. `MainWindow.xaml`（`StatusBarArea`）＝`StatusBar`/`StatusBarItem`用の暗黙的スタイルが
+   ecad2側に存在せず、Aero2既定Style本体のBackground（`#FFF1EDED`固定）・Foreground
+   （SystemColors固定）がそのまま適用、RadioButtonと同一メカニズム（PR-24の2例目）。ステータス
+   バー全体（7項目）が常時ライトモード風配色のまま。
+優先度低3件（Slider・自作パーツリストのカテゴリラベルGray固定・SheetSettingsDialogの
+エラーテキストRed固定）は実害小と推測され、家老裁定により見送り。
+
+**優先度高2件、追加修正完了（2026-07-21、コミット`f0bb3f7`、2ファイル/20insertions/1deletion）**：
+`PdfPreviewDialog.xaml`へ`DialogBackgroundBrush`/`DialogForegroundBrush`追加（`PageLabel`/
+`ZoomLabel`は継承で解決）。`App.xaml`へ`StatusBar`/`StatusBarItem`の暗黙的スタイル新設、
+`ToolBarBackgroundBrush`/`ToolBarForegroundBrush`へ差し替え（一次ソース確認済み、Template
+新設は不要と判断）。`StatusBarItem`の`Background=Transparent`は意図的挙動として維持。隠密
+静的レビュー完了（指摘なし、一次ソース裏取り済み）。
+
+**忍者実機確認完了（2026-07-21、`docs/ecad2-t108-addfix-verify-ninja.md`）**：DoD(1)(2)全OK。
+PDFプレビュー（Window全体・ページ番号・ズームラベル）、ステータスバー全7項目とも、ライト/
+ダーク両テーマで画素採取した結果、理論値と完全一致を確認。「案内/警告メッセージ」のみ
+`Foreground="DarkRed"`固定（意図的な警告色設計、実害なし）。これにてT-108（AddSheetDialog+
+優先度高2件）完了。
 
 ### T-103 配置ツールバー、独自ドロップ枠方式によるドッキング操作の確実化 — Done（2026-07-20、push済みa1f4646）
 
