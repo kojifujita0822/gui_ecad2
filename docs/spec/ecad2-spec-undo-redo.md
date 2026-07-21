@@ -117,6 +117,19 @@ SheetNavigationViewModel.AddCommand/DeleteCommand側で行う」）。`RenameCom
 
 ## 4. `IsEnabled`連動
 
+**（2026-07-21更新、T-061・T-092反映）** `UndoCommand`/`RedoCommand`のCanExecuteは
+`CanEditDiagram && !HasAnyDraft && UndoManager.CanUndo`（Redoは`CanRedo`）の3条件
+（`MainWindowViewModel.cs:3185-3199`）で判定される：
+- `CanEditDiagram`（`HasProject && Mode==AppMode.Drawing`）：**テストモード中はUndo/Redoが
+  無効化される**（T-061、2026-07-14、「テストモード＝観察専用」の一貫性のため）。
+- `!HasAnyDraft`：**縦コネクタ/自由線/画像挿入のドラフト記入中はUndo/Redoが無効化される**
+  （T-092、2026-07-15。巻き戻り先でドラフトが指す行・シートの前提が崩れることを防ぐブロック方式、
+  `AddRowCommand`/`DeleteRowCommand`も同型のガードが追加されている）。
+- `UndoManager.CanUndo`/`CanRedo`：スタックの件数判定（2節参照）。
+
+**旧版本節はこれら3条件のうち`UndoManager.CanUndo`のみを前提としており、`CanEditDiagram`・
+`!HasAnyDraft`の2条件が欠落していた。**
+
 - メニュー・ツールバーとも`Command="{Binding UndoCommand}"`のみをバインド、**明示的な`IsEnabled`
   バインディングは存在しない**（`SaveButton`の`IsEnabled="{Binding HasProject}"`のような個別
   バインディングはない）。WPFの`Button`/`MenuItem`が`Command`バインディング時に`CanExecute`の
