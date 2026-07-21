@@ -68,7 +68,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (Tool.PartId is not string partId) return "PartSelection";
         var entry = PartPalette.Entries.FirstOrDefault(e => e.Category == "" && e.Definition.Id == partId);
-        if (entry is null) return null;
+        // 隠密静的レビュー所見2(殿確認済み2026-07-21): 組込でない自作パーツ(Category!="")選択中も
+        // F11ボタンのハイライトを維持する。組込部品(Category=="")選択時はF5〜F8等の対応ボタンへ
+        // ハイライトが移る対称的な挙動のまま(このentry is null分岐にのみ影響)。
+        if (entry is null) return "PartSelection";
         return Tool.IsOr ? $"OR:{entry.Definition.Name}" : entry.Definition.Name;
     }
 
