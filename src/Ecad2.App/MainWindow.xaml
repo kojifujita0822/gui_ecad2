@@ -20,6 +20,7 @@
         <converters:InverseBooleanConverter x:Key="InverseBool"/>
         <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
+        <converters:ToolModeToTextConverter x:Key="ToolModeToText"/>
         <converters:DeviceClassToTextConverter x:Key="DeviceClassToText"/>
         <converters:CircuitRefListToTextConverter x:Key="LocationsToText"/>
         <converters:StringEqualsMultiConverter x:Key="StringEqualsMultiConverter"/>
@@ -1688,14 +1689,15 @@
              ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
              本実装向け機能に依存するため将来タスク。 -->
         <StatusBar x:Name="StatusBarArea" Grid.Row="4">
-            <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。Tool.Modeと同じ
-                 enumそのまま表示パターン(日本語化はT-053同様の別タスク扱い、既存流儀踏襲)。 -->
+            <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。 -->
             <StatusBarItem>
                 <TextBlock Text="{Binding Mode, StringFormat='モード: {0}'}"/>
             </StatusBarItem>
             <Separator/>
+            <!-- T-109(殿裁定=訳語案B): Tool.Mode(enum)をToolModeToTextConverterで日本語表示に変換する
+                 (内部実装のenum自体は変更しない、表示専用)。 -->
             <StatusBarItem>
-                <TextBlock Text="{Binding Tool.Mode, StringFormat='ツール: {0}'}"/>
+                <TextBlock Text="{Binding Tool.Mode, Converter={StaticResource ToolModeToText}, StringFormat='ツール: {0}'}"/>
             </StatusBarItem>
             <Separator/>
             <StatusBarItem>
