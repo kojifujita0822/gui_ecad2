@@ -11,6 +11,15 @@
     <PackageReference Include="Dirkster.AvalonDock.Themes.VS2013" Version="4.74.1" />
   </ItemGroup>
 
+  <!-- T-077増分1(家老采配2026-07-21): 「使い方」ウィンドウが表示するdocs/spec原文を埋め込みリソース
+       として同梱する(単一の真実源を保ち、docs/spec更新が再ビルドで自動反映される)。増分1はPoCのため
+       代表1領域のみ、全11領域対応は増分2で追加する。 -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-statusbar.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-statusbar.md</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

@@ -950,6 +950,8 @@
                           IsEnabled="{Binding HasProject}" InputGestureText="Ctrl+T"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
+                <!-- T-077増分1(家老采配2026-07-21、殿裁定=F1割当): AboutMenuItem_Clickと同型パターン。 -->
+                <MenuItem Header="使い方(_G)" InputGestureText="F1" Click="UsageMenuItem_Click"/>
                 <MenuItem Header="バージョン情報(_A)" Click="AboutMenuItem_Click"/>
             </MenuItem>
         </Menu>

@@ -924,6 +924,25 @@ public partial class MainWindow : Window
         dialog.ShowDialog();
     }
 
+    // T-077増分1(家老采配2026-07-21、隠密プランdocs/ecad2-t077-plan-onmitsu.md 2節): ヘルプ→使い方、
+    // F1キーとも共通(Window_PreviewKeyDown参照)。プロジェクト初の非モーダルWindow(Show()、
+    // ShowDialog()ではない)。既存インスタンスがあれば再度開かずActivate()のみ行う多重起動防止。
+    private Views.UsageWindow? _usageWindow;
+    private void ShowUsageWindow()
+    {
+        if (_usageWindow is null)
+        {
+            _usageWindow = new Views.UsageWindow { Owner = this };
+            _usageWindow.Closed += (_, _) => _usageWindow = null;
+            _usageWindow.Show();
+        }
+        else
+        {
+            _usageWindow.Activate();
+        }
+    }
+    private void UsageMenuItem_Click(object sender, RoutedEventArgs e) => ShowUsageWindow();
+
     // T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド)。表示メニュー・Ctrl+Alt+S共通。
     private void SaveDockingLayoutMenuItem_Click(object sender, RoutedEventArgs e) => SaveDockingLayoutAsDefault();
 
@@ -2166,6 +2185,14 @@ public partial class MainWindow : Window
         bool noModifier = Keyboard.Modifiers == ModifierKeys.None;
         switch (e.Key)
         {
+            case Key.F1 when noModifier:
+                // T-077増分1(家老采配2026-07-21、殿裁定=F1割当): ヘルプ表示は編集操作ではない汎用
+                // 機能のためdesign-brief原則1(単キーショートカットはキャンバスフォーカス時のみ有効)
+                // の対象外とし、フォーカス位置を問わず常時有効にする(他パネルのキー操作と衝突しない、
+                // F1は既存コードで未使用と確認済み)。
+                ShowUsageWindow();
+                e.Handled = true;
+                break;
             case Key.F11 when noModifier && _viewModel.CanEditDiagram:
                 // T-087往復4周目修正(隠密静的レビュー指摘、PR-13): CyclePanelFocusのPartSelectionList
                 // 分岐(下記)と重複していたロジックをActivateAndFocusPartSelectionへ統合(rule of two)。
