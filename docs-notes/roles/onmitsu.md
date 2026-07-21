@@ -166,7 +166,14 @@ WPFの見た目カスタマイズ（Style.Triggers・DynamicResourceオーバー
 3. ControlTemplate.Triggersの依存関係プロパティ優先順位（既定テンプレート内のTriggerが
    Style.Triggersより優先順位で勝り上書きを握り潰す、T-089実例。`DependencyPropertyHelper
    .GetValueSource`で値解決経路を確認するのが近道、`samurai.md`同名節参照）
-この3パターンのいずれにも該当しない場合のみ、より深い一次ソース精読・仮説検証サイクルへ進む。
+4. 暗黙的スタイル不在によるAero2テーマスタイル本体Setterの継承阻害（PR-24、2026-07-21確定。
+   ecad2側に該当型の暗黙的スタイルが存在しない場合、WPFはAero2既定の同型テーマスタイルへ
+   プロパティ単位でフォールバックする。その**Style本体**（ControlTemplate.Triggersではない）
+   がForeground等を`SystemColors.XxxBrushKey`や固定色で明示Setterしていると、継承を期待した
+   個別指定省略が機能しない。T-108実例＝`RadioButton`・`StatusBar`/`StatusBarItem`。対処は
+   個別にローカル値でDynamicResourceを指定すれば優先度で確実に解決、ControlTemplate差し替え
+   のような大掛かりな対応は不要）
+この4パターンのいずれにも該当しない場合のみ、より深い一次ソース精読・仮説検証サイクルへ進む。
 
 ## 報告フォーマット
 
