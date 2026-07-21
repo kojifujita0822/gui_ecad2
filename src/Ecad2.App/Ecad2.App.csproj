@@ -11,42 +11,42 @@
     <PackageReference Include="Dirkster.AvalonDock.Themes.VS2013" Version="4.74.1" />
   </ItemGroup>
 
-  <!-- T-077増分1/増分2(家老采配2026-07-21): 「使い方」ウィンドウが表示するdocs/spec原文11領域全てを
-       埋め込みリソースとして同梱する(単一の真実源を保ち、docs/spec更新が再ビルドで自動反映される)。
-       この段階ではコンテンツは原文のまま(ユーザー向け平易版への変換は増分3)。 -->
+  <!-- T-077増分4(家老采配2026-07-21): 「使い方」ウィンドウの参照先をdocs/spec原文(開発者向け)から
+       docs/usage平易版(隠密作成、ユーザー向け)へ切替(単一の真実源を保つ方針は継続、docs/usage更新が
+       再ビルドで自動反映される)。docs/spec側の埋め込みは表示に使わなくなったため除去。 -->
   <ItemGroup>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-sheet-document.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-sheet-document.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-sheet-document.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-sheet-document.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-menu-toolbar.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-menu-toolbar.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-menu-toolbar.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-menu-toolbar.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-placement.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-placement.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-placement.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-placement.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-wiring.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-wiring.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-wiring.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-wiring.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-undo-redo.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-undo-redo.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-undo-redo.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-undo-redo.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-canvas-display.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-canvas-display.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-canvas-display.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-canvas-display.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-part-management.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-part-management.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-part-management.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-part-management.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-device-table.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-device-table.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-device-table.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-device-table.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-statusbar.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-statusbar.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-statusbar.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-statusbar.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-drc-output.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-drc-output.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-drc-output.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-drc-output.md</LogicalName>
     </EmbeddedResource>
-    <EmbeddedResource Include="..\..\docs\spec\ecad2-spec-pdf-testmode.md">
-      <LogicalName>Ecad2.App.UsageContent.ecad2-spec-pdf-testmode.md</LogicalName>
+    <EmbeddedResource Include="..\..\docs\usage\ecad2-usage-pdf-testmode.md">
+      <LogicalName>Ecad2.App.UsageContent.ecad2-usage-pdf-testmode.md</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
 
