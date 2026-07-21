@@ -2474,6 +2474,12 @@ public partial class MainWindow : Window
                     // 無関係セル選択という副作用が発生していた(横展開漏れ)。他のSelected*と同じ
                     // 位置(SelectedCellへのフォールスルー直前)に追加し、対称性を回復する。
                     MoveSelectedImageByKey(e.Key);
+                else if (_viewModel.SelectedFrame is not null)
+                    // T-105(殿裁定2026-07-21「案A」): 選択中の枠(SelectedFrame)を平行移動する。
+                    // SelectedFrameはSelectedImageと同型の独立選択状態(SelectedElementのような
+                    // SelectedCellからの自動算出プロパティではない)のため、同じ位置(SelectedCellへの
+                    // フォールスルー直前)に追加し対称性を保つ。
+                    MoveSelectedFrameByKey(e.Key);
                 else
                     MoveSelectedCell(e.Key);
                 e.Handled = true;
@@ -2908,6 +2914,23 @@ public partial class MainWindow : Window
             Key.Down => _viewModel.MoveSelectedElement(1, 0),
             Key.Left => _viewModel.MoveSelectedElement(0, -1),
             Key.Right => _viewModel.MoveSelectedElement(0, 1),
+            _ => false,
+        };
+        if (moved) RedrawCanvas();
+    }
+
+    // T-105(殿裁定2026-07-21「案A」=既存の独立選択状態群(Connector/WireBreak/FreeLine/
+    // ConnectionDot/Image)と同一の無修飾矢印キー割当): 選択中の枠(SelectedFrame)を矢印キー1回分、
+    // GridPos単位で平行移動する(MoveSelectedImageByKeyと同じ設計、GroupFrameはGrid座標系のため
+    // 引数はMoveSelectedElementByKeyと同型のint deltaRow/Column)。
+    private void MoveSelectedFrameByKey(Key key)
+    {
+        bool moved = key switch
+        {
+            Key.Up => _viewModel.MoveSelectedFrame(-1, 0),
+            Key.Down => _viewModel.MoveSelectedFrame(1, 0),
+            Key.Left => _viewModel.MoveSelectedFrame(0, -1),
+            Key.Right => _viewModel.MoveSelectedFrame(0, 1),
             _ => false,
         };
         if (moved) RedrawCanvas();

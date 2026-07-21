@@ -1519,6 +1519,23 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void CancelDragFrame()
         => CancelDrag(ref _draggingFrame, frame => frame.TopLeft = _dragFrameOrigTopLeft);
 
+    /// <summary>SelectedFrameを矢印キー1回分(Shift無し、殿裁定2026-07-21=既存の独立選択状態群
+    /// (Connector/WireBreak/FreeLine/ConnectionDot/Image)と同一の無修飾矢印キー割当)平行移動する
+    /// (T-105、GridPos単位)。IsFrameWithinGridBoundsを満たす場合のみ移動する(満たさなければ
+    /// 移動しない、全否定方式、MoveSelectedElementと同型。GroupFrameは他要素との重複を許容する
+    /// ため占有判定は不要)。実際に動けた場合のみRecordSnapshot+MarkDirty()する。</summary>
+    public bool MoveSelectedFrame(int deltaRow, int deltaColumn)
+    {
+        if (SelectedFrame is not GroupFrame frame || CurrentSheet is not Sheet sheet) return false;
+        var newTopLeft = new GridPos(frame.TopLeft.Row + deltaRow, frame.TopLeft.Column + deltaColumn);
+        if (newTopLeft == frame.TopLeft) return false;
+        if (!IsFrameWithinGridBounds(newTopLeft, frame.Width, frame.Height, sheet)) return false;
+        UndoManager.RecordSnapshot(Document);
+        frame.TopLeft = newTopLeft;
+        MarkDirty();
+        return true;
+    }
+
     // T-067: 枠の新規作成(キーボードステップ方式、_freeLineDraftと同型)。Anchorは左上セル固定
     // (通常SelectedCell)、Width/Heightを1ずつ増減する(呼び出し元=View層がKeyを判定し、
     // deltaWidth/deltaHeightとして渡す。MoveFreeLineDraftEndと同じくViewModel側はKey型に依存
