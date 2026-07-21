@@ -757,8 +757,15 @@
                              設計書docs/ecad2-t104-toolbar-tabswitch-design-onmitsu.md §4-5参照。
                              CanFloat="False"はT-099(c)案YのContentDockingガードがContentId限定
                              (PlacementToolBarのみ)で本タブには不適用のため、フロート化自体を
-                             構造的に禁止しリスクを回避する設計(同設計書§3)。 -->
-                        <avalonDock:LayoutAnchorable Title="基本機能" ContentId="MainToolBar" CanClose="False" CanFloat="False">
+                             構造的に禁止しリスクを回避する設計(同設計書§3)。
+                             T-110增分1(家老采配2026-07-22、指1=隠密静的レビュー差し戻し):
+                             全6アンカラブル共通でCanDockAsTabbedDocument="False"を追加する。
+                             `LayoutAnchorable.CanDockAsTabbedDocument`(v4.74.1一次ソース確認済み、
+                             正規の封止機構)を封止しないと、ShowHeader="False"の文書ペイン(裁2)へ
+                             「タブ付きドキュメントとしてドッキング」した際、タブUIが見えない
+                             文書ペイン内で選択が新規文書へ移りキャンバスがマウス操作では戻せない
+                             形で隠れる恐れがある(Ctrl+Alt+Rで復旧可能だが殿の通常操作圏内の罠)。 -->
+                        <avalonDock:LayoutAnchorable Title="基本機能" ContentId="MainToolBar" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                             <!-- T-104増分2(家老采配2026-07-20、設計書docs/ecad2-t104-toolbar-tabswitch-
                                  design-onmitsu.md §4骨子どおり): 現行ToolBarArea(1段目固定領域)から
                                  移設。ボタン群自体(Style/Command/ToolTip等)は無改修、配置場所のみ移動
@@ -849,7 +856,7 @@
                                 </ToggleButton>
                             </ToolBar>
                         </avalonDock:LayoutAnchorable>
-                        <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False">
+                        <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False" CanDockAsTabbedDocument="False">
                             <!-- T-083増分6(家老采配2026-07-16、殿指摘): パネル中身(ToolBar本体)の
                                  配色をDynamicResource化(層C扱い)。1段目ToolBarAreaと同型パターン。
                                  AvalonDockのタブ・タイトルバー自体(層B)は保留中で対象外。 -->
@@ -1046,7 +1053,7 @@
                              名前変更/設定ボタン・D&D並び替え対応ListBox)は無改修でLayoutAnchorablePaneの
                              直下へ移植。 -->
                         <avalonDock:LayoutAnchorablePane DockWidth="220">
-                            <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False" CanFloat="False">
+                            <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                                 <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitle="シート"を
                                      表示するため、旧実装の手動タイトルTextBlockは二重表示になっていた。削除。 -->
                                 <DockPanel>
@@ -1181,7 +1188,7 @@
                              =Empty)になるまで境界ドラッグで縮小可能だった。旧Grid実装時代のMinHeight="80"
                              (MainContentArea.RowDefinitions、既存T-059出力パネル領域と同値)を踏襲し明示指定する。 -->
                         <avalonDock:LayoutAnchorablePane DockMinHeight="80">
-                            <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False" CanFloat="False">
+                            <avalonDock:LayoutAnchorable Title="機器表" ContentId="DeviceTable" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                                 <DataGrid x:Name="DeviceTableGrid" ItemsSource="{Binding DeviceTable.Devices}" AutoGenerateColumns="False"
                                           HeadersVisibility="Column" GridLinesVisibility="Horizontal" CellEditEnding="DeviceTableGrid_CellEditEnding"
                                           CanUserAddRows="False" CanUserDeleteRows="False">
@@ -1200,7 +1207,7 @@
                                  プロパティ側はさらにHasSelectedElementで「要素を選択してください」
                                  プレースホルダと選択中要素の詳細表示を切替える(T-017)。Title初期値="プロパティ"
                                  (既定表示、UpdateRightPanelBottomTitleが以後の状況変化を追従)。 -->
-                            <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False" CanFloat="False">
+                            <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                                 <Grid>
                                     <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
                                         <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
@@ -1331,7 +1338,7 @@
                              継承(Visual/Logical Tree経由)の対象外のため(GitHub一次ソース確認済み、
                              忍者の推測通り)。BindingではなくMainWindow.xaml.csでFind.PropertyChangedを
                              購読しTitleを直接更新する方式に切替える(UpdateOutputPanelTitle参照)。 -->
-                        <avalonDock:LayoutAnchorable Title="出力" ContentId="OutputPanel" CanClose="False" CanFloat="False">
+                        <avalonDock:LayoutAnchorable Title="出力" ContentId="OutputPanel" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                             <DockPanel>
                                 <!-- T-070隠密レビュー指摘A-9: 2つのDataGridをDockPanelへ直接並べると、Fill対象(Star列展開)を
                                      受けられるのは最後の子のみというDockPanel仕様上、FindResultsGridがDock.Left扱いとなり
