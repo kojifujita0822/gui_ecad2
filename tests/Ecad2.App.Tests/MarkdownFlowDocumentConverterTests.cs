@@ -6,13 +6,16 @@ using Ecad2.App.Views;
 namespace Ecad2.App.Tests;
 
 /// <summary>
-/// T-077増分1(FlowDocument自作変換、殿裁定「案B」)の回帰テスト。対応構文は限定的
-/// (見出しH1-H3・段落・箇条書き・番号付きリスト・コードブロック・水平線・インライン強調/コード)。
+/// T-077増分1(FlowDocument自作変換、殿裁定「案B」)・増分5(表構文対応)の回帰テスト。対応構文
+/// (見出しH1-H3・段落・箇条書き・番号付きリスト・コードブロック・水平線・インライン強調/コード・表)。
 /// </summary>
 public class MarkdownFlowDocumentConverterTests
 {
     private static string TextOf(Paragraph paragraph)
         => string.Concat(paragraph.Inlines.OfType<Run>().Select(r => r.Text));
+
+    private static string TextOf(TableCell cell)
+        => TextOf((Paragraph)cell.Blocks.Single());
 
     [Fact]
     public void Convert_見出しをParagraphへ変換しレベルに応じたFontSizeを持つ()
@@ -92,12 +95,75 @@ public class MarkdownFlowDocumentConverterTests
     }
 
     [Fact]
-    public void Convert_未対応のMarkdown表構文はプレーンテキストの段落として残る()
+    public void Convert_表をヘッダー行とデータ行を持つTableへ変換する()
     {
-        // PoC範囲外の構文(Markdown表)は言語仕様上パースされずそのままテキストとして残る仕様。
-        var doc = MarkdownFlowDocumentConverter.Convert("| a | b |\n|---|---|\n| 1 | 2 |");
+        var doc = MarkdownFlowDocumentConverter.Convert("| a | b |\n|---|---|\n| 1 | 2 |\n| 3 | 4 |");
+
+        var table = Assert.IsType<Table>(doc.Blocks.Single());
+        var rowGroup = table.RowGroups.Single();
+        Assert.Equal(3, rowGroup.Rows.Count); // ヘッダー1行+データ2行
+        Assert.Equal("a", TextOf(rowGroup.Rows[0].Cells[0]));
+        Assert.Equal("b", TextOf(rowGroup.Rows[0].Cells[1]));
+        Assert.Equal("1", TextOf(rowGroup.Rows[1].Cells[0]));
+        Assert.Equal("4", TextOf(rowGroup.Rows[2].Cells[1]));
+    }
+
+    [Fact]
+    public void Convert_表のヘッダー行は太字になる()
+    {
+        var doc = MarkdownFlowDocumentConverter.Convert("| 見出し |\n|---|\n| データ |");
+
+        var table = Assert.IsType<Table>(doc.Blocks.Single());
+        var rowGroup = table.RowGroups.Single();
+        var headerParagraph = (Paragraph)rowGroup.Rows[0].Cells[0].Blocks.Single();
+        var dataParagraph = (Paragraph)rowGroup.Rows[1].Cells[0].Blocks.Single();
+        Assert.Equal(FontWeights.Bold, headerParagraph.FontWeight);
+        Assert.NotEqual(FontWeights.Bold, dataParagraph.FontWeight);
+    }
+
+    [Fact]
+    public void Convert_データ行の列数がヘッダーより少ない場合は空セルで埋める()
+    {
+        // docs/usage実例(menu-toolbar)の継続行表記(先頭列以降を省略)に対応する。
+        var doc = MarkdownFlowDocumentConverter.Convert("| メニュー | 項目 |\n|---|---|\n| ファイル | 新規 |\n| | 開く |");
+
+        var table = Assert.IsType<Table>(doc.Blocks.Single());
+        var rowGroup = table.RowGroups.Single();
+        Assert.Equal(2, rowGroup.Rows[2].Cells.Count);
+        Assert.Equal("", TextOf(rowGroup.Rows[2].Cells[0]));
+        Assert.Equal("開く", TextOf(rowGroup.Rows[2].Cells[1]));
+    }
+
+    [Fact]
+    public void Convert_表セル内のインラインコードも処理される()
+    {
+        var doc = MarkdownFlowDocumentConverter.Convert("| 項目 | 説明 |\n|---|---|\n| 開く | `.gcad`ファイルを開く |");
+
+        var table = Assert.IsType<Table>(doc.Blocks.Single());
+        var cellParagraph = (Paragraph)table.RowGroups.Single().Rows[1].Cells[1].Blocks.Single();
+        var codeRun = Assert.Single(cellParagraph.Inlines.OfType<Run>(), r => r.Text == ".gcad");
+        Assert.Equal("Consolas", codeRun.FontFamily.Source);
+    }
+
+    [Fact]
+    public void Convert_表の前後の段落は表と独立したブロックのまま残る()
+    {
+        var doc = MarkdownFlowDocumentConverter.Convert("前文。\n\n| a |\n|---|\n| 1 |\n\n後文。");
+
+        var blocks = doc.Blocks.ToList();
+        Assert.Equal(3, blocks.Count);
+        Assert.IsType<Paragraph>(blocks[0]);
+        Assert.IsType<Table>(blocks[1]);
+        Assert.IsType<Paragraph>(blocks[2]);
+    }
+
+    [Fact]
+    public void Convert_区切り線が続かないパイプ始まり行は通常段落として処理し無限ループしない()
+    {
+        // 増分5の教訓(段落結合ループの1行目除外条件による無限ループ回避)の直接検証。
+        var doc = MarkdownFlowDocumentConverter.Convert("| これは表ではない行 |\n通常の続き。");
 
         var paragraph = Assert.IsType<Paragraph>(doc.Blocks.Single());
-        Assert.Contains("| a | b |", TextOf(paragraph));
+        Assert.Equal("| これは表ではない行 | 通常の続き。", TextOf(paragraph));
     }
 }

@@ -1,13 +1,14 @@
 using System.Linq;
+using System.Windows.Documents;
 using Ecad2.App.Views;
 
 namespace Ecad2.App.Tests;
 
 /// <summary>
 /// T-077増分2(ナビゲーションUI、殿裁定「案1」左目次+右コンテンツ)・増分4(docs/usage平易版への
-/// 参照先切替)の回帰テスト。UI操作(ListBox SelectionChanged等)はコードビハインドのためテスト
-/// 基盤が無く対象外(T-088等と同事情)。Topics定義・埋め込みリソースの整合性(全11領域が実際に
-/// 読み込めるか)を検証する。
+/// 参照先切替)・増分5(表構文対応)の回帰テスト。UI操作(ListBox SelectionChanged等)はコードビハインド
+/// のためテスト基盤が無く対象外(T-088等と同事情)。Topics定義・埋め込みリソースの整合性(全11領域が
+/// 実際に読み込めるか)、および実データがMarkdownFlowDocumentConverterで例外なく変換できるかを検証する。
 /// </summary>
 public class UsageWindowTests
 {
@@ -64,6 +65,36 @@ public class UsageWindowTests
         {
             string content = UsageWindow.LoadEmbeddedMarkdown(topic.ResourceFileName);
             Assert.NotEmpty(content);
+        }
+    }
+
+    [Theory]
+    [InlineData("ecad2-usage-menu-toolbar.md")]
+    [InlineData("ecad2-usage-pdf-testmode.md")]
+    [InlineData("ecad2-usage-placement.md")]
+    [InlineData("ecad2-usage-sheet-document.md")]
+    [InlineData("ecad2-usage-statusbar.md")]
+    [InlineData("ecad2-usage-wiring.md")]
+    public void LoadEmbeddedMarkdown_表を含む6領域は実際にTableへ変換される(string fileName)
+    {
+        // T-077増分5(DoD2): 殿指摘の表構文多用6領域が、実データで実際にTableへ変換されることを
+        // 直接検証する(単体テスト用の簡易表だけでなく実コンテンツでの回帰も担保する)。
+        string content = UsageWindow.LoadEmbeddedMarkdown(fileName);
+
+        var document = MarkdownFlowDocumentConverter.Convert(content);
+
+        Assert.Contains(document.Blocks, b => b is Table);
+    }
+
+    [Fact]
+    public void Topics_全項目のコンテンツがMarkdownFlowDocumentConverterで例外なく変換できる()
+    {
+        // 表を含まない残り5領域も含め、実データ全11件がConvert()で例外を起こさないことの安全網。
+        foreach (var topic in UsageWindow.Topics)
+        {
+            string content = UsageWindow.LoadEmbeddedMarkdown(topic.ResourceFileName);
+            var document = MarkdownFlowDocumentConverter.Convert(content);
+            Assert.NotEmpty(document.Blocks);
         }
     }
 }
