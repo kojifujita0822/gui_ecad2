@@ -168,6 +168,23 @@
                     </Setter.Value>
                 </Setter>
             </Style>
+
+            <!-- T-108追加修正(家老采配2026-07-21、隠密全体点検PR-24第2例): StatusBar用の暗黙的スタイルが
+                 ecad2側に存在せず、Aero2既定テーマスタイル本体のBackground(固定薄灰#FFF1EDED)・
+                 Foreground({DynamicResource SystemColors.ControlTextBrushKey}、OS設定準拠で固定に近い)
+                 がそのまま適用され、ステータスバー7項目が常時ライトモード風配色のままだった
+                 (一次ソースdotnet/wpf Aero2.NormalColor.xaml 5377-5458行で確認済み)。既定Template
+                 (Border+ItemsPresenter/ContentPresenter)はTemplateBinding経由でBackground/Foreground
+                 を継承するのみのシンプルな構造のため、Template自体は新設せずStyle.Setterのみで
+                 十分(DataGridと同型、RadioButton(T-108先行修正)と同一メカニズム=PR-24)。 -->
+            <Style TargetType="{x:Type StatusBar}">
+                <Setter Property="Background" Value="{DynamicResource ToolBarBackgroundBrush}"/>
+                <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
+            </Style>
+            <Style TargetType="{x:Type StatusBarItem}">
+                <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
+            </Style>
+
             <Style TargetType="{x:Type DataGrid}">
                 <Setter Property="Background" Value="{DynamicResource PanelContentBackgroundBrush}"/>
                 <Setter Property="Foreground" Value="{DynamicResource PanelContentForegroundBrush}"/>
