@@ -91,24 +91,24 @@
 
 - **内容**: 隠密プラン§2.2案1トポロジへの統合（4Manager撤去→単一Manager+LayoutDocumentPane）、
   永続化単一ファイル化、`ApplyDockingManagerThemes`単一化+統合タイトルスタイル、T-103再配線、
-  T-104タブナビ再確認、既存テスト追随修正。**增分0のPoC・忍者実機確認で以下が確定済み**:
-  1. **T-099(c)案Y代替＝候補a確定**（標準`Dock()`をそのまま使用）。增分0のPoC(c)で
+  T-104タブナビ再確認、既存テスト追随修正。**増分0のPoC・忍者実機確認で以下が確定済み**:
+  1. **T-099(c)案Y代替＝候補a確定**（標準`Dock()`をそのまま使用）。増分0のPoC(c)で
      Float→Dock往復をボタン経由3周＋MenuDropDownButton経由2周、計5周実施しタブ自己複製・
      縦長化・空白化いずれも再現しなかった（`docs/ecad2-t110-poc-verification-ninja.md`(c)）。
      統合トポロジではPreviousContainer解決の文脈が変わりバグが再現しないという隠密プラン§3.3の
      見立てどおり。**`ContentDocking`ハンドラの`e.Cancel`自体を撤去してよい**（候補b/cは不要）。
-  2. **裁2（ドキュメントタブ非表示）は`ShowHeader="False"`属性方式を採用**（增分0静的レビューで
+  2. **裁2（ドキュメントタブ非表示）は`ShowHeader="False"`属性方式を採用**（増分0静的レビューで
      判明、`docs/ecad2-t110-poc-review-onmitsu.md`§3——テンプレートコピー約60行が不要、ライブラリ
      正規機構ゆえ将来のAvalonDock更新にも強い）。**残課題**＝`DockAsDocument`経路で生成される
      新規ペインの`ShowHeader`封止要否（未検証、一次ソース確認要）。
   3. **統合PaneControlスタイルに`Items.Count==1`時のTabItem Collapseトリガーを追加必須**
-     （增分0修2で判明した設計ギャップ、本実装の`PlacementToolBarPaneControlStyle`自体にも
+     （増分0修2で判明した設計ギャップ、本実装の`PlacementToolBarPaneControlStyle`自体にも
      元々無い。一次ソースGeneric.xaml:536-540どおりStyle.Triggersへ追加）。
   4. ダークモード切替時は`Application.Current.Resources.MergedDictionaries`側のTheme.Light/Dark
      差し替えも本実装の`ApplyUiChromeTheme`（既存、`MainWindow.xaml.cs:796-807`）でカバー済みの
-     はずだが、統合後のManager一元化と整合しているか回帰確認に含める（增分0修1と同型の見落とし
+     はずだが、統合後のManager一元化と整合しているか回帰確認に含める（増分0修1と同型の見落とし
      防止）。
-- **申し送り事項（增分1設計・レビュー時に確認）**: (a) `DockAsDocument`経路の新規ペイン
+- **申し送り事項（増分1設計・レビュー時に確認）**: (a) `DockAsDocument`経路の新規ペイン
   `ShowHeader`封止要否 (b) `SelectedContentIndex="1"`が実機で反映されない事象の要否確認
   （軽微） (c) DataGridColumnHeader単体クリックで非アクティブなまま（軽微、実害なしと見られる）
   (d) 配置ツールバーが単独ドッキングペインになる場面が本実装で実在するか（ContentId分岐の
@@ -116,7 +116,7 @@
   実機確認後の追補§追2参照）。
 - **DoD**: 隠密プラン§5増分1の忍者確認項目全て（起動・全ペイン表示・リサイズ・保存/復元・
   Ctrl+Alt+R・ダークモード切替・Float/Dock往復・Tab巡回・ElementPlacementBar位置）が正常。
-  加えて增分0(f)相当（ドキュメントタブ非表示時にキャンバス内容が正しく表示されること）を
+  加えて増分0(f)相当（ドキュメントタブ非表示時にキャンバス内容が正しく表示されること）を
   ShowHeader方式で回帰確認。
 - **検証観点**: 高リスク領域（`AnchorablePaneControlStyle`系）ゆえ、侍実装→隠密静的レビュー
   （フル観点、code-reviewスキルは恒久無効のため手動レビュー代替。PR-21パターン=Style本体の
