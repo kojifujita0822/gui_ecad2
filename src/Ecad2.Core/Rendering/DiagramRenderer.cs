@@ -73,6 +73,19 @@ public sealed class DiagramRenderer
     public int PageCount(Sheet sheet) =>
         Math.Max(1, (TotalRows(sheet) + RowsPerPage - 1) / RowsPerPage);
 
+    /// <summary>GroupFrameの矩形をmm実座標で返す(Visual*Mm優先、無ければTopLeft/Width/Height由来)。
+    /// T-114(P-061対処、隠密所見2026-07-12): MainCircuitVirtualRows・MainCircuitContentMaxX・
+    /// DrawFramesの3箇所で同型フォールバック式が重複していたのを共通化する。Y座標はPageY補正前の
+    /// 生値を返す(DrawFramesはVisualYMm使用時のみ追加でPageY補正を適用する、既存の描画仕様どおり)。</summary>
+    private (double X, double Y, double Width, double Height) FrameRectMm(GroupFrame f)
+    {
+        double x = f.VisualXMm ?? X(f.TopLeft.Column);
+        double y = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - Cell * 0.4);
+        double w = f.VisualWidthMm ?? f.Width * Cell;
+        double h = f.VisualHeightMm ?? f.Height * Cell;
+        return (x, y, w, h);
+    }
+
     /// <summary>主回路（Sheet.MainCircuit）シートの仮想行数。自由直線・接続点・枠は mm 実座標で
     /// グリッド行範囲を超えて広がりうるため、その最大 Y を行数換算してページ分割に使う。
     /// ページ分割の内部計算専用の値であり、要素の描画位置には影響しない。</summary>
@@ -83,8 +96,7 @@ public sealed class DiagramRenderer
         foreach (var d in sheet.ConnectionDots) maxYmm = Math.Max(maxYmm, d.YMm);
         foreach (var f in sheet.Frames)
         {
-            double fy = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - Cell * 0.4);
-            double fh = f.VisualHeightMm ?? f.Height * Cell;
+            var (_, fy, _, fh) = FrameRectMm(f);
             maxYmm = Math.Max(maxYmm, fy + fh);
         }
         return (int)Math.Ceiling((maxYmm - _opt.MarginMm) / Cell);
@@ -109,11 +121,8 @@ public sealed class DiagramRenderer
                 maxXmm = Math.Max(maxXmm, d.XMm);
         foreach (var f in sheet.Frames)
         {
-            double fy = f.VisualYMm ?? (_geo.YRow(f.TopLeft.Row) - Cell * 0.4);
-            double fh = f.VisualHeightMm ?? f.Height * Cell;
+            var (fx, fy, fw, fh) = FrameRectMm(f);
             if (fy + fh < bandTop || fy > bandBot) continue;
-            double fx = f.VisualXMm ?? X(f.TopLeft.Column);
-            double fw = f.VisualWidthMm ?? f.Width * Cell;
             maxXmm = Math.Max(maxXmm, fx + fw);
         }
         return maxXmm;

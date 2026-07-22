@@ -321,7 +321,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 「常時無条件」のままとする(二重のモグラ叩きを避ける)。</summary>
     internal void SetCurrentSheetIndexCore(int value)
     {
-        SetProperty(ref _currentSheetIndex, value);
+        // T-114(P-068対処): propertyName省略だと[CallerMemberName]によりこのメソッド名自身
+        // ("SetCurrentSheetIndexCore")がPropertyChangedへ渡ってしまう。本来のプロパティ名を明示する。
+        SetProperty(ref _currentSheetIndex, value, nameof(CurrentSheetIndex));
         NotifyCurrentSheetDependentPropertiesChanged();
         SelectedCell = null;
     }
@@ -335,7 +337,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 「所見L」型再発(往復1〜2周目で対症療法に留まっていた欠陥、docs/ecad2-t082-sheet-reorder-
     /// review2-onmitsu.md)の根本原因だった。
     /// </summary>
-    internal void SetCurrentSheetIndexWithoutCrossCut(int value) => SetProperty(ref _currentSheetIndex, value);
+    // T-114(P-068対処): 同上、propertyNameを明示する。
+    internal void SetCurrentSheetIndexWithoutCrossCut(int value)
+        => SetProperty(ref _currentSheetIndex, value, nameof(CurrentSheetIndex));
 
     /// <summary>現在表示中のシート。Document.Sheets[CurrentSheetIndex] の読み取り専用ビュー。
     /// Document.Sheets.Count==0(起動直後の濃紺スタート、殿裁定2026-07-05)の間はnull。</summary>
@@ -1791,12 +1795,19 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// まずドラッグ位置(currentMm)がアンカーのどちら側にあるかで判定する(反転追従)。ただし、その
     /// 方向では最小サイズを確保できない場合(アンカーがページ境界に極めて近い異常ケース)は、掴んだ
     /// ハンドル本来の伸びる方向(defaultGrowsPositive)へフォールバックし、往復1周目と同じ境界優先
-    /// クランプ(安全側、min>maxでのMath.Clamp例外を避ける)を適用する。</summary>
+    /// クランプ(安全側、min>maxでのMath.Clamp例外を避ける)を適用する。
+    /// T-114(P-073/074/076対処、隠密所見2026-07-13、severity低)：
+    /// (P-074) currentMm==anchorMm(ドラッグ未移動)の等号をハンドル種別に関わらず正方向優先していた
+    /// 偏りを解消し、defaultGrowsPositive(呼び出し元が渡すハンドルごとの既定伸長方向)へ委ねる。
+    /// (P-073/076) 「ページが最小サイズの2倍未満」の二重異常(正負どちらの方向にも最小サイズを
+    /// 確保できない縮退ケース)では、両方向とも不足という1つのhasRoom判定へ統合する(旧実装は独立した
+    /// 2つのif文で表現しており、可読性上どちらもdefaultGrowsPositveへ収束する意図が伝わりにくかった。
+    /// 挙動は完全に等価、旧実装との数式的同値性は実装時に手計算で確認済み)。</summary>
     private static double ClampResizeTarget(double currentMm, double anchorMm, bool defaultGrowsPositive, double maxMm)
     {
-        bool growsPositive = currentMm >= anchorMm;
-        if (growsPositive && anchorMm + ImageMinSizeMm > maxMm) growsPositive = defaultGrowsPositive;
-        if (!growsPositive && anchorMm - ImageMinSizeMm < 0) growsPositive = defaultGrowsPositive;
+        bool growsPositive = currentMm == anchorMm ? defaultGrowsPositive : currentMm > anchorMm;
+        bool hasRoom = growsPositive ? anchorMm + ImageMinSizeMm <= maxMm : anchorMm - ImageMinSizeMm >= 0;
+        if (!hasRoom) growsPositive = defaultGrowsPositive;
 
         if (growsPositive)
         {
@@ -2485,8 +2496,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>行削除で「要素ごと削除」(T-055増分3、RowOps.DeleteRow)された複数のElementInstanceに対し、
     /// DeleteSelectedElement(単一削除)と同じ規則で機器表(Document.Devices)クリーンアップを行う。
     /// 削除された要素群のDeviceNameのうち、他のどのシートのどの要素からも参照されなくなったものだけ
-    /// Document.Devices.ByNameから除去する(重複DeviceNameはDistinctで1回のみ判定)。</summary>
-    private void CleanupRemovedDeviceNames(IReadOnlyList<ElementInstance> removed)
+    /// Document.Devices.ByNameから除去する(重複DeviceNameはDistinctで1回のみ判定)。
+    /// T-117(P-104対処): SheetNavigationViewModel.DeleteCommand(シート削除)からも呼ぶためinternal化。</summary>
+    internal void CleanupRemovedDeviceNames(IReadOnlyList<ElementInstance> removed)
     {
         if (removed.Count == 0) return;
         foreach (var deviceName in removed.Select(e => e.DeviceName).OfType<string>().Distinct(StringComparer.OrdinalIgnoreCase))

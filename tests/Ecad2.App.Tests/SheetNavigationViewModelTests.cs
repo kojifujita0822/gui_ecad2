@@ -2,6 +2,7 @@ using System.Linq;
 using System.Windows.Threading;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
+using Ecad2.Persistence;
 using Ecad2.Simulation;
 
 namespace Ecad2.App.Tests;
@@ -172,6 +173,48 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         Assert.Equal(
             "DRC結果が削除されました。DRC再実行してください。 シート削除によりページ番号に欠番が生じました。",
             vm.StatusMessage);
+    }
+
+    // --- T-117(P-104対処): シート削除時の機器表クリーンアップ ---
+
+    /// <summary>削除したシートが保持していた要素のDeviceNameが、他のどのシートのどの要素からも
+    /// 参照されなくなった場合、機器表(Document.Devices.ByName)から該当エントリが除去されること
+    /// (DeleteSelectedElement/DeleteRowAtCommandの既存クリーンアップパターンをシート削除へ拡張した
+    /// 回帰テスト、RowInsertDeleteCommandsTests.DeleteRowAtCommand_Execute_RemovesDeviceTableEntry_
+    /// WhenNoLongerReferencedと同型)。</summary>
+    [Fact]
+    public void DeleteCommand_RemovesDeviceTableEntry_WhenNoLongerReferenced()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(3, 0);
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0;   // 要素配置済みのシート1を選択
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.False(vm.Document.Devices.ByName.ContainsKey("X001"));
+    }
+
+    /// <summary>対照ケース: 削除したシートのDeviceNameが他シートの別要素から参照されていれば
+    /// 機器表エントリは残る。</summary>
+    [Fact]
+    public void DeleteCommand_KeepsDeviceTableEntry_WhenStillReferencedElsewhere()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(3, 0);
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+        var sheet2 = AddSheet(vm, 2, "シート2");
+        sheet2.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X001", Pos = new GridPos(5, 0) });
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0;   // 要素配置済みのシート1を選択
+
+        vm.SheetNavigation.DeleteCommand.Execute(null);
+
+        Assert.True(vm.Document.Devices.ByName.ContainsKey("X001"));
     }
 
     [Fact]

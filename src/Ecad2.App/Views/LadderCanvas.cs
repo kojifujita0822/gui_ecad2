@@ -306,25 +306,29 @@ public sealed class LadderCanvas : FrameworkElement
         InvalidateMeasure();
     }
 
+    /// <summary>行コメント編集の対象として、指定した行が適格か判定する(T-114 P-062対処、
+    /// 隠密所見2026-07-12: F2キー経路(MainWindow.xaml.cs)とHitTestRungCommentRowに同じ適格条件
+    /// [MainCircuit除外・行範囲判定]が手書きで重複していた)。主回路シートは右母線を描画しない=
+    /// 行コメントの対象外(T-080往復1周目指摘G)、かつ行は描画範囲内のみ。</summary>
+    internal static bool IsRungCommentRowEligible(int row, Sheet sheet)
+        => !sheet.MainCircuit && row >= 0 && row < DiagramRenderer.TotalRows(sheet);
+
     /// <summary>
     /// クリック位置(ローカルDIP座標)が行コメント記入領域(右母線の右側)にあるか判定し、該当すれば
     /// 行番号を返す(T-080)。GuiEcad原本のヒット領域(xMm > 右母線位置、かつ行が描画範囲内)を踏襲する。
     /// </summary>
     internal int? HitTestRungCommentRow(Point localPositionDip, Sheet sheet)
     {
-        // 主回路シートは右母線を描画しない=行コメントの対象外のため、ヒットさせない
-        // (T-080往復1周目指摘G: RightBusXはMainCircuit非依存の機械的な列数計算のため、無条件だと
-        // 右母線相当の座標帯より右のダブルクリックが、ツールモードを問わず最優先の本判定に
-        // 吸い込まれてしまう)。
-        if (sheet.MainCircuit) return null;
-
         (double xMm, double yMm) = ToMm(localPositionDip);
         var geo = _renderer.Geometry;
+        // T-080往復1周目指摘G: RightBusXはMainCircuit非依存の機械的な列数計算のため、無条件だと
+        // 右母線相当の座標帯より右のダブルクリックが、ツールモードを問わず最優先の本判定に
+        // 吸い込まれてしまう(IsRungCommentRowEligible側のMainCircuit判定だけでは、座標帯自体の
+        // 判定=RightBusX比較は別軸のためここで先に行う)。
         if (xMm <= _renderer.RightBusX(sheet.Grid.Columns)) return null;
 
         int row = geo.RowAt(yMm);
-        if (row < 0 || row >= DiagramRenderer.TotalRows(sheet)) return null;
-        return row;
+        return IsRungCommentRowEligible(row, sheet) ? row : null;
     }
 
     /// <summary>行コメントエディタのアンカー位置をローカルDIP座標で返す(T-080)。X座標は

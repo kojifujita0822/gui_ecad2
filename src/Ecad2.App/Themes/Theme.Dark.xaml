@@ -3,10 +3,17 @@
                     xmlns:sys="clr-namespace:System.Windows;assembly=PresentationFramework">
     <!--
         T-083増分2(層C=UIクローム基盤、家老采配2026-07-16): ダークテーマの配色定義。
-        WorkAreaBackgroundBrush/EmptyStateBackgroundBrushは層A(Ecad2.Core.Rendering.DrawingTheme.Dark)
-        のBackground(#FF202224)・GridColor(#FF464A50)と値を揃え、テーマ全体の一貫性を保つ。
+        WorkAreaBackgroundBrushは層A(Ecad2.Core.Rendering.DrawingTheme.Dark)のBackground(#FF202226)・
+        GridColor(#FF464A50)と値を揃え、テーマ全体の一貫性を保つ。
+        T-114(P-117副次気づき、隠密所見2026-07-22): 上記Background値、コメント記載が誤って
+        #FF202224(1桁ズレ)だったのを実測値#FF202226へ訂正(視覚上判別不可・実害なしのコメント誤記、
+        ブラシ本体の値は変更なし)。
     -->
-    <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#FF202224"/>
+    <!-- T-115(P-117対処、殿裁定2026-07-22=案1採用): 増分2実装でWorkAreaBackgroundBrushと同一値に
+         流用されてしまい、空状態/作業領域の視覚的区別が失われていた見落としを修正。ライトモードの
+         濃紺#24325Aと同色相の暗色バリエーション(目安#18223D〜#1A2440の範囲内)を採用し、GX3由来の
+         「状態依存で配色を変える」コンセプトを色相ごと継承する。 -->
+    <SolidColorBrush x:Key="EmptyStateBackgroundBrush" Color="#FF19233F"/>
     <SolidColorBrush x:Key="WorkAreaBackgroundBrush" Color="#FF202224"/>
     <SolidColorBrush x:Key="WorkAreaGridBrush" Color="#FF464A50"/>
     <!-- T-061由来の意味色(通電/励磁と同一)。テーマ非依存のためLightと同値。 -->

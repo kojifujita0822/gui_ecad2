@@ -470,4 +470,37 @@ public class FindViewModelTests : ViewModelTestBase
         Assert.Equal(0, vm.Find.CurrentIndex);
         Assert.Equal(a.Pos, vm.Find.CurrentMatch!.Element.Pos);
     }
+
+    // ===== T-114(P-085対処): IndexOfSelectedCellOrZeroのシート比較条件専用テスト =====
+
+    /// <summary>P-085(隠密所見2026-07-14): IndexOfSelectedCellOrZeroはElement.Pos一致だけでなく
+    /// シート一致(`_owner.Document.Sheets.IndexOf(Matches[i].Sheet) == _owner.CurrentSheetIndex`)も
+    /// 見るが、この条件だけを専用に検証するテストが無かった(現状ロジックは正しいが、将来の
+    /// リファクタリングで同型バグが再発してもテストで検出できない隙間、隠密所見)。異なる2シートに
+    /// 偶然同じGridPosを持つ同名デバイスが存在する場合、選択中シート側の要素のみが正しくヒット
+    /// すること(Pos一致のみで判定すると、DeviceRenamer.FindがPageNumber順に返す先頭シート側の
+    /// 要素が誤って優先されてしまう)を確認する。RefreshAfterDocumentReplaced()は本来Undo/Redo/
+    /// ReplaceDocument経由でのみ呼ばれるが、シート比較条件そのものの検証に的を絞るため直接呼ぶ。</summary>
+    [Fact]
+    public void RefreshAfterDocumentReplaced_SameGridPosOnDifferentSheet_MatchesSelectedSheetOnly()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheet1 = vm.CurrentSheet!;
+        var a = MakeContact(0, 0, "X001");
+        sheet1.Elements.Add(a);
+
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        var sheet2 = vm.Document.Sheets[1];
+        var b = MakeContact(0, 0, "X001");   // シート1のaと偶然同じGridPos
+        sheet2.Elements.Add(b);
+
+        vm.Find.Query = "X001";   // Matches = [a(sheet1、PageNumber順で先頭), b(sheet2)]
+        vm.CurrentSheetIndex = 1;   // シート2(bを含む方)を選択中
+        vm.SelectedCell = new GridPos(0, 0);   // bの座標(シート1のaとも数値上は一致)
+
+        vm.Find.RefreshAfterDocumentReplaced();
+
+        Assert.Same(b, vm.Find.CurrentMatch!.Element);
+    }
 }

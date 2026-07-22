@@ -986,6 +986,15 @@ public partial class MainWindow : Window
         _viewModel.MarkDirty();
     }
 
+    // T-114(P-081対処、隠密所見2026-07-14): 機器表「型式」列がCanEditDiagram未ガードのまま
+    // テストモード中も編集可能だった見落とし。既存の機器名編集欄(DeviceNameBox.IsEnabled)・
+    // 画像挿入メニュー(IsEnabled)と同種のガードを、DataGridColumnはVisual Tree外でDataContextを
+    // 継承しないためBeginningEditイベントで代替する。
+    private void DeviceTableGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+    {
+        if (!_viewModel.CanEditDiagram) e.Cancel = true;
+    }
+
     // シート名変更ボタン。ダイアログ表示自体はView側の責務のためcode-behindで行い、結果の反映のみ
     // ViewModelのRenameCommandへ委譲する。
     private void RenameSheetButton_Click(object sender, RoutedEventArgs e)
@@ -1766,16 +1775,19 @@ public partial class MainWindow : Window
                 return;
             }
             // T-041増分5: 自由線・接続点(主回路シート)の選択。同じ排他クリア順序に倣う。
-            if (LadderCanvasHost.HitTestFreeLine(position, sheet) is Ecad2.Model.FreeLine freeLine)
-            {
-                _viewModel.SelectedCell = null;
-                _viewModel.SelectedFreeLine = freeLine;
-                return;
-            }
+            // T-116(P-107対処、GuiEcad原本=MainPage.Pointer.cs354行踏襲): 接続点は線の交点上に
+            // 置かれるため、自由線より先に判定する(逆順だと交点上の接続点が自由線の当たり判定に
+            // 隠れ実質選択不能になる)。
             if (LadderCanvasHost.HitTestConnectionDot(position, sheet) is Ecad2.Model.ConnectionDot dot)
             {
                 _viewModel.SelectedCell = null;
                 _viewModel.SelectedConnectionDot = dot;
+                return;
+            }
+            if (LadderCanvasHost.HitTestFreeLine(position, sheet) is Ecad2.Model.FreeLine freeLine)
+            {
+                _viewModel.SelectedCell = null;
+                _viewModel.SelectedFreeLine = freeLine;
                 return;
             }
             // T-064: 画像の選択(GuiEcad同様、背面固定描画のため他要素より判定優先度が最後)。
@@ -1842,7 +1854,11 @@ public partial class MainWindow : Window
         // 判定がズレる)ため、最下行付近の枠は下辺境界ヒット帯の大半がrowInRange=falseと判定され
         // 右クリックがほぼ不能になっていた(当初「殿裁定によりグリッドセル単位固定だからConnector
         // と同じでよい」と判断したが誤りだった、画像と同じくrowInRangeガードの対象外にする)。
-        if (!rowInRange && LadderCanvasHost.HitTestImage(position, sheet) is null
+        // T-114(P-075対処、隠密所見2026-07-13): 同一クリックに対しHitTestImageが2回(この行範囲外
+        // ガード判定用と、後段のメニュー構築判定用)呼ばれ同じ結果を再計算していた冗長を解消する
+        // (position/sheetとも不変、この関数内でsheet.Imagesを変更する操作は無いため結果は同一)。
+        var imageHitForContextMenu = LadderCanvasHost.HitTestImage(position, sheet);
+        if (!rowInRange && imageHitForContextMenu is null
             && LadderCanvasHost.HitTestFrame(position, sheet) is null) return;
 
         var menu = new ContextMenu();
@@ -1894,7 +1910,7 @@ public partial class MainWindow : Window
         // 無く、左クリック(LadderCanvasHost_PreviewMouseLeftButtonUp)とは対称性が崩れていた
         // (画像上で右クリックしても行操作メニューへフォールバックし削除できなかった)。GuiEcad同様
         // 背面固定描画のため要素・縦コネクタより後、行操作より前の優先順位で判定する。
-        else if (LadderCanvasHost.HitTestImage(position, sheet) is Ecad2.Model.ImageInsert hitImage)
+        else if (imageHitForContextMenu is Ecad2.Model.ImageInsert hitImage)
         {
             CommitDeviceNameEdit();
             _viewModel.SelectedCell = null;
@@ -2573,11 +2589,11 @@ public partial class MainWindow : Window
                     && _viewModel.CurrentSheet is Ecad2.Model.Sheet commentSheet:
                 // T-080往復1周目・追加I(殿裁定): 選択セルの行の行コメントエディタをキーボードで
                 // 開く等価経路(キーボードファースト原則。GuiEcad原本にも「コメント編集」キー割当が
-                // 存在した、T-081調査)。対象条件はダブルクリック経路(HitTestRungCommentRow)と
-                // 揃える: 主回路シートは対象外(指摘G)・行は描画範囲内のみ。矢印キー・Deleteと同じく
-                // キャンバスフォーカス時のみ有効(選択セルに対する操作のため)。
-                if (!commentSheet.MainCircuit && commentCell.Row >= 0
-                    && commentCell.Row < Ecad2.Rendering.DiagramRenderer.TotalRows(commentSheet))
+                // 存在した、T-081調査)。矢印キー・Deleteと同じくキャンバスフォーカス時のみ有効
+                // (選択セルに対する操作のため)。T-114(P-062対処): 対象条件はダブルクリック経路
+                // (HitTestRungCommentRow)と共有ヘルパーIsRungCommentRowEligibleで統一する
+                // (旧実装は同じ条件[主回路シート除外・行範囲判定]を手書きで重複していた)。
+                if (Views.LadderCanvas.IsRungCommentRowEligible(commentCell.Row, commentSheet))
                     OpenRungCommentEditor(commentCell.Row, commentSheet);
                 e.Handled = true;
                 break;
@@ -3403,12 +3419,17 @@ public partial class MainWindow : Window
     // バーの実サイズはVisibility=Visible反映後でないと取得できない(WPF仕様: Collapsed中の
     // Measure()はDesiredSizeを強制的に0,0にする)。呼び出し元でIsPlacementBarVisible=trueを
     // 先に設定してから本メソッドを呼ぶ前提。
+    // T-114(P-065対処、隠密所見2026-07-12「課題3修正の横展開」): クランプ基準をCanvasDocumentGrid
+    // (キャンバス文書全体、スクロールバー等含む外枠)からCanvasArea(ScrollViewerの可視ビューポート
+    // そのもの)へ変更し、PositionRungCommentEditorと同じ共有ヘルパーClampToViewportを使う形へ統一。
+    // 現状は常に可視セルクリックからのみ呼ばれるため実害未確認だったが(隠密所見どおり)、将来
+    // スクロール外セルから呼ぶ経路が増えた場合の画面外描画(課題3と同型)を予防する。
     private void PositionPlacementBar(Ecad2.Model.GridPos cell)
     {
         var localRect = LadderCanvasHost.CellRectDip(cell);
         var inputPoint = new Point(localRect.X, localRect.Bottom);
         var topLeft = LadderCanvasHost.TranslatePoint(inputPoint, RootLayoutGrid);
-        var workAreaOrigin = CanvasDocumentGrid.TranslatePoint(new Point(0, 0), RootLayoutGrid);
+        var canvasAreaOrigin = CanvasArea.TranslatePoint(new Point(0, 0), RootLayoutGrid);
 
         // 診断ログ一次パスCONFIRMED(docs-notes/ecad2-t033-diag-pass1-diagnosis-samurai.md): 前回呼び出し
         // 終了時のMarginが残留したままMeasure()すると、WPF仕様(DesiredSize=content+Margin)により前回の
@@ -3417,13 +3438,9 @@ public partial class MainWindow : Window
         ElementPlacementBar.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         Size barSize = ElementPlacementBar.DesiredSize;
 
-        // 画面端クランプ(殿注文2): 右端・下端でバーがCanvasDocumentGridの外へはみ出さないようにする。
-        double maxX = Math.Max(workAreaOrigin.X, workAreaOrigin.X + CanvasDocumentGrid.ActualWidth - barSize.Width);
-        double maxY = Math.Max(workAreaOrigin.Y, workAreaOrigin.Y + CanvasDocumentGrid.ActualHeight - barSize.Height);
-        double x = Math.Clamp(topLeft.X, workAreaOrigin.X, maxX);
-        double y = Math.Clamp(topLeft.Y, workAreaOrigin.Y, maxY);
+        Point clamped = ClampToViewport(topLeft, canvasAreaOrigin, CanvasArea.ActualWidth, CanvasArea.ActualHeight, barSize);
 
-        ElementPlacementBar.Margin = new Thickness(x, y, 0, 0);
+        ElementPlacementBar.Margin = new Thickness(clamped.X, clamped.Y, 0, 0);
     }
 
     // T-080: 行コメント編集中の行番号。エディタが閉じている間はnull。

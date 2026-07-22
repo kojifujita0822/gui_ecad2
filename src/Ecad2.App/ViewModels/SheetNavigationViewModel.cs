@@ -169,6 +169,13 @@ public sealed class SheetNavigationViewModel : ViewModelBase
                 bool createsPageNumberGap = Sheets.Any(s => s.PageNumber > sheet.PageNumber);
                 _owner.Document.Sheets.RemoveAt(index);
                 Sheets.RemoveAt(index);
+                // T-117(P-104対処、殿裁可2026-07-22): DeleteSelectedElement/DeleteRowAtCommandと
+                // 同じ規則で機器表(Document.Devices)クリーンアップを行う。シート削除でsheet.Elements
+                // ごと消えるが、機器表エントリだけゴーストとして残存していた見落とし。
+                // Document.Sheets.RemoveAt実行後(削除確定後)に呼ぶこと——RemoveDeviceIfUnreferenced
+                // は現在のDocument.Sheets全体を走査して参照有無を判定するため、削除前に呼ぶと削除対象
+                // シート自身が「参照あり」の一票として残り誤判定する。
+                _owner.CleanupRemovedDeviceNames(sheet.Elements);
                 // T-050往復2周目(隠密CONFIRMED二重発火の解消): 公開セッタではなくSetCurrentSheetIndexCore。
                 // 公開セッタ経由だと、既に縮小済みのコレクションを削除前indexに近い値で読む誤った旧値の
                 // ネスト通知が挟まり、直後の自前通知(下)と合わせて二重発火するため。

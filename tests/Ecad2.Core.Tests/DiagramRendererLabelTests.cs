@@ -172,31 +172,3 @@ public class DiagramRendererLabelTests
         Assert.True(commentY > deviceNameY, $"comment Y({commentY}) should be below device name Y({deviceNameY})");
     }
 }
-
-/// <summary>DrawTextの呼び出し引数(text)のみを記録するIRendererのテストダブル。他の描画命令は
-/// no-op(アサーション対象外、隠密テスト設計 表2 検証方法(a)を採用)。</summary>
-internal sealed class RecordingRenderer : IRenderer
-{
-    public List<string> DrawnTexts { get; } = new();
-    public List<(string Text, Point2D Position, TextStyle Style)> DrawnTextEntries { get; } = new();
-
-    public void PushTransform(double translateX, double translateY, double scale = 1.0) { }
-    public void PopTransform() { }
-    public void PushClip(Rect2D rect) { }
-    public void PopClip() { }
-    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) { }
-    public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke) { }
-    public void DrawRectangle(Rect2D rect, StrokeStyle stroke) { }
-    public void FillRectangle(Rect2D rect, Color color) { }
-    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) { }
-    public void FillCircle(Point2D center, double radius, Color color) { }
-    public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) { }
-    public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) { }
-    public void DrawText(string text, Point2D position, TextStyle style)
-    {
-        DrawnTexts.Add(text);
-        DrawnTextEntries.Add((text, position, style));
-    }
-    public Size2D MeasureText(string text, TextStyle style) => new(0, 0);
-    public void DrawImage(string filePath, Rect2D bounds) { }
-}
