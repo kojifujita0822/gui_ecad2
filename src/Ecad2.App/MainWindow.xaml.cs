@@ -398,7 +398,7 @@ public partial class MainWindow : Window
         }
     }
 
-    // T-110增分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴いforeachを撤去。
+    // T-110増分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴いforeachを撤去。
     // B-2: LayoutDocument走査により、キャンバスDocumentのContentId("Canvas")も期待集合へ
     // 自然に含まれる(既存のLayoutAnchorable/LayoutDocument両方の走査ロジックを維持するだけで足りる)。
     private void RegisterDockingContents()
@@ -770,6 +770,12 @@ public partial class MainWindow : Window
             ? new AvalonDock.Themes.Vs2013DarkTheme()
             : new AvalonDock.Themes.Vs2013LightTheme();
         MainDockingManager.Resources[typeof(AvalonDock.Controls.AnchorablePaneTitle)] = unifiedAnchorablePaneTitleStyle;
+
+        // T-110増分3(裁5=案A、家老采配2026-07-22、設計書§2.4): 単一ペインタイトルバー完全非表示。
+        // UnifiedAnchorablePaneTitleStyleと同じ暗黙スタイル登録方式・同じ場所に揃える
+        // (テーマ切替時も同一経路で再登録、スタイル自体はDynamicResource参照ゆえテーマ非依存)。
+        var titleBarHiddenAnchorableControlStyle = (Style)FindResource("TitleBarHiddenAnchorableControlStyle");
+        MainDockingManager.Resources[typeof(AvalonDock.Controls.LayoutAnchorableControl)] = titleBarHiddenAnchorableControlStyle;
     }
 
     // T-083増分2(層C=UIクローム基盤): Application.Resourcesのテーマ辞書(Theme.Light.xaml/

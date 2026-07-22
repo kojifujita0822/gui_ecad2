@@ -631,6 +631,102 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- T-110増分3(裁5=案A、家老采配2026-07-22): 単一ペインタイトルバー完全非表示。
+             VS2013テーマ既定のLayoutAnchorableControlスタイル(AvalonDock v4.74.1 Generic.xaml:1719-1807、
+             docs-notes/vendor-reference/avalondock-v4.74.1/参照)を完全コピーし、対象4ペイン
+             (ContentId名指し)のみHeader BorderをCollapseする(既定=表示、フェイルセーフ設計、
+             設計書§2.3)。T-099の罠(AnchorablePaneTitle自体をCollapse化し対話機能ごと殺す)とは
+             異なる一段上のHeader Border層を消すため、AnchorablePaneTitle自体のスタイル
+             (UnifiedAnchorablePaneTitleStyle)には一切触れない(設計書§2.5)。
+             原典トリガー5本を完全移植(PoC(h)の簡略2本→軽2解消、ドッキング時の上辺欠け防止)し、
+             対象4ペインContentId名指しのDataTrigger4本を追加する
+             (docs/ecad2-t110-increment3-titlebar-hide-and-autohide-ui-design-onmitsu.md §2.2-2.3)。 -->
+        <Style x:Key="TitleBarHiddenAnchorableControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorableControl}">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type avalonDock:LayoutAnchorableControl}">
+                        <Border
+                            x:Name="Bd"
+                            Background="{TemplateBinding Background}"
+                            BorderBrush="{DynamicResource {x:Static vs2013Themes:ResourceKeys.PanelBorderBrush}}"
+                            BorderThickness="1,0,1,1">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border x:Name="Header">
+                                    <avalonDock:AnchorablePaneTitle Model="{Binding Model, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                </Border>
+                                <ContentPresenter
+                                    Grid.Row="1"
+                                    Content="{Binding LayoutItem.View, RelativeSource={RelativeSource TemplatedParent}}"
+                                    ContentTemplate="{Binding LayoutItem.View.ContentTemplate, RelativeSource={RelativeSource TemplatedParent}}"
+                                    ContentTemplateSelector="{Binding LayoutItem.View.ContentTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}"
+                                    FlowDirection="{TemplateBinding FlowDirection}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <!-- 原典トリガー1(Generic.xaml:1762-1768): フロート直接ホスト時 Header Collapse -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.IsFloating}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.Parent.IsDirectlyHostedInFloatingWindow}" Value="True"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </MultiDataTrigger>
+                            <!-- 原典トリガー2(Generic.xaml:1769-1778): Model null時(仮想化) Header Collapse -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model}" Value="{x:Null}"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </MultiDataTrigger>
+                            <!-- 原典トリガー3(Generic.xaml:1780-1786): IsFloating=False時 Bd BorderThickness=1
+                                 (軽2解消の要=ドッキング時の上辺欠け防止) -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.IsFloating}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1"/>
+                            </MultiDataTrigger>
+                            <!-- 原典トリガー4(Generic.xaml:1788-1793): IsDirectlyHostedInFloatingWindow=False時 Bd=1 -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.Parent.IsDirectlyHostedInFloatingWindow}" Value="False"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="1"/>
+                            </MultiDataTrigger>
+                            <!-- 原典トリガー5(Generic.xaml:1795-1802): フロート直接ホスト+Items.Count==1時 Bd=0 -->
+                            <MultiDataTrigger>
+                                <MultiDataTrigger.Conditions>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.IsFloating}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Self}, Path=Model.Parent.IsDirectlyHostedInFloatingWindow}" Value="True"/>
+                                    <Condition Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count}" Value="1"/>
+                                </MultiDataTrigger.Conditions>
+                                <Setter TargetName="Bd" Property="BorderThickness" Value="0"/>
+                            </MultiDataTrigger>
+                            <!-- T-110増分3追加(設計書§2.3): 対象4ペインContentId名指しでHeader Collapse
+                                 (既定=表示、名指し4ペインのみ非表示。フェイルセーフ・機序不明への頑健性・
+                                 UnifiedAnchorablePaneTitleStyleのContentId分岐と同型思想) -->
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="LeftPalette">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="DeviceTable">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="RightPanelBottom">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="OutputPanel">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="RootLayoutGrid">
