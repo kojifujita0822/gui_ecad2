@@ -410,12 +410,23 @@
                                             DropDownContextMenu="{Binding Model.Root.Manager.AnchorableContextMenu, RelativeSource={RelativeSource TemplatedParent}}"
                                             DropDownContextMenuDataContext="{Binding Path=LayoutItem, RelativeSource={RelativeSource TemplatedParent}}"
                                             Style="{DynamicResource DropDownControlArea}">
-                                            <ContentPresenter
+                                            <!-- T-110増分3所見(殿裁定、家老采配2026-07-22): 旧実装はContentPresenter+
+                                                 Model.Root.Manager.AnchorableTitleTemplateという動的間接参照でタイトル
+                                                 テンプレートを解決していた(AvalonDock標準パターン)。AutoHide復帰処理
+                                                 (ToggleAutoHide)でモデルツリーが再構築される過程、瞬間的にModel.Root
+                                                 の解決が失敗するタイミングがあるとContentTemplateがnullのままとなり、
+                                                 WPF既定の「ContentTemplate未設定時はContent.ToString()を表示」という
+                                                 フォールバックにより型名("AvalonDock.Layout.LayoutAnchorable")がその
+                                                 まま表示され続ける不具合を実機で確認した。Model.Titleへ直接バインドする
+                                                 方式へ置換し、この間接参照経路自体を排除する
+                                                 (Generic.xaml:1287-1292のAvalonDockThemeVs2013AnchorableTitleTemplate
+                                                 と同等の見た目、TextTrimming/VerticalAlignmentも踏襲)。 -->
+                                            <TextBlock
                                                 x:Name="Header"
-                                                Content="{Binding Model, RelativeSource={RelativeSource TemplatedParent}}"
-                                                ContentTemplate="{Binding Model.Root.Manager.AnchorableTitleTemplate, RelativeSource={RelativeSource TemplatedParent}}"
-                                                ContentTemplateSelector="{Binding Model.Root.Manager.AnchorableTitleTemplateSelector, RelativeSource={RelativeSource TemplatedParent}}"
-                                                TextElement.Foreground="{TemplateBinding Foreground}"/>
+                                                VerticalAlignment="Center"
+                                                Text="{Binding Model.Title, RelativeSource={RelativeSource TemplatedParent}}"
+                                                TextTrimming="CharacterEllipsis"
+                                                Foreground="{TemplateBinding Foreground}"/>
                                         </avalonDock:DropDownControlArea>
                                     </Border>
                                     <!-- T-100本体: ハッチング模様の実体(DrawingBrush市松模様)を非表示化 -->
