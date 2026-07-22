@@ -73,6 +73,26 @@ try {
             + 'long-horizon-discipline スキル§5の離脱プロトコルに従え。'
         $out = @{ decision = 'block'; reason = $reason } | ConvertTo-Json -Compress
         Write-Output $out
+        exit 0
+    }
+
+    # 簡体字混入検知（殿指摘2026-07-22、家老セッション集中発生。memory:
+    # feedback_simplified_chinese_character_contamination／CLAUDE.md「簡体字禁止」参照）。
+    # CLAUDE.md自体の説明文中の意図的な例示（增→増 等の対比表記）は誤検知しうるため、
+    # そうした引用箇所ではこの検知を鵜呑みにせず文脈で判断してよい。
+    $sc = New-Object System.Collections.Generic.List[string]
+    if ($joined -match '增') { [void]$sc.Add('增(→増)') }
+    if ($joined -match '实') { [void]$sc.Add('实(→実)') }
+    if ($joined -match '检') { [void]$sc.Add('检(→検)') }
+    if ($joined -match '殷') { [void]$sc.Add('殷(→殿)') }
+    if ($joined -match '侪') { [void]$sc.Add('侪(→侍)') }
+    if ($sc.Count -gt 0) {
+        $reason = '【簡体字混入検知(Stop hook機械検知)】このターンの出力に簡体字の疑いがある文字を検知した: ' `
+            + ($sc -join '／') `
+            + '。CLAUDE.md「簡体字禁止」の説明文中の意図的な例示なら無視してよいが、地の文への混入なら ' `
+            + '正しい字体で言い直せ。'
+        $out = @{ decision = 'block'; reason = $reason } | ConvertTo-Json -Compress
+        Write-Output $out
     }
     exit 0
 }
