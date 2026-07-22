@@ -117,3 +117,77 @@ WorkAreaBackgroundBrush/EmptyStateBackgroundBrushは層A(Ecad2.Core.Rendering.Dr
 
 なし。対処案（区別復元）の提示は殿裁定により「見落としと判明した場合のみ」とされているため、
 本報告では意図確認の結果のみとし、対処の要否・方式は家老・殿の判断を仰ぐ。
+
+---
+
+## 追記（2026-07-22、殿裁可を受けた対処案検討）
+
+意図確認結果を以て次段へ進めてよいとの殿裁可を受け、対処案（区別復元）を検討する。
+
+### 構造の再確認：ライトモードは実は「2つの異なる設計方針の組合せ」だった
+
+`MainWindow.xaml`1229-1264行を精読したところ、画面に見える色の構造は以下の2層である：
+
+```
+LayoutDocument(作図キャンバス)
+  └ ScrollViewer(x:Name="CanvasArea", Background=WorkAreaBackgroundBrush、
+                 DataTrigger HasProject=FalseでEmptyStateBackgroundBrushへ切替)
+      └ LadderCanvas(x:Name="LadderCanvasHost"、Core層DrawingThemeで自前描画)
+```
+
+`HasProject=true`（作業領域、シートあり）時は`LadderCanvas`が表示領域をほぼ覆うため、実際に
+目に映る色は**Core層`DrawingTheme.Default/Dark.Background`**（キャンバス自体の描画背景）であり、
+`WorkAreaBackgroundBrush`（ScrollViewer側）はキャンバスがビューポートより小さい場合の周辺余白
+にのみ見える。`HasProject=false`（空状態、シート無し）時は`LadderCanvas`の描画対象が無いため、
+`EmptyStateBackgroundBrush`（ScrollViewer側）がそのまま画面全体に見える。
+
+この構造を踏まえてライトモードの実際の値を見直すと：
+
+| ブラシ | ライトモード値 | Core層との関係 |
+|---|---|---|
+| `WorkAreaBackgroundBrush` | `White` | Core層`Default.Background`（`White`）と**一致**——キャンバス周辺の余白をキャンバス自体の色と揃える設計 |
+| `EmptyStateBackgroundBrush` | `#24325A`（濃紺） | Core層とは**無関係の独自色**——GX Works3由来の「プロジェクト未作成」を示す状態表示色（本調査書「気づき」節参照、殿裁定2026-07-05で色調整済み） |
+
+つまりライトモードは「作業領域＝Core層と揃える」「空状態＝Core層と無関係な固有の状態表示色」
+という**2つの異なる設計方針の組合せ**だった。増分2の実装（本調査書「結論」節参照）は前者
+（作業領域をCore層Dark.Backgroundと揃える、`#FF202224`≈Core層`#FF202226`）は正しく踏襲したが、
+**後者（空状態は独自色を持つ）を踏襲せず、同じCore層の値を流用してしまった**——これが本件の
+構造的な正体であり、「見落とし」判定（結論節）を補強する材料になる。
+
+### GX Works3系整合の確認
+
+`docs/ecad2-gxworks3-uiux-survey-onmitsu-part2.md`21-23行を確認したが、GX Works3自体には
+ダークモード相当の観測記録がない（同調査は「白/グレー基調」を基本とした実機調査であり、空状態の
+濃紺は**ライトモードのみの状態依存配色**として観測されたもの）。よって「ダークモード時の空状態
+色をGX3のどの色に合わせるか」という直接の参照先はGX3側に存在しない。継承すべきはGX3由来の
+「状態に応じて配色が変わる」という**コンセプト**であり、具体的な色値そのものではない。
+
+### 対処の方向性
+
+`WorkAreaBackgroundBrush`（Core層と揃える設計、現状で正しく機能）はそのまま維持し、
+`EmptyStateBackgroundBrush`のダークモード値のみ、ライトモードの`#24325A`と同様に**独自の
+状態表示色**として新規に定める。変更は`Theme.Dark.xaml`の1ブラシの値のみで、`MainWindow.xaml`
+側のDataTrigger構造・ロジックは変更不要（規模=小）。
+
+### 色候補（3案、いずれもUI/UX判断のため殿裁定が必要）
+
+1. **ライトモード濃紺の暗色バリエーション**：`#24325A`の色相（青み）を保ちつつ、ダークモード
+   全体の暗いトーンに合わせて明度を落とした色（目安：`#18223D`〜`#1A2440`程度）。GX3由来の
+   「濃紺」という色相の一貫性を最も強く継承する案。
+2. **既存ダークパレットの青系アクセントを流用**：`PanelContentSelectedBackgroundBrush`
+   （`#FF0E639C`、VS Dark系選択色）を暗くしたバリエーション（目安：`#0A2E48`程度）。既存の
+   ダークテーマ内で唯一「青」を意味的に使っている色との統一感を狙う案。
+3. **Core層の色をベースに明度差だけで区別**：`WorkAreaBackgroundBrush`（`#FF202224`系）より
+   明確に暗い、または明るいグレー系（青みなし）にする案。GX3の「濃紺」色相は継承しないが、
+   実装・調整は最も単純。
+
+隠密としては案1（GX3由来の色相継承を優先）が最も設計意図に忠実と考えるが、最終的な色の
+選定・微調整は`docs-notes/roles/samurai.md`「UI/UX確認は家老経由で」の原則どおり、殿の実機
+確認（色見本比較）を経て裁定を仰ぐべき事項であり、断定はしない。
+
+### 実装規模
+
+小。`Theme.Dark.xaml`の`EmptyStateBackgroundBrush`定義値を1行変更するのみ。既存のDataTrigger・
+`ApplyUiChromeTheme`等のロジックは無変更で流用可能。忍者の実機確認は画素採取での色一致確認
+（`ecad2-ui-automation`スキル、色比較は目視でなく画素採取を標準とする教訓——本調査書引用元
+`docs/todo-archive.md`2440-2441行）で足りる見込み。
