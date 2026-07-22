@@ -1,0 +1,157 @@
+# P-104・P-109 原因調査（隠密）
+
+日付: 2026-07-22
+契機: 忍者の再現確認完了（`docs/ecad2-p104-p109-reproduction-check-ninja.md`、両件とも再現OK）を
+受け、原因調査を家老采配（殿裁可）。
+
+## P-104：シート削除後の機器表旧機器名残存
+
+### 結論
+
+**原因確定**。`SheetNavigationViewModel.DeleteCommand`（シート削除処理）に、既存の削除系操作
+（要素単体削除・行削除）が持つ「機器表(DeviceTable)クリーンアップ」呼び出しが欠落している。
+新規パターン候補として台帳記帳を提起する（下記「パターン再発照合」参照）。
+
+### 根拠
+
+`Document.Devices.ByName`（機器表の実データ）へのクリーンアップ呼び出しは、既存の削除系操作
+すべてに存在する：
+
+- `MainWindowViewModel.DeleteSelectedElement()`（2357-2386行）: 単体要素削除時、
+  `RemoveDeviceIfUnreferenced(deviceName)`（2369行）を呼び、他要素から参照されなくなった
+  機器名を`Document.Devices.ByName`から除去する。
+- `MainWindowViewModel.DeleteRowAtCommand`（3153-3177行、`RowOps.DeleteRow`で「要素ごと削除」）:
+  `CleanupRemovedDeviceNames(removed)`（3171行）を呼び、削除された要素群の機器名をまとめて
+  クリーンアップする。専用コメント（2485-2488行）に「`DeleteSelectedElement`（単一削除）と
+  同じ規則で機器表クリーンアップを行う」と明記。
+
+これに対し`SheetNavigationViewModel.DeleteCommand`（159-198行）は、`_owner.Document.Sheets.
+RemoveAt(index)`でシート丸ごと（その`sheet.Elements`全件を含む）を削除するにもかかわらず、
+`RemoveDeviceIfUnreferenced`/`CleanupRemovedDeviceNames`のいずれも呼んでいない。DRC結果
+クリア（186-190行）・欠番警告（191-192行）等、他の後始末処理は行っているが、機器表への
+言及は無い。
+
+### 失敗シナリオ（忍者再現内容と一致）
+
+1. シートAに要素を配置し機器名を設定（`Document.Devices.ByName`にエントリ登録）。
+2. シートAを削除（`sheet.Elements`はシートと共に消えるが、`Document.Devices.ByName`の
+   エントリは誰も除去しない）。
+3. 機器表（`DeviceTableViewModel`、`Document.Devices.ByName`から構築）に、もう存在しない
+   シートの機器名がゴーストとして残存する。
+
+### パターン再発照合
+
+`docs-notes/pattern-recurrence-log.md`と照合した。完全一致する既存パターンは無いが、
+**PR-05「状態リセット処理の横展開漏れ（Document/Sheet構成変更時）」**の親戚筋にあたる
+（PR-05は「文書・シート構成を差し替える処理を新設する際、既存の同種処理が担う状態クリア責務
+への追従が漏れる」型で、対象責務としてUndoManager/OutputPanel/SelectedSheet通知/SelectedCell
+クランプが挙げられているが、「機器表クリーンアップ」は含まれていない）。また、PR-07の説明文
+自体が「機器表クリーンアップ」を複製されやすい共通ロジックの一例として挙げており、実際に
+`RemoveDeviceIfUnreferenced`/`CleanupRemovedDeviceNames`という2つの薄いラッパーに分散している
+構造とも符合する。
+
+新規パターン候補として提起する：「要素をまとめて削除する操作（シート削除等）が、個別要素削除・
+行削除で確立済みの機器表クリーンアップ責務を継承しない」型。家老の判断で台帳記帳の要否・
+既存PR-05への統合可否を検討されたい。
+
+## P-109：シート改名（1番目限定）で選択色消失
+
+### 結論
+
+**構造は特定できたが「1番目限定」の具体的機序までは静的読解で完全特定できず**。UIA固有の
+事象ではなく実装（アプリロジック）に起因する可能性が高いという判断はできる。1番目限定という
+非対称性の根本メカニズムは動的タイミング依存の領域と考えられ、実機での追加検証（忍者領分）が
+必要と考える。
+
+### 特定できた構造
+
+`SheetNavigationViewModel.RenameCommand`（207-233行）は、シート名変更をListBoxへ反映させる
+ため、意図的に以下の手順を踏む（207-206行のコメントに明記）：
+
+```csharp
+sheet.Name = trimmed;
+...
+Sheets.RemoveAt(index);
+Sheets.Insert(index, sheet);      // 同じ位置に同じ参照を戻す
+_dispatcher.BeginInvoke(DispatcherPriority.ContextIdle, () => RefreshSelectedSheet(sheet));
+```
+
+理由（既存コメント）：`Sheet`モデルは永続化対象のため`INotifyPropertyChanged`を実装しておらず、
+`sheet.Name`への直接代入だけではListBoxの表示（`DisplayMemberPath="Name"`）に反映されない。
+同一参照での`ObservableCollection`置換も`ItemContainerGenerator`が「DataContext自体は変わって
+いない」と判定し再評価しないため反映されない（T-026実機確認で発見済みの既知制約）。この制約を
+`RemoveAt`+`Insert`でコンテナ自体を強制的に再生成させることで回避している。
+
+WPF一次ソース（`dotnet/wpf` `Selector.cs`）を確認したところ、`RemoveAt`（`NotifyCollectionChanged
+Action.Remove`）が発火すると`RemoveFromSelection`（1255-1281行）が呼ばれ、削除されたアイテムが
+選択中であれば選択リストから除去される。選択の再設定はコンテナの`IsSelected`起点の自動処理には
+依存せず、`RefreshSelectedSheet`が発火する`PropertyChanged`通知をバインディングエンジンが拾い、
+`SelectedSheet`のgetterを再評価して`Selector.SelectedItem`へ反映する、という非同期な設計に
+なっている——**「選択解除→(遅延した)選択再設定」という、瞬間的に選択が失われる区間を作る構造**
+である点は明確に特定できた。
+
+`AddCommand`（104-156行）にも同型の`_dispatcher.BeginInvoke(ContextIdle, ...)`パターンがあり、
+コメント（138-141行）に「`ObservableCollection`へのAdd直後はListBoxがまだ新しいアイテムのUI
+要素を生成し終えていないため、同期的に設定すると選択ハイライトが追従しない（T-026実機確認で
+発見）」とある。つまり「コンテナ生成完了を待つための遅延実行」という設計思想自体は、T-026時点
+から既知の制約への対処として確立している。
+
+### UIA固有か否かの切り分け
+
+`RenameCommand`本体（ボタンクリック→ダイアログ確定→上記コードパス実行）は、UI Automation
+経由のクリック（`SelectionItemPattern.Select()`/`InvokePattern.Invoke()`）でも、殿の物理
+クリックでも**全く同一のコードパスを通る**——`RemoveAt`+`Insert`+`BeginInvoke(ContextIdle)`
+という処理自体は入力手段に依存しない。したがって、**選択消失という現象の根本原因はUIA固有の
+バグではなく、アプリ側の実装構造（コンテナ再生成方式）に起因する可能性が高い**と判断できる。
+
+ただし、UI Automationでの検証は`SelectionItemPattern.Select()`という即時同期的なAPI呼び出しで
+`IsSelected`を読み取るのに対し、物理クリックでは殿の目に映るまでに（人間の知覚を含め）追加の
+時間経過が生じる。もし本件の真因が「`ContextIdle`（低優先度）で遅延実行される選択再設定が、
+UIAの読み取りタイミングにはまだ間に合っていないだけ」という**タイミングの問題**であれば、
+物理クリック後に少し待ってから目視すれば選択色が正しく表示されている可能性も否定できない
+（これは静的読解だけでは判定不能、実機での時間経過込みの確認が必要）。
+
+### 「1番目限定」の機序が特定できなかった理由
+
+`Selector.cs`のAddイベント処理（1103-1108行）に「挿入位置(`NewStartingIndex`)が0の場合のみ
+`ResetSelectedItemsAlgorithm()`を呼ぶ」という**インデックス0特有の分岐**を発見したが、この
+メソッドの中身（1944-1950行）は`_selectedItems`が内部的に使うハッシュコード最適化アルゴリズム
+の選定に過ぎず、選択状態そのものを変更する処理ではないと確認した。このため、この分岐だけでは
+「なぜ1番目のシート改名時のみ選択色が消えるか」を直接説明できない。
+
+`ItemContainerGenerator`によるコンテナの生成・再利用順序（1番目要素のコンテナ再利用パターンが
+2番目以降と異なる可能性）や、`ContextIdle`実行タイミングとレイアウトパスの相対順序など、
+更に深い一次ソース精読（`ItemContainerGenerator.cs`・`VirtualizingStackPanel.cs`等）で機序を
+追うことは可能だが、これは`docs-notes/roles/onmitsu.md`が言う「動的タイミングの謎」（一次
+ソース精読だけでは確定できず実測が本質的に必要な領域）に踏み込むと判断し、費用対効果を鑑み
+本調査ではここで区切る。
+
+### 派生提案
+
+対処の方向性としては、`RenameCommand`の`RemoveAt`+`Insert`方式そのものを見直す（例：
+`Sheet`に軽量な変更通知機構を持たせる、またはListBoxItemの`ContentPresenter`側で明示的に
+再バインドする等）ことで、そもそも選択解除区間を作らない設計にする案が考えられるが、これは
+実装判断であり侍・家老の裁量に委ねる。本調査は原因究明の範囲に留める。
+
+## 不明点
+
+- P-109「1番目限定」の具体的機序（`ItemContainerGenerator`のコンテナ再利用パターンとの関連は
+  未検証、動的タイミング依存の可能性が高い）。
+- P-109の物理クリックでの再現有無（忍者領分、時間経過込みの確認が必要）。
+
+## 派生提案の有無
+
+- P-104: 新規パターン候補としての台帳記帳（PR-05関連）を提起（上記参照）。対処自体
+  （シート削除時に`CleanupRemovedDeviceNames`相当の呼び出しを追加）は規模が小さいと見受けるが
+  実装判断は侍・家老に委ねる。
+- P-109: 対処案の方向性のみ示す（上記「派生提案」参照）、断定・実装判断はしない。
+
+## 出典
+
+- `docs/ecad2-p104-p109-reproduction-check-ninja.md`
+- `src/Ecad2.App/ViewModels/MainWindowViewModel.cs`2357-2386,2469-2495,3153-3177行
+- `src/Ecad2.App/ViewModels/SheetNavigationViewModel.cs`89-233行
+- `src/Ecad2.App/MainWindow.xaml`1204-1211行
+- `docs-notes/pattern-recurrence-log.md`（PR-05・PR-07）
+- `dotnet/wpf` `Selector.cs`（`raw.githubusercontent.com/dotnet/wpf/main/.../Selector.cs`、
+  1103-1281,1944-1950行）
