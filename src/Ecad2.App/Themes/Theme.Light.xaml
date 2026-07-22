@@ -75,4 +75,25 @@
     <!-- T-111新規(殿指摘2026-07-22): ステータスバー警告文字色。ライトモードは現状のDarkRedを維持
          (殿指摘は「ダークモード時」限定のため)。 -->
     <SolidColorBrush x:Key="WarningMessageBrush" Color="#FF8B0000"/>
+
+    <!-- T-119新規(殿直接指示2026-07-22、配置ツールバータブのAeroテーマ風形状変更): 縦グラデーション。
+         AvalonDock.Themes.Aero原色(#FCFDFE→#D2E6FA等)そのままの流用はせず、既存パレット
+         (PanelHeaderBackgroundBrush=#F0F0F0/PanelContentBackgroundBrush=White)を基準にした
+         バリエーションとする。 -->
+    <LinearGradientBrush x:Key="PlacementTabBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FAFAFA"/>
+        <GradientStop Offset="1" Color="#E5E5E5"/>
+    </LinearGradientBrush>
+    <!-- T-119往復3周目(殿実機確認2026-07-22、強調色変更): 水色系(往復2周目)から濃いグレー系へ
+         差し替え。非選択(PlacementTabBackgroundBrush=#FAFAFA〜#E5E5E5)より明確に濃い色合いとし、
+         枠線のアクセントカラー(PlacementTabSelectedBorderBrush、青系)との組み合わせで視認性を
+         確保する(既定Foreground=黒系でも判別できる濃度に留める)。 -->
+    <LinearGradientBrush x:Key="PlacementTabSelectedBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#D8D8D8"/>
+        <GradientStop Offset="1" Color="#BEBEBE"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PlacementTabBorderBrush" Color="#BFBFBF"/>
+    <!-- T-119往復2周目追加要望: 選択中タブの外周枠線をアクセントカラーで目立たせる。
+         PlacementToolActiveBorderBrush(T-101)と同値を流用し、既存のアクセント色体系と統一する。 -->
+    <SolidColorBrush x:Key="PlacementTabSelectedBorderBrush" Color="#FF0078D7"/>
 </ResourceDictionary>

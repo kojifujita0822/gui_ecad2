@@ -123,10 +123,13 @@ public class SelectedSheetNotificationTests : ViewModelTestBase
 
     // ---- ケース5a: 回帰(RenameCommand) ----
 
-    /// <summary>ケース5a。改名は同一シートに留まる操作(index・参照とも不変)ゆえ、SelectedSheetは
-    /// ちょうど1回発火し旧値=新値=当該シート(old==newは意図通り)。本修正で回帰していないことの回帰確認。</summary>
+    /// <summary>ケース5a(T-118改訂、殿裁定2026-07-22=P-109根本対処): 旧実装は改名時に
+    /// Sheets.RemoveAt+Insertでコンテナを再生成しSelectedSheetのPropertyChangedをちょうど1回
+    /// 発火していたが、この手法がWPFの選択状態管理と衝突し選択色消失の原因だった。新実装は
+    /// SheetListItem.Nameのsetter経由でName自体のPropertyChangedのみ発火し、SelectedSheet
+    /// (選択状態そのもの)には一切触れない。この設計変更を回帰確認する。</summary>
     [Fact]
-    public void RenameCommand_RaisesSelectedSheetChanged_ExactlyOnce()
+    public void RenameCommand_DoesNotRaiseSelectedSheetChanged()
     {
         var vm = CreateViewModel();
         vm.NewDocument();
@@ -135,8 +138,8 @@ public class SelectedSheetNotificationTests : ViewModelTestBase
 
         vm.SheetNavigation.RenameCommand.Execute("新名称");
 
-        var only = Assert.Single(olds);
-        Assert.Same(selected, only);
+        Assert.Empty(olds);
+        Assert.Same(selected, vm.SheetNavigation.SelectedSheet);
     }
 
     // ---- ケース5c: 回帰(CurrentSheetIndexセッタの汎用直接代入=DRCジャンプ相当) ----

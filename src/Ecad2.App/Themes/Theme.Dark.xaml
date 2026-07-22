@@ -73,4 +73,23 @@
     <!-- T-111新規(殿指摘2026-07-22): ステータスバー警告文字色。ダークモード時はDarkRedが視認しづらい
          ため、既存の選択ハイライト色OrangeRed(LadderCanvas.csのSelectedCellPen等)へ変更。 -->
     <SolidColorBrush x:Key="WarningMessageBrush" Color="#FFFF4500"/>
+
+    <!-- T-119新規(殿直接指示2026-07-22、配置ツールバータブのAeroテーマ風形状変更、詳細は
+         Theme.Light.xaml参照): 既存パレット(PanelHeaderBackgroundBrush=#FF3E3E42/
+         PanelContentBackgroundBrush=#FF2D2D30)を基準にしたバリエーション。 -->
+    <LinearGradientBrush x:Key="PlacementTabBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FF454549"/>
+        <GradientStop Offset="1" Color="#FF343438"/>
+    </LinearGradientBrush>
+    <!-- T-119往復3周目(殿実機確認2026-07-22、強調色変更、詳細はTheme.Light.xaml参照): 青み系
+         (往復2周目)から濃いグレー系へ差し替え。非選択(PlacementTabBackgroundBrush=#FF454549〜
+         #FF343438)よりさらに暗い色合いとし、既定Foreground=白系とのコントラストを高める。 -->
+    <LinearGradientBrush x:Key="PlacementTabSelectedBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Offset="0" Color="#FF232326"/>
+        <GradientStop Offset="1" Color="#FF17171A"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PlacementTabBorderBrush" Color="#FF636363"/>
+    <!-- T-119往復2周目追加要望: 選択中タブの外周枠線をアクセントカラーで目立たせる。
+         PlacementToolActiveBorderBrush(T-101)と同値を流用。 -->
+    <SolidColorBrush x:Key="PlacementTabSelectedBorderBrush" Color="#FF3399FF"/>
 </ResourceDictionary>

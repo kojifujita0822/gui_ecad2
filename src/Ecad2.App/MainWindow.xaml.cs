@@ -101,7 +101,8 @@ public partial class MainWindow : Window
     // ドラッグ(マウスキャプチャ方式)とは対象が異なりWPFネイティブDragDrop APIを使う(Explore調査で
     // 既存流用パターン無しと確認済み)。
     private Point _sheetDragStartPoint;
-    private Ecad2.Model.Sheet? _sheetDragSource;
+    // T-118: ListBoxItem.DataContext・DragDropペイロードともSheetListItem型(旧Sheet型)に変更。
+    private ViewModels.SheetListItem? _sheetDragSource;
     private ListBoxItem? _sheetDragSourceContainer;
     private Adorner? _sheetReorderAdorner;
 
@@ -999,9 +1000,9 @@ public partial class MainWindow : Window
     // ViewModelのRenameCommandへ委譲する。
     private void RenameSheetButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.SheetNavigation.SelectedSheet is not Ecad2.Model.Sheet sheet) return;
+        if (_viewModel.SheetNavigation.SelectedSheet is not ViewModels.SheetListItem sheetItem) return;
 
-        var dialog = new Views.RenameDialog(sheet.Name) { Owner = this };
+        var dialog = new Views.RenameDialog(sheetItem.Name) { Owner = this };
         if (dialog.ShowDialog() == true)
             _viewModel.SheetNavigation.RenameCommand.Execute(dialog.NewName);
     }
@@ -1020,8 +1021,9 @@ public partial class MainWindow : Window
     // UpdateSheetSettingsCommandへ(行数, 左母線名, 右母線名)を渡す。
     private void SheetSettingsButton_Click(object sender, RoutedEventArgs e)
     {
-        if (_viewModel.SheetNavigation.SelectedSheet is not Ecad2.Model.Sheet sheet) return;
+        if (_viewModel.SheetNavigation.SelectedSheet is not ViewModels.SheetListItem sheetItem) return;
 
+        var sheet = sheetItem.Sheet;
         var dialog = new Views.SheetSettingsDialog(sheet.Grid.Rows, sheet.Bus.LeftName, sheet.Bus.RightName) { Owner = this };
         if (dialog.ShowDialog() == true)
             _viewModel.UpdateSheetSettingsCommand.Execute(new ViewModels.MainWindowViewModel.SheetSettings(dialog.Rows, dialog.LeftName, dialog.RightName));
@@ -3799,7 +3801,7 @@ public partial class MainWindow : Window
         _sheetDragStartPoint = e.GetPosition(null);
         var container = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
         _sheetDragSourceContainer = container;
-        _sheetDragSource = container?.DataContext as Ecad2.Model.Sheet;
+        _sheetDragSource = container?.DataContext as ViewModels.SheetListItem;
     }
 
     private void SheetNavList_PreviewMouseMove(object sender, MouseEventArgs e)
@@ -3824,7 +3826,7 @@ public partial class MainWindow : Window
 
     private void SheetNavList_DragOver(object sender, DragEventArgs e)
     {
-        if (!e.Data.GetDataPresent(typeof(Ecad2.Model.Sheet)))
+        if (!e.Data.GetDataPresent(typeof(ViewModels.SheetListItem)))
         {
             e.Effects = DragDropEffects.None;
             return;
@@ -3847,7 +3849,7 @@ public partial class MainWindow : Window
     private void SheetNavList_Drop(object sender, DragEventArgs e)
     {
         RemoveSheetReorderAdorner();
-        if (e.Data.GetData(typeof(Ecad2.Model.Sheet)) is not Ecad2.Model.Sheet droppedSheet) return;
+        if (e.Data.GetData(typeof(ViewModels.SheetListItem)) is not ViewModels.SheetListItem droppedSheet) return;
 
         var sheets = _viewModel.SheetNavigation.Sheets;
         int fromIndex = sheets.IndexOf(droppedSheet);
@@ -3855,7 +3857,7 @@ public partial class MainWindow : Window
 
         var container = FindAncestor<ListBoxItem>(e.OriginalSource as DependencyObject);
         int toIndex;
-        if (container?.DataContext is Ecad2.Model.Sheet targetSheet)
+        if (container?.DataContext is ViewModels.SheetListItem targetSheet)
         {
             int targetIndex = sheets.IndexOf(targetSheet);
             bool insertAfter = e.GetPosition(container).Y > container.ActualHeight / 2;

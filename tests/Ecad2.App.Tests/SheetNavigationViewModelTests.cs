@@ -228,7 +228,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         Assert.True(vm.IsDirty);
         // 追加したシートが選択状態になることを検証する(BeginInvoke経由の同期、クラスコメント参照)。
-        Assert.Equal(vm.Document.Sheets[^1], vm.SheetNavigation.SelectedSheet);
+        Assert.Same(vm.Document.Sheets[^1], vm.SheetNavigation.SelectedSheet?.Sheet);
     }
 
     /// <summary>
@@ -393,6 +393,31 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         vm.NewDocument();
+
+        vm.SheetNavigation.RenameCommand.Execute("新シート名");
+
+        Assert.True(vm.IsDirty);
+    }
+
+    /// <summary>T-118(P-109対処、殿裁定2026-07-22=案A採用)の回帰テスト。RenameCommandは
+    /// SheetListItem.Nameのsetter経由でPropertyChanged(nameof(Name))を発火するだけで、
+    /// ListBoxの表示更新に必要十分となる(旧実装のSheets.RemoveAt+Insert+BeginInvokeによる
+    /// SelectedSheet自体の変更通知パターンは、選択状態管理と衝突し選択色消失の原因だったため廃止)。
+    /// 旧テスト(RenameCommand_MarksDirty内でselectedSheetChangedを検証)・
+    /// RenameCommand_DispatchesRefreshWithContextIdlePriority・
+    /// RenameCommand_MarksDirtyBeforeDispatchingRefreshは、BeginInvoke自体が無くなったことに伴い
+    /// 本テストへ置き換える。</summary>
+    [Fact]
+    public void RenameCommand_RaisesNamePropertyChangedOnSheetListItem_WithoutTouchingSelection()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        var sheetItem = vm.SheetNavigation.SelectedSheet!;
+        bool nameChanged = false;
+        sheetItem.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SheetListItem.Name)) nameChanged = true;
+        };
         bool selectedSheetChanged = false;
         vm.SheetNavigation.PropertyChanged += (_, e) =>
         {
@@ -401,36 +426,42 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         vm.SheetNavigation.RenameCommand.Execute("新シート名");
 
-        Assert.True(vm.IsDirty);
-        // RefreshSelectedSheet()経由でSelectedSheetのPropertyChangedが発火することを検証する
-        // (BeginInvoke経由の同期、クラスコメント参照)。
-        Assert.True(selectedSheetChanged);
+        Assert.True(nameChanged);
+        Assert.Equal("新シート名", sheetItem.Name);
+        // 選択状態(SelectedSheet自体)には一切触れない設計であることの確認(選択色消失バグの根治)。
+        Assert.False(selectedSheetChanged);
+        Assert.Same(sheetItem, vm.SheetNavigation.SelectedSheet);
+        Assert.Null(Dispatcher.LastPriority);
     }
 
-    /// <summary>増分A補遺(隠密所見1、CONFIRMED)の回帰テスト。RenameCommand版。</summary>
+    /// <summary>DoD(4): 改名対象が非末尾シートの場合でも同じ経路(SheetListItem.Nameのsetterのみ、
+    /// RemoveAt+Insertを伴わない)を通ることを確認する。旧実装は「改名対象がリスト末尾でない場合に
+    /// 選択色消失」が忍者追加検証で確定した再現条件だった(`docs/ecad2-p104-p109-cause-
+    /// investigation-onmitsu.md`追記部)。Sheets[0]が同一インスタンスのまま(コンテナ再生成なし)
+    /// であることを確認することで、位置に関わらず選択状態が保持される設計であることを裏付ける。</summary>
     [Fact]
-    public void RenameCommand_DispatchesRefreshWithContextIdlePriority()
+    public void RenameCommand_ForNonLastSheet_DoesNotReplaceItemInstance()
     {
         var vm = CreateViewModel();
         vm.NewDocument();
+        AddSheet(vm, 2, "シート2");
+        vm.SheetNavigation.ResetSheets();
+        vm.CurrentSheetIndex = 0;   // 非末尾(先頭、シート1)を選択
+        var selectedItem = vm.SheetNavigation.Sheets[0];
+        bool nameChanged = false;
+        selectedItem.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SheetListItem.Name)) nameChanged = true;
+        };
 
-        vm.SheetNavigation.RenameCommand.Execute("新シート名");
+        vm.SheetNavigation.RenameCommand.Execute("改名後");
 
-        Assert.Equal(DispatcherPriority.ContextIdle, Dispatcher.LastPriority);
-    }
-
-    /// <summary>増分A補遺(隠密所見2、CONFIRMED)の回帰テスト。RenameCommand版。</summary>
-    [Fact]
-    public void RenameCommand_MarksDirtyBeforeDispatchingRefresh()
-    {
-        var vm = CreateViewModel();
-        vm.NewDocument();
-        bool isDirtyWhenDispatched = false;
-        Dispatcher.BeforeInvoke = () => isDirtyWhenDispatched = vm.IsDirty;
-
-        vm.SheetNavigation.RenameCommand.Execute("新シート名");
-
-        Assert.True(isDirtyWhenDispatched);
+        Assert.True(nameChanged);
+        Assert.Equal("改名後", selectedItem.Name);
+        // RemoveAt+Insertされていれば別インスタンスに置き換わるが、新実装では同一インスタンスの
+        // ままSheets[0]に留まる(=WPFのSelector選択状態管理と衝突しない)。
+        Assert.Same(selectedItem, vm.SheetNavigation.Sheets[0]);
+        Assert.Same(selectedItem, vm.SheetNavigation.SelectedSheet);
     }
 
     /// <summary>
@@ -447,7 +478,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
     [InlineData(3)]  // 追加前3枚 → oldValueは追加前の選択シート
     public void DetermineOldSelectedSheetForAdd_ReturnsNullOnlyWhenSheetsEmpty(int sheetsCountBeforeAdd)
     {
-        var current = new Sheet { Name = "既存シート", Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        var current = new SheetListItem(new Sheet { Name = "既存シート", Grid = new GridSpec { Rows = 10, Columns = 20 } });
 
         var result = SheetNavigationViewModel.DetermineOldSelectedSheetForAdd(sheetsCountBeforeAdd, current);
 
@@ -626,7 +657,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.MoveSheetCommand.Execute((2, 0));
 
         Assert.Equal(new[] { sheet3, sheet1, sheet2 }, vm.Document.Sheets);
-        Assert.Equal(new[] { sheet3, sheet1, sheet2 }, vm.SheetNavigation.Sheets);
+        Assert.Equal(new[] { sheet3, sheet1, sheet2 }, vm.SheetNavigation.Sheets.Select(s => s.Sheet));
     }
 
     [Fact]
@@ -672,7 +703,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.MoveSheetCommand.Execute((0, 2));
 
         Assert.Equal(2, vm.CurrentSheetIndex);
-        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet);
+        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet?.Sheet);
         Assert.NotNull(vm.SelectedCell);
     }
 
@@ -690,7 +721,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         // 選択中でないシート2・シート3(index 1, 2)を入れ替える。
         vm.SheetNavigation.MoveSheetCommand.Execute((2, 1));
 
-        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet);
+        Assert.Same(sheet1, vm.SheetNavigation.SelectedSheet?.Sheet);
         Assert.Equal(0, vm.CurrentSheetIndex);
     }
 
@@ -779,7 +810,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
         vm.SheetNavigation.MoveSheetCommand.Execute((0, 3));
 
         Assert.Equal(1, vm.CurrentSheetIndex);
-        Assert.Same(sheet3, vm.SheetNavigation.SelectedSheet);
+        Assert.Same(sheet3, vm.SheetNavigation.SelectedSheet?.Sheet);
         Assert.NotNull(vm.SelectedCell);
     }
 
@@ -942,7 +973,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         Assert.NotNull(vm.SelectedCell);
         Assert.Equal(expectedNewIndex, vm.CurrentSheetIndex);
-        Assert.Same(movingSheet, vm.SheetNavigation.SelectedSheet);
+        Assert.Same(movingSheet, vm.SheetNavigation.SelectedSheet?.Sheet);
     }
 
     /// <summary>設計書6.2(P1、記入中ドラフト保持、代表1件)。選択中シート自身の移動で、
@@ -985,7 +1016,7 @@ public class SheetNavigationViewModelTests : ViewModelTestBase
 
         Assert.NotNull(vm.SelectedCell);
         Assert.Equal(0, vm.CurrentSheetIndex);
-        Assert.Same(sheet2, vm.SheetNavigation.SelectedSheet);
+        Assert.Same(sheet2, vm.SheetNavigation.SelectedSheet?.Sheet);
     }
 
     /// <summary>設計書6.4(P3、添字不変、任意の穴埋め)。対称性点検表の空欄(P3×記入中ドラフト)を

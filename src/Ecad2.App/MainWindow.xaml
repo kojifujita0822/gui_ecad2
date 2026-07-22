@@ -182,6 +182,70 @@
             <Setter Property="Foreground" Value="{DynamicResource ToolBarForegroundBrush}"/>
         </Style>
 
+        <!-- T-119(殿直接指示2026-07-22): 配置ツールバーのタブ(基本機能/配置ツール)をAeroテーマ風の
+             形状へ変更。一次ソース(AvalonDock.Themes.Aero、Ms-PLライセンス、
+             docs-notes/vendor-reference/avalondock-v4.74.1配下、Theme.xaml128-211行=
+             LayoutDocumentTabItem用ControlTemplate)を参考にecad2独自実装。左20px幅にSplineBorder
+             (曲線)、残りは直線Border(右上2px角丸)。色はAero原色そのままでなくecad2既存パレット
+             ベースのグラデーション(Theme.Light/Dark.xamlのPlacementTab*Brush)を使う。
+             UnifiedAnchorablePaneControlStyle(全ペイン共通)のItemContainerStyle内、Model.ContentId
+             が"MainToolBar"/"PlacementToolBar"の場合のみDataTriggerでこのTemplateへ切り替える
+             (下記ItemContainerStyle定義を参照)、他ペイン(シート/機器表/プロパティ/出力)には無影響。 -->
+        <ControlTemplate x:Key="PlacementToolBarTabItemTemplate" TargetType="{x:Type TabItem}">
+            <Grid SnapsToDevicePixels="true">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <!-- T-119往復3周目(殿実機確認2026-07-22、家老原因調査依頼): 選択中タブの文字消失は
+                     往復2周目で追加したTargetName付きSetter(ControlTemplate.Triggers内、SplineBd/Bd
+                     個別指定)が原因の疑いが強い(強調表示追加前=往復1周目では文字消失の指摘なし)。
+                     TargetName Setterは、Template切り替え直後に既にIsSelected=Trueな場合
+                     (配置ツールタブはSelectedContentIndex="1"で起動時から選択済み)にVisualTree
+                     名前解決のタイミング問題を起こしうる。Background切り替え(既存・正常動作)と
+                     同型のTemplateBinding+TabItem自身のプロパティ経由方式へ統一し、
+                     TargetName Setterを完全に排除する。 -->
+                <views:SplineBorder x:Name="SplineBd"
+                    BottomBorderMargin="0.5"
+                    Fill="{TemplateBinding Background}"
+                    Stroke="{TemplateBinding BorderBrush}"
+                    Thickness="{Binding BorderThickness.Left, RelativeSource={RelativeSource TemplatedParent}}"/>
+                <Border x:Name="Bd" Grid.Column="1"
+                    Background="{TemplateBinding Background}"
+                    BorderBrush="{TemplateBinding BorderBrush}"
+                    BorderThickness="{TemplateBinding BorderThickness}"
+                    CornerRadius="0,2,0,0">
+                    <ContentPresenter x:Name="Content"
+                        Margin="3,2,4,2"
+                        HorizontalAlignment="{Binding HorizontalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                        VerticalAlignment="{Binding VerticalContentAlignment, RelativeSource={RelativeSource AncestorType={x:Type ItemsControl}}}"
+                        ContentSource="Header"
+                        RecognizesAccessKey="True"
+                        SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                </Border>
+            </Grid>
+            <ControlTemplate.Triggers>
+                <Trigger Property="Selector.IsSelected" Value="true">
+                    <Setter Property="Background" Value="{DynamicResource PlacementTabSelectedBackgroundBrush}"/>
+                    <Setter Property="Panel.ZIndex" Value="1"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                    <!-- T-119往復3周目(選択中タブの外周アクセント強調): TargetName Setterではなく、
+                         TabItem自身のBorderBrush/BorderThicknessをSetterで上書きする
+                         (Backgroundと同じ仕組み、SplineBd/BdはTemplateBinding経由で自動追従)。 -->
+                    <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabSelectedBorderBrush}"/>
+                    <Setter Property="BorderThickness" Value="2"/>
+                </Trigger>
+                <MultiTrigger>
+                    <MultiTrigger.Conditions>
+                        <Condition Property="IsMouseOver" Value="true"/>
+                        <Condition Property="Selector.IsSelected" Value="false"/>
+                    </MultiTrigger.Conditions>
+                    <Setter Property="Background" Value="{DynamicResource PlacementTabSelectedBackgroundBrush}"/>
+                    <Setter Property="Panel.ZIndex" Value="0"/>
+                </MultiTrigger>
+            </ControlTemplate.Triggers>
+        </ControlTemplate>
+
         <!-- T-099根本修正(隠密2仮説確定・家老采配2026-07-17): 配置ツールバー2段目
              (PlacementToolBarDockingManager)のみを対象に、ドッキング時はドックタグ(タブストリップ)
              を非表示、フローティング時は表示する。AvalonDock既定のAnchorablePaneControlStyle
@@ -326,6 +390,24 @@
                         <Style.Triggers>
                             <DataTrigger Binding="{Binding RelativeSource={RelativeSource Mode=FindAncestor, AncestorType={x:Type TabControl}}, Path=Items.Count}" Value="1">
                                 <Setter Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <!-- T-119(殿直接指示2026-07-22): 配置ツールバーの2タブ(基本機能/配置ツール、
+                                 ContentId="MainToolBar"/"PlacementToolBar")のみAeroテーマ風形状
+                                 (PlacementToolBarTabItemTemplate)へ切り替える。TabItem自体のDataContext
+                                 はLayoutAnchorable(Model)自身のため(ItemTemplateのModel="{Binding}"参照)、
+                                 Path省略でContentIdへ直接バインドできる。他ペイン(シート/機器表/
+                                 プロパティ/出力)には無影響。 -->
+                            <DataTrigger Binding="{Binding ContentId}" Value="MainToolBar">
+                                <Setter Property="Background" Value="{DynamicResource PlacementTabBackgroundBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabBorderBrush}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Template" Value="{StaticResource PlacementToolBarTabItemTemplate}"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding ContentId}" Value="PlacementToolBar">
+                                <Setter Property="Background" Value="{DynamicResource PlacementTabBackgroundBrush}"/>
+                                <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabBorderBrush}"/>
+                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="Template" Value="{StaticResource PlacementToolBarTabItemTemplate}"/>
                             </DataTrigger>
                         </Style.Triggers>
                     </Style>
@@ -1166,6 +1248,19 @@
                         <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="部品"/>
                     </StackPanel>
                 </Button>
+                <Separator/>
+                <!-- T-120(殿直接指示2026-07-22): 配置ツールタブ末尾にテストモード切替ボタンを増設。
+                     基本機能タブ側の既存ボタン(TestModeToolBarButtonStyle使用)と完全に同一の
+                     見た目・バインディングで複製(サイズも含め既存踏襲、殿指示どおり)。 -->
+                <ToggleButton Style="{StaticResource TestModeToolBarButtonStyle}" ToolTip="テストモード (Ctrl+T)"
+                              AutomationProperties.Name="テストモード (Ctrl+T)"
+                              IsChecked="{Binding IsTestMode}"
+                              IsEnabled="{Binding HasProject}">
+                    <StackPanel>
+                        <Path Style="{StaticResource ToolBarIconStyle}" Data="M4,3 L4,15 L14,9 Z"/>
+                        <TextBlock Style="{StaticResource ToolBarKeyLabelStyle}" Text="テスト"/>
+                    </StackPanel>
+                </ToggleButton>
                             </ToolBar>
                         </avalonDock:LayoutAnchorable>
                     </avalonDock:LayoutAnchorablePane>
