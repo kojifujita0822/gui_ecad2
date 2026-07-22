@@ -191,7 +191,38 @@ DoD：
    クリーンアップする処理を追加
 2. シートに要素配置(機器名設定)→シート削除→機器表に旧機器名が残らないことを確認する回帰テスト追加
 
-検証：規模小。忍者実機確認は「シート削除後の機器表」を具体観点に含める。 — Approved（gated、殿直接指示2026-07-21）
+検証：規模小。忍者実機確認は「シート削除後の機器表」を具体観点に含める。
+
+### T-118 シート改名時の選択色消失を根本対処（P-109対処・案A） — Approved（auto-OK、殿裁定2026-07-22）
+
+**起票=proposed.md P-109対処**（隠密対処案検討`docs/ecad2-p104-p109-cause-investigation-onmitsu.md`
+追記部）。忍者の追加検証で判明した正確な条件＝「改名対象がリスト末尾でない場合に選択色消失」
+（当初「1番目限定」との報告は不正確、訂正済み）。根本原因＝`RenameCommand`が`Sheet`モデルの
+`INotifyPropertyChanged`未実装を回避するため`Sheets.RemoveAt(index); Sheets.Insert(index,
+sheet);`でListBoxコンテナを強制再生成する手法自体が、WPFの選択状態管理（`Selector`内部の
+`_selectedItems`/`ItemInfo`）と衝突する（機序完全特定には`ItemContainerGenerator.cs`のさらなる
+精読を要すが、対処案提示を優先し区切った）。
+
+**殿裁定2026-07-22＝案A（根本対処）採用**：`RemoveAt`+`Insert`自体を廃止し、選択状態に一切触れ
+ない方式へ変更する。
+
+DoD：
+1. `Sheet`の`Name`をラップする軽量ViewModelアイテム（`INotifyPropertyChanged`実装、`Name`
+   プロパティのgetter/setterで`Sheet.Name`を仲介）を`SheetNavigationViewModel`層に新設。
+   Core層`Sheet`モデル自体は変更しない（他Core層モデルと同じ「永続化対象はPOCO」方針を維持）
+2. `RenameCommand`の`Sheets.RemoveAt`+`Insert`+`BeginInvoke(ContextIdle)`パターンを廃止し、
+   ラッパーの`Name`変更時に`OnPropertyChanged(nameof(Name))`を発火するだけでListBox表示が
+   更新される方式へ置き換え
+3. `ListBox.ItemsSource`のバインディング先・`SelectedSheet`の型（`Sheet`のままかラッパー型
+   経由か）等、関連コードへの影響範囲を精査し、既存の`AddCommand`/`DeleteCommand`等他コマンドの
+   動作に回帰がないことを確認
+4. シートが末尾/非末尾いずれの位置でも、改名確定後に選択色が消失しないことを確認する回帰テスト
+   追加
+
+検証：規模中のため通常の検証パイプライン（侍実装→隠密静的レビュー→忍者実機確認）。忍者実機
+確認は「末尾シートの改名」「非末尾シートの改名」両方を具体観点に含める。
+
+### T-110 4分割DockingManagerの単一統合 — Approved（gated、殿直接指示2026-07-21）
 
 **起票=殿直接指摘2026-07-21**（スクリーンショット添付）「シート」「出力」タブのみアクティブ色
 （青）、「機器表」「プロパティ」は非アクティブ色（灰）という非対称性の質問を発端に、隠密調査
