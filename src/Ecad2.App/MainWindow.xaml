@@ -875,7 +875,11 @@
                      そのもの(独自ドロップ枠方式で代替)。メニュー経由Dock()・T-103独自枠は
                      CanDockを参照しないため無傷。 -->
                 <avalonDock:LayoutPanel Orientation="Vertical" CanDock="False">
-                    <avalonDock:LayoutAnchorablePane DockHeight="123" SelectedContentIndex="1">
+                    <!-- T-113(殿直接指示2026-07-22、実機操作): 配置ツールバーペイン既定高さを
+                         殿の実機リサイズ値へ調整(忍者計測=Top55px/Height100px、内訳:ツールバー
+                         本体のみHeight48px)。既定DockHeightに加えMinHeightも同時に100pxへ
+                         設定する殿追加指示(docs/todo.md T-113節)。 -->
+                    <avalonDock:LayoutAnchorablePane DockHeight="100" DockMinHeight="100" SelectedContentIndex="1">
                         <!-- T-104増分2(殿裁定2026-07-20、案A採用): 既定選択タブは「配置ツール」
                              (SelectedContentIndex=1、0番目=基本機能・1番目=配置ツール)。従来の
                              主要作業画面(ラダー編集)をそのまま初期表示し視覚的一貫性を保つ方針。 -->
