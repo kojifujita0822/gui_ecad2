@@ -80,7 +80,7 @@
 
 - **ApplyDocumentInfoが無条件MarkDirty（既存の同値ガード規約と不整合）** →
   同種の「ダイアログ結果を一括適用」パターンである既存`UpdateSheetSettingsCommand`
-  （T-055增分2、隠密レビュー済み）も同様に無条件MarkDirtyであり、これは本コミット固有の
+  （T-055増分2、隠密レビュー済み）も同様に無条件MarkDirtyであり、これは本コミット固有の
   逸脱ではなく既存パターン踏襲と判明。
 - **ApplyDocumentInfoがRelayCommandでなく生メソッド呼び出し** →
   `SaveToFile`/`LoadFromFile`/`NewDocument`等、既に生メソッド直呼び出し＋

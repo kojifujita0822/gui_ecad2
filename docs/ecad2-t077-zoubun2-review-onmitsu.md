@@ -59,5 +59,5 @@ marketplace版導入後も起動不可（本セッション冒頭で再確認済
 - `src/Ecad2.App/Views/UsageWindow.xaml`・`UsageWindow.xaml.cs`（`Topics`配列・`TopicList_SelectionChanged`）
 - `src/Ecad2.App/App.xaml`（ListBox暗黙的スタイル36行目）
 - `tests/Ecad2.App.Tests/UsageWindowTests.cs`
-- `docs/todo.md` T-077節（654-681行、殿裁定・增分1/2経緯）
+- `docs/todo.md` T-077節（654-681行、殿裁定・増分1/2経緯）
 - `docs/ecad2-t077-plan-onmitsu.md`（隠密プラン、増分計画叩き台）

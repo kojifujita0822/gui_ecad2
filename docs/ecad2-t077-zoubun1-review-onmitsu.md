@@ -71,5 +71,5 @@ marketplace版導入後も起動不可（本セッション冒頭で再確認済
 - `src/Ecad2.App/Ecad2.App.csproj`（EmbeddedResource設定）
 - `tests/Ecad2.App.Tests/MarkdownFlowDocumentConverterTests.cs`
 - `docs/ecad2-ui-ux-design-brief.md`（45行目、原則1）
-- `docs/todo.md` T-077節（626-663行、殿裁定・增分1采配）
+- `docs/todo.md` T-077節（626-663行、殿裁定・増分1采配）
 - `src/Ecad2.App/Themes/Theme.Dark.xaml`・`Theme.Light.xaml`（DynamicResourceキー定義）
