@@ -156,6 +156,26 @@ DoD：
 検証：規模小（1ブラシの値変更のみ）だが色・視認性に関わる観点のため、忍者実機確認は**画素採取
 による機械的判定**（目視でなく座標指定のRGB値確認、殿裁定2026-07-16のルール適用）。
 
+### T-116 FreeLine/ConnectionDotの当たり判定順序をGuiEcad原本の優先順位へ復元（P-107対処） — Approved（auto-OK、殿裁定2026-07-22）
+
+**起票=proposed.md P-107対処**（隠密調査`docs/ecad2-p107-freeline-connectiondot-order-investigation-onmitsu.md`、
+実害あり=可能性が高い）。GuiEcad原本（`MainPage.Pointer.cs`354行）は「線の交点上に置かれるため
+自由直線より先に判定」という明示コメントつきでConnectionDotを先に判定するが、ecad2
+（`MainWindow.xaml.cs`1768-1780行、T-041増分5）はFreeLine→ConnectionDotの順に逆転している。
+当たり判定半径が両者同程度（`LadderCanvas.cs`116-117行、いずれも2.0mm）で範囲が重複するため、
+主回路シートで自由線交点上に接続点(F10)を配置する通常運用で、常にFreeLineが選択され
+ConnectionDotが選択・移動・削除いずれも実質的に到達不能になりうる。
+
+DoD：
+1. `MainWindow.xaml.cs`1768-1780行、FreeLine判定ブロックとConnectionDot判定ブロックの前後を
+   入れ替え、GuiEcad原本と同じ「ConnectionDot先→FreeLine後」の順序へ復元
+2. 主回路シートで自由線を配置→その交点上に接続点(F10)を配置→クリックでConnectionDotが正しく
+   選択されることを確認（回帰テスト追加）
+
+検証：規模小（2ブロックの前後入替のみ）。忍者実機確認は「自由線交点上に配置した接続点をクリック
+で選択できるか」を具体観点に含める（隠密調査は机上のコード読解に留まり実機未確認のため、ここで
+初めて実機確認する）。
+
 ### T-110 4分割DockingManagerの単一統合 — Approved（gated、殿直接指示2026-07-21）
 
 **起票=殿直接指摘2026-07-21**（スクリーンショット添付）「シート」「出力」タブのみアクティブ色
