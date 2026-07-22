@@ -194,11 +194,11 @@
              Model.IsDirectlyHostedInFloatingWindow(LayoutAnchorablePane.cs、PropertyChanged通知あり
              動的追従可能・一次ソース確認済み)をItemContainerStyleのDataTriggerで判定する
              (下記ItemContainerStyle定義を参照)。
-             T-110增分1(家老采配2026-07-22): 単一DockingManagerへの統合に伴い、本スタイルは
+             T-110増分1(家老采配2026-07-22): 単一DockingManagerへの統合に伴い、本スタイルは
              Manager全体のAnchorablePaneControlStyle(全アンカラブルペイン共通)へ昇格。
-             単一ペイン(シート/機器表/プロパティ/出力)ではItems.Count==1トリガー(增分0修2で
+             単一ペイン(シート/機器表/プロパティ/出力)ではItems.Count==1トリガー(増分0修2で
              追加、VS2013テーマ標準Generic.xaml:536-540どおり)によりTabItem自体がCollapseされ
-             冗長タブは出ない(增分0実機確認済み)。 -->
+             冗長タブは出ない(増分0実機確認済み)。 -->
         <Style x:Key="UnifiedAnchorablePaneControlStyle" TargetType="{x:Type avalonDock:LayoutAnchorablePaneControl}">
             <Setter Property="Foreground" Value="{Binding Model.Root.Manager.Foreground, RelativeSource={RelativeSource Self}}"/>
             <Setter Property="Background" Value="{Binding Model.Root.Manager.Background, RelativeSource={RelativeSource Self}}"/>
@@ -314,7 +314,7 @@
                              戻す。帯はラベル自体が通常のTabItemクリック領域として機能するため
                              不要と判断し併せて削除(通常のタブヘッダーと同様、ラベルがドラッグ
                              起点になる)。 -->
-                        <!-- T-110增分1(增分0修2の本実装反映): VS2013テーマ標準の「Items.Count==1で
+                        <!-- T-110増分1(増分0修2の本実装反映): VS2013テーマ標準の「Items.Count==1で
                              TabItem自体をCollapse」トリガー(一次ソースGeneric.xaml:536-540)。従来の
                              2タブ固定ペイン専用スタイルでは死文だったため省かれていたが、全ペイン
                              共通スタイルへの昇格に伴い、単一ペイン4領域(シート/機器表/プロパティ/
@@ -364,13 +364,13 @@
              MainWindow.xaml.csのApplyDockingManagerThemesから、Theme適用直後にDockingManagerの
              Resources[typeof(AnchorablePaneTitle)]へ本スタイルを直接登録し、VS2013テーマの
              MergedDictionaries経由スタイルより優先させる。
-             T-110增分1(家老采配2026-07-22、增分0(e)実証済み方式): 単一DockingManager統合に伴い、
+             T-110増分1(家老采配2026-07-22、増分0(e)実証済み方式): 単一DockingManager統合に伴い、
              旧PlacementToolBarAnchorablePaneTitleStyle(T-099(c)案E、配置ツールバーのみラベル
              非表示)を本スタイルへ統合する。4Manager出し分け(旧ApplyDockingManagerThemesの
              manager identity判定)は成立しなくなるため、Model.ContentId分岐(下記
              ControlTemplate.Triggers末尾)へ置き換える。案E原典の条件
              (Model.Parent.IsDirectlyHostedInFloatingWindow=False=ドッキング時のみ)はそのまま
-             MultiDataTriggerとして維持する(增分0 PoCレビュー軽1指摘=忠実形採用)。
+             MultiDataTriggerとして維持する(増分0 PoCレビュー軽1指摘=忠実形採用)。
              【A-6/E-3再判断(隠密着手前チェック、忍者PoC実機確認申し送り2.5)】本実装の
              PlacementToolBarDockingManagerは常時2タブ(基本機能/配置ツール)構成のためドッキング中は
              タブUI(UnifiedAnchorablePaneControlStyle)がホストしAnchorablePaneTitle自体は使われず、
@@ -626,7 +626,7 @@
                                 <Setter TargetName="PART_HidePin" Property="BorderBrush" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedBorder}}"/>
                                 <Setter TargetName="PART_ImgHidePin" Property="Fill" Value="{DynamicResource {x:Static vs2013Themes:ResourceKeys.ToolWindowCaptionButtonActivePressedGlyph}}"/>
                             </Trigger>
-                            <!-- T-110增分1(旧PlacementToolBarAnchorablePaneTitleStyle統合、T-099(c)案E踏襲):
+                            <!-- T-110増分1(旧PlacementToolBarAnchorablePaneTitleStyle統合、T-099(c)案E踏襲):
                                  ドッキング時、配置ツールバー(ContentId="PlacementToolBar")のみラベル
                                  (Header)を非表示にする。MenuDropDownButton等のボタン列は無変更で
                                  常時表示・操作可能に残す(案E原典どおり)。 -->
@@ -752,7 +752,7 @@
              RowSpanでそのまま束ね、内部に同じ行構成(Auto/*)を持たせる。配置バー
              (ElementPlacementBar)・ステータスバーはこのラッパーの外に残し、常時有効のままとする
              (殿裁定=バー自身とステータスバーはグレーアウト対象外)。
-             T-110增分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
+             T-110増分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
              出力パネル)を単一MainDockingManagerへ統合したことに伴い、旧5行構成
              (Auto/Auto/*(Min200)/Auto/160(Min80)、ツールバー段・メイン作業域・GridSplitter・
              出力パネル段を個別行として持っていた)をAuto(メニューバー)/*(単一DockingManager、
@@ -842,7 +842,7 @@
             </MenuItem>
         </Menu>
 
-        <!-- T-110增分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
+        <!-- T-110増分1(家老采配2026-07-22): 4分割DockingManager(ツールバー/左パレット/右パネル/
              出力パネル)を単一MainDockingManagerへ統合(隠密プラン§2.2案1トポロジ)。キャンバス
              (LadderCanvas)をLayoutDocumentPaneとして内包し、Manager全体でRootLayoutGrid行1(*行)を
              占める。旧4Manager個別のGridSplitter・Auto+Star列包み(T-099要件3の回避策、無限幅測定で
@@ -859,7 +859,7 @@
                      領域(LayoutAnchorSideControl、4方向、通常時は空でも常にビジュアルツリーに
                      存在する)を巡回するのみでタブヘッダー間(基本機能⇔配置ツール)へ到達しない
                      問題(docs/ecad2-t104-canfloat-tabnav-root-cause-survey-onmitsu.md)への対処。
-                     T-110增分1: 単一Manager化によりAutoHideサイド領域はウィンドウ全域に及ぶため、
+                     T-110増分1: 単一Manager化によりAutoHideサイド領域はウィンドウ全域に及ぶため、
                      本対処が全ペイン共通で有効になる(隠密プラン§3.5、望ましい方向)。 -->
                 <Style TargetType="{x:Type avalonDock:LayoutAnchorSideControl}">
                     <Setter Property="Focusable" Value="False"/>
@@ -867,7 +867,7 @@
                 </Style>
             </avalonDock:DockingManager.Resources>
             <avalonDock:LayoutRoot>
-                <!-- T-110增分1対策(家老采配2026-07-22、隠密案D確定): CanDock="False"により
+                <!-- T-110増分1対策(家老采配2026-07-22、隠密案D確定): CanDock="False"により
                      AvalonDock標準OverlayWindow(十字型ドッキングボタン群)自体を生成させない
                      (一次ソース確認済み——LayoutPanel.cs:51-101で公開DependencyProperty・
                      シリアライズ対応、DragService.cs:282のGetOverlayWindowHostsゲート1箇所が
@@ -889,7 +889,7 @@
                              CanFloat="False"はT-099(c)案YのContentDockingガードがContentId限定
                              (PlacementToolBarのみ)で本タブには不適用のため、フロート化自体を
                              構造的に禁止しリスクを回避する設計(同設計書§3)。
-                             T-110增分1(家老采配2026-07-22、指1=隠密静的レビュー差し戻し):
+                             T-110増分1(家老采配2026-07-22、指1=隠密静的レビュー差し戻し):
                              全6アンカラブル共通でCanDockAsTabbedDocument="False"を追加する。
                              `LayoutAnchorable.CanDockAsTabbedDocument`(v4.74.1一次ソース確認済み、
                              正規の封止機構)を封止しないと、ShowHeader="False"の文書ペイン(裁2)へ
@@ -1179,7 +1179,7 @@
                         <!-- 左パレット: シートナビゲーション(T-026)。GuiEcadのナビツリー調査結果を踏襲し、
                              実質フラットリスト(1シート=1ノード、階層なし)とする。部品選択は右パネルへ移設予定
                              (T-026段階4、案B=状況依存切替)。
-                             T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる
+                             T-110増分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる
                              (配置ツールバーのみフロート可を維持)。既存のDockPanel中身(シート追加/削除/
                              名前変更/設定ボタン・D&D並び替え対応ListBox)は無改修でLayoutAnchorablePaneの
                              直下へ移植。 -->
@@ -1213,11 +1213,11 @@
                             </avalonDock:LayoutAnchorable>
                         </avalonDock:LayoutAnchorablePane>
 
-                        <!-- 中央キャンバス: 図面描画。T-110增分1(裁1、隠密プラン§2.2案1トポロジ):
+                        <!-- 中央キャンバス: 図面描画。T-110増分1(裁1、隠密プラン§2.2案1トポロジ):
                              キャンバスをLayoutDocumentPaneへ内包する(統合の幾何学的必然、キャンバスは
                              どのManagerにも属さない現状の4分割構成では単一統合が不可能だったため)。
                              裁2(ドキュメントタブ非表示)はLayoutDocumentPane.ShowHeader="False"属性1つで
-                             足りる(增分0(f)重大バグ・隠密PoCレビュー追補で判明、DocumentPaneControlStyleの
+                             足りる(増分0(f)重大バグ・隠密PoCレビュー追補で判明、DocumentPaneControlStyleの
                              テンプレートコピーは不要——ライブラリ正規機構のため将来のAvalonDock更新にも
                              強い。ShowHeaderはLayoutDocumentPane側の公開プロパティであり、
                              LayoutDocument側には存在しない点に注意)。CanClose="False"は必須
@@ -1306,7 +1306,7 @@
 
                         <!-- 右パネル: 機器表/プロパティ。design-brief 3節#7(タブ排他式・固定幅の反省)を踏まえ、
                              上下2分割で常時同時参照可能にする(タブ切替不要)。
-                             T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
+                             T-110増分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
                              上下分割はLayoutPanel(Orientation="Vertical")一つで実現。
                              下段(プロパティ⇔部品選択)のタイトルはAvalonDockのオフツリー構造ゆえBindingが機能せず
                              (docs-notes/handover-next-session.md§3)、MainWindow.xaml.csでIsPartSelectionVisible変更を
@@ -1457,7 +1457,7 @@
                          殿裁定=構造化DataGrid＋重大度色分け)。実行はツール(_T)メニュー「設計チェック実行」から。
                          行選択でGuiEcadのCenterViewOnRow相当のジャンプ(該当シート・セルへ選択移動)を行う
                          (OutputPanelViewModel.SelectedDiagnostic参照)。
-                         T-110增分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
+                         T-110増分1(裁4、殿裁可済み): フロート化可否はCanFloat="False"で封じる。
                          DockHeight="160"は旧MinHeight=80/既定160(MainContentArea.RowDefinitions側指定)を
                          踏襲。 -->
                     <avalonDock:LayoutAnchorablePane DockHeight="160">
@@ -1535,7 +1535,7 @@
              docs/ecad2-t099-c-overlaywindow-position-drift-survey-onmitsu.md)には一切依存しない
              独自方式。意匠(線種・色・太さ・文言)は仮実装(最小PoC、後日殿プレビューで複数案から確定、
              UI/UX分岐)。
-             T-110增分1(座標取得元の再配線、隠密プランC-1): 旧構成は配置ツールバー段の空き領域
+             T-110増分1(座標取得元の再配線、隠密プランC-1): 旧構成は配置ツールバー段の空き領域
              (Star列)にのみ重ねていたが、単一統合後は列構成自体が消滅したためMainDockingManager
              全体に重ねる形へ変更する。ヒットテスト(コードビハインド側、GetCursorPos+本オーバーレイの
              スクリーン矩形)の対象範囲がツールバー段のみから全域へ広がるため、ドロップ枠として
@@ -1554,7 +1554,7 @@
         <!-- ステータスバー: design-brief 4節#6「モード可視化の多重化」。現在の配置ツールモードと
              ズーム率を表示する最小実装。GX Works3同等の高情報密度(機種名/局番/ステップ数等)は
              本実装向け機能に依存するため将来タスク。
-             T-110增分1: RootLayoutGrid行構成の単純化(5行→3行: メニュー/単一DockingManager/
+             T-110増分1: RootLayoutGrid行構成の単純化(5行→3行: メニュー/単一DockingManager/
              ステータスバー)に伴い、Grid.Row="4"→"2"へ変更。 -->
         <StatusBar x:Name="StatusBarArea" Grid.Row="2">
             <!-- T-061(調査書DoD(3)7項目目「ステータスバー連携」): モード表示。 -->

@@ -110,7 +110,7 @@ public partial class MainWindow : Window
     // (Ctrl+Alt+R)を新設する。起動直後の既定レイアウトをXmlLayoutSerializerで文字列として保持し、
     // リセット時にDeserializeし直す(PoC実証済み手法の流用)。
     private readonly Dictionary<string, object?> _dockingContentRegistry = new();
-    // T-110增分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴い、Manager単位の
+    // T-110増分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴い、Manager単位の
     // Dictionaryを単一値へ縮退する。
     private string? _defaultDockingLayoutXml;
     // 家老采配2026-07-19(T-099(c)復旧作業で発覚、%AppData%配下の永続化レイアウトXML破損対策):
@@ -125,7 +125,7 @@ public partial class MainWindow : Window
     private string DockingLayoutDirectory =>
         System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Ecad2", "docking-layout");
 
-    // T-110增分1(家老采配2026-07-22、B-1): 4分割時代の4分岐(GetDockingLayoutFileName)を単一
+    // T-110増分1(家老采配2026-07-22、B-1): 4分割時代の4分岐(GetDockingLayoutFileName)を単一
     // ファイル名へ縮退。旧4ファイル(left-palette.xml等)は放置する(rm禁止・裁3=移行ロジック無し、
     // 新ファイル名は旧ファイルを参照しないため既定フォールバックで無害)。
     internal const string DockingLayoutFileName = "main-layout.xml";
@@ -189,8 +189,8 @@ public partial class MainWindow : Window
         _viewModel.Find.PropertyChanged += Find_PropertyChanged;
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
-        // T-110增分1(家老采配2026-07-22、A-3=候補a確定): T-099(c)案Y(ContentDockingをCancelし
-        // ハードコード既定XMLへDeserializeする機構)は撤去する。增分0のPoCで標準Dock()を5周検証し
+        // T-110増分1(家老采配2026-07-22、A-3=候補a確定): T-099(c)案Y(ContentDockingをCancelし
+        // ハードコード既定XMLへDeserializeする機構)は撤去する。増分0のPoCで標準Dock()を5周検証し
         // タブ自己複製・縦長化・空白化いずれも再現しなかったため、統合トポロジではバグの前提
         // (PreviousContainer解決の文脈)自体が変わり再現しないと確定した(忍者実機確認
         // docs/ecad2-t110-poc-verification-ninja.md)。ContentDockingイベント購読・
@@ -200,7 +200,7 @@ public partial class MainWindow : Window
         // 0.0のままプライマリモニタ原点(0,0)にフロートウィンドウが生成される(一次ソース
         // DockingManager.cs:3281-3287で確認済み)。ContentFloatingイベント(Float実行前、一次ソース
         // DockingManager.cs:2313-2328)で配置ツールバー自身の現在スクリーン座標を設定しておくことで、
-        // Float()内のウィンドウ生成がこの値をそのまま使う。T-110增分1: 単一Manager化に伴い
+        // Float()内のウィンドウ生成がこの値をそのまま使う。T-110増分1: 単一Manager化に伴い
         // MainDockingManagerへ購読先変更(ロジック自体はContentId=="PlacementToolBar"チェック済みの
         // ため無改修)。
         MainDockingManager.ContentFloating += PlacementToolBarDockingManager_ContentFloating;
@@ -208,7 +208,7 @@ public partial class MainWindow : Window
         // OverlayWindow/DropTarget(位置ズレバグ)に依存しない独自ドロップ枠方式。フロートウィンドウ
         // 生成直後(Show前)に発火するこのイベントでLoaded後フックの登録を仕込む
         // (docs/ecad2-t103-drag-message-path-and-guard-survey-samurai.md参照)。
-        // T-110增分1(隠密プランC-1、着手前チェックC-1): 単一Manager化で本イベントは全ペインの
+        // T-110増分1(隠密プランC-1、着手前チェックC-1): 単一Manager化で本イベントは全ペインの
         // フロートで発火するようになるため、ハンドラ内のContentIdフィルタ(isPlacementToolBar判定、
         // 既存実装済み)が防御として機能する。購読先をMainDockingManagerへ変更。
         MainDockingManager.LayoutFloatingWindowControlCreated += PlacementToolBarDockingManager_LayoutFloatingWindowControlCreated;
@@ -218,7 +218,7 @@ public partial class MainWindow : Window
         // ItemsControl(一次ソースgeneric.xaml:382、AvalonDock標準テンプレート)には伝播しない
         // (WPF仕様通りの帰結)。VisualTreeHelperでこのItemsControlインスタンスを直接検索し
         // Focusable/IsTabStopを設定する、より確実性の高い方式へ切替える。
-        // T-110增分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
+        // T-110増分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
         // ウィンドウ全域に及ぶため、本対処が全ペイン共通で有効になる。
         MainDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
     }
@@ -230,8 +230,8 @@ public partial class MainWindow : Window
         DisableFocusOnAutoHideSideItemsControl(MainDockingManager.RightSidePanel);
         DisableFocusOnAutoHideSideItemsControl(MainDockingManager.BottomSidePanel);
 
-        // T-110增分1差し戻し(忍者实機確認(2)NG、家老采配2026-07-22): XAML宣言の
-        // SelectedContentIndex="1"(增分0のPoCでも同一現象を確認済み、E-1)が起動時に反映されず
+        // T-110増分1差し戻し(忍者実機確認(2)NG、家老采配2026-07-22): XAML宣言の
+        // SelectedContentIndex="1"(増分0のPoCでも同一現象を確認済み、E-1)が起動時に反映されず
         // 「基本機能」(index0)が選択された状態で起動していた。Loaded後にContentIdベースで
         // 対象LayoutAnchorableを検索しIsActiveを明示設定する(インデックス依存を避ける、
         // AvalonDock標準のアクティブ化機構)。
@@ -262,9 +262,9 @@ public partial class MainWindow : Window
         return null;
     }
 
-    // T-110增分1(家老采配2026-07-22、A-3=候補a確定): 旧PlacementToolBarDockingManager_ContentDocking・
+    // T-110増分1(家老采配2026-07-22、A-3=候補a確定): 旧PlacementToolBarDockingManager_ContentDocking・
     // ResetPlacementToolBarLayoutToDefault(T-099(c)案Y、ContentDockingをCancelしハードコード既定XML
-    // Deserializeで復帰する機構)は撤去した。增分0のPoCで標準Dock()を5周検証しタブ自己複製・
+    // Deserializeで復帰する機構)は撤去した。増分0のPoCで標準Dock()を5周検証しタブ自己複製・
     // 縦長化・空白化いずれも再現しなかったため(忍者実機確認docs/ecad2-t110-poc-verification-
     // ninja.md)、統合トポロジではバグの前提(PreviousContainer解決の文脈)自体が変わり再現しないと
     // 確定した。撤去に伴い_defaultDockingLayoutXmlByManagerへの旧参照(PlacementToolBarDockingManager
@@ -343,12 +343,12 @@ public partial class MainWindow : Window
         if (!dropZone.Contains(cursor.X, cursor.Y)) return IntPtr.Zero;
 
         handled = true;
-        // T-110增分1対策(家老采配2026-07-22、忍者所見=十字型ドロップターゲット残留の間欠事象):
+        // T-110増分1対策(家老采配2026-07-22、忍者所見=十字型ドロップターゲット残留の間欠事象):
         // handled=trueによりAvalonDock自身のWM_EXITSIZEMOVEハンドラ(=DragService.Drop()内の
         // _currentHost.HideOverlayWindow()、一次ソースDragService.cs:207-238)が丸ごとスキップ
         // されるため、AvalonDock標準のOverlayWindow後始末に頼らず、T-103側で確実に後始末する。
         PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed;
-        // T-110增分1(A-3=候補a確定に伴う派生対応): ハードコード既定XMLへの強制Deserialize
+        // T-110増分1(A-3=候補a確定に伴う派生対応): ハードコード既定XMLへの強制Deserialize
         // (ResetPlacementToolBarLayoutToDefault、撤去済み)ではなく、標準のDock()を呼ぶ形に変更する。
         // 「標準Dock()に任せる」方針(A-3)と一貫させるため。
         var anchorableToDock = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
@@ -516,10 +516,10 @@ public partial class MainWindow : Window
     // 家老采配2026-07-19(読込側防御・本丸): TryReadSavedDockingLayoutXml→TryDeserializeDockingLayout
     // の二段フォールバック構造で、ResetDockingLayoutToDefault()と同じ保護(IO/XML構文/Content実体
     // 欠落の3層)を持たせる。
-    // T-110增分1(裁3、殿裁可済み): 旧4ファイル(left-palette.xml等)は新ファイル名
+    // T-110増分1(裁3、殿裁可済み): 旧4ファイル(left-palette.xml等)は新ファイル名
     // (main-layout.xml)からは参照されないため、既存ユーザーは全員ファイル無し扱いとなり
     // XAML初期状態のまま起動する(保存カスタムレイアウト喪失は許容、移行ロジックは作らない)。
-    // 隠密静的レビュー指摘(2026-07-22、副次所見・退行): 增分1实装時、ファイル無し(savedXml is
+    // 隠密静的レビュー指摘(2026-07-22、副次所見・退行): 増分1実装時、ファイル無し(savedXml is
     // null)の場合に即returnせずフォールスルーし、_defaultDockingLayoutXml(=起動直後のXAML初期
     // 状態を自己Serializeしたもの)への無意味なDeserializeを毎回実行してしまっていた。
     // XAML初期状態は起動時点で既に正しく構築済みのため、ファイル無し時は何もしない(旧実装の
@@ -594,7 +594,7 @@ public partial class MainWindow : Window
             serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
             serializer.Deserialize(reader);
-            // T-110增分1対策(家老采配2026-07-22、隠密案D第4防御): 5123eb3より前に保存された
+            // T-110増分1対策(家老采配2026-07-22、隠密案D第4防御): 5123eb3より前に保存された
             // main-layout.xml等、RootPanelにCanDock属性が無いXMLを読み込むとLayoutPanel.ReadXml
             // は既定値trueへ復元し、XAML側のCanDock="False"が上書き消滅する(「十字型が再発する」
             // という偽の再発を招く)。Deserialize成功直後に強制Falseへ戻すことで無害化する
@@ -786,7 +786,7 @@ public partial class MainWindow : Window
             LadderCanvasHost.Clear();
     }
 
-    // T-110增分1(家老采配2026-07-22、C-3): 単一MainDockingManagerへの統合に伴い、旧4Manager出し
+    // T-110増分1(家老采配2026-07-22、C-3): 単一MainDockingManagerへの統合に伴い、旧4Manager出し
     // 分け(manager identity判定)を撤去する。統合タイトルスタイル(UnifiedAnchorablePaneTitleStyle、
     // Model.ContentId分岐を内包)を1つだけ登録すればよい。
     private void ApplyDockingManagerThemes(bool isDarkMode)
@@ -3394,7 +3394,7 @@ public partial class MainWindow : Window
     // ElementPlacementBarはRootLayoutGrid直下(Grid.Row="1"、ラッパーMainContentAreaの外)にあるため、
     // Marginの基準はRootLayoutGrid座標系でなければならない。
     //
-    // T-110增分1(家老采配2026-07-22、C-4): GridSplitter撤去・MainWorkAreaGrid撤去に伴い、
+    // T-110増分1(家老采配2026-07-22、C-4): GridSplitter撤去・MainWorkAreaGrid撤去に伴い、
     // クランプ基準をキャンバスDocument内包コンテナ(CanvasDocumentGrid、LayoutDocument直下の
     // Grid)へ変更する。旧MainWorkAreaGrid(左パレット+キャンバス+右パネル全体)よりも狭い
     // 範囲(キャンバス領域のみ)でのクランプになるが、配置バーは常にキャンバス上のセル近くに
