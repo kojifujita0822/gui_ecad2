@@ -373,4 +373,47 @@ public class UndoRedoCommandsTests : ViewModelTestBase
         Assert.Equal(1, vm.CurrentSheetIndex);
         Assert.Equal(new GridPos(9, 4), vm.SelectedCell);
     }
+
+    // ---- T-112: Undo/Redo「0枚袋小路」対処(P-120、殿裁定=案1)
+    // RedoCommandのCanExecuteからHasProjectゲートを外す ----
+
+    /// <summary>【RED証明の中核】NewDocument()を呼ばず(Sheets.Count==0の起動直後状態)最初の
+    /// AddCommandを実行すると、その実行直前(0枚)がUndo履歴へ記録される
+    /// (SheetNavigationViewModel.AddCommand、RecordSnapshotがSheets.Add直前に呼ばれる、125行目)。
+    /// そこからUndoすると0枚(HasProject=false)に戻る。修正前コードはRedoCommandのCanExecuteが
+    /// CanEditDiagram(=HasProject&amp;&amp;Mode==Drawing)を経由するため、Redoスタックにデータが
+    /// 残っていてもfalseになり復旧不能(袋小路、docs/ecad2-t110-increment2-sheet-loss-investigation-onmitsu.md
+    /// 99-101行)。修正後はMode==Drawingのみを見るためtrueになる。</summary>
+    [Fact]
+    public void RedoCommand_CanExecute_ReturnsTrue_AtZeroSheets_WhenRedoStackHasData()
+    {
+        var vm = CreateViewModel();
+        // NewDocument()を呼ばない=起動直後のSheets.Count==0を維持。
+        vm.SheetNavigation.AddCommand.Execute(("シート1", false));
+        vm.UndoCommand.Execute(null);
+        Assert.Equal(0, vm.Document.Sheets.Count); // 前提: 0枚まで戻った
+        Assert.False(vm.HasProject); // 前提: HasProjectがfalseになる状態
+
+        Assert.True(vm.RedoCommand.CanExecute(null));
+    }
+
+    /// <summary>0枚状態からRedoを実行すると、シート構成・機器表(DeviceTable)とも正しく復元される
+    /// こと(ApplyUndoRedoSnapshotのDeviceTable.Rebind呼出は既存のまま機能する見込み、DoD(3))。</summary>
+    [Fact]
+    public void RedoCommand_Execute_AtZeroSheets_RestoresSheetAndDeviceTable()
+    {
+        var vm = CreateViewModel();
+        vm.SheetNavigation.AddCommand.Execute(("シート1", false));
+        vm.Document.Devices.ByName["X001"] = new Model.Device { Name = "X001", Class = Model.DeviceClass.PushButton };
+        vm.SheetNavigation.AddCommand.Execute(("シート2", false));
+        vm.UndoCommand.Execute(null); // シート2枚→1枚(X001含む)
+        vm.UndoCommand.Execute(null); // 1枚→0枚
+        Assert.Equal(0, vm.Document.Sheets.Count); // 前提: 0枚まで戻った
+
+        vm.RedoCommand.Execute(null); // 0枚→1枚(X001含む)へやり直し
+
+        Assert.Equal(1, vm.Document.Sheets.Count);
+        Assert.True(vm.HasProject);
+        Assert.Contains(vm.Document.Devices.ByName.Values, d => d.Name == "X001");
+    }
 }

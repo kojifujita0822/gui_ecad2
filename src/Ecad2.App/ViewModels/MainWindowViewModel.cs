@@ -3190,13 +3190,17 @@ public sealed class MainWindowViewModel : ViewModelBase
             },
             () => CanEditDiagram && !HasAnyDraft && UndoManager.CanUndo);
 
+        // T-112(P-120、殿裁定=案1): RedoのCanExecuteのみHasProjectゲートを外す。シート0枚まで
+        // Undoした直後はHasProject=falseとなりCanEditDiagram経由ではRedoが恒久的にDisabledのまま
+        // 復旧不能になる袋小路(docs/ecad2-t110-increment2-sheet-loss-investigation-onmitsu.md
+        // 93-101行)があったため。UndoCommand・CanEditDiagram本体(統一ゲートPR-12)は変更しない。
         RedoCommand = new RelayCommand(
             () =>
             {
                 if (UndoManager.Redo(Document) is not LadderDocument restored) return;
                 ApplyUndoRedoSnapshot(restored);
             },
-            () => CanEditDiagram && !HasAnyDraft && UndoManager.CanRedo);
+            () => Mode == AppMode.Drawing && !HasAnyDraft && UndoManager.CanRedo);
     }
 
     /// <summary>T-051往復3周目(隠密再々レビューPLAUSIBLE、docs/ecad2-t051-selectedcell-clamp-test-design-onmitsu.md):
