@@ -176,7 +176,22 @@ DoD：
 で選択できるか」を具体観点に含める（隠密調査は机上のコード読解に留まり実機未確認のため、ここで
 初めて実機確認する）。
 
-### T-110 4分割DockingManagerの単一統合 — Approved（gated、殿直接指示2026-07-21）
+### T-117 シート削除時の機器表クリーンアップ欠落を修正（P-104対処） — Approved（auto-OK、殿裁定2026-07-22）
+
+**起票=proposed.md P-104対処**（隠密原因確定`docs/ecad2-p104-p109-cause-investigation-onmitsu.md`、
+パターン再発台帳PR-12候補）。既存の削除系操作（`DeleteSelectedElement`単体要素削除・
+`DeleteRowAtCommand`行削除）は`RemoveDeviceIfUnreferenced`/`CleanupRemovedDeviceNames`で機器表
+(`Document.Devices.ByName`)クリーンアップを行うが、`SheetNavigationViewModel.DeleteCommand`
+（シート削除）だけこの呼び出しが欠落している。シート丸ごと削除すると`sheet.Elements`は消えるが
+機器表エントリだけゴーストとして残存する。
+
+DoD：
+1. `SheetNavigationViewModel.DeleteCommand`に、削除対象シートの`sheet.Elements`が参照していた
+   機器名を`CleanupRemovedDeviceNames`（他要素からも参照されなくなったもののみ除去）で
+   クリーンアップする処理を追加
+2. シートに要素配置(機器名設定)→シート削除→機器表に旧機器名が残らないことを確認する回帰テスト追加
+
+検証：規模小。忍者実機確認は「シート削除後の機器表」を具体観点に含める。 — Approved（gated、殿直接指示2026-07-21）
 
 **起票=殿直接指摘2026-07-21**（スクリーンショット添付）「シート」「出力」タブのみアクティブ色
 （青）、「機器表」「プロパティ」は非アクティブ色（灰）という非対称性の質問を発端に、隠密調査
