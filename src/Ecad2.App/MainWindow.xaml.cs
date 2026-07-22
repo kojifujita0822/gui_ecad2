@@ -398,6 +398,36 @@ public partial class MainWindow : Window
         }
     }
 
+    // T-110増分3(裁5付帯裁定、家老采配2026-07-22、設計書§3.1-4): メニューを開くたびに実際の
+    // AutoHide状態(LayoutAnchorable.IsAutoHidden)を4項目へ反映する。変更通知の有無が未確認のため
+    // Bindingではなく都度評価する設計(通知が無くても正しく動く、通知があっても害はない)。
+    private void AutoHideSubmenu_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        AutoHideLeftPaletteMenuItem.IsChecked = IsPaneAutoHidden("LeftPalette");
+        AutoHideDeviceTableMenuItem.IsChecked = IsPaneAutoHidden("DeviceTable");
+        AutoHideRightPanelBottomMenuItem.IsChecked = IsPaneAutoHidden("RightPanelBottom");
+        AutoHideOutputPanelMenuItem.IsChecked = IsPaneAutoHidden("OutputPanel");
+    }
+
+    private bool IsPaneAutoHidden(string contentId)
+    {
+        var anchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == contentId);
+        return anchorable?.IsAutoHidden ?? false;
+    }
+
+    // T-110増分3(裁5付帯裁定、家老采配2026-07-22、設計書§3.1-1/2): 発動・復帰とも同じ項目のトグル。
+    // 対象取得はContentId検索(x:Name参照は使わない、レイアウトDeserializeでモデルツリーが丸ごと
+    // 差し替わるT-099(c)の教訓)。ToggleAutoHide()はpublic、DockingManager.ExecuteAutoHideCommand
+    // (internal)の中身も同メソッド呼出のみと一次ソース確認済み(設計書§3.1-1)。
+    private void AutoHideMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string contentId }) return;
+        var anchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == contentId);
+        anchorable?.ToggleAutoHide();
+    }
+
     // T-110増分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴いforeachを撤去。
     // B-2: LayoutDocument走査により、キャンバスDocumentのContentId("Canvas")も期待集合へ
     // 自然に含まれる(既存のLayoutAnchorable/LayoutDocument両方の走査ロジックを維持するだけで足りる)。

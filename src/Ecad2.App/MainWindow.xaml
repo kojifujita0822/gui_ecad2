@@ -802,6 +802,18 @@
                      メニュー配置はここに確定済み、起動時既定・OSテーマ追従・永続化等はPoC後に殿確認。 -->
                 <MenuItem Header="ダークモード(作図色)(_D)" IsCheckable="True" IsChecked="{Binding IsDarkMode, Mode=TwoWay}"/>
                 <Separator/>
+                <!-- T-110増分3(裁5付帯裁定=AutoHide機能を残す、殿裁定=案1、家老采配2026-07-22): タイトル
+                     バー完全非表示(本ファイル内TitleBarHiddenAnchorableControlStyle)に伴いピンでの
+                     発動・復帰が困難になる4ペインへ、メニュー経由の代替動線を提供する。発動・復帰とも
+                     同じ項目で完結(トグル)。チェック状態はSubmenuOpenedで都度評価する(IsAutoHiddenの
+                     変更通知有無が未確認のため、通知に依存しない設計。設計書§3.1-4/§3.2)。 -->
+                <MenuItem Header="パネルを自動的に隠す(_A)" SubmenuOpened="AutoHideSubmenu_SubmenuOpened">
+                    <MenuItem x:Name="AutoHideLeftPaletteMenuItem" Header="シート(_S)" IsCheckable="True" Tag="LeftPalette" Click="AutoHideMenuItem_Click"/>
+                    <MenuItem x:Name="AutoHideDeviceTableMenuItem" Header="機器表(_D)" IsCheckable="True" Tag="DeviceTable" Click="AutoHideMenuItem_Click"/>
+                    <MenuItem x:Name="AutoHideRightPanelBottomMenuItem" Header="プロパティ(_P)" IsCheckable="True" Tag="RightPanelBottom" Click="AutoHideMenuItem_Click"/>
+                    <MenuItem x:Name="AutoHideOutputPanelMenuItem" Header="出力(_O)" IsCheckable="True" Tag="OutputPanel" Click="AutoHideMenuItem_Click"/>
+                </MenuItem>
+                <Separator/>
                 <!-- T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド): 現在のパネルレイアウト
                      (左パレット・出力パネル・右パネル)を既定として%AppData%配下へ保存する。
                      Ctrl+Alt+R(リセット)と対をなすキーバインド。 -->
