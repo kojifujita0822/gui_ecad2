@@ -222,6 +222,39 @@ DoD：
 検証：規模中のため通常の検証パイプライン（侍実装→隠密静的レビュー→忍者実機確認）。忍者実機
 確認は「末尾シートの改名」「非末尾シートの改名」両方を具体観点に含める。
 
+### T-119 配置ツールバーのタブ形状をAeroテーマ風に変更 — Approved（gated、殿直接指示2026-07-22）
+
+**起票=殿直接指示2026-07-22**（AvalonDock公式ドキュメントのAeroTheme画面例を提示、「このタブの
+形にしたい」）。家老がAvalonDock一次ソース（`AvalonDock.Themes.Aero`、Ms-PLライセンス）を取得し
+正体を特定：タブ左側の丸みは単純な角丸ではなく`SplineBorder`という専用コントロール（`OnRender`
+を自前実装、2本の`QuadraticBezierSegment`で曲線を描く、`source/Components/AvalonDock.Themes.Aero/
+Controls/SplineBorder.cs`、124行）。一次ソースの`ControlTemplate`（`Theme.xaml`128-211行）は
+`Grid.ColumnDefinitions`で**幅20pxの列にのみ**`SplineBorder`を配置し、残りは通常の直線Border
+（`CornerRadius="0,2,0,0"`、右上のみ角丸）という構成。選択中タブは単色でなく縦グラデーション
+（Aero原色は`#FCFDFE`→`#D2E6FA`）。座標を正確に再現したモックアップを提示し殿確認済み
+（Artifact、v2で訂正——初版は曲線をタブ全幅に誤って伸ばしていた）。
+
+**対象範囲**：配置ツールバーのタブ（「基本機能」「配置ツール」、`MainWindow.xaml`の
+`PlacementToolBarPaneControlStyle`系ItemContainerStyle、236-334行付近）。AeroTheme画像自体は
+AvalonDockの「ドキュメントタブ」用デザインで、配置ツールバーが使う「ツールウィンドウタブ」には
+元々別デザインが使われるが、同じ形をecad2側で移植する。
+
+DoD：
+1. `SplineBorder`相当のカスタムControl（`OnRender`オーバーライド、2本のベジェ曲線描画）を
+   ecad2側に新設（一次ソースのMs-PLコードを参考に実装、ライセンス表記の要否を確認）
+2. 配置ツールバーのTabItem用ControlTemplateを、`Grid.ColumnDefinitions`（Width="20"+Width="*"）
+   構成へ変更。左列に新設の曲線コントロール、右列に直線Border（右上2px角丸）
+3. 選択中/非選択の背景を単色から縦グラデーションへ変更。色はecad2既存パレット
+   （`PanelHeaderBackgroundBrush`/`PanelContentBackgroundBrush`系）をベースにしたグラデーション
+   バリエーションとし、Aero原色そのままの流用はしない（既存のライト/ダーク両テーマとの整合を
+   優先、具体的な色調整は侍裁量）
+4. 選択中タブが隣接タブに重なる視覚効果（Aero原本のマイナスMargin、ZIndex調整）も踏襲するか
+   どうかは実装時の見た目で判断してよい
+5. ライト/ダーク両テーマで表示確認
+
+検証：見た目の変更のため通常の検証パイプライン（侍実装→隠密静的レビュー→忍者実機確認）。
+忍者実機確認は両テーマでの表示確認を含める（色に関わる観点は画素採取等の機械的判定を推奨）。
+
 ### T-110 4分割DockingManagerの単一統合 — Approved（gated、殿直接指示2026-07-21）
 
 **起票=殿直接指摘2026-07-21**（スクリーンショット添付）「シート」「出力」タブのみアクティブ色
