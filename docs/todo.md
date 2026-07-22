@@ -263,6 +263,15 @@ DoD：
 やすい）。`SplineBorder`を上下反転する対処が必要（`LayoutTransform`での反転、または内部の
 `OnRender`座標計算にBottom用の分岐を追加、実装方式は侍裁量）。
 
+**追加要望（殿2026-07-22、往復2周目のビルド確認前に合流）**：選択中タブの強調表示を強める。
+現状は背景色変化+`FontWeight="Bold"`のみ（`PlacementToolBarTabItemTemplate`のControlTemplate.
+Triggers、219-223行付近）。殿選択＝以下2点を組み合わせる：
+1. 選択中タブの**外周に枠線を目立たせる**（アクセントカラー、既存の`PlacementTabBorderBrush`
+   より明確に区別できる太さ・色で）
+2. 選択中タブの**背景コントラストを強める**（現状の`PlacementTabSelectedBackgroundBrush`
+   グラデーションを、非選択との差がもっとはっきり分かる色合いへ調整）
+具体的な色・太さの数値は侍裁量でよい、ライト/ダーク両テーマで確認すること。
+
 ### T-120 配置ツールタブ末尾にテストモードボタンを増設 — Approved（auto-OK、殿直接指示2026-07-22）
 
 **起票=殿直接指示2026-07-22**。テストモード切替ボタン（`TestModeToolBarButtonStyle`、
