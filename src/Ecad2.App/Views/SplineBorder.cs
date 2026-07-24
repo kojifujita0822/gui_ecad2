@@ -38,6 +38,16 @@ namespace Ecad2.App.Views;
 /// </summary>
 public class SplineBorder : Control
 {
+    // T-121(忍者実機確認2026-07-24、家老原因特定): タブ左20px幅の純粋な装飾用コントロールだが、
+    // 基底Controlの既定Focusable値(True)のままだったためTabキー巡回でフォーカスが移ってしまって
+    // いた。クリック等の対話処理は一切実装していない(OnRenderのみ)ため、既定値を上書きし恒久的に
+    // 非フォーカス対象とする(利用箇所ごとにXAML属性で個別指定するのではなく、コントロール自体の
+    // 性質として一箇所で保証する)。
+    static SplineBorder()
+    {
+        FocusableProperty.OverrideMetadata(typeof(SplineBorder), new FrameworkPropertyMetadata(false));
+    }
+
     public static readonly DependencyProperty ThicknessProperty =
         DependencyProperty.Register(nameof(Thickness), typeof(double), typeof(SplineBorder),
             new FrameworkPropertyMetadata(1.0, FrameworkPropertyMetadataOptions.AffectsRender));
