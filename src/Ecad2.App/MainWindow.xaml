@@ -955,6 +955,14 @@
                 <MenuItem Header="テストモード(_M)" IsCheckable="True" IsChecked="{Binding IsTestMode, Mode=TwoWay}"
                           IsEnabled="{Binding HasProject}" InputGestureText="Ctrl+T"/>
             </MenuItem>
+            <!-- T-068増分1(家老采配2026-07-24、殿裁定=案B): 自作パーツ管理(新規作成/編集/削除)の
+                 UI導線。GuiEcad原本(MainPage.Parts.cs「図形(G)」メニュー)踏襲、独立メニュー項目として
+                 新設する。自作パーツ(_C)サブメニューはSubmenuOpened時にPartPalette.Entriesから
+                 動的構築する(AutoHideSubmenu_SubmenuOpenedと同型パターン)。 -->
+            <MenuItem Header="パーツ(_P)">
+                <MenuItem Header="新規作成(_N)..." Click="CreatePartMenuItem_Click"/>
+                <MenuItem x:Name="CustomPartsMenu" Header="自作パーツ(_C)" SubmenuOpened="CustomPartsMenu_SubmenuOpened"/>
+            </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <!-- T-077増分1(家老采配2026-07-21、殿裁定=F1割当): AboutMenuItem_Clickと同型パターン。 -->
                 <MenuItem Header="使い方(_G)" InputGestureText="F1" Click="UsageMenuItem_Click"/>

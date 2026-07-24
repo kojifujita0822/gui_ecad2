@@ -16,6 +16,7 @@ using AvalonDock;
 using AvalonDock.Controls;
 using AvalonDock.Layout;
 using AvalonDock.Layout.Serialization;
+using Ecad2.Persistence;
 
 namespace Ecad2.App;
 
@@ -458,6 +459,61 @@ public partial class MainWindow : Window
         {
             bottomAnchorable.Title = _viewModel.IsPartSelectionVisible ? "部品選択" : "プロパティ";
         }
+    }
+
+    // T-068増分1(家老采配2026-07-24、殿裁定=案B): 自作パーツ管理メニュー。「自作パーツ」サブ
+    // メニューは開くたびにPartPalette.Entriesから動的構築する(GuiEcad原本のBuildCustomShapesSubItem/
+    // BuildShapeSubMenu踏襲、AutoHideSubmenu_SubmenuOpenedと同型パターン=Bindingでなく都度評価)。
+    // 基本図形(Category=="")は編集・削除の対象に含めない(自作のみ)。
+    private void CreatePartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new Views.PartEditorDialog(null) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.PartPalette.SaveNewPart(dialog.Result);
+    }
+
+    private void CustomPartsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        CustomPartsMenu.Items.Clear();
+        var customs = _viewModel.PartPalette.Entries
+            .Where(entry => entry.Category == "自作")
+            .OrderBy(entry => entry.Definition.Name, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (customs.Count == 0)
+        {
+            CustomPartsMenu.Items.Add(new MenuItem { Header = "(なし)", IsEnabled = false });
+            return;
+        }
+
+        foreach (var entry in customs)
+        {
+            var sub = new MenuItem { Header = entry.Definition.Name };
+            var editItem = new MenuItem { Header = "編集(_E)...", Tag = entry };
+            editItem.Click += EditPartMenuItem_Click;
+            sub.Items.Add(editItem);
+            var deleteItem = new MenuItem { Header = "削除(_D)", Tag = entry };
+            deleteItem.Click += DeletePartMenuItem_Click;
+            sub.Items.Add(deleteItem);
+            CustomPartsMenu.Items.Add(sub);
+        }
+    }
+
+    private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;
+        var dialog = new Views.PartEditorDialog(entry.Definition) { Owner = this };
+        if (dialog.ShowDialog() == true)
+            _viewModel.PartPalette.SaveEditedPart(dialog.Result, entry.FilePath);
+    }
+
+    private void DeletePartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;
+        var result = MessageBox.Show(this, $"自作パーツ「{entry.Definition.Name}」を削除しますか？", "パーツの削除",
+            MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result == MessageBoxResult.Yes)
+            _viewModel.PartPalette.DeletePart(entry.FilePath);
     }
 
     // T-110増分3(裁5付帯裁定、家老采配2026-07-22、設計書§3.1-4): メニューを開くたびに実際の
