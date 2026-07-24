@@ -960,8 +960,14 @@
                  新設する。自作パーツ(_C)サブメニューはSubmenuOpened時にPartPalette.Entriesから
                  動的構築する(AutoHideSubmenu_SubmenuOpenedと同型パターン)。 -->
             <MenuItem Header="パーツ(_P)">
-                <MenuItem Header="新規作成(_N)..." Click="CreatePartMenuItem_Click"/>
-                <MenuItem x:Name="CustomPartsMenu" Header="自作パーツ(_C)" SubmenuOpened="CustomPartsMenu_SubmenuOpened"/>
+                <!-- T-068増分1差し戻し(隠密静的レビュー指摘・家老裁定2026-07-24、pattern-recurrence-
+                     log.md PR-13型3件目): 新規作成・自作パーツ(編集/削除)ともCanEditDiagramガードが
+                     漏れていた。既存「削除(_D)」メニュー項目(909行目付近)と同型のIsEnabledバインディング
+                     を追加する。サブメニュー自体をガードすることで、配下の動的生成される編集/削除
+                     項目への到達自体を防ぐ(個別の編集/削除MenuItemへ都度ガードを付ける必要がない)。 -->
+                <MenuItem Header="新規作成(_N)..." Click="CreatePartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                <MenuItem x:Name="CustomPartsMenu" Header="自作パーツ(_C)" SubmenuOpened="CustomPartsMenu_SubmenuOpened"
+                          IsEnabled="{Binding CanEditDiagram}"/>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <!-- T-077増分1(家老采配2026-07-21、殿裁定=F1割当): AboutMenuItem_Clickと同型パターン。 -->
