@@ -7,9 +7,10 @@ namespace Ecad2.App.Views;
 
 /// <summary>
 /// T-068増分1: 自作パーツのプロパティ編集ダイアログ(名前/幅高さ/役割)。
-/// T-068増分2: 端子(接続点)編集をタブ追加(リスト形式、殿裁定=案A・キャンバス上ドラッグは増分3で
-/// 正式統合)。形状(Primitive)編集は増分3で別途扱う(本ダイアログのスコープ外)。
-/// RenameDialog/AddSheetDialogと同型の最小モーダル。
+/// T-068増分2: 端子(接続点)編集(リスト形式、殿裁定=案A・キャンバス上ドラッグは増分3-cで正式統合)。
+/// T-068増分3-a: タブ構成を廃止し、GuiEcad原本(PartEditorWindow)と同じ単一画面構成へ再設計。
+/// キャンバス領域の確保までを行い、形状編集ロジックは増分3-b・接続点ツール統合は増分3-cで扱う
+/// (画面構成と原本Row0-3との対応はPartEditorDialog.xaml冒頭のコメント参照)。
 /// </summary>
 public partial class PartEditorDialog : Window
 {
@@ -36,7 +37,7 @@ public partial class PartEditorDialog : Window
 
     /// <summary>新規作成の場合はeditにnullを渡す。編集の場合は対象のPartDefinitionを渡す
     /// (Id・IsOrEligible・Primitivesは編集対象からそのまま引き継ぐ。Portsは本ダイアログの
-    /// 端子タブで編集可能)。</summary>
+    /// 端子リストで編集可能)。</summary>
     public PartEditorDialog(PartDefinition? edit)
     {
         InitializeComponent();
