@@ -474,6 +474,16 @@ public partial class MainWindow : Window
 
     private void CustomPartsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
     {
+        // T-068増分1真因確定(忍者診断ログ実測→隠密仮説→侍一次ソース確定2026-07-24):
+        // MenuItem.SubmenuOpenedEventはRoutingStrategy.Bubble(一次ソースMenuItem.cs 279-280行)。
+        // 動的生成した子(sub、各パーツのMenuItem)自身のSubmenuOpenedが論理ツリーを上へバブリング
+        // し、このハンドラ(CustomPartsMenuが購読)を誤って再発火させていた。再発火のたびに
+        // Items.Clear()が実行され、まさに開こうとしていたsub自身を含む全階層が消失していた
+        // (診断ログ実測=sub.SubmenuOpened発火の3ms後にAfterAdd系ログが再度出現、と症状が完全に
+        // 一致)。発火源がCustomPartsMenu自身の場合のみ処理し、子孫からのバブリングは無視する。
+        if (!ReferenceEquals(e.OriginalSource, CustomPartsMenu)) return;
+        e.Handled = true;
+
         CustomPartsMenu.Items.Clear();
         var customs = _viewModel.PartPalette.Entries
             .Where(entry => entry.Category == "自作")
@@ -497,19 +507,6 @@ public partial class MainWindow : Window
             sub.Items.Add(deleteItem);
             CustomPartsMenu.Items.Add(sub);
         }
-
-        // T-068増分1・2件目の重大バグ修正(忍者往復2周目実機確認・侍一次ソース確認2026-07-24):
-        // 動的に追加した各パーツのMenuItem(sub)は、この時点ではまだ一度もMeasure()されておらず
-        // ApplyTemplate()も未実行(一次ソースFrameworkElement.MeasureCore、4284-4299行=ApplyTemplate
-        // 呼び出しはMeasureCore内の1箇所のみで、Measureは通常のレイアウトパス=次のDispatcherサイクル
-        // まで遅延される)。ApplyTemplate未実行だとControlTemplate内のPART_Popup(MenuItem.
-        // _submenuPopupフィールドの取得元、OnApplyTemplate内)が未確立のままとなり、この状態で
-        // subのサブメニュー展開操作(ExpandCollapsePattern/クリック/キーボード)を行うと、WPFの
-        // 内部状態管理が破綻しメニュー階層全体が閉じてしまう(忍者確認=6→5パターン全て、階層ごと
-        // 閉じる・キー送信直後0msで上位階層のポップアップ数が既に減少)。UpdateLayout()
-        // (一次ソースUIElement.cs 1630行、ContextLayoutManager経由で保留中のMeasure/Arrangeを
-        // 同期的に処理する)を明示的に呼び、追加した全subのApplyTemplateをこの場で確定させる。
-        CustomPartsMenu.UpdateLayout();
     }
 
     private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
