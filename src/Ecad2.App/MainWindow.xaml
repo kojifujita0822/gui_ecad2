@@ -966,8 +966,20 @@
                      を追加する。サブメニュー自体をガードすることで、配下の動的生成される編集/削除
                      項目への到達自体を防ぐ(個別の編集/削除MenuItemへ都度ガードを付ける必要がない)。 -->
                 <MenuItem Header="新規作成(_N)..." Click="CreatePartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                <!-- T-068増分1重大バグ修正(忍者実機確認・侍一次ソース確認2026-07-24): 子要素0件の
+                     自己終了タグだとWPF標準のMenuItem.UpdateRole()(一次ソースdotnet/wpf
+                     MenuItem.cs 764-792行)がHasItems=falseを見て本項目のRoleをSubmenuItem
+                     (親から見て単純クリック項目)に確定してしまい、サブメニュー展開UI自体が
+                     生成されずSubmenuOpenedも発火しなかった(忍者実機確認=サブメニューが
+                     一切開かない、6パターン全て不成立)。ダミー子項目を1つ静的に持たせて
+                     HasItems=trueを保証し、SubmenuHeaderロールへ確定させる(AutoHideSubmenu
+                     ＝最初から静的な子要素を持つ既存パターンと同じ前提に揃える)。ダミー項目は
+                     SubmenuOpened発火直後にItems.Clear()で実際の一覧へ差し替わるため、表示され
+                     続けることはない。 -->
                 <MenuItem x:Name="CustomPartsMenu" Header="自作パーツ(_C)" SubmenuOpened="CustomPartsMenu_SubmenuOpened"
-                          IsEnabled="{Binding CanEditDiagram}"/>
+                          IsEnabled="{Binding CanEditDiagram}">
+                    <MenuItem Header="(読み込み中...)" IsEnabled="False"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <!-- T-077増分1(家老采配2026-07-21、殿裁定=F1割当): AboutMenuItem_Clickと同型パターン。 -->
