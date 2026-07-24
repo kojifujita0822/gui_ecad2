@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    T-068増分0 PoC: 自作パーツ形状編集キャンバス(線/折れ線/矩形/円/弧/回転の6論点)が
+    実用的に成立するか検証する。ecad2既存のIRenderer/WpfRenderer/GridGeometry(src/Ecad2.Core・
+    src/Ecad2.Rendering.Wpf)をProjectReferenceで参照し実物の描画基盤を使う(poc/t041-drag-poc/の
+    前例踏襲、詳細はREADME.md参照)。PartDrawing(Ecad2.Core.Rendering)はinternalのため参照不可、
+    同等ロジックを本PoC側で複製する(Core層は無改変、docs/ecad2-t068-increment0-poc-design-
+    onmitsu.md §6方針どおり)。
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Ecad2.Core\Ecad2.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\Ecad2.Rendering.Wpf\Ecad2.Rendering.Wpf.csproj" />
+  </ItemGroup>
+
+</Project>

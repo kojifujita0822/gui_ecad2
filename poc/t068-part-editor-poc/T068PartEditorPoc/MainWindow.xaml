@@ -1,0 +1,47 @@
+<Window x:Class="T068PartEditorPoc.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:T068PartEditorPoc"
+        Title="T-068 増分0 PoC - パーツ形状編集キャンバス" Height="750" Width="1000">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <ToolBar Grid.Row="0">
+            <RadioButton x:Name="ToolSelect" Content="選択" GroupName="Tool" IsChecked="True" Checked="Tool_Checked" Tag="Select" Margin="4,0"/>
+            <RadioButton x:Name="ToolLine" Content="線" GroupName="Tool" Checked="Tool_Checked" Tag="Line" Margin="4,0"/>
+            <RadioButton x:Name="ToolPolyline" Content="折れ線(右クリック確定)" GroupName="Tool" Checked="Tool_Checked" Tag="Polyline" Margin="4,0"/>
+            <RadioButton x:Name="ToolRect" Content="矩形" GroupName="Tool" Checked="Tool_Checked" Tag="Rect" Margin="4,0"/>
+            <RadioButton x:Name="ToolCircle" Content="円" GroupName="Tool" Checked="Tool_Checked" Tag="Circle" Margin="4,0"/>
+            <RadioButton x:Name="ToolArc" Content="弧(半楕円)" GroupName="Tool" Checked="Tool_Checked" Tag="Arc" Margin="4,0"/>
+            <RadioButton x:Name="ToolRotate" Content="回転(15度)" GroupName="Tool" Checked="Tool_Checked" Tag="Rotate" Margin="4,0"/>
+            <Separator/>
+            <Button Content="元に戻す(Ctrl+Z)" Click="Undo_Click"/>
+            <Button Content="やり直し(Ctrl+Y)" Click="Redo_Click"/>
+            <Button Content="削除(Delete)" Click="Delete_Click"/>
+            <Separator/>
+            <Button Content="ズームリセット" Click="ZoomReset_Click"/>
+            <TextBlock Text="Ctrl+ホイール=ズーム、中ボタンドラッグ=パン" VerticalAlignment="Center" Margin="8,0" Foreground="Gray"/>
+        </ToolBar>
+
+        <Border Grid.Row="1" BorderBrush="Gray" BorderThickness="1" Margin="4"
+                FocusManager.IsFocusScope="True">
+            <local:PartEditorCanvas x:Name="Canvas"/>
+        </Border>
+
+        <Grid Grid.Row="2" Margin="4">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="StatusText" Grid.Column="0" VerticalAlignment="Center"/>
+            <TextBlock x:Name="ArcRyLabel" Grid.Column="1" Text="弧の縦半径(Ry, セル): " VerticalAlignment="Center" Margin="8,0,4,0" Visibility="Collapsed"/>
+            <TextBox x:Name="ArcRyBox" Grid.Column="2" Width="60" VerticalAlignment="Center" Visibility="Collapsed"
+                     KeyDown="ArcRyBox_KeyDown"/>
+        </Grid>
+    </Grid>
+</Window>
