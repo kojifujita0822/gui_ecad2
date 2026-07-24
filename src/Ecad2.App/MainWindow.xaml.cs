@@ -497,6 +497,19 @@ public partial class MainWindow : Window
             sub.Items.Add(deleteItem);
             CustomPartsMenu.Items.Add(sub);
         }
+
+        // T-068増分1・2件目の重大バグ修正(忍者往復2周目実機確認・侍一次ソース確認2026-07-24):
+        // 動的に追加した各パーツのMenuItem(sub)は、この時点ではまだ一度もMeasure()されておらず
+        // ApplyTemplate()も未実行(一次ソースFrameworkElement.MeasureCore、4284-4299行=ApplyTemplate
+        // 呼び出しはMeasureCore内の1箇所のみで、Measureは通常のレイアウトパス=次のDispatcherサイクル
+        // まで遅延される)。ApplyTemplate未実行だとControlTemplate内のPART_Popup(MenuItem.
+        // _submenuPopupフィールドの取得元、OnApplyTemplate内)が未確立のままとなり、この状態で
+        // subのサブメニュー展開操作(ExpandCollapsePattern/クリック/キーボード)を行うと、WPFの
+        // 内部状態管理が破綻しメニュー階層全体が閉じてしまう(忍者確認=6→5パターン全て、階層ごと
+        // 閉じる・キー送信直後0msで上位階層のポップアップ数が既に減少)。UpdateLayout()
+        // (一次ソースUIElement.cs 1630行、ContextLayoutManager経由で保留中のMeasure/Arrangeを
+        // 同期的に処理する)を明示的に呼び、追加した全subのApplyTemplateをこの場で確定させる。
+        CustomPartsMenu.UpdateLayout();
     }
 
     private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
