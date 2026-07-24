@@ -205,11 +205,17 @@
                      名前解決のタイミング問題を起こしうる。Background切り替え(既存・正常動作)と
                      同型のTemplateBinding+TabItem自身のプロパティ経由方式へ統一し、
                      TargetName Setterを完全に排除する。 -->
+                <!-- T-119往復7周目(殿実機確認2026-07-24、家老原因特定): 往復6周目でBd左辺の継ぎ目を
+                     解消するためBorderThickness.Leftを0化したが、曲線側の縁線太さもLeftを参照して
+                     いたため道連れで0になり、縁線(Stroke)自体が消え曲線の輪郭が視認できなくなって
+                     いた(ライトはFillの階調で辛うじて見えたがダークは判別不能)。0化していない辺
+                     (Bottom、タブ外周の"roof"線と同じ役割)を参照するよう変更、継ぎ目解消(Left=0)は
+                     不変。 -->
                 <views:SplineBorder x:Name="SplineBd"
                     BottomBorderMargin="0.5"
                     Fill="{TemplateBinding Background}"
                     Stroke="{TemplateBinding BorderBrush}"
-                    Thickness="{Binding BorderThickness.Left, RelativeSource={RelativeSource TemplatedParent}}"/>
+                    Thickness="{Binding BorderThickness.Bottom, RelativeSource={RelativeSource TemplatedParent}}"/>
                 <Border x:Name="Bd" Grid.Column="1"
                     Background="{TemplateBinding Background}"
                     BorderBrush="{TemplateBinding BorderBrush}"
@@ -233,7 +239,9 @@
                          TabItem自身のBorderBrush/BorderThicknessをSetterで上書きする
                          (Backgroundと同じ仕組み、SplineBd/BdはTemplateBinding経由で自動追従)。 -->
                     <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabSelectedBorderBrush}"/>
-                    <Setter Property="BorderThickness" Value="2"/>
+                    <!-- T-119往復6周目(殿裁定・家老正式依頼2026-07-24): 通常時と同じ理由(左辺・上辺は
+                         継ぎ目/コンテンツ接続部ゆえ0)で辺ごと指定へ変更、強調の太さ自体は2を維持。 -->
+                    <Setter Property="BorderThickness" Value="0,0,2,2"/>
                 </Trigger>
                 <MultiTrigger>
                     <MultiTrigger.Conditions>
@@ -397,16 +405,24 @@
                                  はLayoutAnchorable(Model)自身のため(ItemTemplateのModel="{Binding}"参照)、
                                  Path省略でContentIdへ直接バインドできる。他ペイン(シート/機器表/
                                  プロパティ/出力)には無影響。 -->
+                            <!-- T-119往復6周目(殿裁定・家老正式依頼2026-07-24): 右側の直線Border(Bd)が
+                                 左辺にも枠線を描いており、曲線側(SplineBd)との継ぎ目が浮いて見えていた。
+                                 原本(AvalonDock、BorderThickness="0,1,1,0")同様、左辺(曲線側との継ぎ目)・
+                                 上辺(コンテンツ接続部、TabStripPlacement="Bottom"のため往復3周目の反転
+                                 基準どおり上辺が接続部)を0にし、右辺・下辺(タブ外周)のみ線を引く。
+                                 強調色Trigger不具合(往復3周目発見、初期選択状態で強調表示が反映されない
+                                 件、俯瞰評価待ちで据え置き中)とは別件——太さパターンのみの変更であり
+                                 Background/BorderBrushの値・Trigger条件そのものには触れていない。 -->
                             <DataTrigger Binding="{Binding ContentId}" Value="MainToolBar">
                                 <Setter Property="Background" Value="{DynamicResource PlacementTabBackgroundBrush}"/>
                                 <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabBorderBrush}"/>
-                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
                                 <Setter Property="Template" Value="{StaticResource PlacementToolBarTabItemTemplate}"/>
                             </DataTrigger>
                             <DataTrigger Binding="{Binding ContentId}" Value="PlacementToolBar">
                                 <Setter Property="Background" Value="{DynamicResource PlacementTabBackgroundBrush}"/>
                                 <Setter Property="BorderBrush" Value="{DynamicResource PlacementTabBorderBrush}"/>
-                                <Setter Property="BorderThickness" Value="1"/>
+                                <Setter Property="BorderThickness" Value="0,0,1,1"/>
                                 <Setter Property="Template" Value="{StaticResource PlacementToolBarTabItemTemplate}"/>
                             </DataTrigger>
                         </Style.Triggers>
