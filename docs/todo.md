@@ -496,6 +496,22 @@ effort=low）。
 
 **忍者最終実機確認＝A/B/Cすべて解消、回帰なし。これにてT-121クローズ**。
 
+**回帰疑い再発見→調査完了・回帰ではないと確定（2026-07-24）**：T-122実機確認中に忍者が「タブ
+ヘッダー復活」を発見（`docs/ecad2-t122-verification-ninja.md`）、Wチェック（侍実測＋隠密独立調査）
+を並行実施。
+- 侍（診断ログ実測、`%TEMP%\ecad2-diag.log`）：T-121対象のHeader(AnchorablePaneTitle)は
+  BeforeFloat/AfterDockとも`styleMatch=True`・`headerVis=Collapsed`で終始正しく機能、回帰なし。
+- 隠密（一次ソース独立調査、`docs/ecad2-t121-tabheader-regression-investigation-onmitsu.md`）：
+  忍者が見たのはHeaderでなく別機構のタブストリップ(HeaderPanel、`MainWindow.xaml:398-401`の
+  Items.Count==1判定でCollapse)、フロート中はPlacementToolBar離脱でItems.Count=1→Collapse、
+  再ドッキングでItems.Count=2に復帰→表示、という「常時2タブ構成」の意図された標準機構と判定。
+- 忍者（追加確認・自己訂正、`docs/ecad2-t121-tabheader-regression-ninja-followup.md`）：起動直後
+  のUIA階層を実測した結果、前回報告「フロート化前は非表示」は誤り（拙速な混同）と判明、実際は
+  起動直後からタブストリップ表示済みと確定。隠密所見と完全整合。
+
+3者の結論が一致、**T-121の回帰ではなく既存の標準機構と確定**。追加修正なし、T-121クローズ状態を
+維持。
+
 ### T-120 配置ツールタブ末尾にテストモードボタンを増設 — Done（2026-07-22、検証パイプライン完了）
 
 **起票=殿直接指示2026-07-22**。テストモード切替ボタン（`TestModeToolBarButtonStyle`、
@@ -1667,6 +1683,157 @@ UI導線が完全に皆無（欠落確認＝YES）。増分5分割案（増分0=
 
 次工程＝増分0（PoC、高リスク領域=形状編集キャンバスの操作感検証）または増分1（プロパティ編集、
 低リスク）の詳細設計・着手。侍へ采配予定。
+
+**増分0 PoC詳細設計完了（2026-07-24、隠密、`docs/ecad2-t068-increment0-poc-design-onmitsu.md`）**：
+6検証論点（描画応答性/折れ線操作/弧作図/回転/Undo単位/座標変換・ヒットテスト）を整理。UI/UX分岐
+3点は殿確認へ回した。
+
+**殿裁定（2026-07-24）＝3分岐とも案A（GuiEcad踏襲、隠密推奨どおり）**：
+1. 折れ線の確定方法＝右クリックのみ（Enterキー確定は無し）
+2. 頂点単位のハンドル編集＝不可（プリミティブ全体の平行移動のみ）
+3. 弧の開き角＝半楕円弧のみ（SweepDeg=180固定）
+
+侍がT-122完了次第、PoC実装（`poc/t068-part-editor-poc/`）へ着手。
+
+**増分0 PoC実装完了（2026-07-24、侍、コミット`91b179e`）**：6論点すべて実装、UI/UX分岐3点は
+殿裁定どおり案A（GuiEcad踏襲）。技術的発見2点＝(1)`PartDrawing`はinternalのためPoCから参照不可、
+Core層無改変方針を守りPoC側で同等ロジックを複製 (2)`GridGeometry`の線形変換はパーツローカル座標へ
+転用可能。**自己レビューでUndo/Redo単位設計のバグを発見・修正**（確定時に「変更後」状態を積み
+Undoが実質無効化される設計ミス、ドラッグ開始時点のスナップショットを積む方式へ修正）。build exit 0、
+起動確認OK、変更は`poc/t068-part-editor-poc/`配下7ファイルのみ。
+
+設計書§7の定めどおり、6論点の操作感評価（定性判断）は隠密が直接操作確認する（忍者実機確認は
+PoCにつき不要）。隠密へ采配。
+
+**増分0 PoC操作感評価完了（2026-07-24、隠密、`docs/ecad2-t068-increment0-poc-verification-onmitsu.md`）**：
+6論点すべて「増分3本体実装に進めて問題ない」、技術的障壁なし。侍発見のUndo/Redoバグ修正も実地
+検証で正確に機能。軽微な所見2件（(1)選択のみでもUndoが1エントリ余分に積まれる (2)Ctrl+ホイール
+ズーム時ステータスバー表示が更新されない）は増分3実装時の修正対象として申し送り。**PoC完了、
+増分1（プロパティ編集、低リスク）へ進む**。
+
+**増分1実装完了（2026-07-24、侍、コミット`74eb164`）**：`PartEditorDialog`新設（RenameDialog/
+AddSheetDialog踏襲）、名前/幅高さ(1〜12セル)/役割編集+バリデーション。UI導線＝**殿裁定（2026-07-24）
+＝案B（メニューバーに新規項目「パーツ(_P)」追加）**、新規作成+自作パーツ一覧サブメニュー（編集/
+削除）。`PartPaletteViewModel`をEntries/Library/SelectionEntries再構築可能な設計へ変更。build/test
+exit 0（Core131+App808）、回帰なし。役割(Role)選択肢＝**殿裁定（2026-07-24）＝案A（GuiEcad同一の
+8種のまま、ecad2拡張分の残り7種は対象外）**。隠密静的レビューへ回す。
+
+**隠密静的レビュー完了（2026-07-24、`docs/ecad2-t068-increment1-review-onmitsu.md`）**：DoD整合OK。
+指摘1件（PR-13型3件目＝「パーツ(_P)」メニューにCanEditDiagramガード無し、パターン再発台帳へ記帳）
+は侍が即修正（コミット`fb208be`）、隠密再確認でOK。
+
+**忍者実機確認、観点1・2前半・4はOK、観点2後半・3で重大なバグ疑いを検出（2026-07-24、
+`docs/ecad2-t068-increment1-verification-ninja.md`）**：「自作パーツ」サブメニュー自体が
+ExpandCollapsePattern/Invoke/物理クリック(2種)/キーボード右矢印/Enterの6パターン全てで開かず、
+編集・削除の検証（観点3）およびダイアログ経由の一覧反映確認（観点2後半）が実施不能。忍者理論
+（未確定）＝XAML定義（`<MenuItem x:Name="CustomPartsMenu" ... SubmenuOpened="..." />`、子要素0件の
+自己終了タグ）がWPFの`HasItems=false`判定を招きExpandCollapsePattern自体が提供されない疑い。
+侍へ原因調査＋修正、隠密へ独立の根本原因調査を並行采配（Wチェック）。
+
+**Wチェック完全一致、原因確定・修正完了（2026-07-24）**：侍（`docs/todo.md`本記帳、コミット`a12736c`）・
+隠密（`docs/ecad2-t068-increment1-submenu-bug-investigation-onmitsu.md`）とも一次ソース
+（dotnet/wpf `MenuItem.cs` `UpdateRole()` 764-792行）で独立に同一結論＝**WPFのMenuItem.Role
+（SubmenuHeader/SubmenuItem）はHasItemsのみで決まり、`CustomPartsMenu`は子要素0件の自己終了タグ
+（`SubmenuOpened`のみ指定）ゆえ起動時からHasItems=false→サブメニュー展開UI自体が生成されない
+構造的欠陥**（侍が同型と誤認した既存`AutoHideSubmenu`は子4件が静的定義済みでHasItems=true確定、
+という決定的差異を隠密が指摘）。修正＝ダミー子項目1つ（`(読み込み中...)`、IsEnabled=False）を
+静的にXAMLへ追加しHasItems=trueを保証、`SubmenuOpened`ハンドラは無変更（既存の`Items.Clear()`から
+始まる実装のまま機能）。build/test exit 0、回帰なし。忍者へ再検証を采配。
+
+**忍者再検証、観点1・2はOK（前回の重大バグ解消確認）、観点3で新たな重大所見（2026-07-24、
+`docs/ecad2-t068-increment1-verification-ninja-round2.md`）**：個別パーツ項目（「忍者テストパーツ01」）
+自体の子メニュー（編集/削除）展開が、前回と酷似した症状（5操作パターン全てでメニュー全体が閉じる）
+で開けず。該当コード（`sub.Items.Add(editItem/deleteItem)`→`CustomPartsMenu.Items.Add(sub)`、ツリー
+追加前に子2件を持たせる順序）は前回のHasItems=false問題とは構造が異なるように見えるが症状は酷似。
+**同一機能領域（動的MenuItemサブメニュー生成）で2件目の重大バグ**、モグラ叩き検知の観点（karo.md）
+も踏まえ、侍へ原因調査＋修正、隠密へ独立の根本原因調査（+動的生成方式自体の妥当性の俯瞰評価も
+含める）を並行采配。
+
+**殿裁定（2026-07-24）＝バグの根が深い可能性を踏まえ、本件は往復2周超のゲート適用を待たず3周目
+以降も継続してよいと事前許可**。ゲート免除は本件（動的MenuItemサブメニュー生成のバグ調査・修正）
+限定、他の往復案件には及ばない。
+
+**2件目バグ、Wチェック突合（2026-07-24）**：侍（一次ソース`FrameworkElement.MeasureCore`/
+`UIElement.UpdateLayout`、コミット`9855a36`）＝動的生成した`sub`（各パーツMenuItem）が`Items.Add`
+直後はまだMeasure/ApplyTemplate未実行で`PART_Popup`未確立のまま操作を受け内部状態が破綻、と推定。
+隠密（一次ソース`MenuItem.CoerceIsSubmenuOpen`）＝`IsLoaded=false`なら強制的にfalseへ戻す機構が
+展開を無効化している疑い。**メカニズムの記述は異なるが、いずれも「動的生成直後、レイアウトパス
+完了前の状態で操作を受けている」という同一の根本現象を指しており矛盾しないと家老判断**。侍の
+修正＝`Items`構築完了直後に`CustomPartsMenu.UpdateLayout()`を明示呼び出し（保留中のMeasure/Arrange
+をその場で同期完了させる）。View層の話につき単体テスト不可、忍者実機確認へ回す。
+
+隠密の俯瞰評価（動的MenuItemツリー構築自体がWPFメニューシステムと構造的に衝突、3件目リスク高）
+への侍所見＝「今回はレイアウトタイミングの見落としが真因、WPF標準機能の範囲内で対処可能だった
+と考えられる。ただし今回の対処でも実機で解消しない場合は抜本的設計見直し（一覧ダイアログ選択方式
+等）を検討すべき」。**実機確認の結果を見て、解消しなければ設計変更の分岐を殿へ提示する方針**。
+
+**忍者再検証(3周目)、観点3依然未解消（2026-07-24、`docs/ecad2-t068-increment1-verification-ninja-round3.md`）**：
+前回と完全に同一の症状が再現、`UpdateLayout()`修正の効果は確認できず。忍者の追加所見（未確認・
+推測）＝`CustomPartsMenu.UpdateLayout()`は2階層目（自作パーツメニュー自体）への呼び出しであり、
+3階層目本体（個別パーツ`sub`自身・`editItem`/`deleteItem`）には及んでいない可能性。**殿裁定により
+3周目超の継続が既に許可されているため、対象を絞った追加修正を4周目として試みる**（侍・隠密へ
+采配）。モグラ叩き俯瞰評価（隠密所見、3件目リスク高）も踏まえ、これでも解消しない場合は設計変更
+（動的メニュー構築→一覧ダイアログ選択方式）の分岐を殿へ提示する方針は維持（殿御不在中につき
+【報告】保留、帰参時に確認）。
+
+**隠密の一次ソース確認でメカニズム確定（2026-07-24、
+`docs/ecad2-t068-increment1-updatelayout-scope-investigation-onmitsu.md`）**：`UpdateLayout()`が
+3階層目のPopupへ原理的に到達不可能と確定——`MenuItem.PART_Popup`の子コンテンツは`IsSubmenuOpen=true`
+になった瞬間に初めてVisual Tree構築される設計（`Popup.cs` `CreateWindow`/`BuildWindow`）のため、
+`CustomPartsMenu.UpdateLayout()`呼び出し時点ではsub自身のPopup内部はまだ存在せずMeasureQueueに
+入りようがない。侍の当初仮説（ApplyTemplate未完了）自体は方向性として正しいが、修正対象の階層が
+浅すぎた、というのが実態。侍は診断ログ（`%TEMP%\ecad2-diag.log`）を追加計装、忍者へ再現操作＋ログ
+採取を依頼中。4周目の対処方針＝「subのIsSubmenuOpen変化検知でeditItem/deleteItem側にも改めて
+UpdateLayoutを適用」を試み、解消しなければ設計変更（一覧ダイアログ方式）を殿へ提示する段取り。
+隠密所見＝対症療法継続でも将来Popup階層がさらに深くなれば同型再発の懸念残る（【報告】、帰参時に
+判断材料として提示）。
+
+**真因確定（2026-07-24、忍者の着眼を侍が一次ソースで確定）**：忍者が診断ログ実測から発見した
+「子孫の`SubmenuOpened`バブリングで親ハンドラが誤再発火」仮説を、侍が`MenuItem.cs`279-280行
+（`SubmenuOpenedEvent = EventManager.RegisterRoutedEvent(..., RoutingStrategy.Bubble, ...)`）で
+確定。動的生成した`sub`（子）自身の`SubmenuOpened`が論理ツリーを上へバブリングし、
+`CustomPartsMenu_SubmenuOpened`ハンドラ（`Items.Clear()`から始まる実装）を誤って再発火させ、
+開こうとしていた階層ごと消失させていた——これまでの1〜4周目の`UpdateLayout`系対処は全て的外れ
+だった可能性が高い（真因はイベントハンドラの発火源チェック漏れという単純な実装バグ、「動的
+MenuItemツリー構築」というアプローチ自体の構造的限界ではなかった）。修正＝
+`CustomPartsMenu_SubmenuOpened`冒頭に発火源チェック（`e.OriginalSource`がCustomPartsMenu自身の
+時のみ処理、`e.Handled=true`）追加。build/test exit 0。隠密も独立に一次ソース（`MenuItem.
+OnIsSelectedChanged`が同種バブリング処理で発火源チェックを行っている前例）で確定、前回仮説
+（Popupタイミング問題）は率直に訂正。
+
+**忍者最終再検証＝観点1〜4全てOK、3件のバグ（HasItems=false問題・Measure/ApplyTemplate未実行
+問題・SubmenuOpenedバブリング問題）いずれも解消確認、回帰なし（2026-07-24、
+`docs/ecad2-t068-increment1-verification-ninja-final.md`）。これにてT-068増分1完全決着**。
+
+**最終整理完了（2026-07-24、侍、コミット`a09e86d`）**：診断ログ計装・過去2周分のUpdateLayout系
+対処（真因＝Bubbleイベント誤発火さえ解消すれば不要と判明）を除去、発火源チェックのみのシンプルな
+実装に整理。build/test exit 0、変更はMainWindow.xaml.csのみ（+10/-13、正味コード減）。
+**T-068増分1、これにて完全クローズ**。次は増分2（端子編集、低〜中リスク）。
+
+**増分2着手前確認・UI/UX分岐発見、殿確認待ち【報告】（2026-07-24、侍）**：GuiEcad原本では端子
+(Port)編集は「接続点」ツール経由のキャンバス上クリック/ドラッグ（形状編集キャンバス=増分3に
+組込み）だが、隠密プラン（`docs/ecad2-t068-part-editor-plan-onmitsu.md`63行）は増分2を「リスト
+形式でRowOffset/BoundaryOffset込みの追加・削除」と記述、殿裁定「端子位置の入力方式=キャンバス
+上でのドラッグ」（T-068 UI/UX判断分岐点4）とは手段が異なる。侍提示の2案：
+- 案A（侍推奨）：増分2はまずリスト形式（仮実装）、キャンバス上ドラッグは増分3着手時に正式統合
+  （段階的積み上げ方針に忠実、手戻り少ない）
+- 案B：増分2の時点で端子編集専用の簡易キャンバス（ドラッグのみ）を新設（増分3との重複実装・
+  手戻りリスクあり）
+
+**殿御不在中につきUI/UX分岐は保留、帰参時に確認**。侍にはUI実装に踏み込まず、他の待機可能な
+作業（Core層API・バリデーションロジックの技術検証等）を続けるよう指示済み。
+
+**侍の着手前調査完了（2026-07-24）**：`PortDef`（Core層、`readonly record struct`3フィールド）は
+UI方式に依存しない構造と確認。既存`DeviceTableGrid`パターンはリスト形式（案A）採用時にほぼ流用可能
+と確認。バリデーション（ポート2点以上必須、GuiEcad原本`OnSave`925-928行）・保存時並べ替え
+（`BoundaryOffset`昇順、先頭=NetA・末尾=NetB規約）も確認済み、UI方式確定後即実装可能な状態。
+**殿裁定（2026-07-25）＝案A（まずリスト形式で仮実装、増分3着手時にキャンバス上ドラッグへ正式
+統合）確定**。侍へ実装着手を采配。
+
+**増分2実装完了（2026-07-25、侍、コミット`e5d54e4`）**：PartEditorDialogへ端子タブ新設、DataGrid
+形式でRowOffset/BoundaryOffsetの追加・削除・編集、保存時バリデーション（ポート2点未満は
+`NonSimulated`以外拒否）・並べ替え（BoundaryOffset昇順）実装。build/test exit 0（Core131+App808）、
+回帰なし。**忍者実機確認は次回セッション以降**。
 
 ### T-105 GroupFrame（グループ枠）の矢印キーでの平行移動対応 — Done（2026-07-21）
 
