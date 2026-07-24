@@ -13,6 +13,7 @@ using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using AvalonDock;
+using AvalonDock.Controls;
 using AvalonDock.Layout;
 using AvalonDock.Layout.Serialization;
 
@@ -263,6 +264,22 @@ public partial class MainWindow : Window
         return null;
     }
 
+    // T-122(家老采配2026-07-24、隠密設計): 述語版オーバーロード。同じ型Tが複数存在する場合に
+    // 条件に合う最初の1件を探す(単一マッチのまま、AvalonDock本体GetDropAreasの
+    // FindVisualChildren<LayoutAnchorablePaneControl>()と同型の探索手法だが、こちらは複数列挙
+    // ではなく述語で1件に絞り込む)。
+    private static T? FindVisualChild<T>(DependencyObject parent, Func<T, bool> predicate) where T : DependencyObject
+    {
+        var childCount = VisualTreeHelper.GetChildrenCount(parent);
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = VisualTreeHelper.GetChild(parent, i);
+            if (child is T typedChild && predicate(typedChild)) return typedChild;
+            if (FindVisualChild<T>(child, predicate) is T found) return found;
+        }
+        return null;
+    }
+
     // T-110増分1(家老采配2026-07-22、A-3=候補a確定): 旧PlacementToolBarDockingManager_ContentDocking・
     // ResetPlacementToolBarLayoutToDefault(T-099(c)案Y、ContentDockingをCancelしハードコード既定XML
     // Deserializeで復帰する機構)は撤去した。増分0のPoCで標準Dock()を5周検証しタブ自己複製・
@@ -277,6 +294,10 @@ public partial class MainWindow : Window
     private HwndSourceHook? _placementToolBarFloatingWindowHook;
 
     private const int WM_EXITSIZEMOVE = 0x0232;
+
+    // T-122(家老采配2026-07-24、殿裁定): オーバーレイの表示開始トリガーをフロート生成時の
+    // 即時Visible化からドラッグ中(WM_MOVING受信)へ変更する。
+    private const int WM_MOVING = 0x0216;
 
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -300,7 +321,9 @@ public partial class MainWindow : Window
         var isPlacementToolBar = fwc.Model.Descendents().OfType<LayoutAnchorable>().Any(a => a.ContentId == "PlacementToolBar");
         if (!isPlacementToolBar) return;
 
-        PlacementToolBarDropZoneOverlay.Visibility = Visibility.Visible;
+        // T-122(家老采配2026-07-24、殿裁定): フロート生成時の即時Visible化は廃止。表示開始は
+        // PlacementToolBarFloatingWindowFilterMessage内のWM_MOVING受信へ移す(実際にドラッグ
+        // している間だけ表示する)。
         fwc.Loaded += PlacementToolBarFloatingWindow_Loaded;
         fwc.Closed += PlacementToolBarFloatingWindow_Closed;
     }
@@ -331,6 +354,19 @@ public partial class MainWindow : Window
     // 物理ピクセルへ変換する。
     private IntPtr PlacementToolBarFloatingWindowFilterMessage(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
+        // T-122(家老采配2026-07-24、殿裁定): ドラッグ開始(WM_MOVING)で初めてオーバーレイを
+        // 表示する。既に表示中なら再計算不要(ドラッグ中は元の親ペイン自体は動かないため、
+        // 表示開始の1回だけ位置・サイズを算出すれば足りる)。
+        if (msg == WM_MOVING)
+        {
+            if (PlacementToolBarDropZoneOverlay.Visibility != Visibility.Visible)
+            {
+                UpdatePlacementToolBarDropZoneOverlayBounds();
+                PlacementToolBarDropZoneOverlay.Visibility = Visibility.Visible;
+            }
+            return IntPtr.Zero;
+        }
+
         if (msg != WM_EXITSIZEMOVE) return IntPtr.Zero;
         if (!GetCursorPos(out var cursor)) return IntPtr.Zero;
 
@@ -356,6 +392,31 @@ public partial class MainWindow : Window
             .FirstOrDefault(a => a.ContentId == "PlacementToolBar");
         anchorableToDock?.Dock();
         return IntPtr.Zero;
+    }
+
+    // T-122(家老采配2026-07-24、隠密設計): ドロップ判定範囲をPlacementToolBarの元の親ペイン
+    // (MainToolBarを含むLayoutAnchorablePaneControl、同一ペイン内の他タブが残るためフロート後も
+    // Visual Treeから消滅しない)の実座標のみへ狭小化する。AvalonDock本体のGetDropAreas
+    // (LayoutAnchorableFloatingWindowControl.cs)がFindVisualChildren<LayoutAnchorablePaneControl>()
+    // で行う探索と同型の手法(こちらは述語版FindVisualChild<T>で単一マッチに絞り込む)。
+    // ヒットテスト側(WM_EXITSIZEMOVE処理)はPlacementToolBarDropZoneOverlay自体の実座標を
+    // そのまま参照する設計を維持するため、本メソッドでオーバーレイの位置・サイズをこのペインへ
+    // 合わせておけば、狭小化はヒットテスト・見た目の両方へ自動的に反映される。
+    private void UpdatePlacementToolBarDropZoneOverlayBounds()
+    {
+        var originPaneControl = FindVisualChild<LayoutAnchorablePaneControl>(MainDockingManager,
+            p => p.Model is LayoutAnchorablePane pane && pane.Children.Any(c => c.ContentId == "MainToolBar"));
+        if (originPaneControl == null) return;
+        if (PlacementToolBarDropZoneOverlay.Parent is not UIElement overlayParent) return;
+
+        var topLeftScreen = originPaneControl.PointToScreen(new Point(0, 0));
+        var topLeftLocal = overlayParent.PointFromScreen(topLeftScreen);
+
+        PlacementToolBarDropZoneOverlay.HorizontalAlignment = HorizontalAlignment.Left;
+        PlacementToolBarDropZoneOverlay.VerticalAlignment = VerticalAlignment.Top;
+        PlacementToolBarDropZoneOverlay.Margin = new Thickness(topLeftLocal.X, topLeftLocal.Y, 0, 0);
+        PlacementToolBarDropZoneOverlay.Width = originPaneControl.ActualWidth;
+        PlacementToolBarDropZoneOverlay.Height = originPaneControl.ActualHeight;
     }
 
     private void PlacementToolBarDockingManager_ContentFloating(object? sender, ContentFloatingEventArgs e)
