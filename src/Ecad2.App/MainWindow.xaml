@@ -835,6 +835,19 @@
                             <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="OutputPanel">
                                 <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
                             </DataTrigger>
+                            <!-- T-121(殿裁定・家老正式依頼2026-07-24、設計書ecad2-t121-titlebar-hide-design-
+                                 onmitsu.md§2.1・§3.1案イ簡略版): 配置ツールバー2タブ(基本機能/配置ツール)も
+                                 対象4ペインと同型の単純形で追加。ドッキング/フロート区別なく常時Collapse
+                                 (フロート時は§2.2の一次ソード調査によりこのスタイル自体がフロートウィンドウ
+                                 内へ届かず原典トリガー1へフォールバックする見込みのため、区別する意味が無い)。
+                                 フロート時のDock/AutoHide操作入口は下記表示メニュー新設項目(Float発動のみ)で
+                                 代替、帯そのものの復元は追求しない(殿裁定=案イ簡略版)。 -->
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="MainToolBar">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding Model.ContentId, RelativeSource={RelativeSource Self}}" Value="PlacementToolBar">
+                                <Setter TargetName="Header" Property="Visibility" Value="Collapsed"/>
+                            </DataTrigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
@@ -926,6 +939,11 @@
                     <MenuItem x:Name="AutoHideRightPanelBottomMenuItem" Header="プロパティ(_P)" IsCheckable="True" Tag="RightPanelBottom" Click="AutoHideMenuItem_Click"/>
                     <MenuItem x:Name="AutoHideOutputPanelMenuItem" Header="出力(_O)" IsCheckable="True" Tag="OutputPanel" Click="AutoHideMenuItem_Click"/>
                 </MenuItem>
+                <!-- T-121(殿裁定・家老正式依頼2026-07-24、設計書§3.1案イ簡略版): 帯常時非表示化に伴い
+                     配置ツールバー(PlacementToolBar)のドッキング操作入口が失われるため代替提供。
+                     対象はPlacementToolBarのみ(MainToolBarはCanFloat="False"のため対象外)。Dock項目は
+                     実装しない(殿裁定=簡略版、ドッキング復帰は既存のタブドラッグに一本化)。 -->
+                <MenuItem Header="配置ツールバーをフロート化(_F)" Tag="PlacementToolBar" Click="FloatMenuItem_Click"/>
                 <Separator/>
                 <!-- T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド): 現在のパネルレイアウト
                      (左パレット・出力パネル・右パネル)を既定として%AppData%配下へ保存する。
@@ -1089,7 +1107,16 @@
                                 </ToggleButton>
                             </ToolBar>
                         </avalonDock:LayoutAnchorable>
-                        <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False" CanDockAsTabbedDocument="False">
+                        <!-- T-121新規発見C(隠密一次ソード確定・家老正式依頼2026-07-24): FloatingWidth
+                             未指定だと`DockingManager.CreateFloatingWindowCore`のフォールバック
+                             (ドッキング時ペインの実測ActualWidth+10px)が使われるが、本ペインが属する
+                             Vertical系LayoutPanelの`OnFixChildrenDockLengths`がDockWidthを一切制約
+                             しないため幅方向が無制約に伸びる(T-110当時のDockWidth="Auto"不成立問題とは
+                             別コードパスだが同根の限界)。FloatingWidthを明示指定し実測依存を断つ。
+                             値=ボタン群実測610px+余白目安の暫定値、忍者実機確認で微調整前提。
+                             FloatingHeightは既存DockHeight="100"(T-113)が既に適正化済みにつき変更
+                             不要(隠密所見)。 -->
+                        <avalonDock:LayoutAnchorable Title="配置ツール" ContentId="PlacementToolBar" CanClose="False" CanDockAsTabbedDocument="False" FloatingWidth="640">
                             <!-- T-083増分6(家老采配2026-07-16、殿指摘): パネル中身(ToolBar本体)の
                                  配色をDynamicResource化(層C扱い)。1段目ToolBarAreaと同型パターン。
                                  AvalonDockのタブ・タイトルバー自体(層B)は保留中で対象外。 -->

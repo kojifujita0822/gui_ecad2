@@ -429,6 +429,36 @@ public partial class MainWindow : Window
         anchorable?.ToggleAutoHide();
     }
 
+    // T-121(殿裁定・家老正式依頼2026-07-24、設計書§3.1案イ簡略版): タイトルバー常時非表示化に伴い
+    // 失われたドッキング操作入口(フロート化)の代替。AutoHideMenuItem_Clickと同型、対象取得は
+    // ContentId検索(x:Name参照は使わない、T-099(c)の教訓)。Float()はLayoutContent.cs、public。
+    // Dock項目は実装しない(殿裁定=簡略版、ドッキング復帰は既存のタブドラッグに一本化)。
+    //
+    // T-121新規発見C(忍者実機確認2026-07-24、隠密一次ソード確定・侍仮説と一致、確度高):
+    // (症状1・オーバーレイ残留) メニュー経由のFloat()は内部で
+    // `StartDraggingFloatingWindowForContent(this, false)`(startDrag=false)を呼ぶため
+    // `AttachDrag()`が発火せずWM_MOVING/WM_EXITSIZEMOVEが一切発生しない。
+    // 【往復訂正・2026-07-24、殿ご発見の重大回帰を受け差し戻し】当初ここで
+    // `PlacementToolBarDropZoneOverlay.Visibility = Visibility.Collapsed`を直接代入する修正を
+    // 試みたが、これは誤り——`PlacementToolBarDropZoneOverlay`のVisibility制御にTrigger/Binding
+    // は存在せず(XAML定義は素朴な`Visibility="Collapsed"`のみ、確認済み)、
+    // `LayoutFloatingWindowControlCreated`側のVisible化(コードビハインド直接代入)は「フロート化
+    // されている間ずっと表示し続け、再ドッキング成功時にのみ消す」設計であり「ドラッグ中だけの
+    // 目印」ではなかった。本行での即時Collapse代入は、この意図された「フロート中は表示し続ける」
+    // 挙動そのものを恒久的に破壊し、以後ユーザーがこの浮動ウィンドウをドラッグしてもオーバーレイが
+    // 二度と現れない重大回帰を招いた(殿実機発見)。症状1の根本対処は本メソッド内の応急処置ではなく
+    // 別途の設計検討が必要と判断し、いったん差し戻す(家老采配待ち)。
+    // (症状2・タブ消失、確度中) 既にフロート中に再度Float()を呼ぶとフック管理の状態不整合が
+    // 複合する疑いがあるため、IsFloatingガードで再入を抑止する(この対処は上記回帰と無関係、維持)。
+    private void FloatMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string contentId }) return;
+        var anchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
+            .FirstOrDefault(a => a.ContentId == contentId);
+        if (anchorable == null || anchorable.IsFloating) return;
+        anchorable.Float();
+    }
+
     // T-110増分1(家老采配2026-07-22、B-3): 単一MainDockingManagerへの統合に伴いforeachを撤去。
     // B-2: LayoutDocument走査により、キャンバスDocumentのContentId("Canvas")も期待集合へ
     // 自然に含まれる(既存のLayoutAnchorable/LayoutDocument両方の走査ロジックを維持するだけで足りる)。
