@@ -107,6 +107,9 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ClearConnectorDraftIfAny();
                 ClearFreeLineDraftIfAny();
                 CancelImageInsertDraft();
+                // T-102: 記入中ドラフトのクリア対象に、要素配置ごと取消(解釈(i))を要するこのドラフトも
+                // 追加する(他の3種と異なり単純な破棄ではなく要素・機器登録のロールバックを伴う)。
+                ClearOrJoinTargetDraftIfAny();
                 Tool = ToolState.SelectDefault;
                 if (CurrentSheet is Sheet sheet) GetOrCreateTestSession(sheet).Evaluate();
             }
@@ -455,6 +458,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             // T-067: 枠の記入中状態(_frameDraft)も同型でクリアする(P-080=3種ドラフトクリア責務
             // 分散への対応、4種目として同じ箇所へ追加)。
             ClearFrameDraftIfAny();
+            // T-102: 合流先確認ドラフトも同型でクリアする(5種目、他のドラフトと同じ理由=別セルへの
+            // 移動が起きても記入中状態を残留させない)。
+            ClearOrJoinTargetDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
                 OnPropertyChanged(nameof(SelectedCellDisplay));
@@ -1952,7 +1958,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// ドラフト保護ガードを、静的なツールモード(Tool.Mode!=Select全般)ではなく実際にドラフトを
     /// 持つ状態のみへ絞り込むために使う。往復2周目のTool.Modeガードは、ドラフトを一切持たない
     /// PlaceElement(連続配置、T-021分岐A)等まで一律ブロックする過剰な副作用があった。</summary>
-    public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null || _frameDraft is not null;
+    public bool HasAnyDraft => _connectorDraft is not null || _freeLineDraft is not null || _imageInsertDraft is not null || _frameDraft is not null || _orJoinTargetDraft is not null;
 
     /// <summary>T-069往復4周目修正1(隠密テスト設計書、殿裁可済み): ツールバーのツール切替ボタン
     /// (部品配置・自作パーツ選択)は、記入中ドラフト(縦コネクタ/自由線/画像挿入)を保持したまま
@@ -1969,6 +1975,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         // ままだと別ツールへ切替えてもFrameDraftPreviewが幽霊表示され続ける、ClearFrameDraftIfAny
         // 経由でCancelFrameDraft()を呼ぶ、記入中でなければ何もしないガード済み)。
         ClearFrameDraftIfAny();
+        // T-102: 合流先確認ドラフトも同様に扱う(ツール切替ボタン押下時、要素配置ごと取消)。
+        CancelOrJoinTarget();
     }
 
     /// <summary>記入中の自由線のプレビュー形状(LadderCanvasの点線描画用)。記入中でなければnull。</summary>
@@ -2836,9 +2844,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、基準行
-    /// (SelectedCellより上にある直近の既存要素行、殿裁定で上方向限定)との間に縦コネクタを
-    /// 2本自動生成しOR(並列)接続にする。基準行内では新要素に列位置が最も近い要素を対応先とする。
+    /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、合流先候補
+    /// (T-102、殿裁定=案A)を列挙し合流先確認モードへ遷移する。候補が無ければ何も接続せず終了する。
     /// </summary>
     public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
     {
@@ -2862,7 +2869,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         // setterと同じ流儀: 新規デバイス名(未登録)のみ要素種別から解決したDeviceClass(T-045
         // P-020対応)で追加し、既存デバイス名なら既存エントリを維持(上書きしない)。デバイス名
         // 空欄の場合は機器表を一切操作しない。
-        if (deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName))
+        bool deviceWasNewlyRegistered = deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName);
+        if (deviceWasNewlyRegistered)
             Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = ResolveDeviceClass(newElement) };
         DeviceTable.Refresh();
 
@@ -2876,44 +2884,151 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (!isOr) return;
 
-        int? baseRow = sheet.Elements
+        var candidates = BuildOrJoinCandidates(sheet, newElement, pos, cellWidth);
+        if (candidates.Count == 0) return;
+
+        // T-102(殿裁定=1-a・2-a): 配置確定後、自動で合流先確認モードへ遷移する(候補1件でも同様に
+        // 遷移するが、Enter一発で確定できるため実質無操作、T-041のConnectorDraftと同型のUX)。
+        _orJoinTargetDraft = new OrJoinTargetDraft(sheet, Document, newElement, deviceWasNewlyRegistered, candidates, SelectedIndex: 0);
+        Tool = new ToolState(ToolMode.ConfirmOrJoinTarget);
+        OnPropertyChanged(nameof(OrJoinTargetPreview));
+    }
+
+    /// <summary>T-102(殿裁定=案A): OR配置の合流先候補を列挙する。新要素の配置行(pos.Row)より上に
+    /// 既存要素を持つ行を全て抽出し、近い順(降順)に候補とする。候補[0]は旧baseRow探索(直近上の行)と
+    /// 同じ結果になり後方互換を保つ(候補1件のみで即Enter確定すれば旧挙動と完全一致)。候補[1]以降が
+    /// より外側(配置行から遠い側)の代替候補——T-044実例(A/B並列ブロック→無名接点→線番2→コイル、
+    /// A/Bの行は各々別行)で言えば、候補[0]=B(線番1)・候補[1]=A(線番2側の無名接点と同じ行)という
+    /// 並びになる(隠密設計書§4.1「候補の生成方法」の見立てを、既存baseRow探索の単純な一般化
+    /// [Max→全件降順列挙]で実現。ネットリスト解決グラフの走査は不要と判断——各候補行内では既存の
+    /// baseElement探索[列位置最近傍]がそのまま働き、行0のように複数要素を持つ候補でも正しい要素
+    /// [無名接点]を自動選択する)。各候補は独自にbaseElement・左右コネクタ列・左縦分岐要否
+    /// (NothingBetweenRailAndColumn、既存ロジックを候補ごとに適用)を持つ。</summary>
+    private static IReadOnlyList<OrJoinCandidate> BuildOrJoinCandidates(Sheet sheet, ElementInstance newElement, GridPos pos, int cellWidth)
+    {
+        var candidateRows = sheet.Elements
             .Where(el => el != newElement && el.Pos.Row < pos.Row)
-            .Select(el => (int?)el.Pos.Row)
-            .DefaultIfEmpty(null)
-            .Max();
-        if (baseRow is not int br) return;
+            .Select(el => el.Pos.Row)
+            .Distinct()
+            .OrderByDescending(row => row);
 
-        var baseElement = sheet.Elements
-            .Where(el => el.Pos.Row == br)
-            .OrderBy(el => Math.Abs(el.Pos.Column - pos.Column))
-            .FirstOrDefault();
-        if (baseElement is null) return;
+        var candidates = new List<OrJoinCandidate>();
+        foreach (int row in candidateRows)
+        {
+            var baseElement = sheet.Elements
+                .Where(el => el.Pos.Row == row)
+                .OrderBy(el => Math.Abs(el.Pos.Column - pos.Column))
+                .FirstOrDefault();
+            if (baseElement is null) continue;
 
-        int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
-        int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
+            int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
+            int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
+            bool needsLeftConnector = !NothingBetweenRailAndColumn(sheet, pos.Row, leftColumn)
+                || !NothingBetweenRailAndColumn(sheet, row, leftColumn);
+            candidates.Add(new OrJoinCandidate(row, leftColumn, rightColumn, needsLeftConnector));
+        }
+        return candidates;
+    }
 
-        // T-044(殿直接要望、隠密事前調査docs/ecad2-t044-presurvey-onmitsu.md): OR自動配線の左縦分岐は、
-        // 配置行・基準行の両方で「OR左接続点(leftColumn)と左母線(列0)の間に既存要素が無い」場合のみ
-        // 省略する(殿最終裁定=トポロジー等価保証ケース限定)。母線への直結横線
-        // (DiagramRenderer.LeftTerminator/NetlistBuilder.LeftRailReachedの既存c.Column>0除外条件)が
-        // このケースを自然にカバーするため、省略しても電気的分断は起きない(列0はこの条件の自明な
-        // 特殊ケースとして包含される)。いずれかの行に既存要素があれば縦分岐を維持し、その要素を
-        // 誤ってバイパスする配線を防ぐ。右(合流側)縦分岐は従来どおり常時生成する。
-        //
-        // 隠密レビューCONFIRMED(重大、docs/ecad2-t044-review-onmitsu.md所見1): 既存要素(sheet.Elements)
-        // だけでなく既存の縦コネクタ(sheet.Connectors)も見る必要がある。同一列で3階層以上のOR配置を
-        // 重ねる連鎖ケースでは、基準行(br)が「要素としては空」でも、より上位のOR配置で生成済みの
-        // 縦コネクタにより既に母線から分岐された状態(=直結ではない)になっている。この既存コネクタを
-        // 見落とすと、末端行が誤って母線へ直結され電気的トポロジーが壊れる(B・Cが同一ネットであるべき
-        // ところ、Cだけ母線ネットになってしまう)。判定対象の行がTopRow/BottomRowとして紐づく既存
-        // コネクタのうちColumn<=leftColumnのものが無いかも確認する。
-        bool NothingBetweenRailAndColumn(int row, int column)
-            => !sheet.Elements.Any(el => el.Pos.Row == row && el.Pos.Column < column)
-            && !sheet.Connectors.Any(c => (c.TopRow == row || c.BottomRow == row) && c.Column <= column);
+    // T-044(殿直接要望、隠密事前調査docs/ecad2-t044-presurvey-onmitsu.md): OR自動配線の左縦分岐は、
+    // 配置行・候補行の両方で「OR左接続点(leftColumn)と左母線(列0)の間に既存要素が無い」場合のみ
+    // 省略する(殿最終裁定=トポロジー等価保証ケース限定)。母線への直結横線
+    // (DiagramRenderer.LeftTerminator/NetlistBuilder.LeftRailReachedの既存c.Column>0除外条件)が
+    // このケースを自然にカバーするため、省略しても電気的分断は起きない(列0はこの条件の自明な
+    // 特殊ケースとして包含される)。いずれかの行に既存要素があれば縦分岐を維持し、その要素を
+    // 誤ってバイパスする配線を防ぐ。右(合流側)縦分岐は従来どおり常時生成する。
+    //
+    // 隠密レビューCONFIRMED(重大、docs/ecad2-t044-review-onmitsu.md所見1): 既存要素(sheet.Elements)
+    // だけでなく既存の縦コネクタ(sheet.Connectors)も見る必要がある。同一列で3階層以上のOR配置を
+    // 重ねる連鎖ケースでは、候補行が「要素としては空」でも、より上位のOR配置で生成済みの
+    // 縦コネクタにより既に母線から分岐された状態(=直結ではない)になっている。この既存コネクタを
+    // 見落とすと、末端行が誤って母線へ直結され電気的トポロジーが壊れる。判定対象の行がTopRow/
+    // BottomRowとして紐づく既存コネクタのうちColumn<=leftColumnのものが無いかも確認する。
+    // T-102(BuildOrJoinCandidates新設に伴いローカル関数からprivate staticへ抽出、ロジックは無変更)。
+    private static bool NothingBetweenRailAndColumn(Sheet sheet, int row, int column)
+        => !sheet.Elements.Any(el => el.Pos.Row == row && el.Pos.Column < column)
+        && !sheet.Connectors.Any(c => (c.TopRow == row || c.BottomRow == row) && c.Column <= column);
 
-        if (!NothingBetweenRailAndColumn(pos.Row, leftColumn) || !NothingBetweenRailAndColumn(br, leftColumn))
-            sheet.Connectors.Add(new VerticalConnector { Column = leftColumn, TopRow = br, BottomRow = pos.Row });
-        sheet.Connectors.Add(new VerticalConnector { Column = rightColumn, TopRow = br, BottomRow = pos.Row });
+    /// <summary>T-102: OR配置の合流先候補1件分。Rowは候補行、LeftColumn/RightColumnは新要素との間に
+    /// 生成する縦コネクタの列、NeedsLeftConnectorは左(母線側)縦分岐の要否(NothingBetweenRailAndColumn
+    /// 判定済み)。</summary>
+    private readonly record struct OrJoinCandidate(int Row, int LeftColumn, int RightColumn, bool NeedsLeftConnector);
+
+    // T-102(殿裁定=案A・1-a・2-a・解釈(i)): OR配置後の合流先確認ドラフト(T-041 _connectorDraftと同型の
+    // 「作業中データ」パターン)。ただし_connectorDraftと異なり、このドラフトが指す要素(NewElement)は
+    // 既に確定済みでsheet.Elementsへ追加されている(配置バーOK確定は原子的取消の境界、殿裁定=T-021)。
+    // Escによる取消(解釈(i)=要素配置ごと取消)は、この既に確定済みの要素をも削除する必要があるため、
+    // Sheet/Documentへの直接参照を保持する(CurrentSheet/Documentの再取得に頼らない——ReplaceDocument
+    // 内ではDocument差し替え[Document = newDocument]がClear*IfAny呼び出しより先に走るため、その時点で
+    // CurrentSheet/Documentを引くと新Document側を指してしまい、旧Documentにある要素/機器を正しく
+    // 取り除けない)。
+    private sealed record OrJoinTargetDraft(
+        Sheet Sheet, LadderDocument Document, ElementInstance NewElement, bool DeviceWasNewlyRegistered,
+        IReadOnlyList<OrJoinCandidate> Candidates, int SelectedIndex);
+
+    private OrJoinTargetDraft? _orJoinTargetDraft;
+
+    /// <summary>合流先確認モード中、現在選択中の候補に対応するプレビュー連結線(LadderCanvasの
+    /// 点線描画用)。記入中でなければnull。</summary>
+    public VerticalConnector? OrJoinTargetPreview
+    {
+        get
+        {
+            if (_orJoinTargetDraft is not { } draft) return null;
+            var c = draft.Candidates[draft.SelectedIndex];
+            return new VerticalConnector { Column = c.RightColumn, TopRow = c.Row, BottomRow = draft.NewElement.Pos.Row };
+        }
+    }
+
+    /// <summary>合流先確認モード中、候補一覧を切り替える(Up/Down、殿裁定=1-a)。deltaは±1想定。
+    /// 候補配列の範囲内でクランプする(範囲外への巡回はしない、T-041のMoveConnectorDraftRowと同型)。</summary>
+    public void MoveOrJoinTargetCandidate(int delta)
+    {
+        if (_orJoinTargetDraft is not { } draft) return;
+        int newIndex = Math.Clamp(draft.SelectedIndex + delta, 0, draft.Candidates.Count - 1);
+        _orJoinTargetDraft = draft with { SelectedIndex = newIndex };
+        OnPropertyChanged(nameof(OrJoinTargetPreview));
+    }
+
+    /// <summary>合流先確認モードを確定する(Enter、殿裁定=1-a)。選択中の候補で縦コネクタを生成する
+    /// (既存のOR自動配線と同じ直接List操作+MarkDirty()の流儀)。候補は常に1件以上存在する状態でのみ
+    /// このモードに入るため(PlaceElementAtSelectedCell参照)、T-041のConfirmConnectorDraftと異なり
+    /// 拒否条件(戻り値false)は無い。</summary>
+    public void ConfirmOrJoinTarget()
+    {
+        if (_orJoinTargetDraft is not { } draft) return;
+        var c = draft.Candidates[draft.SelectedIndex];
+        int newElementRow = draft.NewElement.Pos.Row;
+        if (c.NeedsLeftConnector)
+            draft.Sheet.Connectors.Add(new VerticalConnector { Column = c.LeftColumn, TopRow = c.Row, BottomRow = newElementRow });
+        draft.Sheet.Connectors.Add(new VerticalConnector { Column = c.RightColumn, TopRow = c.Row, BottomRow = newElementRow });
+        MarkDirty();
+        _orJoinTargetDraft = null;
+        Tool = ToolState.SelectDefault;
+        OnPropertyChanged(nameof(OrJoinTargetPreview));
+    }
+
+    /// <summary>合流先確認モード中の取消(Esc、殿裁定=解釈(i)「要素配置ごと取消」)。</summary>
+    public void CancelOrJoinTarget() => ClearOrJoinTargetDraftIfAny();
+
+    /// <summary>記入中(_orJoinTargetDraft)であれば取消してSelect状態へ戻す(ClearConnectorDraftIfAny
+    /// 等と同じ共通クリア入口パターン)。T-041の同型ドラフトと異なり、このドラフトは既に確定済みの
+    /// 要素(NewElement)を指しているため、単純にドラフトを破棄するだけでは要素がOR接続されない孤立
+    /// 要素として残ってしまう。よって取消時は要素配置そのものを取り消す(sheet.Elementsから除去し、
+    /// この配置で新規登録されたデバイスがあれば機器表からも除去する)。SelectedCellのsetter・
+    /// CancelResidualDraftForToolSwitch・ReplaceDocument・AppMode setterから呼ぶ(横展開、T-041の
+    /// 教訓)。</summary>
+    private void ClearOrJoinTargetDraftIfAny()
+    {
+        if (_orJoinTargetDraft is not { } draft) return;
+        draft.Sheet.Elements.Remove(draft.NewElement);
+        if (draft.DeviceWasNewlyRegistered && draft.NewElement.DeviceName is string deviceName)
+            draft.Document.Devices.ByName.Remove(deviceName);
+        DeviceTable.Refresh();
+        _orJoinTargetDraft = null;
+        Tool = ToolState.SelectDefault;
+        NotifySelectedElementChanged();
+        OnPropertyChanged(nameof(OrJoinTargetPreview));
     }
 
     /// <summary>現在のDocumentを指定パスへ.GCAD形式で保存する(T-019)。CurrentFilePathを更新する。
@@ -3011,6 +3126,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         ClearConnectorDraftIfAny();
         // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同様。
         ClearFreeLineDraftIfAny();
+        // T-102: 合流先確認ドラフトも同様に、旧Documentの実体を持ち越さない。ClearOrJoinTargetDraftIfAny
+        // はドラフトが直接保持するSheet/Document参照(旧文書側)を操作するため、直前のDocument=newDocument
+        // (旧文書からの差し替え)より後にここで呼んでも問題なく旧文書側の要素・機器を正しく除去できる。
+        ClearOrJoinTargetDraftIfAny();
         // T-064追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像挿入の記入中状態
         // (_imageInsertDraft)も同様に、旧文書の情報を持ち越さないようクリアする必要があった
         // (横展開漏れ、ClearConnectorDraftIfAny/ClearFreeLineDraftIfAnyのみ呼ばれ本項が欠落)。

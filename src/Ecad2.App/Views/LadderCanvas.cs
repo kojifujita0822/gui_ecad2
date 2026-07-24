@@ -191,7 +191,8 @@ public sealed class LadderCanvas : FrameworkElement
         FreeLine? freeLineDraft = null, ConnectionDot? selectedConnectionDot = null,
         ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null,
         GroupFrame? selectedFrame = null,
-        SimState? sim = null, DeviceTable? devices = null)
+        SimState? sim = null, DeviceTable? devices = null,
+        VerticalConnector? orJoinTargetPreview = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -238,6 +239,15 @@ public sealed class LadderCanvas : FrameworkElement
                 var (p1, p2) = draft.TopRow == draft.BottomRow
                     ? ConnectorEndpointsDip(draft.Column, draft.TopRow, draft.TopRow, extendBottomMm: _renderer.Geometry.CellMm * 0.3)
                     : ConnectorEndpointsDip(draft.Column, draft.TopRow, draft.BottomRow);
+                dc.DrawLine(ConnectorDraftPen, p1, p2);
+            }
+
+            // 合流先確認モード中(未確定)のOR接続プレビュー(T-102)。ConnectorDraftと同じ見た目
+            // (Pen共用)で描く。候補行と新要素行は常に異なる(TopRow==BottomRowになりえない)ため、
+            // ConnectorDraftのようなゼロ長時の特別扱いは不要。
+            if (orJoinTargetPreview is { } orPreview)
+            {
+                var (p1, p2) = ConnectorEndpointsDip(orPreview.Column, orPreview.TopRow, orPreview.BottomRow);
                 dc.DrawLine(ConnectorDraftPen, p1, p2);
             }
 

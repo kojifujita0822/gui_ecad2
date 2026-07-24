@@ -9,7 +9,10 @@ namespace Ecad2.App.ViewModels;
 /// 集約し、この状態は MainWindowViewModel が公開する１つのプロパティとして扱う（code-behindや
 /// 複数箇所に散らばせない）。
 /// </summary>
-public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak, PlaceImage }
+// T-102(殿裁定=案A・1-a・2-a・解釈(i)): OR自動配線の合流先確認モード。要素配置(PlaceElementAtSelectedCell)
+// の完了後、isOr=trueかつ合流先候補が存在すれば自動的にこのモードへ遷移する(T-041のPlaceConnectorと
+// 同型、確定後自動遷移方式)。
+public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak, PlaceImage, ConfirmOrJoinTarget }
 
 /// <summary>現在の配置ツール状態。Kind/PartId/Orient/IsOr は Mode==PlaceElement のときのみ意味を持つ。</summary>
 public readonly record struct ToolState(

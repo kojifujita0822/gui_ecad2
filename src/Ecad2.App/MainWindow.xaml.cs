@@ -656,6 +656,9 @@ public partial class MainWindow : Window
             // T-067(1)欠陥修正(忍者実機NG2026-07-18): SelectedFrameが列挙から漏れており、枠の
             // クリック選択直後にハイライトが描画されなかった(他の再描画契機を挟むと現れる)。
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedFrame)
+            // T-102: 合流先確認モードの候補プレビュー切替(Up/Down)・取消(Esc)を、他のDraftPreview系
+            // プロパティと同じ自動再描画契機に含める。
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.OrJoinTargetPreview)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode))
             RedrawCanvas();
 
@@ -812,7 +815,8 @@ public partial class MainWindow : Window
                 _viewModel.ConnectorDraftPreview, _viewModel.SelectedWireBreak, _viewModel.SelectedFreeLine,
                 _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
                 _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.SelectedFrame,
-                _viewModel.CurrentTestSession?.State, _viewModel.Document.Devices);
+                _viewModel.CurrentTestSession?.State, _viewModel.Document.Devices,
+                _viewModel.OrJoinTargetPreview);
         else
             LadderCanvasHost.Clear();
     }
@@ -2428,6 +2432,16 @@ public partial class MainWindow : Window
                     // 上記最優先層で処理済みのためここには到達しない) → 選択モードへ戻す。
                     _viewModel.Tool = ViewModels.ToolState.SelectDefault;
                 }
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.ConfirmOrJoinTarget)
+                {
+                    // 層2'''''(T-102、殿裁定=解釈(i)): 合流先確認モード中 → 要素配置ごと取消。
+                    // 他の層2系と異なり、既に確定済みの要素(sheet.Elements)まで取り消すため描画へ
+                    // 反映する必要があり明示的にRedrawCanvas()を呼ぶ(縦コネクタ/自由線等の記入中
+                    // ドラフトはプレビューのみのためRedrawCanvas()を要さず、他の層2系呼び出しに
+                    // 明示呼び出しが無いのと対照的)。
+                    _viewModel.CancelOrJoinTarget();
+                    RedrawCanvas();
+                }
                 else if (_viewModel.SelectedCell is not null || _viewModel.SelectedConnector is not null
                     || _viewModel.SelectedWireBreak is not null || _viewModel.SelectedFreeLine is not null
                     || _viewModel.SelectedConnectionDot is not null || _viewModel.SelectedImage is not null
@@ -2541,6 +2555,10 @@ public partial class MainWindow : Window
                     AdjustConnectorDraft(e.Key, cellCenterStep: false);
                 else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine)
                     AdjustFreeLineDraft(e.Key);
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.ConfirmOrJoinTarget)
+                    // T-102(殿裁定=1-a): 合流先確認モード中はUp/Downで候補を切替える(Left/Rightは
+                    // 候補が1次元リストのため意味を持たず無視、AdjustOrJoinTargetCandidate側でswitch外)。
+                    AdjustOrJoinTargetCandidate(e.Key);
                 else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceImage)
                 {
                     // T-064往復1周目修正2(隠密レビュー指摘): 配置待機中(殿裁定「案A」の2段階操作)は
@@ -2688,6 +2706,16 @@ public partial class MainWindow : Window
                     RedrawCanvas();
                 else
                     _viewModel.StatusMessage = "矢印キーで長さを広げてから確定してください";
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.ConfirmOrJoinTarget:
+                // T-102(殿裁定=1-a・2-a): 合流先確認モードを確定する。候補は常に1件以上存在する状態
+                // でのみこのモードに入るため(拒否条件なし、ConfirmOrJoinTarget参照)、縦コネクタ系
+                // (Confirm*Draft)と異なりbool判定は不要。
+                _viewModel.ConfirmOrJoinTarget();
+                RedrawCanvas();
+                _viewModel.StatusMessage = "";
                 e.Handled = true;
                 break;
             case Key.S when Keyboard.Modifiers == ModifierKeys.Control:
@@ -3206,6 +3234,18 @@ public partial class MainWindow : Window
         }
     }
 
+    // T-102(殿裁定=1-a): 合流先確認モード中(Tool.Mode==ConfirmOrJoinTarget)の矢印キーで候補を
+    // 切替える。候補は1次元リストのためUp/Downのみ意味を持つ(Left/Rightは無視、AdjustConnectorDraft
+    // と異なり列位置の概念が無い)。
+    private void AdjustOrJoinTargetCandidate(Key key)
+    {
+        switch (key)
+        {
+            case Key.Up: _viewModel.MoveOrJoinTargetCandidate(-1); break;
+            case Key.Down: _viewModel.MoveOrJoinTargetCandidate(1); break;
+        }
+    }
+
     // T-041増分3: F10押下時の配線分断(WireBreak)即時記入。点系は確認フェーズ無し(原案4節)。
     private void TryPlaceWireBreak()
     {
@@ -3707,7 +3747,11 @@ public partial class MainWindow : Window
             // ORa接点で開いてもb接点へ切り替えればORを失う(明示的にORb接点を選べばOR並列b接点になる)。
             bool effectiveIsOr = entry.IsOr;
             _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, PlacementDeviceNameBox.Text.Trim(), effectiveIsOr);
-            _viewModel.StatusMessage = "";
+            // T-102(殿裁定=1-a): isOr配置が合流先確認モードへ遷移した場合は案内メッセージを出す
+            // (T-041のTryBeginConnectorDraftと同様、一度だけ表示しUp/Down操作ごとには更新しない)。
+            _viewModel.StatusMessage = _viewModel.Tool.Mode == ViewModels.ToolMode.ConfirmOrJoinTarget
+                ? "上下キーで合流先候補を切替、Enterで確定、Escで配置ごと取消"
+                : "";
             RedrawCanvas();
         }
         ClosePlacementBar();
