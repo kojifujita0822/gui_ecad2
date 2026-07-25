@@ -14,7 +14,7 @@ namespace Ecad2.Core.Tests;
 ///   RowOffsetとBoundaryOffsetは常に異なる値を与え、両方を検証する。
 ///   同値・同範囲だと <see cref="PartShapeGeometry.ClampPort"/> のcellX/cellY引数の取り違えを見逃す。
 /// - 高さは極力 heightCells>=2（rowLimit>=1）を使う。heightCells=1はrowLimit=0の退化設定で、
-///   行の許容範囲が{0}のみに潰れ、上記の取り違えが期待値と偶然一致してしまう。
+///   行の許容範囲が{0}のみに潰れ、上記の取り違えが<em>行側では</em>期待値と偶然一致してしまう。
 ///   退化ケース自体の確認は専用のテストで別に持つ。
 /// </summary>
 public class PartOptimizerClampPortsTests
@@ -60,7 +60,9 @@ public class PartOptimizerClampPortsTests
     }
 
     /// <summary>忍者が実機で発見した実例そのもの（heightCells=1のパーツにRowOffset=-2）。
-    /// rowLimit=0の退化設定ゆえ単独では引数取り違えを検出できないが、実例の再現として別に持つ。</summary>
+    /// rowLimit=0の退化設定ゆえ<em>行側の検証は無力化される</em>——引数を取り違えても
+    /// RowOffsetは期待値0と偶然一致してしまう。ただしBoundaryOffsetを併せて検証しているため
+    /// 検出自体は効く（引数取り違えの実測で本テストもREDになった）。</summary>
     [Fact]
     public void ClampPortsToFrame_HeightOne_AllowsOnlyRowZero()
     {
@@ -92,6 +94,34 @@ public class PartOptimizerClampPortsTests
 
         Assert.Equal(-3, ports[0].RowOffset);
         Assert.Equal(7, ports[0].BoundaryOffset);
+    }
+
+    /// <summary>
+    /// 保存経路（<c>PartEditorDialog.OkButton_Click</c>）は「クランプ→BoundaryOffset昇順の並べ替え」の
+    /// 順で処理する。この順序自体に意味があることを守るテスト。
+    ///
+    /// クランプは複数の接続点を同一のBoundaryOffsetへ潰しうる（<see cref="Math.Clamp(int,int,int)"/> は
+    /// 単調非減少ゆえ大小関係自体は保たれるが、同値への収束は起きる）。<c>OrderBy</c>は安定ソートゆえ
+    /// 同値どうしの並びは入力順のまま残るが、その「入力順」がクランプの前か後かで変わる。
+    /// 並べ替えは先頭=NetA・末尾=NetBの規約を作る処理ゆえ、順序が入れ替わればどちらの接続点が
+    /// NetAになるかという電気的意味が変わってしまう。
+    ///
+    /// 検出力の実測: 本テストの処理順を逆（並べ替え→クランプ）にすると結果が["B","A"]となりREDになる。
+    /// </summary>
+    [Fact]
+    public void ClampBeforeOrderBy_PortsCollapsingToSameBoundary_KeepsCanvasOrder()
+    {
+        // 幅2に対しどちらも範囲外。クランプ後は両方がBoundaryOffset=2へ潰れる。
+        // 行は範囲内かつ非対称な値を選び、引数取り違えが混ざらないようにする。
+        var ports = new[] { new PortDef("A", 1, 5), new PortDef("B", -1, 3) };
+
+        var result = PartOptimizer.ClampPortsToFrame(ports, widthCells: 2, heightCells: 2)
+            .OrderBy(p => p.BoundaryOffset).ToList();
+
+        Assert.Equal(new[] { "A", "B" }, result.Select(p => p.Name));
+        Assert.All(result, p => Assert.Equal(2, p.BoundaryOffset));
+        Assert.Equal(1, result[0].RowOffset);
+        Assert.Equal(-1, result[1].RowOffset);
     }
 
     [Fact]

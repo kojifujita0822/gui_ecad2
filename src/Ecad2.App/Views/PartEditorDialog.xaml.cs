@@ -274,7 +274,14 @@ public partial class PartEditorDialog : Window
         // 並べ替えてから保存する。
         // T-068増分3-c(殿裁定2026-07-25): 並べ替えの前に基準枠の範囲内へ正規化する。編集中に枠を
         // 縮めても接続点は原本どおり動かさず、保存時にのみ正規化する方式(MergeCollinearLinesと同じ流儀)。
-        // 並べ替えより先に掛けるのは、クランプでBoundaryOffsetが変われば昇順の並びも変わるため。
+        //
+        // 【この2行の順序を入れ替えてはならぬ】クランプは複数の接続点を同一のBoundaryOffsetへ
+        // 潰しうる(Math.Clampは単調非減少ゆえ大小関係自体は保たれるが、同値への収束は起きる)。
+        // OrderByは安定ソートゆえ同値どうしの並びは入力順のまま残るが、その「入力順」がクランプの
+        // 前か後かで変わってしまう——例えば[A(境界5), B(境界3)]を幅2でクランプすると両方が2になり、
+        // この順序なら[A,B]、逆順に処理すると[B,A]となる。すぐ下の並べ替えは先頭=NetA・末尾=NetBの
+        // 規約を作る処理ゆえ、この差は「どちらの接続点がNetAになるか」という電気的意味の差になる。
+        // 回帰テスト: PartOptimizerClampPortsTests.ClampBeforeOrderBy_PortsCollapsingToSameBoundary_KeepsCanvasOrder
         var ports = PartOptimizer.ClampPortsToFrame(ShapeCanvas.Ports, width, height)
             .OrderBy(p => p.BoundaryOffset).ToList();
 
