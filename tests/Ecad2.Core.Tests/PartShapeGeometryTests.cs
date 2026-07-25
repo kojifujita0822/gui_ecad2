@@ -393,6 +393,97 @@ public class PartShapeGeometryTests
         Assert.Equal(5.0, y, Precision);
     }
 
+    // ===== 接続点（T-068増分3-c） =====
+    // 座標の対応に注意: 接続点の x は BoundaryOffset、y は RowOffset であり、PortDef の宣言順
+    // (Name, RowOffset, BoundaryOffset) とは逆になる。入力値は幅≠高さ・x≠y を選び、取り違えが
+    // 結果に現れるようにする。
+
+    [Theory]
+    [InlineData(2.0, 1.0, 1, 2)]      // 枠の内側（丸め不要）
+    [InlineData(-3.0, 0.0, 0, 0)]     // 境界オフセットが左外 -> 0 へ
+    [InlineData(9.0, 0.0, 0, 5)]      // 境界オフセットが右外 -> 幅へ
+    [InlineData(0.0, -7.0, -2, 0)]    // 行オフセットが上外 -> -(高さ-1) へ
+    [InlineData(0.0, 7.0, 2, 0)]      // 行オフセットが下外 -> 高さ-1 へ
+    [InlineData(2.4, 1.4, 1, 2)]      // 近い格子へ丸める（下）
+    [InlineData(2.6, 1.6, 2, 3)]      // 近い格子へ丸める（上）
+    [InlineData(-0.4, -1.6, -2, 0)]   // 負の値の丸めとクランプ
+    public void ClampPort_KeepsPortWithinFrame(double cellX, double cellY, int expectedRow, int expectedBoundary)
+    {
+        var (row, boundary) = PartShapeGeometry.ClampPort(cellX, cellY, widthCells: 5, heightCells: 3);
+
+        Assert.Equal(expectedRow, row);
+        Assert.Equal(expectedBoundary, boundary);
+    }
+
+    [Theory]
+    [InlineData(0.0)]
+    [InlineData(5.0)]
+    [InlineData(-5.0)]
+    public void ClampPort_HeightOne_AllowsOnlyCenterRow(double cellY)
+    {
+        // 高さ1のパーツでは行オフセットの取りうる値が0だけになる（退化ケース）
+        var (row, _) = PartShapeGeometry.ClampPort(0, cellY, widthCells: 3, heightCells: 1);
+
+        Assert.Equal(0, row);
+    }
+
+    [Fact]
+    public void ClampPort_ZeroWidth_AllowsOnlyBoundaryZero()
+    {
+        var (_, boundary) = PartShapeGeometry.ClampPort(5, 0, widthCells: 0, heightCells: 3);
+
+        Assert.Equal(0, boundary);
+    }
+
+    [Fact]
+    public void IndexOfPortAt_FindsPortAtGivenGridPosition()
+    {
+        var ports = new List<PortDef>
+        {
+            new("P1", 0, 0),
+            new("P2", 1, 2),   // 行1・境界2
+            new("P3", 2, 1),   // 行と境界を入れ替えた位置（成分の取り違えを検出するため）
+        };
+
+        Assert.Equal(1, PartShapeGeometry.IndexOfPortAt(ports, rowOffset: 1, boundaryOffset: 2));
+        Assert.Equal(2, PartShapeGeometry.IndexOfPortAt(ports, rowOffset: 2, boundaryOffset: 1));
+        Assert.Equal(-1, PartShapeGeometry.IndexOfPortAt(ports, rowOffset: 3, boundaryOffset: 3));
+    }
+
+    [Fact]
+    public void IndexOfPortAt_EmptyList_ReturnsMinusOne()
+        => Assert.Equal(-1, PartShapeGeometry.IndexOfPortAt(new List<PortDef>(), 0, 0));
+
+    [Fact]
+    public void HitTestPort_MapsBoundaryToXAndRowToY()
+    {
+        var ports = new List<PortDef> { new("P1", 1, 4) };   // 行1・境界4 -> 画面上は (x=4, y=1)
+
+        Assert.Equal(0, PartShapeGeometry.HitTestPort(ports, 4, 1));
+        Assert.Equal(-1, PartShapeGeometry.HitTestPort(ports, 1, 4));   // x/yを取り違えると当たる位置
+    }
+
+    [Fact]
+    public void HitTestPort_BeyondTolerance_ReturnsMinusOne()
+    {
+        var ports = new List<PortDef> { new("P1", 1, 4) };
+
+        Assert.Equal(0, PartShapeGeometry.HitTestPort(ports, 4.29, 1));
+        Assert.Equal(-1, PartShapeGeometry.HitTestPort(ports, 4.31, 1));
+    }
+
+    [Fact]
+    public void HitTestPort_OverlappingPorts_PrefersLastPlaced()
+    {
+        var ports = new List<PortDef> { new("P1", 1, 4), new("P2", 1, 4) };
+
+        Assert.Equal(1, PartShapeGeometry.HitTestPort(ports, 4, 1));
+    }
+
+    [Fact]
+    public void HitTestPort_EmptyList_ReturnsMinusOne()
+        => Assert.Equal(-1, PartShapeGeometry.HitTestPort(new List<PortDef>(), 0, 0));
+
     // ===== CenterOf =====
 
     [Fact]

@@ -7,17 +7,15 @@ using Ecad2.Rendering.Wpf;
 
 namespace Ecad2.App.Views;
 
-/// <summary>形状編集キャンバスの描画ツール。接続点は増分3-cで追加する。</summary>
-public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate, Text }
+/// <summary>形状編集キャンバスの描画ツール（GuiEcad原本と同じ9種）。</summary>
+public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate, Text, Port }
 
 /// <summary>
 /// Undo/Redo のスナップショットに含める、キャンバスの外で編集されている状態。
-/// GuiEcad原本の EditorSnapshot は Prims/Ports/W/H/Role の5項目を持つが、増分3-b2の時点では
-/// 端子・幅高さ・役割はダイアログ側（DataGrid・TextBox・ComboBox）が管理しているため、
-/// キャンバスからは取得・復元の委譲で扱う。増分3-cで端子がキャンバスへ統合された後も、
-/// この形のままスナップショットの一貫性を保てる。
+/// GuiEcad原本の EditorSnapshot は Prims/Ports/W/H/Role の5項目を持つ。増分3-cで端子（Ports）が
+/// キャンバスへ統合されたため、キャンバスの外に残るのは幅・高さ・役割の3項目。
 /// </summary>
-public sealed record PartEditorExternalState(List<PortDef> Ports, int WidthCells, int HeightCells, PartRole Role);
+public sealed record PartEditorExternalState(int WidthCells, int HeightCells, PartRole Role);
 
 /// <summary>
 /// T-068増分3-b2: 自作パーツの形状編集キャンバス（選択/線/折れ線/矩形/円/弧/回転の7ツール）。
@@ -38,11 +36,20 @@ public sealed class PartEditorCanvas : FrameworkElement
     private DrawingTheme _theme = DrawingTheme.Default;
 
     private List<PartPrimitive> _primitives = new();
+    private List<PortDef> _ports = new();
     private readonly List<Snapshot> _undoStack = new();
     private readonly List<Snapshot> _redoStack = new();
 
     private PartEditTool _tool = PartEditTool.Select;
+
+    // 選択状態は「図形」と「接続点」の2系統。同時に両方が選ばれることはなく、片方を選んだら
+    // もう片方は解除する（削除・Undo等の分岐が二重に効くのを防ぐ）。
     private int _selectedIndex = -1;
+    private int _selectedPortIndex = -1;
+
+    // 接続点の移動ドラッグ
+    private Point2D? _portDragStartCell;
+    private PortDef? _portDragOriginal;
     private int _widthCells = 1;
     private int _heightCells = 1;
 
@@ -155,7 +162,9 @@ public sealed class PartEditorCanvas : FrameworkElement
     }
 
     public int SelectedIndex => _selectedIndex;
+    public int SelectedPortIndex => _selectedPortIndex;
     public IReadOnlyList<PartPrimitive> Primitives => _primitives;
+    public IReadOnlyList<PortDef> Ports => _ports;
     public int UndoCount => _undoStack.Count;
     public int RedoCount => _redoStack.Count;
     public bool CanUndo => _undoStack.Count > 0;
@@ -166,16 +175,18 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     /// <summary>作図中・ドラッグ中の状態があるか（Escで取り消せるものがあるか）。</summary>
     private bool HasDraft => _draftPrimitive is not null || _polylinePoints.Count > 0
-        || _moveDragStartCell is not null || _rotateCenterCell is not null;
+        || _moveDragStartCell is not null || _rotateCenterCell is not null || _portDragStartCell is not null;
 
-    /// <summary>編集対象のプリミティブを読み込む。呼び出し元のリストからは切り離したコピーを保持するため、
+    /// <summary>編集対象の図形と接続点を読み込む。呼び出し元のリストからは切り離したコピーを保持するため、
     /// 編集をキャンセルしても元の <see cref="PartDefinition"/> は壊れない（要素は record ゆえ共有でよい）。</summary>
-    public void LoadPrimitives(IEnumerable<PartPrimitive> primitives)
+    public void LoadContent(IEnumerable<PartPrimitive> primitives, IEnumerable<PortDef> ports)
     {
         _primitives = primitives.ToList();
+        _ports = ports.ToList();
         _undoStack.Clear();
         _redoStack.Clear();
         _selectedIndex = -1;
+        _selectedPortIndex = -1;
         CancelDraft();
         Notify();
     }
@@ -249,6 +260,9 @@ public sealed class PartEditorCanvas : FrameworkElement
             case PartEditTool.Text:
                 PlaceText(cell);
                 break;
+            case PartEditTool.Port:
+                AddPort(cell);
+                break;
         }
         e.Handled = true;
     }
@@ -290,7 +304,8 @@ public sealed class PartEditorCanvas : FrameworkElement
                 _polylineCursorCell = cell;
                 break;
             case PartEditTool.Select:
-                if (_moveDragStartCell is not null) UpdateMoveDrag(cell);
+                if (_portDragStartCell is not null) UpdatePortDrag(cell);
+                else if (_moveDragStartCell is not null) UpdateMoveDrag(cell);
                 break;
             case PartEditTool.Rotate:
                 if (_rotateCenterCell is not null) UpdateRotateDrag(dip);
@@ -316,7 +331,8 @@ public sealed class PartEditorCanvas : FrameworkElement
                 Notify();
                 break;
             case PartEditTool.Select:
-                if (_moveDragStartCell is not null) CommitMove();
+                if (_portDragStartCell is not null) CommitPortDrag();
+                else if (_moveDragStartCell is not null) CommitMove();
                 break;
             case PartEditTool.Rotate:
                 if (_rotateCenterCell is not null) CommitRotate();
@@ -382,7 +398,7 @@ public sealed class PartEditorCanvas : FrameworkElement
                 Notify();
                 e.Handled = true;
                 break;
-            case Key.Delete when _tool == PartEditTool.Select && _selectedIndex >= 0:
+            case Key.Delete when _tool == PartEditTool.Select && (_selectedIndex >= 0 || _selectedPortIndex >= 0):
                 DeleteSelected();
                 e.Handled = true;
                 break;
@@ -401,8 +417,25 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     private void BeginSelectOrMove(Point2D cell)
     {
+        // 接続点を図形より優先して拾う（GuiEcad原本踏襲）。図形の線上に接続点が重なっていても
+        // 接続点を掴めるようにするため。
+        int portIdx = HitTestPort(cell);
+        if (portIdx >= 0)
+        {
+            _selectedPortIndex = portIdx;
+            _selectedIndex = -1;                     // 選択は接続点と図形で排他
+            _portDragStartCell = cell;
+            _portDragOriginal = _ports[portIdx];
+            _dragSnapshotBeforeChange = CaptureSnapshot();
+            _dragChanged = false;
+            CaptureMouse();
+            Notify();
+            return;
+        }
+
         int idx = PartShapeGeometry.HitTest(_primitives, cell.X, cell.Y);
         _selectedIndex = idx;
+        _selectedPortIndex = -1;                     // 選択は接続点と図形で排他
         if (idx >= 0)
         {
             _moveDragStartCell = cell;
@@ -411,6 +444,45 @@ public sealed class PartEditorCanvas : FrameworkElement
             _dragChanged = false;
             CaptureMouse();
         }
+        Notify();
+    }
+
+    // ===== 接続点（T-068増分3-c、GuiEcad原本の接続点ツール踏襲） =====
+
+    /// <summary>接続点を置く。位置は整数へ丸めて基準枠の範囲へクランプする。
+    /// 既に同じ位置に接続点があれば何もしない（原本どおり警告は出さない）。</summary>
+    private void AddPort(Point2D cell)
+    {
+        var (row, boundary) = PartShapeGeometry.ClampPort(cell.X, cell.Y, _widthCells, _heightCells);
+        if (PartShapeGeometry.IndexOfPortAt(_ports, row, boundary) >= 0) return;
+
+        PushUndo();
+        _ports.Add(new PortDef($"P{_ports.Count + 1}", row, boundary));
+        Notify();
+    }
+
+    private int HitTestPort(Point2D cell) => PartShapeGeometry.HitTestPort(_ports, cell.X, cell.Y);
+
+    private void UpdatePortDrag(Point2D cell)
+    {
+        if (_portDragStartCell is not { } start || _portDragOriginal is not { } original || _selectedPortIndex < 0) return;
+        double dx = cell.X - start.X, dy = cell.Y - start.Y;
+        if (dx != 0 || dy != 0) _dragChanged = true;
+        // 原本どおり、移動先が既存の接続点と重なっても弾かない（追加時のみ重複を見る非対称を踏襲）。
+        var (row, boundary) = PartShapeGeometry.ClampPort(
+            original.BoundaryOffset + dx, original.RowOffset + dy, _widthCells, _heightCells);
+        _ports[_selectedPortIndex] = original with { RowOffset = row, BoundaryOffset = boundary };
+    }
+
+    private void CommitPortDrag()
+    {
+        if (_portDragStartCell is null) return;
+        if (_dragChanged) PushUndoSnapshot(_dragSnapshotBeforeChange);
+        _portDragStartCell = null;
+        _portDragOriginal = null;
+        _dragSnapshotBeforeChange = null;
+        _dragChanged = false;
+        ReleaseMouseCapture();
         Notify();
     }
 
@@ -488,9 +560,9 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     // ===== Undo/Redo（GuiEcad原本の EditorSnapshot 相当＝Prims/Ports/W/H/Role の5項目） =====
 
-    private sealed record Snapshot(List<PartPrimitive> Primitives, PartEditorExternalState? External);
+    private sealed record Snapshot(List<PartPrimitive> Primitives, List<PortDef> Ports, PartEditorExternalState? External);
 
-    private Snapshot CaptureSnapshot() => new(_primitives.ToList(), CaptureExternalState?.Invoke());
+    private Snapshot CaptureSnapshot() => new(_primitives.ToList(), _ports.ToList(), CaptureExternalState?.Invoke());
 
     private void PushUndo() => PushUndoSnapshot(CaptureSnapshot());
 
@@ -522,8 +594,10 @@ public sealed class PartEditorCanvas : FrameworkElement
     private void ApplySnapshot(Snapshot snapshot)
     {
         _primitives = snapshot.Primitives;
+        _ports = snapshot.Ports;
         if (snapshot.External is { } external) RestoreExternalState?.Invoke(external);
         _selectedIndex = -1;
+        _selectedPortIndex = -1;
     }
 
     private void CommitAdd(PartPrimitive p)
@@ -532,8 +606,18 @@ public sealed class PartEditorCanvas : FrameworkElement
         _primitives.Add(p);
     }
 
+    /// <summary>選択中の接続点、または選択中の図形を削除する（選択は排他ゆえどちらか一方）。</summary>
     public void DeleteSelected()
     {
+        if (_selectedPortIndex >= 0)
+        {
+            PushUndo();
+            _ports.RemoveAt(_selectedPortIndex);
+            _selectedPortIndex = -1;
+            Notify();
+            return;
+        }
+
         if (_selectedIndex < 0) return;
         PushUndo();
         _primitives.RemoveAt(_selectedIndex);
@@ -555,6 +639,10 @@ public sealed class PartEditorCanvas : FrameworkElement
             _primitives[_selectedIndex] = _rotateDragOriginal;
         _rotateCenterCell = null;
         _rotateDragOriginal = null;
+        if (_portDragOriginal is { } portOriginal && _selectedPortIndex >= 0)
+            _ports[_selectedPortIndex] = portOriginal;
+        _portDragStartCell = null;
+        _portDragOriginal = null;
         _dragSnapshotBeforeChange = null;
         _dragChanged = false;
         ReleaseMouseCapture();
@@ -598,6 +686,15 @@ public sealed class PartEditorCanvas : FrameworkElement
                 if (_polylineCursorCell is { } cur) pts.Add(cur);
                 if (pts.Count >= 2)
                     renderer.DrawPolyline(pts.Select(p => CellToLocalMm(p.X, p.Y)).ToArray(), draftStroke);
+            }
+
+            // 接続点は図形の上に重ねて描く（ヒットテストで優先するのと同じ順序）
+            for (int i = 0; i < _ports.Count; i++)
+            {
+                var c = CellToLocalMm(_ports[i].BoundaryOffset, _ports[i].RowOffset);
+                bool selected = i == _selectedPortIndex;
+                renderer.FillCircle(c, _geo.CellMm * 0.14,
+                    selected ? new Ecad2.Rendering.Color(255, 255, 69, 0) : new Ecad2.Rendering.Color(255, 30, 144, 255));
             }
 
             if (_tool == PartEditTool.Rotate && _selectedIndex >= 0)

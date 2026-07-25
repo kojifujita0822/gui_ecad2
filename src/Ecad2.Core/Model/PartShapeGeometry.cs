@@ -71,6 +71,41 @@ public static class PartShapeGeometry
             Ry: Math.Max(0.05, Math.Abs(y2 - y1) / 2),
             Rot: 0);
 
+    // ===== 接続点（T-068増分3-c、家老裁可2026-07-25） =====
+
+    /// <summary>接続点の位置をセル格子（整数）へ丸め、基準枠の範囲へ収める。
+    /// 境界オフセットは 0〜幅、行オフセットは中心行を0として上下 (高さ-1) まで（GuiEcad原本と同じ範囲）。
+    /// 高さ1のパーツでは行オフセットは0のみを取る。</summary>
+    public static (int RowOffset, int BoundaryOffset) ClampPort(double cellX, double cellY, int widthCells, int heightCells)
+    {
+        int boundary = Math.Clamp((int)Math.Round(cellX), 0, Math.Max(0, widthCells));
+        int rowLimit = Math.Max(0, heightCells - 1);
+        int row = Math.Clamp((int)Math.Round(cellY), -rowLimit, rowLimit);
+        return (row, boundary);
+    }
+
+    /// <summary>指定の格子位置にある接続点の添字（無ければ -1）。同じ場所への重複追加を防ぐのに使う。</summary>
+    public static int IndexOfPortAt(IReadOnlyList<PortDef> ports, int rowOffset, int boundaryOffset)
+    {
+        for (int i = 0; i < ports.Count; i++)
+            if (ports[i].RowOffset == rowOffset && ports[i].BoundaryOffset == boundaryOffset) return i;
+        return -1;
+    }
+
+    /// <summary>点に当たる接続点の添字（無ければ -1）。後から置いたものを手前とみなす。
+    /// 座標の対応に注意——接続点の x は <see cref="PortDef.BoundaryOffset"/>、y は
+    /// <see cref="PortDef.RowOffset"/> であり、<see cref="PortDef"/> の宣言順とは逆になる。</summary>
+    public static int HitTestPort(IReadOnlyList<PortDef> ports, double x, double y,
+        double toleranceCells = DefaultHitToleranceCells)
+    {
+        for (int i = ports.Count - 1; i >= 0; i--)
+        {
+            double dx = ports[i].BoundaryOffset - x, dy = ports[i].RowOffset - y;
+            if (Math.Sqrt(dx * dx + dy * dy) <= toleranceCells) return i;
+        }
+        return -1;
+    }
+
     // ===== 距離・ヒットテスト =====
 
     /// <summary>点からプリミティブの輪郭までの距離（セル単位）。矩形・弧は回転を考慮する。</summary>

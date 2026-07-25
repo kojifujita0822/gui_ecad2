@@ -1,4 +1,3 @@
-using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -36,7 +35,6 @@ public partial class PartEditorDialog : Window
     private const int MaxCells = 12;
 
     private readonly PartDefinition? _editing;
-    private readonly ObservableCollection<PortRow> _portRows = new();
 
     /// <summary>OK確定後の結果。DialogResult==trueの場合のみ有効。</summary>
     public PartDefinition Result { get; private set; } = null!;
@@ -44,8 +42,10 @@ public partial class PartEditorDialog : Window
     /// <summary>新規作成の場合はeditにnullを渡す。編集の場合は対象のPartDefinitionを渡す
     /// (Id・IsOrEligibleは編集対象からそのまま引き継ぐ。Ports・Primitivesは本ダイアログで編集可能)。
     /// isDarkModeは形状編集キャンバスの配色に用いる(T-068増分3-b3、メインのラダーキャンバスと同じ
-    /// テーマ追従を行う)。</summary>
-    public PartEditorDialog(PartDefinition? edit, bool isDarkMode = false)
+    /// テーマ追従を行う)。既定値は設けない——渡し忘れるとダークモードで白いキャンバスが出るという
+    /// 実行時にしか気づけない不具合になるため、呼び出し元が増えた際にコンパイルで止める
+    /// (T-068増分3-c、隠密の申し送りへの対応)。</summary>
+    public PartEditorDialog(PartDefinition? edit, bool isDarkMode)
     {
         InitializeComponent();
         _editing = edit;
@@ -60,8 +60,6 @@ public partial class PartEditorDialog : Window
             WidthBox.Text = edit.WidthCells.ToString();
             HeightBox.Text = edit.HeightCells.ToString();
             SelectRole(edit.Role);
-            foreach (var port in edit.Ports)
-                _portRows.Add(new PortRow { Name = port.Name, RowOffset = port.RowOffset, BoundaryOffset = port.BoundaryOffset });
         }
         else
         {
@@ -71,18 +69,18 @@ public partial class PartEditorDialog : Window
             RoleCombo.SelectedIndex = 0;
         }
 
-        PortsGrid.ItemsSource = _portRows;
-
-        // T-068増分3-b2: Undo/RedoのスナップショットにPorts/W/H/Roleも含める(GuiEcad原本の
-        // EditorSnapshotと同じ5項目)。端子・幅高さ・役割は本ダイアログが管理しているため、
-        // キャンバスからは取得・復元を委譲してもらう形にする。
+        // T-068増分3-b2: Undo/RedoのスナップショットはGuiEcad原本のEditorSnapshotと同じ5項目
+        // (Prims/Ports/W/H/Role)。増分3-cで端子がキャンバスへ移ったため、キャンバスの外に残る
+        // 幅・高さ・役割の3項目だけを取得・復元の委譲で扱う。
         ShapeCanvas.CaptureExternalState = CaptureExternalState;
         ShapeCanvas.RestoreExternalState = RestoreExternalState;
 
-        // T-068増分3-b2(家老采配DoD4): 編集対象のPrimitivesはコピーして渡す。素通しにすると
+        // T-068増分3-b2(家老采配DoD4): 編集対象の内容はコピーして渡す。素通しにすると
         // キャンバス上の編集が呼び出し元のPartDefinition(PartLibrary内の実体と同一参照)を直接
         // 書き換えてしまい、キャンセルしても元へ戻らなくなる。
-        ShapeCanvas.LoadPrimitives(edit?.Primitives ?? Enumerable.Empty<PartPrimitive>());
+        ShapeCanvas.LoadContent(
+            edit?.Primitives ?? Enumerable.Empty<PartPrimitive>(),
+            edit?.Ports ?? Enumerable.Empty<PortDef>());
         ShapeCanvas.WidthCells = ParseCells(WidthBox.Text, MinCells);
         ShapeCanvas.HeightCells = ParseCells(HeightBox.Text, MinCells);
         ShapeCanvas.Theme = isDarkMode ? DrawingTheme.Dark : DrawingTheme.Default;
@@ -196,9 +194,11 @@ public partial class PartEditorDialog : Window
 
         UndoButton.IsEnabled = ShapeCanvas.CanUndo;
         RedoButton.IsEnabled = ShapeCanvas.CanRedo;
-        DeleteShapeButton.IsEnabled = ShapeCanvas.SelectedIndex >= 0;
+        DeleteShapeButton.IsEnabled = ShapeCanvas.SelectedIndex >= 0 || ShapeCanvas.SelectedPortIndex >= 0;
 
-        StatusText.Text = $"図形: {ShapeCanvas.Primitives.Count}個 / 表示倍率: {ShapeCanvas.Zoom:0.00}倍"
+        // 図形数・接続点数はGuiEcad原本のステータステキストが持っていた項目（接続点数は増分3-cで追加）。
+        StatusText.Text = $"図形: {ShapeCanvas.Primitives.Count}個 / 接続点: {ShapeCanvas.Ports.Count}個"
+            + $" / 表示倍率: {ShapeCanvas.Zoom:0.00}倍"
             + $" / ツール: {ToolLabel(ShapeCanvas.Tool)} - {ToolGuide(ShapeCanvas.Tool)}";
     }
 
@@ -211,6 +211,7 @@ public partial class PartEditorDialog : Window
         PartEditTool.Arc => "弧",
         PartEditTool.Rotate => "回転",
         PartEditTool.Text => "文字",
+        PartEditTool.Port => "接続点",
         _ => "選択",
     };
 
@@ -223,37 +224,20 @@ public partial class PartEditorDialog : Window
         PartEditTool.Arc => "外接する矩形をドラッグします。描いた後は下の欄で縦半径を変えられます",
         PartEditTool.Rotate => "図形をドラッグすると15度きざみで回ります",
         PartEditTool.Text => "クリックした位置に文字を置きます",
+        PartEditTool.Port => "クリックで接続点を置きます。移動・削除は選択ツールで行います",
         _ => "Ctrl+ホイールで拡大縮小、中ボタンのドラッグで移動",
     };
 
     private PartEditorExternalState CaptureExternalState() => new(
-        _portRows.Select(r => new PortDef(r.Name, r.RowOffset, r.BoundaryOffset)).ToList(),
         ParseCells(WidthBox.Text, MinCells),
         ParseCells(HeightBox.Text, MinCells),
         SelectedRole());
 
     private void RestoreExternalState(PartEditorExternalState state)
     {
-        _portRows.Clear();
-        foreach (var port in state.Ports)
-            _portRows.Add(new PortRow { Name = port.Name, RowOffset = port.RowOffset, BoundaryOffset = port.BoundaryOffset });
         WidthBox.Text = state.WidthCells.ToString();
         HeightBox.Text = state.HeightCells.ToString();
         SelectRole(state.Role);
-    }
-
-    // ===== 端子(T-068増分2、増分3-cでキャンバス上の接続点ツールへ統合予定) =====
-
-    // T-068増分2: GuiEcad原本AddPort(自動命名"P{count+1}")踏襲。RowOffset/BoundaryOffsetは0から
-    // 開始、DataGrid上でそのままインライン編集する想定。
-    private void AddPortButton_Click(object sender, RoutedEventArgs e)
-    {
-        _portRows.Add(new PortRow { Name = $"P{_portRows.Count + 1}", RowOffset = 0, BoundaryOffset = 0 });
-    }
-
-    private void DeletePortButton_Click(object sender, RoutedEventArgs e)
-    {
-        if (PortsGrid.SelectedItem is PortRow row) _portRows.Remove(row);
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -276,25 +260,18 @@ public partial class PartEditorDialog : Window
         }
         var role = SelectedRole();
 
-        // T-068増分2: DataGridのインライン編集中セルは、他コントロール(OKボタン)へフォーカスが
-        // 移るまでItemsSource側へコミットされない場合があるため、バリデーション・保存前に明示的に
-        // 確定させる(WPF DataGridの既知の罠)。
-        PortsGrid.CommitEdit(DataGridEditingUnit.Cell, true);
-        PortsGrid.CommitEdit(DataGridEditingUnit.Row, true);
-
         // T-068増分2(GuiEcad原本OnSave 925-928行踏襲): ポート2点未満はNonSimulated以外拒否。
-        if (_portRows.Count < 2 && role != PartRole.NonSimulated)
+        // 増分3-cで端子の編集UIはキャンバス上の接続点ツールへ移ったが、保存時のこの検査自体は
+        // 変わらず要る(隠密設計書§3.6)。
+        if (ShapeCanvas.Ports.Count < 2 && role != PartRole.NonSimulated)
         {
-            ShowError("接続点(ポート)を2つ以上配置してください。");
+            ShowError("接続点を2つ以上配置してください。ツールバーの「接続点」で置けます。");
             return;
         }
 
         // T-068増分2(GuiEcad原本OnSave 939行踏襲): 先頭=NetA・末尾=NetBの規約でBoundaryOffset昇順に
         // 並べ替えてから保存する。
-        var ports = _portRows
-            .Select(r => new PortDef(r.Name, r.RowOffset, r.BoundaryOffset))
-            .OrderBy(p => p.BoundaryOffset)
-            .ToList();
+        var ports = ShapeCanvas.Ports.OrderBy(p => p.BoundaryOffset).ToList();
 
         // T-068増分3-b2: 形状はキャンバスの編集結果を新しいリストとして取り出す(キャンバス内部の
         // リストとも切り離す)。
@@ -322,14 +299,5 @@ public partial class PartEditorDialog : Window
     {
         ErrorText.Text = message;
         ErrorText.Visibility = Visibility.Visible;
-    }
-
-    // T-068増分2: DataGrid行の編集用DTO。PortDef自体はreadonly record structのためDataGridの
-    // 直接バインディング(セル編集の書き戻し)には使えず、可変プロパティを持つラッパーを介する。
-    private sealed class PortRow
-    {
-        public string Name { get; set; } = "";
-        public int RowOffset { get; set; }
-        public int BoundaryOffset { get; set; }
     }
 }

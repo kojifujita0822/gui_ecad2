@@ -71,6 +71,8 @@
                          ToolTip="図形をドラッグして15度きざみで回します"/>
             <RadioButton Content="文字" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Text" Margin="4,0"
                          ToolTip="クリックした位置に文字を置きます"/>
+            <RadioButton Content="接続点" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Port" Margin="4,0"
+                         ToolTip="クリックした位置に接続点を置きます。移動と削除は選択ツールで行います"/>
             <Separator/>
             <Button x:Name="UndoButton" Content="元に戻す" Click="Undo_Click" ToolTip="Ctrl+Z"/>
             <Button x:Name="RedoButton" Content="やり直し" Click="Redo_Click" ToolTip="Ctrl+Y"/>
@@ -79,38 +81,12 @@
             <Button Content="ズームを戻す" Click="ZoomReset_Click"/>
         </ToolBar>
 
-        <!-- Row2: 左=形状編集キャンバス(原本Row2相当)、右=端子リスト(増分3-cまでの暫定残置)。
-             増分3-cでは右列(ColumnDefinition・PortsPanel)を削除すれば足りる構成とする。 -->
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-
-            <Border Grid.Column="0" MinHeight="160"
-                    BorderBrush="{DynamicResource DialogBorderBrush}" BorderThickness="1">
-                <local:PartEditorCanvas x:Name="ShapeCanvas" ClipToBounds="True"/>
-            </Border>
-
-            <DockPanel x:Name="PortsPanel" Grid.Column="1" Width="290" Margin="8,0,0,0">
-                <TextBlock DockPanel.Dock="Top" Text="端子" Margin="0,0,0,4"/>
-                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="追加" Width="70" Click="AddPortButton_Click"/>
-                    <Button Content="削除" Width="70" Margin="8,0,0,0" Click="DeletePortButton_Click"/>
-                </StackPanel>
-                <DataGrid x:Name="PortsGrid" AutoGenerateColumns="False"
-                          CanUserAddRows="False" CanUserDeleteRows="False"
-                          HeadersVisibility="Column" GridLinesVisibility="Horizontal"
-                          Background="{DynamicResource InputBackgroundBrush}"
-                          Foreground="{DynamicResource InputForegroundBrush}">
-                    <DataGrid.Columns>
-                        <DataGridTextColumn Header="名前" Binding="{Binding Name}" Width="90"/>
-                        <DataGridTextColumn Header="行オフセット" Binding="{Binding RowOffset}" Width="*"/>
-                        <DataGridTextColumn Header="境界オフセット" Binding="{Binding BoundaryOffset}" Width="*"/>
-                    </DataGrid.Columns>
-                </DataGrid>
-            </DockPanel>
-        </Grid>
+        <!-- Row2: 形状編集キャンバス(原本Row2相当)。増分3-cで端子(接続点)をキャンバス上の接続点
+             ツールへ統合したため、増分2から暫定で置いていた右列の端子リストは廃止した。 -->
+        <Border Grid.Row="2" MinHeight="160"
+                BorderBrush="{DynamicResource DialogBorderBrush}" BorderThickness="1">
+            <local:PartEditorCanvas x:Name="ShapeCanvas" ClipToBounds="True"/>
+        </Border>
 
         <TextBlock x:Name="ErrorText" Grid.Row="3" Foreground="Red" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
 
