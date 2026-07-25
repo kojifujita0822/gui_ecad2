@@ -272,7 +272,11 @@ public partial class PartEditorDialog : Window
 
         // T-068増分2(GuiEcad原本OnSave 939行踏襲): 先頭=NetA・末尾=NetBの規約でBoundaryOffset昇順に
         // 並べ替えてから保存する。
-        var ports = ShapeCanvas.Ports.OrderBy(p => p.BoundaryOffset).ToList();
+        // T-068増分3-c(殿裁定2026-07-25): 並べ替えの前に基準枠の範囲内へ正規化する。編集中に枠を
+        // 縮めても接続点は原本どおり動かさず、保存時にのみ正規化する方式(MergeCollinearLinesと同じ流儀)。
+        // 並べ替えより先に掛けるのは、クランプでBoundaryOffsetが変われば昇順の並びも変わるため。
+        var ports = PartOptimizer.ClampPortsToFrame(ShapeCanvas.Ports, width, height)
+            .OrderBy(p => p.BoundaryOffset).ToList();
 
         // T-068増分3-b2: 形状はキャンバスの編集結果を新しいリストとして取り出す(キャンバス内部の
         // リストとも切り離す)。

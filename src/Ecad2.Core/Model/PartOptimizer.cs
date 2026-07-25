@@ -38,6 +38,28 @@ public static class PartOptimizer
         return list;
     }
 
+    /// <summary>
+    /// 接続点を基準枠（W×Hセル）の範囲内へ正規化する。範囲外の接続点をそのまま永続化すると、
+    /// 配置先での実ノード座標（<c>NetlistBuilder</c>）が意図せぬ位置になり誤結線を招くため、
+    /// 保存時にのみ適用する（T-068増分3-c、殿裁定2026-07-25＝UI/UX仮決定12点目）。
+    /// 編集中はGuiEcad原本と同じくクランプしない——原本の <c>OnSizeChanged</c>・<c>OnSave</c> は
+    /// いずれもポートに触れず、枠外へ出た接続点はそのまま保持される。ゆえに本処理は
+    /// <see cref="MergeCollinearLines"/> と同じく「保存直前のみ適用・編集中の実体は不変」の流儀とし、
+    /// 新しいリストを返す（呼び出し元のリストは変更しない）。
+    /// </summary>
+    public static List<PortDef> ClampPortsToFrame(IEnumerable<PortDef> ports, int widthCells, int heightCells)
+    {
+        var list = new List<PortDef>();
+        foreach (var p in ports)
+        {
+            var (row, boundary) = PartShapeGeometry.ClampPort(p.BoundaryOffset, p.RowOffset, widthCells, heightCells);
+            list.Add(row == p.RowOffset && boundary == p.BoundaryOffset
+                ? p
+                : p with { RowOffset = row, BoundaryOffset = boundary });
+        }
+        return list;
+    }
+
     private static bool TryMerge(PartLine a, PartLine b, double eps, out PartLine result)
     {
         result = default!;
