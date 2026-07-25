@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using Ecad2.Model;
 
 namespace Ecad2.App.Views;
@@ -9,7 +10,8 @@ namespace Ecad2.App.Views;
 /// T-068増分1: 自作パーツのプロパティ編集ダイアログ(名前/幅高さ/役割)。
 /// T-068増分2: 端子(接続点)編集(リスト形式、殿裁定=案A・キャンバス上ドラッグは増分3-cで正式統合)。
 /// T-068増分3-a: タブ構成を廃止し、GuiEcad原本(PartEditorWindow)と同じ単一画面構成へ再設計。
-/// キャンバス領域の確保までを行い、形状編集ロジックは増分3-b・接続点ツール統合は増分3-cで扱う
+/// T-068増分3-b2: 形状編集キャンバス(PartEditorCanvas)を組み込み、7ツール・Undo/Redo・ズームを
+/// 使えるようにした。文字ツールは増分3-b3、接続点ツールの統合は増分3-cで扱う
 /// (画面構成と原本Row0-3との対応はPartEditorDialog.xaml冒頭のコメント参照)。
 /// </summary>
 public partial class PartEditorDialog : Window
@@ -29,6 +31,9 @@ public partial class PartEditorDialog : Window
         (PartRole.InputNC, "外部入力 b接点 (NC)"),
     };
 
+    private const int MinCells = 1;
+    private const int MaxCells = 12;
+
     private readonly PartDefinition? _editing;
     private readonly ObservableCollection<PortRow> _portRows = new();
 
@@ -36,8 +41,7 @@ public partial class PartEditorDialog : Window
     public PartDefinition Result { get; private set; } = null!;
 
     /// <summary>新規作成の場合はeditにnullを渡す。編集の場合は対象のPartDefinitionを渡す
-    /// (Id・IsOrEligible・Primitivesは編集対象からそのまま引き継ぐ。Portsは本ダイアログの
-    /// 端子リストで編集可能)。</summary>
+    /// (Id・IsOrEligibleは編集対象からそのまま引き継ぐ。Ports・Primitivesは本ダイアログで編集可能)。</summary>
     public PartEditorDialog(PartDefinition? edit)
     {
         InitializeComponent();
@@ -66,10 +70,26 @@ public partial class PartEditorDialog : Window
 
         PortsGrid.ItemsSource = _portRows;
 
+        // T-068増分3-b2: Undo/RedoのスナップショットにPorts/W/H/Roleも含める(GuiEcad原本の
+        // EditorSnapshotと同じ5項目)。端子・幅高さ・役割は本ダイアログが管理しているため、
+        // キャンバスからは取得・復元を委譲してもらう形にする。
+        ShapeCanvas.CaptureExternalState = CaptureExternalState;
+        ShapeCanvas.RestoreExternalState = RestoreExternalState;
+
+        // T-068増分3-b2(家老采配DoD4): 編集対象のPrimitivesはコピーして渡す。素通しにすると
+        // キャンバス上の編集が呼び出し元のPartDefinition(PartLibrary内の実体と同一参照)を直接
+        // 書き換えてしまい、キャンセルしても元へ戻らなくなる。
+        ShapeCanvas.LoadPrimitives(edit?.Primitives ?? Enumerable.Empty<PartPrimitive>());
+        ShapeCanvas.WidthCells = ParseCells(WidthBox.Text, MinCells);
+        ShapeCanvas.HeightCells = ParseCells(HeightBox.Text, MinCells);
+        ShapeCanvas.StateChanged += (_, _) => UpdateShapeStatus();
+
         Loaded += (_, _) =>
         {
             NameBox.Focus();
             NameBox.SelectAll();
+            ShapeCanvas.Draw();
+            UpdateShapeStatus();
         };
     }
 
@@ -81,6 +101,111 @@ public partial class PartEditorDialog : Window
         }
         RoleCombo.SelectedIndex = 0;   // ecad2拡張Role(タイマ系等)で編集に入った場合のフォールバック
     }
+
+    private PartRole SelectedRole()
+        => RoleCombo.SelectedItem is ComboBoxItem { Tag: PartRole r } ? r : PartRole.ContactNO;
+
+    /// <summary>セル数の入力欄を読む。入力途中の空文字・不正値では既定値を返す(例外を投げない)。</summary>
+    private static int ParseCells(string text, int fallback)
+        => int.TryParse(text, out var v) && v >= MinCells && v <= MaxCells ? v : fallback;
+
+    // ===== 形状編集キャンバス(T-068増分3-b2) =====
+
+    /// <summary>基準枠(外形枠)を幅・高さの入力へ即時連動させる。</summary>
+    private void SizeBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        ShapeCanvas.WidthCells = ParseCells(WidthBox.Text, ShapeCanvas.WidthCells);
+        ShapeCanvas.HeightCells = ParseCells(HeightBox.Text, ShapeCanvas.HeightCells);
+    }
+
+    private void Tool_Checked(object sender, RoutedEventArgs e)
+    {
+        if (ShapeCanvas is null) return;   // InitializeComponent中のIsChecked="True"で先に発火しうる
+        if (sender is not RadioButton { Tag: string tag }) return;
+        ShapeCanvas.Tool = tag switch
+        {
+            "Line" => PartEditTool.Line,
+            "Polyline" => PartEditTool.Polyline,
+            "Rect" => PartEditTool.Rect,
+            "Circle" => PartEditTool.Circle,
+            "Arc" => PartEditTool.Arc,
+            "Rotate" => PartEditTool.Rotate,
+            _ => PartEditTool.Select,
+        };
+        UpdateShapeStatus();
+    }
+
+    private void Undo_Click(object sender, RoutedEventArgs e)
+    {
+        ShapeCanvas.Undo();
+        ShapeCanvas.Focus();
+    }
+
+    private void Redo_Click(object sender, RoutedEventArgs e)
+    {
+        ShapeCanvas.Redo();
+        ShapeCanvas.Focus();
+    }
+
+    private void DeleteShape_Click(object sender, RoutedEventArgs e)
+    {
+        ShapeCanvas.DeleteSelected();
+        ShapeCanvas.Focus();
+    }
+
+    private void ZoomReset_Click(object sender, RoutedEventArgs e)
+    {
+        ShapeCanvas.Zoom = 1.0;
+        ShapeCanvas.Focus();
+    }
+
+    private void ArcRyBox_KeyDown(object sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter) return;
+        if (double.TryParse(ArcRyBox.Text, out var ry)) ShapeCanvas.SetSelectedArcRy(ry);
+        ShapeCanvas.Focus();
+        e.Handled = true;   // IsDefault="True"のOKボタンが発火してダイアログが閉じるのを防ぐ
+    }
+
+    private void UpdateShapeStatus()
+    {
+        if (ShapeCanvas.SelectedArc is { } arc)
+        {
+            ArcRyLabel.Visibility = Visibility.Visible;
+            ArcRyBox.Visibility = Visibility.Visible;
+            if (!ArcRyBox.IsFocused) ArcRyBox.Text = arc.EffRy.ToString("0.###");
+        }
+        else
+        {
+            ArcRyLabel.Visibility = Visibility.Collapsed;
+            ArcRyBox.Visibility = Visibility.Collapsed;
+        }
+
+        UndoButton.IsEnabled = ShapeCanvas.CanUndo;
+        RedoButton.IsEnabled = ShapeCanvas.CanRedo;
+        DeleteShapeButton.IsEnabled = ShapeCanvas.SelectedIndex >= 0;
+
+        StatusText.Text = $"図形: {ShapeCanvas.Primitives.Count}個 / 表示倍率: {ShapeCanvas.Zoom:0.00}倍 "
+            + "/ Ctrl+ホイールで拡大縮小、中ボタンのドラッグで移動";
+    }
+
+    private PartEditorExternalState CaptureExternalState() => new(
+        _portRows.Select(r => new PortDef(r.Name, r.RowOffset, r.BoundaryOffset)).ToList(),
+        ParseCells(WidthBox.Text, MinCells),
+        ParseCells(HeightBox.Text, MinCells),
+        SelectedRole());
+
+    private void RestoreExternalState(PartEditorExternalState state)
+    {
+        _portRows.Clear();
+        foreach (var port in state.Ports)
+            _portRows.Add(new PortRow { Name = port.Name, RowOffset = port.RowOffset, BoundaryOffset = port.BoundaryOffset });
+        WidthBox.Text = state.WidthCells.ToString();
+        HeightBox.Text = state.HeightCells.ToString();
+        SelectRole(state.Role);
+    }
+
+    // ===== 端子(T-068増分2、増分3-cでキャンバス上の接続点ツールへ統合予定) =====
 
     // T-068増分2: GuiEcad原本AddPort(自動命名"P{count+1}")踏襲。RowOffset/BoundaryOffsetは0から
     // 開始、DataGrid上でそのままインライン編集する想定。
@@ -102,17 +227,17 @@ public partial class PartEditorDialog : Window
             ShowError("名前は必須です。");
             return;
         }
-        if (!int.TryParse(WidthBox.Text, out var width) || width < 1 || width > 12)
+        if (!int.TryParse(WidthBox.Text, out var width) || width < MinCells || width > MaxCells)
         {
             ShowError("幅は1〜12の整数で指定してください。");
             return;
         }
-        if (!int.TryParse(HeightBox.Text, out var height) || height < 1 || height > 12)
+        if (!int.TryParse(HeightBox.Text, out var height) || height < MinCells || height > MaxCells)
         {
             ShowError("高さは1〜12の整数で指定してください。");
             return;
         }
-        var role = RoleCombo.SelectedItem is ComboBoxItem { Tag: PartRole r } ? r : PartRole.ContactNO;
+        var role = SelectedRole();
 
         // T-068増分2: DataGridのインライン編集中セルは、他コントロール(OKボタン)へフォーカスが
         // 移るまでItemsSource側へコミットされない場合があるため、バリデーション・保存前に明示的に
@@ -134,13 +259,21 @@ public partial class PartEditorDialog : Window
             .OrderBy(p => p.BoundaryOffset)
             .ToList();
 
+        // T-068増分3-b2: 形状はキャンバスの編集結果を新しいリストとして取り出す(キャンバス内部の
+        // リストとも切り離す)。MergeCollinearLinesの適用は増分3-b3で扱う。
+        var primitives = ShapeCanvas.Primitives.ToList();
+
         Result = _editing is { } original
             ? new PartDefinition
             {
                 Id = original.Id, Name = name, WidthCells = width, HeightCells = height, Role = role,
-                IsOrEligible = original.IsOrEligible, Ports = ports, Primitives = original.Primitives,
+                IsOrEligible = original.IsOrEligible, Ports = ports, Primitives = primitives,
             }
-            : new PartDefinition { Name = name, WidthCells = width, HeightCells = height, Role = role, Ports = ports };
+            : new PartDefinition
+            {
+                Name = name, WidthCells = width, HeightCells = height, Role = role,
+                Ports = ports, Primitives = primitives,
+            };
 
         DialogResult = true;
     }

@@ -1,0 +1,590 @@
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using Ecad2.Model;
+using Ecad2.Rendering;
+using Ecad2.Rendering.Wpf;
+
+namespace Ecad2.App.Views;
+
+/// <summary>形状編集キャンバスの描画ツール。文字・接続点は増分3-b3・3-cで追加する。</summary>
+public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate }
+
+/// <summary>
+/// Undo/Redo のスナップショットに含める、キャンバスの外で編集されている状態。
+/// GuiEcad原本の EditorSnapshot は Prims/Ports/W/H/Role の5項目を持つが、増分3-b2の時点では
+/// 端子・幅高さ・役割はダイアログ側（DataGrid・TextBox・ComboBox）が管理しているため、
+/// キャンバスからは取得・復元の委譲で扱う。増分3-cで端子がキャンバスへ統合された後も、
+/// この形のままスナップショットの一貫性を保てる。
+/// </summary>
+public sealed record PartEditorExternalState(List<PortDef> Ports, int WidthCells, int HeightCells, PartRole Role);
+
+/// <summary>
+/// T-068増分3-b2: 自作パーツの形状編集キャンバス（選択/線/折れ線/矩形/円/弧/回転の7ツール）。
+/// 増分0のPoC（<c>poc/t068-part-editor-poc/</c>）で操作感を検証した実装を本実装へ移植したもの。
+/// PoCからの主な変更点は次の3つ:
+///   1. 描画は <see cref="PartDrawing.DrawPrimitive"/>（増分3-b1でpublic化）へ委譲し、
+///      PoCが持っていた描画ロジックの複製（約60行）を廃した
+///   2. 幾何演算は <see cref="PartShapeGeometry"/>（増分3-b1で切り出し・単体テスト済み）へ委譲した
+///   3. Undo/Redo はドラッグ中に実変化があった場合のみ記録する（PoC所見1の修正）
+/// 座標系はパーツローカル（セル単位、原点=最左ポート点・行中心線=y0）。
+/// </summary>
+public sealed class PartEditorCanvas : FrameworkElement
+{
+    private const double MmToDip = 96.0 / 25.4;
+
+    private readonly VisualCollection _children;
+    private readonly GridGeometry _geo = new(cellMm: 9.0, marginMm: 30.0);
+    private readonly DrawingTheme _theme = DrawingTheme.Default;
+
+    private List<PartPrimitive> _primitives = new();
+    private readonly List<Snapshot> _undoStack = new();
+    private readonly List<Snapshot> _redoStack = new();
+
+    private PartEditTool _tool = PartEditTool.Select;
+    private int _selectedIndex = -1;
+    private int _widthCells = 1;
+    private int _heightCells = 1;
+
+    private double _zoom = 1.0;
+    private Point _panMm = new(0, 0);
+
+    // 作図中（ドラフト）状態
+    private Point2D? _dragStartCell;
+    private PartPrimitive? _draftPrimitive;
+
+    // 折れ線（殿裁定=案A=右クリックのみ確定）
+    private readonly List<Point2D> _polylinePoints = new();
+    private Point2D? _polylineCursorCell;
+
+    // 選択プリミティブの移動ドラッグ（殿裁定=案A=頂点ハンドル無し・全体の平行移動のみ）
+    private Point2D? _moveDragStartCell;
+    private PartPrimitive? _moveDragOriginal;
+
+    // 回転ドラッグ（単体のみ・15度スナップ）
+    private Point2D? _rotateCenterCell;
+    private double _rotateStartMouseAngleDeg;
+    private PartPrimitive? _rotateDragOriginal;
+
+    // ドラッグ開始"前"のスナップショット。ドラッグ中は _primitives を直接書き換え続けるため、
+    // 確定時に「その場の _primitives」を積むと変更後の状態を積んでしまいUndoが機能しない。
+    private Snapshot? _dragSnapshotBeforeChange;
+
+    // GuiEcad原本の _dragChanged 相当。ドラッグで実際に値が変わった場合のみUndoへ記録する
+    // （PoCは無条件に記録しており、クリックで選択しただけでUndoが1つ余分に積まれていた＝PoC所見1）。
+    private bool _dragChanged;
+
+    // パン（中ボタンドラッグ、ツール非依存）
+    private Point? _panDragStartDip;
+    private Point _panDragStartPanMm;
+
+    public event EventHandler? StateChanged;
+
+    /// <summary>Undo/Redo のスナップショットへ含める外部状態の取得。ダイアログ側が設定する。</summary>
+    public Func<PartEditorExternalState>? CaptureExternalState { get; set; }
+
+    /// <summary>Undo/Redo で外部状態を復元する。ダイアログ側が設定する。</summary>
+    public Action<PartEditorExternalState>? RestoreExternalState { get; set; }
+
+    public PartEditorCanvas()
+    {
+        _children = new VisualCollection(this);
+        Focusable = true;
+        PreviewMouseLeftButtonDown += (_, _) => Focus();
+    }
+
+    protected override int VisualChildrenCount => _children.Count;
+    protected override Visual GetVisualChild(int index) => _children[index];
+
+    public PartEditTool Tool
+    {
+        get => _tool;
+        set
+        {
+            if (_tool == value) return;
+            CancelDraft();
+            _tool = value;
+            Notify();
+        }
+    }
+
+    public double Zoom
+    {
+        get => _zoom;
+        set
+        {
+            double clamped = Math.Clamp(value, 0.2, 8.0);
+            if (_zoom == clamped) return;
+            _zoom = clamped;
+            Notify();   // PoC所見2の修正: Draw()だけでは倍率表示が更新されない
+        }
+    }
+
+    /// <summary>基準枠（外形枠）の幅。プロパティ欄の入力に連動させる。</summary>
+    public int WidthCells
+    {
+        get => _widthCells;
+        set { if (_widthCells == value) return; _widthCells = value; Draw(); }
+    }
+
+    /// <summary>基準枠（外形枠）の高さ。プロパティ欄の入力に連動させる。</summary>
+    public int HeightCells
+    {
+        get => _heightCells;
+        set { if (_heightCells == value) return; _heightCells = value; Draw(); }
+    }
+
+    public int SelectedIndex => _selectedIndex;
+    public IReadOnlyList<PartPrimitive> Primitives => _primitives;
+    public int UndoCount => _undoStack.Count;
+    public int RedoCount => _redoStack.Count;
+    public bool CanUndo => _undoStack.Count > 0;
+    public bool CanRedo => _redoStack.Count > 0;
+
+    /// <summary>選択中プリミティブが弧の場合のみ非null（扁平率の事後調整用）。</summary>
+    public PartArc? SelectedArc => _selectedIndex >= 0 && _primitives[_selectedIndex] is PartArc a ? a : null;
+
+    /// <summary>作図中・ドラッグ中の状態があるか（Escで取り消せるものがあるか）。</summary>
+    private bool HasDraft => _draftPrimitive is not null || _polylinePoints.Count > 0
+        || _moveDragStartCell is not null || _rotateCenterCell is not null;
+
+    /// <summary>編集対象のプリミティブを読み込む。呼び出し元のリストからは切り離したコピーを保持するため、
+    /// 編集をキャンセルしても元の <see cref="PartDefinition"/> は壊れない（要素は record ゆえ共有でよい）。</summary>
+    public void LoadPrimitives(IEnumerable<PartPrimitive> primitives)
+    {
+        _primitives = primitives.ToList();
+        _undoStack.Clear();
+        _redoStack.Clear();
+        _selectedIndex = -1;
+        CancelDraft();
+        Notify();
+    }
+
+    /// <summary>選択中の弧の縦半径(Ry)を事後調整する。</summary>
+    public void SetSelectedArcRy(double ry)
+    {
+        if (_selectedIndex < 0 || _primitives[_selectedIndex] is not PartArc a) return;
+        PushUndo();
+        _primitives[_selectedIndex] = a with { Ry = Math.Max(0.05, ry) };
+        Notify();
+    }
+
+    private void Notify()
+    {
+        StateChanged?.Invoke(this, EventArgs.Empty);
+        Draw();
+    }
+
+    // ===== 座標変換 =====
+    // 描画は2段のPushTransformで行う（外側=パン・ズーム、内側=原点余白）。PartDrawing はセル座標を
+    // ×cell するだけで余白を知らないため、余白分を内側の変換として積む必要がある。合成すると
+    // 最終DIP = (cellCoord*cellMm + margin)*K*zoom + pan*K となり、下記の CellToDip と一致する。
+
+    private Point CellToDip(Point2D cell)
+    {
+        double worldMmX = _geo.MarginMm + cell.X * _geo.CellMm;
+        double worldMmY = _geo.MarginMm + cell.Y * _geo.CellMm;
+        return new Point((worldMmX * _zoom + _panMm.X) * MmToDip, (worldMmY * _zoom + _panMm.Y) * MmToDip);
+    }
+
+    private Point2D DipToCell(Point dip)
+    {
+        double worldMmX = (dip.X / MmToDip - _panMm.X) / _zoom;
+        double worldMmY = (dip.Y / MmToDip - _panMm.Y) / _zoom;
+        return new Point2D((worldMmX - _geo.MarginMm) / _geo.CellMm, (worldMmY - _geo.MarginMm) / _geo.CellMm);
+    }
+
+    private static Point2D SnapCell(Point2D p) => new(PartShapeGeometry.Snap(p.X), PartShapeGeometry.Snap(p.Y));
+
+    /// <summary>セル座標を内側変換の基準（余白を含まない mm）へ移す。</summary>
+    private Point2D CellToLocalMm(double cellX, double cellY) => new(cellX * _geo.CellMm, cellY * _geo.CellMm);
+
+    // ===== マウス操作 =====
+
+    protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonDown(e);
+        Focus();
+        var cell = SnapCell(DipToCell(e.GetPosition(this)));
+        switch (_tool)
+        {
+            case PartEditTool.Select:
+                BeginSelectOrMove(cell);
+                break;
+            case PartEditTool.Line:
+            case PartEditTool.Rect:
+            case PartEditTool.Circle:
+            case PartEditTool.Arc:
+                _dragStartCell = cell;
+                _draftPrimitive = BuildPrimitive(_tool, cell, cell);
+                CaptureMouse();
+                break;
+            case PartEditTool.Polyline:
+                _polylinePoints.Add(cell);
+                Notify();
+                break;
+            case PartEditTool.Rotate:
+                BeginRotate(cell, e.GetPosition(this));
+                break;
+        }
+        e.Handled = true;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        var dip = e.GetPosition(this);
+        var cell = SnapCell(DipToCell(dip));
+
+        if (_panDragStartDip is { } panStart && e.MiddleButton == MouseButtonState.Pressed)
+        {
+            var d = dip - panStart;
+            _panMm = new Point(_panDragStartPanMm.X + d.X / (MmToDip * _zoom), _panDragStartPanMm.Y + d.Y / (MmToDip * _zoom));
+            Draw();
+            return;
+        }
+
+        switch (_tool)
+        {
+            case PartEditTool.Line:
+            case PartEditTool.Rect:
+            case PartEditTool.Circle:
+            case PartEditTool.Arc:
+                if (_dragStartCell is { } start && e.LeftButton == MouseButtonState.Pressed)
+                    _draftPrimitive = BuildPrimitive(_tool, start, cell);
+                break;
+            case PartEditTool.Polyline:
+                _polylineCursorCell = cell;
+                break;
+            case PartEditTool.Select:
+                if (_moveDragStartCell is not null) UpdateMoveDrag(cell);
+                break;
+            case PartEditTool.Rotate:
+                if (_rotateCenterCell is not null) UpdateRotateDrag(dip);
+                break;
+        }
+        Draw();
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+        switch (_tool)
+        {
+            case PartEditTool.Line:
+            case PartEditTool.Rect:
+            case PartEditTool.Circle:
+            case PartEditTool.Arc:
+                if (_draftPrimitive is not null && !PartShapeGeometry.IsDegenerate(_draftPrimitive))
+                    CommitAdd(_draftPrimitive);
+                _dragStartCell = null;
+                _draftPrimitive = null;
+                ReleaseMouseCapture();
+                Notify();
+                break;
+            case PartEditTool.Select:
+                if (_moveDragStartCell is not null) CommitMove();
+                break;
+            case PartEditTool.Rotate:
+                if (_rotateCenterCell is not null) CommitRotate();
+                break;
+        }
+    }
+
+    protected override void OnMouseRightButtonDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseRightButtonDown(e);
+        if (_tool == PartEditTool.Polyline)
+        {
+            if (_polylinePoints.Count >= 2)
+            {
+                var pts = _polylinePoints.SelectMany(p => new[] { p.X, p.Y }).ToArray();
+                CommitAdd(new PartPolyline(pts));
+            }
+            _polylinePoints.Clear();
+            _polylineCursorCell = null;
+            Notify();
+        }
+        e.Handled = true;
+    }
+
+    protected override void OnMouseDown(MouseButtonEventArgs e)
+    {
+        base.OnMouseDown(e);
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            _panDragStartDip = e.GetPosition(this);
+            _panDragStartPanMm = _panMm;
+            CaptureMouse();
+        }
+    }
+
+    protected override void OnMouseUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseUp(e);
+        if (e.ChangedButton == MouseButton.Middle)
+        {
+            _panDragStartDip = null;
+            ReleaseMouseCapture();
+        }
+    }
+
+    protected override void OnMouseWheel(MouseWheelEventArgs e)
+    {
+        base.OnMouseWheel(e);
+        if (Keyboard.Modifiers != ModifierKeys.Control) return;
+        Zoom = _zoom * (e.Delta > 0 ? 1.1 : 1.0 / 1.1);
+        e.Handled = true;
+    }
+
+    protected override void OnPreviewKeyDown(KeyEventArgs e)
+    {
+        base.OnPreviewKeyDown(e);
+        switch (e.Key)
+        {
+            // 作図中のときだけEscを消費する。何も作図していないEscはダイアログのキャンセル
+            // (IsCancel="True"のボタン)へ通す——常に消費するとダイアログを閉じられなくなる。
+            case Key.Escape when HasDraft:
+                CancelDraft();
+                Notify();
+                e.Handled = true;
+                break;
+            case Key.Delete when _tool == PartEditTool.Select && _selectedIndex >= 0:
+                DeleteSelected();
+                e.Handled = true;
+                break;
+            case Key.Z when Keyboard.Modifiers == ModifierKeys.Control:
+                Undo();
+                e.Handled = true;
+                break;
+            case Key.Y when Keyboard.Modifiers == ModifierKeys.Control:
+                Redo();
+                e.Handled = true;
+                break;
+        }
+    }
+
+    // ===== 選択・移動 =====
+
+    private void BeginSelectOrMove(Point2D cell)
+    {
+        int idx = PartShapeGeometry.HitTest(_primitives, cell.X, cell.Y);
+        _selectedIndex = idx;
+        if (idx >= 0)
+        {
+            _moveDragStartCell = cell;
+            _moveDragOriginal = _primitives[idx];
+            _dragSnapshotBeforeChange = CaptureSnapshot();
+            _dragChanged = false;
+            CaptureMouse();
+        }
+        Notify();
+    }
+
+    private void UpdateMoveDrag(Point2D cell)
+    {
+        if (_moveDragStartCell is not { } start || _moveDragOriginal is null || _selectedIndex < 0) return;
+        double dx = cell.X - start.X, dy = cell.Y - start.Y;
+        if (dx != 0 || dy != 0) _dragChanged = true;
+        _primitives[_selectedIndex] = PartShapeGeometry.Translate(_moveDragOriginal, dx, dy);
+    }
+
+    private void CommitMove()
+    {
+        if (_moveDragStartCell is null) return;
+        if (_dragChanged) PushUndoSnapshot(_dragSnapshotBeforeChange);
+        _moveDragStartCell = null;
+        _moveDragOriginal = null;
+        _dragSnapshotBeforeChange = null;
+        _dragChanged = false;
+        ReleaseMouseCapture();
+        Notify();
+    }
+
+    // ===== 回転 =====
+
+    private void BeginRotate(Point2D cell, Point mouseDip)
+    {
+        int idx = PartShapeGeometry.HitTest(_primitives, cell.X, cell.Y);
+        _selectedIndex = idx;
+        if (idx < 0) { Notify(); return; }
+        _rotateDragOriginal = _primitives[idx];
+        var (cx, cy) = PartShapeGeometry.CenterOf(_rotateDragOriginal);
+        _rotateCenterCell = new Point2D(cx, cy);
+        _rotateStartMouseAngleDeg = AngleDeg(CellToDip(_rotateCenterCell.Value), mouseDip);
+        _dragSnapshotBeforeChange = CaptureSnapshot();
+        _dragChanged = false;
+        CaptureMouse();
+        Notify();
+    }
+
+    private void UpdateRotateDrag(Point mouseDip)
+    {
+        if (_rotateCenterCell is not { } center || _rotateDragOriginal is null || _selectedIndex < 0) return;
+        double deltaDeg = PartShapeGeometry.SnapAngleDeg(AngleDeg(CellToDip(center), mouseDip) - _rotateStartMouseAngleDeg);
+        if (deltaDeg != 0) _dragChanged = true;
+        _primitives[_selectedIndex] = PartShapeGeometry.Rotate(_rotateDragOriginal, center.X, center.Y, deltaDeg);
+    }
+
+    private void CommitRotate()
+    {
+        if (_rotateCenterCell is null) return;
+        if (_dragChanged) PushUndoSnapshot(_dragSnapshotBeforeChange);
+        _rotateCenterCell = null;
+        _rotateDragOriginal = null;
+        _dragSnapshotBeforeChange = null;
+        _dragChanged = false;
+        ReleaseMouseCapture();
+        Notify();
+    }
+
+    private static double AngleDeg(Point center, Point p) => Math.Atan2(p.Y - center.Y, p.X - center.X) * 180 / Math.PI;
+
+    // ===== 作図 =====
+
+    /// <summary>ツールに応じた形状を組み立てる。形状そのものの構築は <see cref="PartShapeGeometry"/> が持ち、
+    /// ツール種別による分岐（UI状態）だけを本クラスが受け持つ。</summary>
+    private static PartPrimitive? BuildPrimitive(PartEditTool tool, Point2D start, Point2D end) => tool switch
+    {
+        PartEditTool.Line => new PartLine(start.X, start.Y, end.X, end.Y),
+        PartEditTool.Rect => PartShapeGeometry.BuildRect(start.X, start.Y, end.X, end.Y),
+        PartEditTool.Circle => PartShapeGeometry.BuildCircle(start.X, start.Y, end.X, end.Y),
+        PartEditTool.Arc => PartShapeGeometry.BuildArc(start.X, start.Y, end.X, end.Y),
+        _ => null,
+    };
+
+    // ===== Undo/Redo（GuiEcad原本の EditorSnapshot 相当＝Prims/Ports/W/H/Role の5項目） =====
+
+    private sealed record Snapshot(List<PartPrimitive> Primitives, PartEditorExternalState? External);
+
+    private Snapshot CaptureSnapshot() => new(_primitives.ToList(), CaptureExternalState?.Invoke());
+
+    private void PushUndo() => PushUndoSnapshot(CaptureSnapshot());
+
+    private void PushUndoSnapshot(Snapshot? snapshot)
+    {
+        if (snapshot is null) return;
+        _undoStack.Add(snapshot);
+        _redoStack.Clear();
+    }
+
+    public void Undo()
+    {
+        if (_undoStack.Count == 0) return;
+        _redoStack.Add(CaptureSnapshot());
+        ApplySnapshot(_undoStack[^1]);
+        _undoStack.RemoveAt(_undoStack.Count - 1);
+        Notify();
+    }
+
+    public void Redo()
+    {
+        if (_redoStack.Count == 0) return;
+        _undoStack.Add(CaptureSnapshot());
+        ApplySnapshot(_redoStack[^1]);
+        _redoStack.RemoveAt(_redoStack.Count - 1);
+        Notify();
+    }
+
+    private void ApplySnapshot(Snapshot snapshot)
+    {
+        _primitives = snapshot.Primitives;
+        if (snapshot.External is { } external) RestoreExternalState?.Invoke(external);
+        _selectedIndex = -1;
+    }
+
+    private void CommitAdd(PartPrimitive p)
+    {
+        PushUndo();
+        _primitives.Add(p);
+    }
+
+    public void DeleteSelected()
+    {
+        if (_selectedIndex < 0) return;
+        PushUndo();
+        _primitives.RemoveAt(_selectedIndex);
+        _selectedIndex = -1;
+        Notify();
+    }
+
+    private void CancelDraft()
+    {
+        _dragStartCell = null;
+        _draftPrimitive = null;
+        _polylinePoints.Clear();
+        _polylineCursorCell = null;
+        if (_moveDragStartCell is not null && _moveDragOriginal is not null && _selectedIndex >= 0)
+            _primitives[_selectedIndex] = _moveDragOriginal;
+        _moveDragStartCell = null;
+        _moveDragOriginal = null;
+        if (_rotateDragOriginal is not null && _selectedIndex >= 0)
+            _primitives[_selectedIndex] = _rotateDragOriginal;
+        _rotateCenterCell = null;
+        _rotateDragOriginal = null;
+        _dragSnapshotBeforeChange = null;
+        _dragChanged = false;
+        ReleaseMouseCapture();
+    }
+
+    // ===== 描画 =====
+
+    public void Draw()
+    {
+        _children.Clear();
+        double w = ActualWidth > 0 ? ActualWidth : 600;
+        double h = ActualHeight > 0 ? ActualHeight : 400;
+        var visual = new DrawingVisual();
+        using (var dc = visual.RenderOpen())
+        {
+            var bg = _theme.Background;
+            dc.DrawRectangle(new SolidColorBrush(System.Windows.Media.Color.FromArgb(bg.A, bg.R, bg.G, bg.B)), null, new Rect(0, 0, w, h));
+
+            var renderer = new WpfRenderer(dc);
+            renderer.PushTransform(_panMm.X, _panMm.Y, _zoom);            // 外側: パン・ズーム
+            renderer.PushTransform(_geo.MarginMm, _geo.MarginMm, 1.0);    // 内側: 原点余白
+
+            var frameStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 180, 180, 180), 0.1, LineStyle.Dashed);
+            var normalStroke = new StrokeStyle(_theme.Foreground, 0.3);
+            var selectedStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 255, 69, 0), 0.5);
+            var draftStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 30, 144, 255), 0.4, LineStyle.Dashed);
+
+            // 基準枠（プロパティ欄の幅・高さに連動する外形の目安）
+            renderer.DrawRectangle(new Rect2D(0, 0, _widthCells * _geo.CellMm, _heightCells * _geo.CellMm), frameStroke);
+
+            for (int i = 0; i < _primitives.Count; i++)
+                PartDrawing.DrawPrimitive(renderer, _theme, _primitives[i], _geo.CellMm,
+                    i == _selectedIndex ? selectedStroke : normalStroke);
+
+            if (_draftPrimitive is not null)
+                PartDrawing.DrawPrimitive(renderer, _theme, _draftPrimitive, _geo.CellMm, draftStroke);
+
+            if (_polylinePoints.Count > 0)
+            {
+                var pts = new List<Point2D>(_polylinePoints);
+                if (_polylineCursorCell is { } cur) pts.Add(cur);
+                if (pts.Count >= 2)
+                    renderer.DrawPolyline(pts.Select(p => CellToLocalMm(p.X, p.Y)).ToArray(), draftStroke);
+            }
+
+            if (_tool == PartEditTool.Rotate && _selectedIndex >= 0)
+            {
+                var (ccx, ccy) = PartShapeGeometry.CenterOf(_primitives[_selectedIndex]);
+                var c = CellToLocalMm(ccx, ccy);
+                double m = _geo.CellMm * 0.15;
+                renderer.DrawLine(new(c.X - m, c.Y), new(c.X + m, c.Y), selectedStroke);
+                renderer.DrawLine(new(c.X, c.Y - m), new(c.X, c.Y + m), selectedStroke);
+            }
+
+            renderer.PopTransform();
+            renderer.PopTransform();
+        }
+        _children.Add(visual);
+    }
+
+    protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
+    {
+        base.OnRenderSizeChanged(sizeInfo);
+        Draw();
+    }
+}

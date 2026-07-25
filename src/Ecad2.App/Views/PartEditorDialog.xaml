@@ -1,6 +1,7 @@
 <Window x:Class="Ecad2.App.Views.PartEditorDialog"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:Ecad2.App.Views"
         Title="自作パーツ編集" Height="600" Width="800"
         MinHeight="420" MinWidth="640"
         WindowStartupLocation="CenterOwner" ResizeMode="CanResize"
@@ -8,14 +9,16 @@
         Background="{DynamicResource DialogBackgroundBrush}"
         Foreground="{DynamicResource DialogForegroundBrush}">
     <!--
-        T-068増分3-a(家老采配2026-07-25、殿事前裁可に基づく家老仮決定1): タブ構成を廃止し、
-        GuiEcad原本(PartEditorWindow.xaml)と同じ単一画面構成へ再設計する。原本のRow0-3との対応:
+        T-068増分3-a（家老仮決定1・2026-07-25): タブ構成を廃止し、GuiEcad原本(PartEditorWindow.xaml)と
+        同じ単一画面構成へ再設計する。原本のRow0-3との対応:
           Row0 = プロパティ(名前/幅高さ/役割)を常時表示          -> 本ファイルのRow0
-          Row1 = 描画ツールバー(9種+Undo/Redo/削除+ズーム)       -> 本ファイルのRow1(増分3-bで中身を実装)
-          Row2 = 形状編集キャンバス                              -> 本ファイルのRow2左(増分3-bで中身を実装)
-          Row3 = ステータス+保存/閉じるボタン                    -> 本ファイルのRow3(エラー表示)・Row4(ボタン)
+          Row1 = 描画ツールバー(9種+Undo/Redo/削除+ズーム)       -> 本ファイルのRow1
+          Row2 = 形状編集キャンバス                              -> 本ファイルのRow2左
+          Row3 = ステータス+弧の扁平率調整+保存/閉じるボタン      -> 本ファイルのRow3(エラー)・Row4
+        T-068増分3-b2: Row1・Row2左のプレースホルダを実物（ツールバー・PartEditorCanvas）へ置換した。
+        文字ツールは増分3-b3、接続点ツールは増分3-cで追加する。
         端子(接続点)編集は増分3-cでキャンバス上の接続点ツールへ統合し本リストは廃止する。
-        それまでは機能を保つため暫定的にRow2の右列へ残置する(家老采配のDoD4、置き場所は実装判断)。
+        それまでは機能を保つため暫定的にRow2の右列へ残置する（家老采配のDoD4、置き場所は実装判断）。
     -->
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -36,11 +39,13 @@
 
             <TextBlock Text="幅(セル、1〜12):" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBox x:Name="WidthBox" Width="48" VerticalAlignment="Center" Margin="0,0,16,0"
+                     TextChanged="SizeBox_TextChanged"
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
             <TextBlock Text="高さ(セル、1〜12):" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBox x:Name="HeightBox" Width="48" VerticalAlignment="Center" Margin="0,0,16,0"
+                     TextChanged="SizeBox_TextChanged"
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
@@ -50,17 +55,30 @@
                       Foreground="{DynamicResource InputForegroundBrush}"/>
         </WrapPanel>
 
-        <!-- Row1: 形状編集ツールバー(原本Row1相当)。ツール本体は増分3-bで実装するため、
-             本増分では行の器のみ確保する。 -->
-        <Border Grid.Row="1" Margin="0,0,0,8" Padding="8,6"
-                Background="{DynamicResource ToolBarBackgroundBrush}"
-                BorderBrush="{DynamicResource DialogBorderBrush}" BorderThickness="1">
-            <TextBlock Text="形状編集ツール(実装予定)" VerticalAlignment="Center"
-                       Foreground="{DynamicResource ToolBarForegroundBrush}"/>
-        </Border>
+        <!-- Row1: 形状編集ツールバー(原本Row1相当)。 -->
+        <ToolBar Grid.Row="1" Margin="0,0,0,8"
+                 Background="{DynamicResource ToolBarBackgroundBrush}"
+                 Foreground="{DynamicResource ToolBarForegroundBrush}">
+            <RadioButton Content="選択" GroupName="PartEditTool" IsChecked="True" Checked="Tool_Checked" Tag="Select" Margin="4,0"/>
+            <RadioButton Content="線" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Line" Margin="4,0"/>
+            <RadioButton Content="折れ線" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Polyline" Margin="4,0"
+                         ToolTip="クリックで頂点を追加し、右クリックで確定します"/>
+            <RadioButton Content="矩形" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Rect" Margin="4,0"/>
+            <RadioButton Content="円" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Circle" Margin="4,0"/>
+            <RadioButton Content="弧" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Arc" Margin="4,0"
+                         ToolTip="外接する矩形をドラッグして半楕円の弧を描きます"/>
+            <RadioButton Content="回転" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Rotate" Margin="4,0"
+                         ToolTip="図形をドラッグして15度きざみで回します"/>
+            <Separator/>
+            <Button x:Name="UndoButton" Content="元に戻す" Click="Undo_Click" ToolTip="Ctrl+Z"/>
+            <Button x:Name="RedoButton" Content="やり直し" Click="Redo_Click" ToolTip="Ctrl+Y"/>
+            <Button x:Name="DeleteShapeButton" Content="選択を削除" Click="DeleteShape_Click" ToolTip="Delete"/>
+            <Separator/>
+            <Button Content="ズームを戻す" Click="ZoomReset_Click"/>
+        </ToolBar>
 
-        <!-- Row2: 左=形状編集キャンバス(原本Row2相当、増分3-bで実装)、右=端子リスト(増分3-cまでの
-             暫定残置)。増分3-cでは右列(ColumnDefinition・PortsPanel)を削除すれば足りる構成とする。 -->
+        <!-- Row2: 左=形状編集キャンバス(原本Row2相当)、右=端子リスト(増分3-cまでの暫定残置)。
+             増分3-cでは右列(ColumnDefinition・PortsPanel)を削除すれば足りる構成とする。 -->
         <Grid Grid.Row="2">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -68,11 +86,8 @@
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" MinHeight="160"
-                    Background="{DynamicResource WorkAreaBackgroundBrush}"
                     BorderBrush="{DynamicResource DialogBorderBrush}" BorderThickness="1">
-                <TextBlock Text="形状編集キャンバス(実装予定)"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"
-                           Foreground="{DynamicResource DialogForegroundBrush}"/>
+                <local:PartEditorCanvas x:Name="ShapeCanvas" ClipToBounds="True"/>
             </Border>
 
             <DockPanel x:Name="PortsPanel" Grid.Column="1" Width="290" Margin="8,0,0,0">
@@ -97,9 +112,28 @@
 
         <TextBlock x:Name="ErrorText" Grid.Row="3" Foreground="Red" TextWrapping="Wrap" Margin="0,8,0,0" Visibility="Collapsed"/>
 
-        <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
-            <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
-            <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>
-        </StackPanel>
+        <!-- Row4: ステータス+弧の扁平率調整+OK/キャンセル(原本Row3相当)。 -->
+        <Grid Grid.Row="4" Margin="0,8,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <TextBlock x:Name="StatusText" Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+
+            <TextBlock x:Name="ArcRyLabel" Grid.Column="1" Text="弧の縦半径(セル):" VerticalAlignment="Center"
+                       Margin="8,0,4,0" Visibility="Collapsed"/>
+            <TextBox x:Name="ArcRyBox" Grid.Column="2" Width="60" VerticalAlignment="Center" Visibility="Collapsed"
+                     KeyDown="ArcRyBox_KeyDown" ToolTip="値を入れてEnterで反映します"
+                     Background="{DynamicResource InputBackgroundBrush}"
+                     Foreground="{DynamicResource InputForegroundBrush}"/>
+
+            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="12,0,0,0">
+                <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
+                <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>
+            </StackPanel>
+        </Grid>
     </Grid>
 </Window>
