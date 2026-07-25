@@ -134,6 +134,7 @@ public partial class PartEditorDialog : Window
             "Arc" => PartEditTool.Arc,
             "Rotate" => PartEditTool.Rotate,
             "Text" => PartEditTool.Text,
+            "Port" => PartEditTool.Port,
             _ => PartEditTool.Select,
         };
         UpdateShapeStatus();
