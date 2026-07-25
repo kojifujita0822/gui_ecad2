@@ -185,9 +185,31 @@ public partial class PartEditorDialog : Window
         RedoButton.IsEnabled = ShapeCanvas.CanRedo;
         DeleteShapeButton.IsEnabled = ShapeCanvas.SelectedIndex >= 0;
 
-        StatusText.Text = $"図形: {ShapeCanvas.Primitives.Count}個 / 表示倍率: {ShapeCanvas.Zoom:0.00}倍 "
-            + "/ Ctrl+ホイールで拡大縮小、中ボタンのドラッグで移動";
+        StatusText.Text = $"図形: {ShapeCanvas.Primitives.Count}個 / 表示倍率: {ShapeCanvas.Zoom:0.00}倍"
+            + $" / ツール: {ToolLabel(ShapeCanvas.Tool)} - {ToolGuide(ShapeCanvas.Tool)}";
     }
+
+    private static string ToolLabel(PartEditTool tool) => tool switch
+    {
+        PartEditTool.Line => "線",
+        PartEditTool.Polyline => "折れ線",
+        PartEditTool.Rect => "矩形",
+        PartEditTool.Circle => "円",
+        PartEditTool.Arc => "弧",
+        PartEditTool.Rotate => "回転",
+        _ => "選択",
+    };
+
+    /// <summary>ツールごとの操作ガイド（GuiEcad原本のステータステキストが持っていた動的ガイダンス）。
+    /// 原本がガイドを出していたのは折れ線・弧・回転の3つ。それ以外のツールでは代わりに
+    /// ecad2独自のズーム・パン操作の案内を出す（案内が二重に並んで読みづらくなるのを避ける）。</summary>
+    private static string ToolGuide(PartEditTool tool) => tool switch
+    {
+        PartEditTool.Polyline => "クリックで頂点を追加し、右クリックで確定します",
+        PartEditTool.Arc => "外接する矩形をドラッグします。描いた後は下の欄で縦半径を変えられます",
+        PartEditTool.Rotate => "図形をドラッグすると15度きざみで回ります",
+        _ => "Ctrl+ホイールで拡大縮小、中ボタンのドラッグで移動",
+    };
 
     private PartEditorExternalState CaptureExternalState() => new(
         _portRows.Select(r => new PortDef(r.Name, r.RowOffset, r.BoundaryOffset)).ToList(),
