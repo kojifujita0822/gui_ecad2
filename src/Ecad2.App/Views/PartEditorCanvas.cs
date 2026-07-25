@@ -7,8 +7,8 @@ using Ecad2.Rendering.Wpf;
 
 namespace Ecad2.App.Views;
 
-/// <summary>形状編集キャンバスの描画ツール。文字・接続点は増分3-b3・3-cで追加する。</summary>
-public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate }
+/// <summary>形状編集キャンバスの描画ツール。接続点は増分3-cで追加する。</summary>
+public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate, Text }
 
 /// <summary>
 /// Undo/Redo のスナップショットに含める、キャンバスの外で編集されている状態。
@@ -35,7 +35,7 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     private readonly VisualCollection _children;
     private readonly GridGeometry _geo = new(cellMm: 9.0, marginMm: 30.0);
-    private readonly DrawingTheme _theme = DrawingTheme.Default;
+    private DrawingTheme _theme = DrawingTheme.Default;
 
     private List<PartPrimitive> _primitives = new();
     private readonly List<Snapshot> _undoStack = new();
@@ -86,6 +86,11 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// <summary>Undo/Redo で外部状態を復元する。ダイアログ側が設定する。</summary>
     public Action<PartEditorExternalState>? RestoreExternalState { get; set; }
 
+    /// <summary>文字ツールで配置する文字列の入力を求める（ダイアログ側が設定する）。
+    /// null・空を返した場合は配置しない。キャンバス自身はモーダルを開かない——View部品が
+    /// ダイアログを直に開くと、単体で使えず配置先ごとの見え方も制御できなくなるため。</summary>
+    public Func<string?>? RequestText { get; set; }
+
     public PartEditorCanvas()
     {
         _children = new VisualCollection(this);
@@ -95,6 +100,21 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     protected override int VisualChildrenCount => _children.Count;
     protected override Visual GetVisualChild(int index) => _children[index];
+
+    /// <summary>作図キャンバス色のテーマ。T-068増分3-b3（家老采配2026-07-25）: メインの
+    /// ラダーキャンバス（<see cref="LadderCanvas.Theme"/>、T-083 PoC）はダークモードへ追従するのに
+    /// 本キャンバスだけが固定値で、ダークモード時に白背景が浮いていた不整合を解消する。
+    /// パーツエディタはモーダルゆえ、開いている最中のテーマ切替は起こりえないと見て起動時の反映のみとする。</summary>
+    public DrawingTheme Theme
+    {
+        get => _theme;
+        set
+        {
+            if (ReferenceEquals(_theme, value)) return;
+            _theme = value;
+            Draw();
+        }
+    }
 
     public PartEditTool Tool
     {
@@ -226,8 +246,21 @@ public sealed class PartEditorCanvas : FrameworkElement
             case PartEditTool.Rotate:
                 BeginRotate(cell, e.GetPosition(this));
                 break;
+            case PartEditTool.Text:
+                PlaceText(cell);
+                break;
         }
         e.Handled = true;
+    }
+
+    /// <summary>文字ツール: クリック位置へ文字を置く（GuiEcad原本どおり、入力はダイアログで受ける）。
+    /// 文字の大きさを変えるUIは設けないため <see cref="PartText.SizeCells"/> は既定値のまま。</summary>
+    private void PlaceText(Point2D cell)
+    {
+        string? text = RequestText?.Invoke();
+        if (string.IsNullOrEmpty(text)) return;
+        CommitAdd(new PartText(text, cell.X, cell.Y));
+        Notify();
     }
 
     protected override void OnMouseMove(MouseEventArgs e)

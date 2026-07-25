@@ -69,6 +69,8 @@
                          ToolTip="外接する矩形をドラッグして半楕円の弧を描きます"/>
             <RadioButton Content="回転" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Rotate" Margin="4,0"
                          ToolTip="図形をドラッグして15度きざみで回します"/>
+            <RadioButton Content="文字" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Text" Margin="4,0"
+                         ToolTip="クリックした位置に文字を置きます"/>
             <Separator/>
             <Button x:Name="UndoButton" Content="元に戻す" Click="Undo_Click" ToolTip="Ctrl+Z"/>
             <Button x:Name="RedoButton" Content="やり直し" Click="Redo_Click" ToolTip="Ctrl+Y"/>

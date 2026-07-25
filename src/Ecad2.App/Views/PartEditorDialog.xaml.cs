@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using Ecad2.Model;
+using Ecad2.Rendering;
 
 namespace Ecad2.App.Views;
 
@@ -41,8 +42,10 @@ public partial class PartEditorDialog : Window
     public PartDefinition Result { get; private set; } = null!;
 
     /// <summary>新規作成の場合はeditにnullを渡す。編集の場合は対象のPartDefinitionを渡す
-    /// (Id・IsOrEligibleは編集対象からそのまま引き継ぐ。Ports・Primitivesは本ダイアログで編集可能)。</summary>
-    public PartEditorDialog(PartDefinition? edit)
+    /// (Id・IsOrEligibleは編集対象からそのまま引き継ぐ。Ports・Primitivesは本ダイアログで編集可能)。
+    /// isDarkModeは形状編集キャンバスの配色に用いる(T-068増分3-b3、メインのラダーキャンバスと同じ
+    /// テーマ追従を行う)。</summary>
+    public PartEditorDialog(PartDefinition? edit, bool isDarkMode = false)
     {
         InitializeComponent();
         _editing = edit;
@@ -82,6 +85,8 @@ public partial class PartEditorDialog : Window
         ShapeCanvas.LoadPrimitives(edit?.Primitives ?? Enumerable.Empty<PartPrimitive>());
         ShapeCanvas.WidthCells = ParseCells(WidthBox.Text, MinCells);
         ShapeCanvas.HeightCells = ParseCells(HeightBox.Text, MinCells);
+        ShapeCanvas.Theme = isDarkMode ? DrawingTheme.Dark : DrawingTheme.Default;
+        ShapeCanvas.RequestText = AskShapeText;
         ShapeCanvas.StateChanged += (_, _) => UpdateShapeStatus();
 
         Loaded += (_, _) =>
@@ -130,6 +135,7 @@ public partial class PartEditorDialog : Window
             "Circle" => PartEditTool.Circle,
             "Arc" => PartEditTool.Arc,
             "Rotate" => PartEditTool.Rotate,
+            "Text" => PartEditTool.Text,
             _ => PartEditTool.Select,
         };
         UpdateShapeStatus();
@@ -157,6 +163,13 @@ public partial class PartEditorDialog : Window
     {
         ShapeCanvas.Zoom = 1.0;
         ShapeCanvas.Focus();
+    }
+
+    /// <summary>文字ツールで配置する文字列を入力してもらう（キャンセル・空入力ならnull）。</summary>
+    private string? AskShapeText()
+    {
+        var dialog = new PartTextInputDialog { Owner = this };
+        return dialog.ShowDialog() == true ? dialog.InputText : null;
     }
 
     private void ArcRyBox_KeyDown(object sender, KeyEventArgs e)
@@ -197,6 +210,7 @@ public partial class PartEditorDialog : Window
         PartEditTool.Circle => "円",
         PartEditTool.Arc => "弧",
         PartEditTool.Rotate => "回転",
+        PartEditTool.Text => "文字",
         _ => "選択",
     };
 
@@ -208,6 +222,7 @@ public partial class PartEditorDialog : Window
         PartEditTool.Polyline => "クリックで頂点を追加し、右クリックで確定します",
         PartEditTool.Arc => "外接する矩形をドラッグします。描いた後は下の欄で縦半径を変えられます",
         PartEditTool.Rotate => "図形をドラッグすると15度きざみで回ります",
+        PartEditTool.Text => "クリックした位置に文字を置きます",
         _ => "Ctrl+ホイールで拡大縮小、中ボタンのドラッグで移動",
     };
 
@@ -282,8 +297,11 @@ public partial class PartEditorDialog : Window
             .ToList();
 
         // T-068増分3-b2: 形状はキャンバスの編集結果を新しいリストとして取り出す(キャンバス内部の
-        // リストとも切り離す)。MergeCollinearLinesの適用は増分3-b3で扱う。
-        var primitives = ShapeCanvas.Primitives.ToList();
+        // リストとも切り離す)。
+        // T-068増分3-b3(家老裁可7、GuiEcad原本OnSave 940行踏襲): 保存直前にのみ直線マージを掛ける。
+        // 編集中のプリミティブ自体は変えない(MergeCollinearLinesは新しいリストを返すため、
+        // キャンセルした場合はもちろん、OK後もキャンバス側の並びは影響を受けない)。
+        var primitives = PartOptimizer.MergeCollinearLines(ShapeCanvas.Primitives);
 
         Result = _editing is { } original
             ? new PartDefinition

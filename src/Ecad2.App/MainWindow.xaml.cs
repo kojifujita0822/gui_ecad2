@@ -467,9 +467,11 @@ public partial class MainWindow : Window
     // 基本図形(Category=="")は編集・削除の対象に含めない(自作のみ)。
     private void CreatePartMenuItem_Click(object sender, RoutedEventArgs e)
     {
-        var dialog = new Views.PartEditorDialog(null) { Owner = this };
-        if (dialog.ShowDialog() == true)
-            _viewModel.PartPalette.SaveNewPart(dialog.Result);
+        var dialog = new Views.PartEditorDialog(null, _viewModel.IsDarkMode) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+
+        _viewModel.PartPalette.SaveNewPart(dialog.Result);
+        RedrawCanvas();
     }
 
     private void CustomPartsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
@@ -512,9 +514,16 @@ public partial class MainWindow : Window
     private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;
-        var dialog = new Views.PartEditorDialog(entry.Definition) { Owner = this };
-        if (dialog.ShowDialog() == true)
-            _viewModel.PartPalette.SaveEditedPart(dialog.Result, entry.FilePath);
+        var dialog = new Views.PartEditorDialog(entry.Definition, _viewModel.IsDarkMode) { Owner = this };
+        if (dialog.ShowDialog() != true) return;
+
+        _viewModel.PartPalette.SaveEditedPart(dialog.Result, entry.FilePath);
+
+        // T-068増分3-b3(家老采配2026-07-25、侍の着手前調査1.9): 形状を編集して保存しても、既に
+        // 配置済みのパーツの見た目が変わらなかった。PartPaletteViewModel.LoadはPartLibrary.ByIdの
+        // 中身を入れ替えるがキャンバスの再描画までは起こさないため。増分3-b2までは形状自体を
+        // 編集できず顕在化していなかった。
+        RedrawCanvas();
     }
 
     private void DeletePartMenuItem_Click(object sender, RoutedEventArgs e)
@@ -522,8 +531,12 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;
         var result = MessageBox.Show(this, $"自作パーツ「{entry.Definition.Name}」を削除しますか？", "パーツの削除",
             MessageBoxButton.YesNo, MessageBoxImage.Warning);
-        if (result == MessageBoxResult.Yes)
-            _viewModel.PartPalette.DeletePart(entry.FilePath);
+        if (result != MessageBoxResult.Yes) return;
+
+        _viewModel.PartPalette.DeletePart(entry.FilePath);
+
+        // 削除したパーツが配置済みの場合、PartIdが解決できなくなり見た目が変わるため再描画する。
+        RedrawCanvas();
     }
 
     // T-110増分3(裁5付帯裁定、家老采配2026-07-22、設計書§3.1-4): メニューを開くたびに実際の
