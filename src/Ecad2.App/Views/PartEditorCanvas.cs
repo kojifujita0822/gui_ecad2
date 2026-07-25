@@ -151,14 +151,14 @@ public sealed class PartEditorCanvas : FrameworkElement
     public int WidthCells
     {
         get => _widthCells;
-        set { if (_widthCells == value) return; _widthCells = value; ReclampPorts(); Draw(); }
+        set { if (_widthCells == value) return; _widthCells = value; Draw(); }
     }
 
     /// <summary>基準枠（外形枠）の高さ。プロパティ欄の入力に連動させる。</summary>
     public int HeightCells
     {
         get => _heightCells;
-        set { if (_heightCells == value) return; _heightCells = value; ReclampPorts(); Draw(); }
+        set { if (_heightCells == value) return; _heightCells = value; Draw(); }
     }
 
     public int SelectedIndex => _selectedIndex;
@@ -448,20 +448,6 @@ public sealed class PartEditorCanvas : FrameworkElement
     }
 
     // ===== 接続点（T-068増分3-c、GuiEcad原本の接続点ツール踏襲） =====
-
-    /// <summary>基準枠（WidthCells/HeightCells）が変わった際、既存の接続点を新しい範囲へ再クランプする。
-    /// 追加時（<see cref="AddPort"/>）・ドラッグ時（<see cref="UpdatePortDrag"/>）はクランプ済みだが、
-    /// 基準枠自体の変更にはこれまで追従していなかった（T-068増分3-c残欠陥、忍者発見）。</summary>
-    private void ReclampPorts()
-    {
-        for (int i = 0; i < _ports.Count; i++)
-        {
-            var p = _ports[i];
-            var (row, boundary) = PartShapeGeometry.ClampPort(p.BoundaryOffset, p.RowOffset, _widthCells, _heightCells);
-            if (row != p.RowOffset || boundary != p.BoundaryOffset)
-                _ports[i] = p with { RowOffset = row, BoundaryOffset = boundary };
-        }
-    }
 
     /// <summary>接続点を置く。位置は整数へ丸めて基準枠の範囲へクランプする。
     /// 既に同じ位置に接続点があれば何もしない（原本どおり警告は出さない）。</summary>
