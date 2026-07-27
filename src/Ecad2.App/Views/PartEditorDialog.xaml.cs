@@ -270,20 +270,38 @@ public partial class PartEditorDialog : Window
             return;
         }
 
-        // T-068増分2(GuiEcad原本OnSave 939行踏襲): 先頭=NetA・末尾=NetBの規約でBoundaryOffset昇順に
-        // 並べ替えてから保存する。
         // T-068増分3-c(殿裁定2026-07-25): 並べ替えの前に基準枠の範囲内へ正規化する。編集中に枠を
         // 縮めても接続点は原本どおり動かさず、保存時にのみ正規化する方式(MergeCollinearLinesと同じ流儀)。
+        var clampedPorts = PartOptimizer.ClampPortsToFrame(ShapeCanvas.Ports, width, height);
+
+        // T-126(P-129、殿裁可2026-07-27): 上のクランプは複数の接続点を同一座標・同一境界へ潰しうる。
+        // 潰れたまま保存すると誤結線を生むため、並べ替えより前に弾く。検証は二本立て——
+        // (A)完全同一座標の重複、(B)全接続点が同一境界=左右の縮退。行が違えば(B)は(A)をすり抜けるが
+        // 実害は同じ(要素の左右が1点へ潰れ、左右のネットが繋がる)ことを侍の実測で確かめている。
+        if (PartOptimizer.HasDuplicatePorts(clampedPorts))
+        {
+            ShowError("接続点が重なっています。基準枠を広げるか、接続点をずらしてください。");
+            return;
+        }
+        if (PartOptimizer.AllPortsOnSameBoundary(clampedPorts))
+        {
+            ShowError("接続点がすべて同じ左右位置にあります。左右に分けて配置してください。");
+            return;
+        }
+
+        // T-068増分2(GuiEcad原本OnSave 939行踏襲): 先頭=NetA・末尾=NetBの規約でBoundaryOffset昇順に
+        // 並べ替えてから保存する。
         //
-        // 【この2行の順序を入れ替えてはならぬ】クランプは複数の接続点を同一のBoundaryOffsetへ
+        // 【並べ替えはクランプより後に行うこと】クランプは複数の接続点を同一のBoundaryOffsetへ
         // 潰しうる(Math.Clampは単調非減少ゆえ大小関係自体は保たれるが、同値への収束は起きる)。
         // OrderByは安定ソートゆえ同値どうしの並びは入力順のまま残るが、その「入力順」がクランプの
         // 前か後かで変わってしまう——例えば[A(境界5), B(境界3)]を幅2でクランプすると両方が2になり、
-        // この順序なら[A,B]、逆順に処理すると[B,A]となる。すぐ下の並べ替えは先頭=NetA・末尾=NetBの
+        // この順序なら[A,B]、逆順に処理すると[B,A]となる。並べ替えは先頭=NetA・末尾=NetBの
         // 規約を作る処理ゆえ、この差は「どちらの接続点がNetAになるか」という電気的意味の差になる。
+        // なお上のT-126検証Bにより「全点が同一境界」は保存前に弾かれるが、3点以上で一部だけが
+        // 同値へ潰れる場合(残りが別の境界に載る場合)は保存が通るため、この順序は依然効いている。
         // 回帰テスト: PartOptimizerClampPortsTests.ClampBeforeOrderBy_PortsCollapsingToSameBoundary_KeepsCanvasOrder
-        var ports = PartOptimizer.ClampPortsToFrame(ShapeCanvas.Ports, width, height)
-            .OrderBy(p => p.BoundaryOffset).ToList();
+        var ports = clampedPorts.OrderBy(p => p.BoundaryOffset).ToList();
 
         // T-068増分3-b2: 形状はキャンバスの編集結果を新しいリストとして取り出す(キャンバス内部の
         // リストとも切り離す)。

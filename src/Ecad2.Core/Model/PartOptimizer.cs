@@ -60,6 +60,56 @@ public static class PartOptimizer
         return list;
     }
 
+    /// <summary>
+    /// 検証A（重複）: 完全に同じ格子位置（行・境界とも一致）にある接続点が2つ以上あるか。
+    /// <see cref="ClampPortsToFrame"/> は範囲外の接続点を枠内へ寄せるため、複数の接続点が同一座標へ
+    /// 収束しうる（T-126＝P-129。忍者が実機で再現）。重複した接続点は同一ノードに載って区別が付かず、
+    /// データとしても意味を持たぬため、保存時に拒否する。
+    /// 「同じ場所か」の判定は <see cref="PartShapeGeometry.IndexOfPortAt"/>（接続点の追加時に
+    /// 重複を防ぐのに使っているもの）と同一の定義を用いる——編集中に置けぬものが保存時に通っては
+    /// 辻褄が合わぬため、定義を1箇所に集約する。
+    /// </summary>
+    public static bool HasDuplicatePorts(IReadOnlyList<PortDef> ports)
+    {
+        for (int i = 0; i < ports.Count; i++)
+        {
+            // 自分より前に同じ座標の接続点があれば、i 番目は重複。
+            if (PartShapeGeometry.IndexOfPortAt(ports, ports[i].RowOffset, ports[i].BoundaryOffset) != i)
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 検証B（左右の縮退）: 接続点2つ以上が、すべて同じ境界オフセット（＝同じ左右位置）に載っているか。
+    ///
+    /// <para>検証Aだけでは実害を防げぬためこちらが要る（T-126、侍の実測で確認）。
+    /// <c>NetlistBuilder.BuildElementConnections</c> は最左・最右の接続点を
+    /// <c>BoundaryOffset</c> の厳密不等号比較のみで選ぶため、全ての接続点の境界が同値だと
+    /// <c>pl</c>・<c>pr</c> がともに先頭の1点へ落ちる。すると要素の左右が同一ノードへ縮退し、
+    /// <c>AddHorizontalWireUnions</c> が左母線・隣接要素をその1点へまとめて繋ぐ——
+    /// 断線ではなく「本来分かれるべき左右のネットが1つに統合される」誤結線（短絡）になる。
+    /// 行が違えば完全同一座標ではないので検証Aをすり抜けるが、実害は重複と全く同じである。</para>
+    ///
+    /// <para>「2点の境界が一致」ではなく「<em>すべて</em>の境界が同値」で判ずるのが肝。
+    /// 3点以上のうち一部だけが同じ境界に載るのは正常な形状であり（最左・最右は正しく分かれ、
+    /// 残りは中間ポートとして扱われる）、これを弾くと過検出になる。</para>
+    ///
+    /// <para>接続点が1つ以下なら左右の縮退という概念自体が成り立たぬため false を返す。
+    /// この場合は既存の「接続点2つ以上」検査（<c>PartEditorDialog.OkButton_Click</c>）が働き、
+    /// すり抜けるのは <see cref="PartRole.NonSimulated"/> のみ——電気的に寄与せぬ役割ゆえ
+    /// 縮退の実害も生じない（家老裁定2026-07-27）。</para>
+    /// </summary>
+    public static bool AllPortsOnSameBoundary(IReadOnlyList<PortDef> ports)
+    {
+        if (ports.Count < 2) return false;
+
+        int boundary = ports[0].BoundaryOffset;
+        for (int i = 1; i < ports.Count; i++)
+            if (ports[i].BoundaryOffset != boundary) return false;
+        return true;
+    }
+
     private static bool TryMerge(PartLine a, PartLine b, double eps, out PartLine result)
     {
         result = default!;
