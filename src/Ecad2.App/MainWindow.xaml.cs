@@ -181,9 +181,14 @@ public partial class MainWindow : Window
         ApplyDockingManagerThemes(_viewModel.IsDarkMode);
         RegisterDockingContents();
         SerializeDefaultDockingLayouts();
+        // T-130 診断ログ用の一時改変
+        Diagnostics.T130LayoutTrace.LogSessionStart();
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "ctor:XAML初期状態", force: true);
         // T-058増分4: 出荷時ハードコード既定(直前のSerializeDefaultDockingLayouts、不変)を必ず
         // キャプチャした後に、保存済みファイルがあれば読み込んで適用する(順序が重要、設計叩き台3-1節)。
         LoadDockingLayoutFromFileIfExists();
+        // T-130 診断ログ用の一時改変（保存レイアウト読込の前後で PreviousContainer がどう変わるか）
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "ctor:保存レイアウト読込後", force: true);
         // 忍者実機確認で発覚(往復2周目): LayoutAnchorable(LayoutContent→LayoutElement:DependencyObject)
         // はFrameworkElementではなくWPFのDataContext継承(Visual/Logical Tree経由)の対象外のため、
         // Title="{Binding Find.IsVisible, ...}"は解決されず完全に空白になっていた(GitHub一次ソース
@@ -224,6 +229,8 @@ public partial class MainWindow : Window
         // T-110増分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
         // ウィンドウ全域に及ぶため、本対処が全ペイン共通で有効になる。
         MainDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
+        // T-130 診断ログ用の一時改変（レイアウト変化の主経路。状態が前回と同一の連続は抑制される）
+        MainDockingManager.LayoutChanged += (_, _) => Diagnostics.T130LayoutTrace.Log(MainDockingManager, "LayoutChanged");
     }
 
     private void PlacementToolBarDockingManager_Loaded(object sender, RoutedEventArgs e)
@@ -242,6 +249,8 @@ public partial class MainWindow : Window
             .FirstOrDefault(a => a.ContentId == "PlacementToolBar");
         if (placementToolBarAnchorable is not null)
             placementToolBarAnchorable.IsActive = true;
+        // T-130 診断ログ用の一時改変（起動完了時＝殿が操作を始める直前の状態）
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "DockingManager.Loaded", force: true);
     }
 
     private static void DisableFocusOnAutoHideSideItemsControl(AvalonDock.Controls.LayoutAnchorSideControl? sideControl)
@@ -422,6 +431,9 @@ public partial class MainWindow : Window
 
     private void PlacementToolBarDockingManager_ContentFloating(object? sender, ContentFloatingEventArgs e)
     {
+        // T-130 診断ログ用の一時改変（Float操作の契機。ContentIdを問わず記録する——他パネルのFloatが
+        // CollectGarbage()を誘発してシートパネルのPreviousContainerを巻き添えにする、が隠密の仮説ゆえ）
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "ContentFloating", force: true, note: e.Content.ContentId);
         if (e.Content.ContentId != "PlacementToolBar") return;
         // 隠密レビュー指摘: PointToScreenは物理ピクセル座標を返すが、FloatingLeft/TopはDIP消費の
         // ため、DPI拡大率が100%でない環境ではズレる。VisualTreeHelper.GetDpiのDpiScaleX/Yで
@@ -566,7 +578,11 @@ public partial class MainWindow : Window
         if (sender is not MenuItem { Tag: string contentId }) return;
         var anchorable = MainDockingManager.Layout.Descendents().OfType<LayoutAnchorable>()
             .FirstOrDefault(a => a.ContentId == contentId);
+        // T-130 診断ログ用の一時改変（AutoHideの化・解除は仮説の核心ゆえ前後を必ず1行ずつ残す）
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "AutoHide切替:前", force: true, note: contentId);
         anchorable?.ToggleAutoHide();
+        // T-130 診断ログ用の一時改変
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "AutoHide切替:後", force: true, note: contentId);
     }
 
     // T-121(殿裁定・家老正式依頼2026-07-24、設計書§3.1案イ簡略版): タイトルバー常時非表示化に伴い
@@ -790,6 +806,8 @@ public partial class MainWindow : Window
     {
         try
         {
+            // T-130 診断ログ用の一時改変（Deserializeはモデルツリーを丸ごと差し替える最も破壊的な経路）
+            Diagnostics.T130LayoutTrace.Log(MainDockingManager, "Deserialize:前", force: true);
             var serializer = new XmlLayoutSerializer(MainDockingManager);
             serializer.LayoutSerializationCallback += RebindDockingContent;
             using var reader = new StringReader(xml);
@@ -800,6 +818,8 @@ public partial class MainWindow : Window
             // という偽の再発を招く)。Deserialize成功直後に強制Falseへ戻すことで無害化する
             // (次回保存時には正規化されたXMLが書き出される)。
             MainDockingManager.Layout.RootPanel.CanDock = false;
+            // T-130 診断ログ用の一時改変
+            Diagnostics.T130LayoutTrace.Log(MainDockingManager, "Deserialize:後", force: true);
             // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContent実体が
             // 欠落した壊れたXMLをここで検出する(HasExpectedContent参照)。
             return HasExpectedContent();
@@ -1451,6 +1471,8 @@ public partial class MainWindow : Window
             e.Cancel = true;
             return;
         }
+        // T-130 診断ログ用の一時改変（この状態がそのまま main-layout.xml へ保存される）
+        Diagnostics.T130LayoutTrace.Log(MainDockingManager, "Window_Closing:保存直前", force: true);
         // T-058増分4(殿裁定=保存タイミング両方の1つ、アプリ終了時自動保存)。
         SaveDockingLayoutAsDefault();
     }
