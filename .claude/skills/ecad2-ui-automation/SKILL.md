@@ -187,6 +187,10 @@ Invoke-Ecad2Drag -FromX $cx -FromY $cy -ToX ($cx + 300) -ToY ($cy + 400)
 # → 切り離し成立の確認はSave-Ecad2Screenshotではなく6.1節のEnumWindows手法を使う（フロート化した
 #   パネルは別ウィンドウとして生成されるため、メインウィンドウのPrintWindowには写らない）
 
+# ★AutoHideフライアウトのスプリッターは特に長い距離を要する(2026-07-27、T-130実測、忍者)
+#   130pxのドラッグでは掴めずフライアウトが閉じるだけで終わる。310pxで初めて成立した。
+#   既載の「300px以上が安定」がそのまま効く形。フライアウトは滞在時間が短く閉じやすいため、
+#   通常のペイン境界より条件が厳しいと心得る。
 # 境界線リサイズ例: Thumb要素(ControlType=Thumb, LocalizedControlType="縮小表示")をドラッグする
 $thumbCond = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Thumb)
 $thumb = (Get-Ecad2Root).FindAll([System.Windows.Automation.TreeScope]::Descendants, $thumbCond)[0]
