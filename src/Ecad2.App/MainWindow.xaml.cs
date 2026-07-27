@@ -187,7 +187,7 @@ public partial class MainWindow : Window
         // T-130: Deserializeを経ない場合(保存ファイル無し=新規環境、または読込失敗)にも既定値を効かせる。
         // XAMLに書いてもDeserializeでモデルツリーごと差し替わり失われるため、コード側へ一元化している
         // (DockingLayoutDefaultsのdocコメント参照)。
-        Views.DockingLayoutDefaults.ApplyAutoHideWidth(MainDockingManager.Layout);
+        Views.DockingLayoutDefaults.ApplyAutoHideSizes(MainDockingManager.Layout);
         // 忍者実機確認で発覚(往復2周目): LayoutAnchorable(LayoutContent→LayoutElement:DependencyObject)
         // はFrameworkElementではなくWPFのDataContext継承(Visual/Logical Tree経由)の対象外のため、
         // Title="{Binding Find.IsVisible, ...}"は解決されず完全に空白になっていた(GitHub一次ソース
@@ -804,11 +804,12 @@ public partial class MainWindow : Window
             // という偽の再発を招く)。Deserialize成功直後に強制Falseへ戻すことで無害化する
             // (次回保存時には正規化されたXMLが書き出される)。
             MainDockingManager.Layout.RootPanel.CanDock = false;
-            // T-130(殿裁可2026-07-27=幅のみ先に直す): 保存済みXMLにAutoHideWidthが無いと、
-            // AvalonDockはAutoHideMinWidthの既定100.0でフライアウトを描く(通常ドック時の190pxと
-            // 無関係な細い幅になる)。上のCanDock再強制と同型の対処として、Deserialize直後に
-            // 既定値を強制する。理由の詳細はDockingLayoutDefaultsのdocコメント参照。
-            Views.DockingLayoutDefaults.ApplyAutoHideWidth(MainDockingManager.Layout);
+            // T-130(殿裁可2026-07-27): 保存済みXMLにAutoHideWidth/AutoHideHeightが無いと、
+            // AvalonDockはAutoHideMinWidth/AutoHideMinHeightの既定100.0でフライアウトを描く
+            // (通常ドック時の寸法と無関係な細さ・低さになる)。上のCanDock再強制と同型の対処として、
+            // Deserialize直後に既定値を強制する。対象パネルと理由の詳細はDockingLayoutDefaultsの
+            // docコメント参照。
+            Views.DockingLayoutDefaults.ApplyAutoHideSizes(MainDockingManager.Layout);
             // 家老采配2026-07-19(読込側防御・本丸): Deserialize自体は成功してもContent実体が
             // 欠落した壊れたXMLをここで検出する(HasExpectedContent参照)。
             return HasExpectedContent();
