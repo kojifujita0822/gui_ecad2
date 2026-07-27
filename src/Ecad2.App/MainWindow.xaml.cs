@@ -1701,6 +1701,10 @@ public partial class MainWindow : Window
                 if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragElement(); return; }
                 _elementDragPressPositionDip = position;
                 _elementDragStarted = false;
+                // T-125増分β-1: 掴んだ時点で打ち切る(他7分岐と同じ形。この分岐だけが最後で
+                // ないのにreturnを欠いていた)。これが無いと続く枠分岐も同じ押下で評価され、
+                // SelectedElementとSelectedFrameが同時に非nullなら要素と枠を二重に掴みうる。
+                return;
             }
         }
 
@@ -3912,6 +3916,12 @@ public partial class MainWindow : Window
     private void OpenFrameLabelEditor(Ecad2.Model.GroupFrame frame)
     {
         _frameLabelEditingFrame = frame;
+        // T-125増分β-1: 枠選択の排他規約(SelectedFrameを設定する側が先にSelectedCell=nullを呼ぶ。
+        // 意図はMainWindowViewModel.cs:1441-1443/:1620-1621に明記。SelectedCellのsetterは一方向に
+        // SelectedFrameをクリアするが逆方向は保証されない)へ揃える。SelectedFrameを設定する4箇所の
+        // うち、ここだけが規約を破っており、要素選択を残したまま枠が選択される状態を作りうる唯一の
+        // 経路だった。
+        _viewModel.SelectedCell = null;
         _viewModel.SelectedFrame = frame;
         FrameLabelBox.Text = frame.Label;
         _viewModel.IsFrameLabelEditorVisible = true;
