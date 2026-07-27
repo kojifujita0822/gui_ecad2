@@ -37,6 +37,9 @@ GitHub取得の重複を避けるためのもの。殿指示（2026-07-22）に�
 | `source/Components/AvalonDock.Themes.Aero/Brushes.xaml` | AeroThemeのBaseColor1-33実RGB値。同上 |
 | `source/Components/AvalonDock.Themes.Aero/AeroColors.cs` | AeroThemeのBaseColorキー定義（`ComponentResourceKey`）。同上 |
 | `source/Components/AvalonDock.Themes.Aero/Controls/SplineBorder.cs` | タブ左20px幅の曲線を描く専用コントロール（`OnRender`で2本の`QuadraticBezierSegment`）。T-119の核心部分、124行の小さなクラス。同上 |
+| `source/Components/AvalonDock/Layout/LayoutContent.cs` | AvalonDock本体。`LayoutAnchorable`/`LayoutDocument`共通基底。`PreviousContainer`（`[XmlIgnore]`、`PreviousContainerId`としてGUID文字列のみシリアライズ）・`Dock()`/`Float()`（末尾で`CollectGarbage()`呼出）を含む。T-130（シートパネル位置ずれ）調査で追加（2026-07-27） |
+| `source/Components/AvalonDock/Layout/LayoutAnchorGroup.cs` | AvalonDock本体。AutoHide中のパネル群を束ねる入れ物。`ILayoutPreviousContainer`実装（64行の小さなクラス）。同上 |
+| `source/Components/AvalonDock/Layout/LayoutRoot.cs` | AvalonDock本体。`RootPanel`（setterのnull補完=L91相当）・`CollectGarbage()`（PreviousContainer強制クリア=L361-365相当）を含む、レイアウトツリー全体の根。同上 |
 
 各ファイルの先頭には、取得元URL・取得日・対象バージョンを記載したヘッダーコメントを
 追記済み（`.xaml`は`<!-- -->`、`.cs`は`//`）。ヘッダー以外は無改変で保存している。
@@ -86,6 +89,11 @@ GitHub取得の重複を避けるためのもの。殿指示（2026-07-22）に�
 | 同上 | 143-158 | `OnMouseEnter`（押下状態で別タブ進入→`MoveChild`タブ並び替え） | t110所見C調査書 |
 | `AvalonDock/Controls/AnchorablePaneTabPanel.cs` | 84-97 | `OnMouseLeave`→`StartDraggingFloatingWindowForContent`（タブからのフロート化開始の正規経路。キャプチャ無し・`e.LeftButton`状態依存） | t110所見C調査書 |
 | `AvalonDock/DockingManager.cs` | 1701-1712 | `StartDraggingFloatingWindowForContent`（冒頭に`CanFloat`ガード） | t110所見C調査書 |
+| `AvalonDock/Layout/LayoutAnchorable.cs` | 434-607 | `ToggleAutoHide()`。解除時`PreviousContainer==null`だと位置情報を捨てRootPanel端へ新規ペイン挿入（442-555） | t130調査書 |
+| `AvalonDock/Layout/LayoutRoot.cs` | 352-465 | `CollectGarbage()`。361-365=`PreviousContainer`が参照先の親null/別Rootなら強制null化（`LayoutAnchorGroup`も対象） | t130調査書 |
+| `AvalonDock/Layout/LayoutContent.cs` | 509-513, 598-634 | `WriteXml`のPreviousContainerId書出／`Dock()`（末尾`CollectGarbage()`呼出） | t130調査書 |
+
+「t130調査書」= `docs/ecad2-t130-sheetpanel-position-shift-investigation-onmitsu.md`。
 
 「t110設計書」= `docs/ecad2-t110-increment3-titlebar-hide-and-autohide-ui-design-onmitsu.md`、
 「t110所見AB調査書」= `docs/ecad2-t110-increment2-findings-ab-investigation-onmitsu.md`、

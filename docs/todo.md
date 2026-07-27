@@ -65,6 +65,25 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 2. 調査結果を見て侍へ修正を采配（規模が判明してから殿へ改めて報告）
 3. 検証パイプライン既定順（隠密静的レビュー → 忍者実機確認）
 
+**隠密の原因調査 完了（2026-07-27、`docs/ecad2-t130-sheetpanel-position-shift-investigation-onmitsu.md`）
+＝仮説の提示まで。机上調査のみゆえCONFIRMEDではない**。
+- **初動で`main-layout.xml`を検分＝現状は正常構造**。恒常的なファイル破損ではなく**実行時の一過性の
+  モデル異常**と見立てた
+- **【核心】AvalonDock標準の`ToggleAutoHide()`（解除側）に、元のドッキング先ペイン参照
+  （`PreviousContainer`）がnullなら位置情報を一切無視して`RootPanel`端へ新規ペインを生成する分岐がある**
+  （一次ソース`LayoutAnchorable.cs:442-555`）
+- この`PreviousContainer`は**`CollectGarbage()`（`LayoutRoot.cs:361-365`）が「参照先ペインの親が
+  null／別Root」と判定すると強制nullクリアする**。AutoHide中の`LayoutAnchorGroup`自身も対象に含まれる
+- **仮説**＝シートパネルをAutoHide化した状態で`CollectGarbage()`を誘発する操作（他パネルのDock/Float、
+  レイアウトのDeserialize等）が挟まると`PreviousContainer`が巻き添えでクリアされ、解除時に左パレット
+  190px位置を見失って`RootPanel`端へ誤配置される。**忍者が観測した「シート▼」表示と符合する**
+- **P-121との関係＝別件と判定**。「AutoHide復帰処理系」という大枠は共通だが、機序が異なる
+  （P-121＝ビジュアルツリーのレースコンディション／本件＝モデル層の参照消失、タイミング非依存の構造的な罠）
+- **次の一手＝忍者の実機再現確認**（調査書4節に手順）。**これは動的タイミングの謎ゆえ実測が要る**
+  （`memory: feedback_static_vs_dynamic_investigation`）。再現すれば診断ログでCONFIRMED化してから対処設計へ
+- 副産物＝AvalonDock一次ソース3件（`LayoutContent`/`LayoutAnchorGroup`/`LayoutRoot`）を
+  `docs-notes/vendor-reference/avalondock-v4.74.1/`へ保存、README索引も更新
+
 **留意**：AvalonDock絡みは**モデル手術でなくLayout差し替えに任せるのが正解**という過去の教訓あり
 （`memory: avalondock_hidden_invariants_survey_entry_points`、T-099(c)で3周を要した）。同一箇所への
 対症療法が2周続いたらモグラ叩き検知を発動する。**真因が永続化ファイル（`main-layout.xml`）にある
