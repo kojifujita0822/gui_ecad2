@@ -197,6 +197,10 @@ Save-Ecad2Screenshot -Path "$env:TEMP\claude\...\scratchpad\check1.png"
 
 # ウィンドウリサイズ確認（0節の注意点を踏まえ、単独で行い直後に生存確認する。関数内で自動チェック済み）
 Resize-Ecad2Window -Width 900 -Height 500
+# ★リサイズ直後は必ずモニタ位置を確認する（T-127実測2026-07-27、忍者が遭遇した新規事象）
+#   `Resize-Ecad2Window` は内部で MoveWindow を呼ぶため、拡大後の矩形がモニタ境界をまたぐと
+#   ウィンドウがセカンダリからプライマリへ移動してしまう。殿の作業を妨げるため放置は不可。
+Move-Ecad2WindowToScreen -Screen Secondary   # 移動していた場合の復帰（していなくとも無害）
 
 # 検証後のクリーンアップ（通常はここでアプリを終了する）
 Stop-Ecad2App
