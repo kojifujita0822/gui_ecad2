@@ -46,12 +46,24 @@ internal static class DockingLayoutDefaults
     /// <summary>
     /// レイアウト内のシートパネルへAutoHide幅の既定値を適用する。
     /// 対象が見つからない場合・レイアウトがnullの場合は何もしない（起動途中の呼び出しに耐える）。
+    /// <para>
+    /// <b>【殿裁定2026-07-27】保存値が無いとき（<c>0.0</c>）だけ入れる。既に値があれば尊重する。</b>
+    /// 初版は無条件で上書きしていたが、それでは<b>利用者がフライアウトの幅を変えても再起動のたびに
+    /// 巻き戻る</b>（隠密の静的レビューで発覚）。<c>AutoHideMinWidth</c> を190固定にする案を
+    /// 「リサイズの自由度を奪う」として却下しておきながら、<b>同じ問題を「起動毎」という別の形で
+    /// 再導入していた</b>——却下の理由が自分の実装に跳ね返っていたことになる。
+    /// </para>
+    /// <para>
+    /// 現在の症状（98px）はこれで直る——今の保存XMLに <c>AutoHideWidth</c> は無く、
+    /// AvalonDockの既定 <c>0.0</c> のままだからである。
+    /// </para>
     /// </summary>
     internal static void ApplyAutoHideWidth(LayoutRoot? layout)
     {
         var anchorable = layout?.Descendents().OfType<LayoutAnchorable>()
             .FirstOrDefault(a => a.ContentId == SheetPanelContentId);
         if (anchorable is null) return;
+        if (anchorable.AutoHideWidth != 0.0) return;
         anchorable.AutoHideWidth = SheetPanelAutoHideWidth;
     }
 }

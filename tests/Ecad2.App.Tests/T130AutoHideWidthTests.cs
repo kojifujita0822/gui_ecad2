@@ -48,18 +48,49 @@ public class T130AutoHideWidthTests
     }
 
     /// <summary>
-    /// Deserializeで別の値が復元された場合も既定へ揃える。
-    /// 「0.0のときだけ埋める」実装では、誤った値が保存済みの環境を救えない。
+    /// 【殿裁定2026-07-27で意図が反転したテスト】保存値があれば尊重し、上書きしない。
+    /// <para>
+    /// <b>初版はこの逆（無条件に190で上書き）を期待動作として固定していた。</b>それでは利用者が
+    /// フライアウトの幅を変えても<b>再起動のたびに巻き戻る</b>——隠密の静的レビューで発覚。
+    /// <c>AutoHideMinWidth</c> を190固定にする案を「リサイズの自由度を奪う」として却下しながら、
+    /// 同じ問題を「起動毎」という別の形で再導入していた。
+    /// </para>
+    /// <para>
+    /// <b>旧テストを消さず意図を反転させて残すのは、「かつてこう決めていた」ではなく
+    /// 「今はこう決めている」が読み取れるようにするため</b>（家老指示）。
+    /// </para>
     /// </summary>
     [Fact]
-    public void ApplyAutoHideWidth_OverwritesExistingValue()
+    public void ApplyAutoHideWidth_RespectsExistingValue_SoUserResizeSurvivesRestart()
     {
         var (layout, sheetPanel) = BuildLayoutWith(DockingLayoutDefaults.SheetPanelContentId);
-        sheetPanel.AutoHideWidth = 320.0;
+        sheetPanel.AutoHideWidth = 320.0;   // 利用者が広げた幅が保存されていた状態
 
         DockingLayoutDefaults.ApplyAutoHideWidth(layout);
 
-        Assert.Equal(190.0, sheetPanel.AutoHideWidth);
+        Assert.Equal(320.0, sheetPanel.AutoHideWidth);
+    }
+
+    /// <summary>
+    /// 【境界】保存値が「0でない極小値」であった場合の振る舞い。
+    /// <para>
+    /// <c>AutoHideWidth</c> の setter は <c>Math.Max(value, AutoHideMinWidth)</c> を通す
+    /// （<c>LayoutAnchorable.cs:66</c>）ため、<b>100.0未満は設定した時点で100.0へ切り上げられる</b>。
+    /// すなわち「0でない極小値」は実質存在しえず、利用者が100px未満へ縮めることもできない。
+    /// 本テストはその前提を実測で固定する——前提が崩れれば「保存値を尊重する」判断の意味も変わる。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void AutoHideWidth_BelowMinWidth_IsClampedBySetter_SoTinySavedValuesCannotExist()
+    {
+        var (layout, sheetPanel) = BuildLayoutWith(DockingLayoutDefaults.SheetPanelContentId);
+
+        sheetPanel.AutoHideWidth = 1.0;
+        Assert.Equal(100.0, sheetPanel.AutoHideWidth);   // AutoHideMinWidthの既定へ切り上げ
+
+        // 切り上げ後は0でないため、既定値の適用は行われない（＝保存値として尊重される）
+        DockingLayoutDefaults.ApplyAutoHideWidth(layout);
+        Assert.Equal(100.0, sheetPanel.AutoHideWidth);
     }
 
     /// <summary>
