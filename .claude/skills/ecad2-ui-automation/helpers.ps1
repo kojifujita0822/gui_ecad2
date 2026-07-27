@@ -414,12 +414,69 @@ function Resize-Ecad2Window {
     if ($proc.HasExited) { throw "Ecad2.App process exited after resize to ${Width}x${Height}. Possible resize-related crash." }
 }
 
+# T-129(殿裁定2026-07-27、忍者の具申): 正規終了(WindowPattern.Close)を既定とし、
+# 効かぬ場合にのみ強制終了へ落とす。
+#
+# 【なぜ改めたか】旧実装は無条件の Stop-Process -Force だったため Window_Closing を経由せず、
+# 終了時に走るはずの処理が一切走らなかった。T-128の実機確認中、SaveDockingLayoutAsDefault() が
+# 呼ばれぬまま終了した結果、検証用の一時的なパネル配置が殿の main-layout.xml にそのまま残る
+# 事故が起きている(忍者が直後に気づき復旧)。正規終了なら実際のユーザー操作と同じ経路を通るため、
+# 終了時保存・未保存確認ダイアログ等の挙動もそのまま再現される。
+#
+# 【戻り値】従来どおり文字列1行。強制終了へ落ちた場合のみ "WARNING:" で始まる(旧実装の作法を
+# 踏襲)ため、呼び出し側は文字列の頭を見るだけでフォールバックの発生を判別できる。
+# 強制終了された場合、終了時保存は走っておらぬ——検証結果の解釈が変わるので必ず読むこと。
 function Stop-Ecad2App {
-    Get-Process -Name "Ecad2.App" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+    param(
+        # 正規終了を待つ上限。未保存確認ダイアログ等でブロックされうるため必ず区切りを設ける。
+        [int]$TimeoutMs = 5000
+    )
+
+    if (-not (Get-Ecad2Process)) {
+        $result = "Ecad2.App stopped (was not running)"
+    }
+    else {
+        # (1) 正規終了を試みる。
+        $reason = $null
+        try {
+            $proc = Get-Ecad2Process
+            $win = [System.Windows.Automation.AutomationElement]::FromHandle($proc.MainWindowHandle)
+            $pattern = $win.GetCurrentPattern([System.Windows.Automation.WindowPattern]::Pattern)
+            $pattern.Close()
+
+            $sw = [System.Diagnostics.Stopwatch]::StartNew()
+            while ($sw.ElapsedMilliseconds -lt $TimeoutMs -and (Get-Ecad2Process)) {
+                Start-Sleep -Milliseconds 200
+            }
+            if (Get-Ecad2Process) {
+                $reason = "終了を ${TimeoutMs}ms 待っても完了せず(未保存確認ダイアログ等でブロックされている可能性)"
+            }
+        }
+        catch {
+            # ウィンドウハンドル未取得・WindowPattern非対応・ウィンドウ消失等。
+            $reason = "WindowPattern.Close に失敗: $($_.Exception.Message)"
+        }
+
+        if (-not (Get-Ecad2Process)) {
+            $result = "Ecad2.App stopped (graceful close)"
+        }
+        else {
+            # (2) 正規終了が効かぬ場合のみ強制終了。終了時の保存処理は走らない。
+            Get-Process -Name "Ecad2.App" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 300
+            $result = if (Get-Ecad2Process) {
+                "WARNING: Ecad2.App still running after Stop-Ecad2App (強制終了も効かず)。$reason"
+            } else {
+                "WARNING: Ecad2.App を強制終了した(正規終了が効かず)。$reason 。終了時の保存処理(SaveDockingLayoutAsDefault等)は走っておらぬ"
+            }
+        }
+    }
+
+    # dotnet run 経由のラッパープロセスは Ecad2.App の終了に追随して落ちるのが常だが、
+    # 稀に残るためどちらの経路でも最後に掃除する(残っていなければ何も起きない)。
     Get-Process -Name "dotnet" -ErrorAction SilentlyContinue | Where-Object {
         (Get-CimInstance Win32_Process -Filter "ProcessId = $($_.Id)" -ErrorAction SilentlyContinue).CommandLine -like "*Ecad2.App*"
     } | Stop-Process -Force -ErrorAction SilentlyContinue
-    Start-Sleep -Milliseconds 300
-    if (Get-Ecad2Process) { Write-Output "WARNING: Ecad2.App still running after Stop-Ecad2App" }
-    else { Write-Output "Ecad2.App stopped" }
+
+    Write-Output $result
 }
