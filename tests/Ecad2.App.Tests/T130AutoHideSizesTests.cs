@@ -18,8 +18,8 @@ namespace Ecad2.App.Tests;
 /// あり、幅ではない</b>——AvalonDock一次ソースは右(<c>:297</c>)・左(<c>:306</c>)が
 /// <c>AutoHideWidth</c>、上(<c>:316</c>)・下(<c>:327</c>)が <c>AutoHideHeight</c> を見るが、
 /// <b>いずれも「0.0なら AutoHideMinXxx（既定100.0）を採る」という完全に同型の構造</b>であり、
-/// 軸が違うことは穴を分ける理由にならぬと判じた。クラス名は <c>Width</c> のままだが、
-/// 実際には幅・高さの双方を扱う。
+/// 軸が違うことは穴を分ける理由にならぬと判じた。本クラスは幅・高さの双方を扱う（第1段では幅のみ
+/// だったため <c>T130AutoHideWidthTests</c> という名であったが、実態に合わせて改称した）。
 /// </para>
 /// <para>
 /// <b>本テストが成立するのは、対処をView層から純粋関数として切り出したため</b>——
@@ -28,7 +28,7 @@ namespace Ecad2.App.Tests;
 /// <c>LayoutRoot</c>/<c>LayoutAnchorable</c> はモデル層でありUIスレッドを要求しない。
 /// </para>
 /// </summary>
-public class T130AutoHideWidthTests
+public class T130AutoHideSizesTests
 {
     private static (LayoutRoot Layout, LayoutAnchorable Anchorable) BuildLayoutWith(string contentId)
     {

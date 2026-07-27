@@ -67,7 +67,7 @@ internal static class DockingLayoutDefaults
     /// <para>
     /// <b>各値は <c>MainWindow.xaml</c> の <c>DockWidth</c>／<c>DockHeight</c> と揃えること。</b>
     /// 片方だけ変えるとドック時とAutoHide時で寸法が食い違う。この不変条件は
-    /// <c>T130AutoHideWidthTests</c> が全行について固定している。
+    /// <c>T130AutoHideSizesTests</c> が全行について固定している。
     /// </para>
     /// <para>
     /// <b>留意</b>——<c>AutoHideWidth</c>／<c>AutoHideHeight</c> の setter はいずれも
