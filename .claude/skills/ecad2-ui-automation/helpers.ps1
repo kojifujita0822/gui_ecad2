@@ -458,7 +458,15 @@ function Stop-Ecad2App {
         }
 
         if (-not (Get-Ecad2Process)) {
-            $result = "Ecad2.App stopped (graceful close)"
+            # P-135(隠密所見2026-07-27): 例外・タイムアウトの直後にプロセスが自然終了していると、
+            # 生存判定だけでは「正規終了が効いた」と「異常が起きたが結果的に消えていた」を
+            # 取り違える。$reason が立っていれば握り潰さず知らせる——後者は Close() を呼べて
+            # おらぬ場合があり、そのときは終了時の保存処理も走っておらぬ。
+            $result = if ($reason) {
+                "WARNING: Ecad2.App は終了したが、正規終了の途中で異常があった。$reason 。終了時の保存処理(SaveDockingLayoutAsDefault等)が走った保証はない"
+            } else {
+                "Ecad2.App stopped (graceful close)"
+            }
         }
         else {
             # (2) 正規終了が効かぬ場合のみ強制終了。終了時の保存処理は走らない。
