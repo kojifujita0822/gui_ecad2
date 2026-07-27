@@ -9,7 +9,7 @@
         xmlns:avalonDock="https://github.com/Dirkster99/AvalonDock"
         xmlns:vs2013Themes="clr-namespace:AvalonDock.Themes.VS2013.Themes;assembly=AvalonDock.Themes.VS2013"
         mc:Ignorable="d"
-        Title="ecad2" Height="800" Width="1280" WindowStartupLocation="CenterScreen"
+        Title="ecad2" Height="800" Width="1400" WindowStartupLocation="CenterScreen"
         PreviewKeyDown="Window_PreviewKeyDown"
         PreviewKeyUp="Window_PreviewKeyUp"
         PreviewMouseLeftButtonDown="Window_PreviewMouseLeftButtonDown"
@@ -1343,7 +1343,7 @@
                              (配置ツールバーのみフロート可を維持)。既存のDockPanel中身(シート追加/削除/
                              名前変更/設定ボタン・D&D並び替え対応ListBox)は無改修でLayoutAnchorablePaneの
                              直下へ移植。 -->
-                        <avalonDock:LayoutAnchorablePane DockWidth="220">
+                        <avalonDock:LayoutAnchorablePane DockWidth="190">
                             <avalonDock:LayoutAnchorable Title="シート" ContentId="LeftPalette" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                                 <!-- 殿ご指摘(実機確認): AvalonDockのタブヘッダー自体がTitle="シート"を
                                      表示するため、旧実装の手動タイトルTextBlockは二重表示になっていた。削除。 -->
