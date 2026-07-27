@@ -229,8 +229,17 @@ public partial class MainWindow : Window
         // T-110増分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
         // ウィンドウ全域に及ぶため、本対処が全ペイン共通で有効になる。
         MainDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
-        // T-130 診断ログ用の一時改変（レイアウト変化の主経路。状態が前回と同一の連続は抑制される）
-        MainDockingManager.LayoutChanged += (_, _) => Diagnostics.T130LayoutTrace.Log(MainDockingManager, "LayoutChanged");
+        // T-130 診断ログ用の一時改変
+        // LayoutChangedはLayout依存関係プロパティの差し替え時にしか発火しない(一次ソース
+        // DockingManager.cs:160/181/184/265で確認、2周目の実測で判明)。差し替わったら
+        // LayoutRootへの購読を張り直す必要があるため、ここでAttachを呼び直す。
+        MainDockingManager.LayoutChanged += (_, _) =>
+        {
+            Diagnostics.T130LayoutTrace.Log(MainDockingManager, "LayoutChanged(Layout差替)", force: true);
+            Diagnostics.T130LayoutTrace.Attach(MainDockingManager);
+        };
+        // T-130 診断ログ用の一時改変（LayoutRootのイベント購読＋経路非依存のポーリング開始）
+        Diagnostics.T130LayoutTrace.Attach(MainDockingManager);
     }
 
     private void PlacementToolBarDockingManager_Loaded(object sender, RoutedEventArgs e)
