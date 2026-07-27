@@ -3512,7 +3512,13 @@ public partial class MainWindow : Window
             return;
         }
         var (xMm, yMm) = LadderCanvasHost.CellToMm(pos);
-        _viewModel.BeginFreeLineDraft(horizontal, xMm, yMm, LadderCanvasHost.CellMm);
+        // T-125増分α往復2周目: 起点セルが範囲外なら記入モードに入らせない(ViewModel側が判定して
+        // falseを返す)。旧実装のmm下限ガードだけでは、MarginMmを挟む変換のズレで素通りしていた。
+        if (!_viewModel.BeginFreeLineDraft(horizontal, xMm, yMm, LadderCanvasHost.CellMm))
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
         _viewModel.StatusMessage = (horizontal ? "左右キー" : "上下キー") + "で長さを調整しEnterで確定、Escで取消";
     }
 
@@ -3551,9 +3557,17 @@ public partial class MainWindow : Window
             _viewModel.StatusMessage = "配置するセルを先に選択してください";
             return;
         }
+        // T-125増分α往復2周目: 起点セルの範囲を先に見る(配線分断と同じ尺度)。旧実装は下のmm下限
+        // ガードだけであったため、MarginMm(=20.0)を足す変換のズレで素通りしていた
+        // (列-2でX=2.0、列-1でX=11.0、行-1でY=15.5。詳細はPlaceConnectionDotのdocコメント)。
+        if (!_viewModel.IsSelectedCellWithinGrid())
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
         var (xMm, yMm) = LadderCanvasHost.CellToMm(pos);
-        // T-125増分α: 用紙原点より外(負のmm座標)を先に弾いて理由を出し分ける。TryPlaceWireBreakと
-        // 同じ作法。上限を課さない理由はMainWindowViewModel.IsWithinPaperLowerBoundのdocコメント参照。
+        // T-125増分α: 用紙原点より外(負のmm座標)も弾く。上限を課さない理由は
+        // MainWindowViewModel.IsWithinPaperLowerBoundのdocコメント参照。
         if (!ViewModels.MainWindowViewModel.IsWithinPaperLowerBound(xMm, yMm))
         {
             _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";

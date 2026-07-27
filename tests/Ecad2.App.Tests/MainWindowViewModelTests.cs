@@ -729,6 +729,8 @@ public class MainWindowViewModelTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
         vm.CurrentSheet!.MainCircuit = true;
+        // T-125増分α往復2周目: 起点セルの範囲を見るようになったため選択セルを与える。
+        vm.SelectedCell = new GridPos(0, 1);
 
         vm.BeginFreeLineDraft(horizontal: true, startXMm: 10, startYMm: 10, stepMm: 5);
 

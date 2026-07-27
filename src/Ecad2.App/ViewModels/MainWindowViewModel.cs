@@ -1229,6 +1229,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool PlaceConnectionDot(double xMm, double yMm)
     {
         if (CurrentSheet is not Sheet sheet) return false;
+        // T-125増分α往復2周目(忍者実機確認NG): 起点セルがグリッド範囲内であることを見る。
+        // 下のmm下限ガードだけでは守れない——mm変換がMarginMmを足すため、範囲外セルでも
+        // mm座標が正になる。実際に使われるMarginMmは20.0(RenderOptions.MarginMm、
+        // DiagramRenderer.cs:10)であり、列-2でX=2.0、列-1でX=11.0、行-1でY=15.5となる。
+        // すなわちSelectedCellの仕様範囲(行-1・列-2まで、P-022/P-024)が丸ごと素通りしていた。
+        // 【注意】GridGeometryのコンストラクタ既定は15.0だが、この値は使われない——
+        // DiagramRendererが常にRenderOptions.MarginMm(20.0)で上書きする(同cs:44)。
+        // 「mm>=0」は「グリッド内」を意味しない。原本GuiEcadの xMm>=0 はマウスがキャンバス外を
+        // 指した場合の無視が目的で機能するが、ecad2の入力は選択セルであり出所が異なる。
+        if (!IsSelectedCellWithinGrid()) return false;
         if (!IsWithinPaperLowerBound(xMm, yMm)) return false;
         if (sheet.ConnectionDots.Any(d => d.XMm == xMm && d.YMm == yMm)) return false;
         sheet.ConnectionDots.Add(new ConnectionDot { XMm = xMm, YMm = yMm });
@@ -2010,12 +2020,19 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// F9(横線)/sF9(縦線)押下時、指定のmm座標を起点に自由線記入を開始する(T-041増分5)。呼び出し元
     /// (MainWindow.xaml.cs)でHasProject/主回路シート判定・SelectedCell存在は済ませてある前提。
     /// mm座標への変換(SelectedCell→mm)・矢印キー1回分の移動量(stepMm=CellMm)はView側が渡す。
+    /// T-125増分α往復2周目: 起点セルがグリッド範囲外なら記入モードに入らない(戻り値false)。
+    /// 接続点と同じ理由——mm下限ガードだけでは、MarginMm(実際に使われるのは
+    /// RenderOptions.MarginMm=20.0)を足す変換のズレを守れない(列-2でX=2.0、列-1でX=11.0、
+    /// 行-1でY=15.5と、SelectedCellの仕様範囲が丸ごと正の値になる)。要素配置が配置バーを
+    /// 出す前に弾くのと同じ作法で、記入を始める前に弾く。
     /// </summary>
-    public void BeginFreeLineDraft(bool horizontal, double startXMm, double startYMm, double stepMm)
+    public bool BeginFreeLineDraft(bool horizontal, double startXMm, double startYMm, double stepMm)
     {
+        if (!IsSelectedCellWithinGrid()) return false;
         _freeLineDraft = (startXMm, startYMm, stepMm, 0, horizontal);
         Tool = new ToolState(ToolMode.PlaceLine);
         OnPropertyChanged(nameof(FreeLineDraftPreview));
+        return true;
     }
 
     /// <summary>記入中の自由線の終点を矢印キー1回分(delta=±1)動かす。方向(水平/垂直)に沿わない

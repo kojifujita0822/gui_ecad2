@@ -81,6 +81,9 @@ public class FreeLineConnectionDotSelectionTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         var sheet = MainCircuitSheet(vm);
+        // T-125増分α往復2周目: 記入APIが起点セルの範囲も見るようになったため選択セルを与える。
+        // 旧版が未設定でも通っていたこと自体が、実際の記入経路(選択セル起点)を通していなかった証。
+        vm.SelectedCell = new GridPos(1, 1);
 
         bool placed = vm.PlaceConnectionDot(15.5, 24.0);
 
@@ -96,6 +99,8 @@ public class FreeLineConnectionDotSelectionTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         var sheet = MainCircuitSheet(vm);
+        // T-125増分α往復2周目: 上記と同じ理由で選択セルを与える。
+        vm.SelectedCell = new GridPos(1, 1);
         vm.PlaceConnectionDot(15.5, 24.0);
 
         bool placedAgain = vm.PlaceConnectionDot(15.5, 24.0);

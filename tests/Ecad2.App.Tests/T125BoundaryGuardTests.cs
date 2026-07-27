@@ -1,5 +1,6 @@
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
+using Ecad2.Rendering;
 
 namespace Ecad2.App.Tests;
 
@@ -137,6 +138,10 @@ public class T125BoundaryGuardTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         var sheet = PrepareSheet(vm, mainCircuit: true);
+        // 往復2周目で追加: 起点セルの範囲も見るようになったため、mm下限だけを問う本テストでは
+        // セルを範囲内に固定しておく必要がある。旧版がこれを設定していなかったこと自体が、
+        // 「セル→mm変換を一度も通していないテスト」であったことの証左でもある。
+        vm.SelectedCell = new GridPos(2, 3);
 
         Assert.Equal(expected, vm.PlaceConnectionDot(xMm, yMm));
         Assert.Equal(expected ? 1 : 0, sheet.ConnectionDots.Count);
@@ -153,6 +158,7 @@ public class T125BoundaryGuardTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         var sheet = PrepareSheet(vm, mainCircuit: true);
+        vm.SelectedCell = new GridPos(2, 3);
 
         Assert.True(vm.PlaceConnectionDot(9999.0, 8888.0));
         Assert.Single(sheet.ConnectionDots);
@@ -164,6 +170,7 @@ public class T125BoundaryGuardTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
         var sheet = PrepareSheet(vm, mainCircuit: true);
+        vm.SelectedCell = new GridPos(2, 3);
 
         Assert.True(vm.PlaceConnectionDot(20.0, 33.0));
         Assert.Single(sheet.ConnectionDots);
@@ -304,4 +311,138 @@ public class T125BoundaryGuardTests : ViewModelTestBase
     [InlineData(-0.1, -4.2, false)]
     public void IsWithinPaperLowerBound_ChecksBothAxesIndependently(double xMm, double yMm, bool expected)
         => Assert.Equal(expected, MainWindowViewModel.IsWithinPaperLowerBound(xMm, yMm));
+
+    // ---------------------------------------------------------------------
+    // 往復2周目：セル→mm変換を通した経路（初版の穴。忍者の実機確認で発覚）
+    // ---------------------------------------------------------------------
+
+    /// <summary>View（<c>LadderCanvas.CellToMm</c>）と同じ変換を再現する。</summary>
+    private static (double XMm, double YMm) CellToMm(GridPos cell)
+    {
+        var geometry = ActualGeometry();
+        return (geometry.X(cell.Column), geometry.YRow(cell.Row));
+    }
+
+    /// <summary>
+    /// 画面描画で実際に使われる幾何。<b><c>GridGeometry</c>のコンストラクタ既定（<c>MarginMm=15.0</c>）
+    /// ではない</b>——<c>DiagramRenderer</c>が常に<c>RenderOptions.MarginMm</c>（20.0）で上書きする
+    /// （<c>DiagramRenderer.cs:44</c>）ため、コンストラクタ既定は実質使われない。
+    /// </summary>
+    private static GridGeometry ActualGeometry()
+    {
+        var options = new RenderOptions();
+        return new GridGeometry(options.CellMm, options.MarginMm);
+    }
+
+    /// <summary>
+    /// <b>【真因の記録】</b>mm変換は<c>MarginMm</c>を足すため、グリッド範囲外のセルでも
+    /// mm座標が正になる。<b>「mm &gt;= 0」は「グリッド内」を意味しない</b>——これが初版の穴の正体。
+    /// <para>
+    /// 実際に使われる<c>MarginMm</c>は<b>20.0</b>（<c>RenderOptions</c>の既定）。ゆえに
+    /// 列-2でX=2.0、列-1でX=11.0、行-1でY=15.5と、<b><c>SelectedCell</c>の仕様範囲
+    /// （行-1・列-2まで、P-022/P-024）が丸ごと正の値になる</b>。初版は接続点・自由線を
+    /// mm下限だけで守っていたため、この範囲がすべて素通りした。
+    /// </para>
+    /// <para>
+    /// 配線分断が同じ範囲外セルで正しく弾けていたのは、グリッド境界（整数の行・列）で判定しており
+    /// 変換を挟まなかったからである。<b>同じ範囲外セルでも尺度が違えば結果が違う。</b>
+    /// </para>
+    /// <para>
+    /// <b>【罠】</b><c>GridGeometry</c>のコンストラクタ既定は15.0であり、これを実際の値と
+    /// 取り違えると「列-2は負（X=-3.0）ゆえ弾ける」という誤った結論に至る（侍が実際に誤った）。
+    /// 既定値が2箇所にあり片方が使われない構造ゆえ、差異そのものを本テストで固定しておく。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ActualMargin_MapsOutOfGridCellsToPositiveMm_WhichIsWhyLowerBoundAlone_WasNotEnough()
+    {
+        var options = new RenderOptions();
+        Assert.Equal(20.0, options.MarginMm);       // 実際に使われる値
+
+        var geometry = ActualGeometry();
+        Assert.Equal(11.0, geometry.X(-1));         // 列-1 → 正。mm下限では弾けない
+        Assert.Equal(2.0, geometry.X(-2));          // 列-2 → 正。仕様下限すら素通りする
+        Assert.Equal(15.5, geometry.YRow(-1));      // 行-1 → 正。同上
+        Assert.Equal(20.0, geometry.X(0));          // 範囲内の下限セル
+        Assert.Equal(24.5, geometry.YRow(0));
+
+        // 【罠その2】GridGeometryはreadonly structゆえ、引数なしの new GridGeometry() では
+        // structに常に存在する暗黙のパラメータレスコンストラクタ（全フィールドゼロ初期化）が
+        // 選ばれ、宣言された既定値(cellMm=9.0 / marginMm=15.0)は適用されない。
+        // すなわち「コンストラクタ既定は15.0」という読み方自体が、書き方によっては成り立たない。
+        Assert.Equal(0.0, new GridGeometry().MarginMm);
+        Assert.Equal(15.0, new GridGeometry(9.0).MarginMm);   // 引数を1つでも渡せば既定値が効く
+    }
+
+    /// <summary>
+    /// 【往復2周目の本体】範囲外セルからセル→mm変換を通した座標で接続点を記入しようとしても拒む。
+    /// <para>
+    /// <b>本テストの要は、検体が「mm下限ガードを素通りする値」であることを事前アサートしている点</b>
+    /// にある。初版のテストは<c>PlaceConnectionDot(-0.1, 33.0)</c>のようにmm座標を直接与えており、
+    /// <b>セル→mm変換を一度も通していなかった</b>。変換の後の値でいくら境界を刻んでも、
+    /// 変換そのものが持つズレは永久に現れない。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(2, -1)]         // 列-1（X=11.0で正）
+    [InlineData(2, -2)]         // 列-2（X=2.0で正）。SelectedCellの仕様下限すら素通りしていた
+    [InlineData(-1, 3)]         // 行-1（Y=15.5で正）
+    [InlineData(-1, -2)]        // 両軸とも仕様下限
+    [InlineData(2, Columns)]    // 上限側（列10）。mm下限では原理的に弾けない
+    [InlineData(Rows, 3)]       // 上限側（行5）。同上
+    public void PlaceConnectionDot_FromOutOfGridCell_IsRejected_EvenWhenConvertedMmIsPositive(int row, int column)
+    {
+        var vm = CreateViewModel();
+        var sheet = PrepareSheet(vm, mainCircuit: true);
+        vm.SelectedCell = new GridPos(row, column);
+
+        var (xMm, yMm) = CellToMm(new GridPos(row, column));
+
+        // 【重要】この検体は「mm下限ガードを素通りする値」でなければ本テストの意味がない。
+        // すなわち旧実装がなぜ通してしまったかを、テスト自身が証拠として持つ。
+        Assert.True(MainWindowViewModel.IsWithinPaperLowerBound(xMm, yMm),
+            "検体が負のmmでは、mm下限ガードが弾いてしまい今回の穴を突けない");
+
+        Assert.False(vm.PlaceConnectionDot(xMm, yMm));
+        Assert.Empty(sheet.ConnectionDots);
+    }
+
+    /// <summary>
+    /// 自由線も同型の穴を持っていた（忍者の初回確認では「拒まれた」と出たが、
+    /// それは試した検体がたまたま弾ける条件だったためと見る）。起点セルが範囲外なら
+    /// <b>記入モードに入らせない</b>——要素配置が配置バーを出す前に弾くのと同じ作法。
+    /// </summary>
+    [Theory]
+    [InlineData(2, -1)]
+    [InlineData(2, -2)]
+    [InlineData(-1, 3)]
+    [InlineData(2, Columns)]
+    public void BeginFreeLineDraft_FromOutOfGridCell_IsRejected_AndDoesNotEnterDraftMode(int row, int column)
+    {
+        var vm = CreateViewModel();
+        PrepareSheet(vm, mainCircuit: true);
+        vm.SelectedCell = new GridPos(row, column);
+
+        var (xMm, yMm) = CellToMm(new GridPos(row, column));
+        Assert.True(MainWindowViewModel.IsWithinPaperLowerBound(xMm, yMm),
+            "検体が負のmmでは、mm下限ガードが弾いてしまい今回の穴を突けない");
+
+        Assert.False(vm.BeginFreeLineDraft(horizontal: true, xMm, yMm, stepMm: 9.0));
+        Assert.Null(vm.FreeLineDraftPreview);
+        Assert.NotEqual(ToolMode.PlaceLine, vm.Tool.Mode);
+    }
+
+    /// <summary>範囲内セルからの記入開始は従来どおり通る（回帰）。</summary>
+    [Fact]
+    public void BeginFreeLineDraft_FromCellWithinGrid_StillStartsDraft()
+    {
+        var vm = CreateViewModel();
+        PrepareSheet(vm, mainCircuit: true);
+        vm.SelectedCell = new GridPos(2, 1);
+
+        var (xMm, yMm) = CellToMm(new GridPos(2, 1));
+        Assert.True(vm.BeginFreeLineDraft(horizontal: true, xMm, yMm, stepMm: 9.0));
+        Assert.Equal(ToolMode.PlaceLine, vm.Tool.Mode);
+        Assert.NotNull(vm.FreeLineDraftPreview);
+    }
 }

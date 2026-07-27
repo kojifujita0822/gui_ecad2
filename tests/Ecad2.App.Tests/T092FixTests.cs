@@ -102,6 +102,9 @@ public class T092FixTests : ViewModelTestBase
                 vm.BeginConnectorDraft();
                 break;
             case "FreeLine":
+                // T-125増分α往復2周目: 起点セルの範囲を見るようになったため、Connectorと同様に
+                // 選択セルを与えてから記入を開始する。
+                vm.SelectedCell = new GridPos(0, 1);
                 vm.BeginFreeLineDraft(horizontal: true, startXMm: 10, startYMm: 10, stepMm: 5);
                 break;
             case "Image":
