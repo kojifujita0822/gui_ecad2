@@ -736,7 +736,11 @@ public partial class MainWindow : Window
         // 巻き戻り中身と食い違う。両タイトル同期メソッドを呼び直して整合を回復する。
         UpdateOutputPanelTitle();
         UpdateRightPanelBottomTitle();
-        _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
+        // T-128(殿裁可2026-07-27、忍者の実機所見): 旧文言「パネルレイアウトを既定に戻しました」は
+        // 実態とずれていた——本メソッドが戻す先は保存済みカスタムであって出荷時の既定ではない。
+        // 新設のRestoreFactoryDefaultDockingLayoutと文言が酷似し、動作が正反対なのに読み違える
+        // 恐れがあるため、メニュー項目名「保存したレイアウトに戻す」へ揃える。処理自体は不変。
+        _viewModel.StatusMessage = "保存したレイアウトに戻しました";
     }
 
     // T-128(殿裁可2026-07-27): 保存済みカスタム(%AppData%のmain-layout.xml)を一切見ず、出荷時の
