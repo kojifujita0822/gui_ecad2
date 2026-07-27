@@ -2879,7 +2879,11 @@ public partial class MainWindow : Window
                     && _viewModel.Tool.Mode == ViewModels.ToolMode.PlaceLine:
                 // T-041増分5: 記入中の自由線を確定する。長さが0(まだ矢印キーで伸ばしていない)場合は
                 // 確定せず案内のみ出す(縦コネクタと同型)。
-                if (_viewModel.ConfirmFreeLineDraft())
+                // T-125増分α: 用紙原点より外へ伸びた場合を先に弾いて理由を出し分ける(長さ0の案内と
+                // 混同させないため)。TryPlaceWireBreak/TryPlaceConnectionDotと同じ作法。
+                if (!_viewModel.IsFreeLineDraftWithinPaperBounds)
+                    _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+                else if (_viewModel.ConfirmFreeLineDraft())
                     RedrawCanvas();
                 else
                     _viewModel.StatusMessage = "矢印キーで長さを広げてから確定してください";
@@ -3441,6 +3445,14 @@ public partial class MainWindow : Window
             _viewModel.StatusMessage = "配置するセルを先に選択してください";
             return;
         }
+        // T-125増分α: 範囲外を先に弾いて理由を出し分ける(要素配置TryPlaceElementと同じ作法)。
+        // ViewModel側のPlaceWireBreakAtSelectedCellも同じ判定を持つ(防御的二重検証)が、戻り値
+        // boolでは「範囲外」と「重複」を区別できないため、文言の選択はView側で行う。
+        if (!_viewModel.IsSelectedCellWithinGrid())
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
         if (_viewModel.PlaceWireBreakAtSelectedCell())
             RedrawCanvas();
         else
@@ -3509,6 +3521,13 @@ public partial class MainWindow : Window
             return;
         }
         var (xMm, yMm) = LadderCanvasHost.CellToMm(pos);
+        // T-125増分α: 用紙原点より外(負のmm座標)を先に弾いて理由を出し分ける。TryPlaceWireBreakと
+        // 同じ作法。上限を課さない理由はMainWindowViewModel.IsWithinPaperLowerBoundのdocコメント参照。
+        if (!ViewModels.MainWindowViewModel.IsWithinPaperLowerBound(xMm, yMm))
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
         if (_viewModel.PlaceConnectionDot(xMm, yMm))
             RedrawCanvas();
         else

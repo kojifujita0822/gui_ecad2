@@ -856,10 +856,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// F10押下時、SelectedCellの位置へ配線分断を即時記入する(T-041増分3、点系は確認フェーズ無し
     /// で即時記入する原案3節の設計)。呼び出し元(MainWindow.xaml.cs)でHasProject/制御回路シート判定は
     /// 済ませてある前提。同一位置に既存の配線分断があれば重複記入を避けて何もしない(戻り値false)。
+    /// T-125増分α: グリッド範囲外への記入を弾く(戻り値false)。SelectedCellは仕様として範囲外
+    /// (行-1・列-2まで)を取りうるため(P-022/P-024、殿教示2026-07-07)、記入側で防ぐ一手しかない。
+    /// GuiEcad原本もMainPage.Pointer.cs:261で要素配置(同:305)と同一のガードを持っており、本ガードは
+    /// その移植漏れの補填にあたる。行上限(Row &lt; Rows)は原本には無いがecad2の要素配置は課している
+    /// ため(IsWithinGridBounds、T-045)、ecad2内の一貫性を採り同じ規則に揃える(殿裁定2026-07-27=C-1)。
     /// </summary>
     public bool PlaceWireBreakAtSelectedCell()
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return false;
+        if (!IsWithinGridBounds(pos, cellWidth: 1, sheet)) return false;
         double boundary = pos.Column + 0.5;
         if (sheet.WireBreaks.Any(b => b.Row == pos.Row && b.Boundary == boundary)) return false;
         sheet.WireBreaks.Add(new WireBreak { Boundary = boundary, Row = pos.Row });
@@ -1217,10 +1223,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// (LadderCanvas.CellToMm)、ViewModelはmm座標を受け取るのみ(FreeLineの座標系がグリッドに
     /// 依存しないmm実座標のため、他の記入メソッドと異なりViewModelは幾何変換を行わない)。
     /// 同一位置に既存の接続点があれば重複記入を避けて何もしない(戻り値false)。
+    /// T-125増分α: 用紙原点より外(負のmm座標)への記入を弾く(戻り値false)。<b>下限のみ</b>である
+    /// 理由はIsWithinPaperLowerBoundのdocコメント参照。
     /// </summary>
     public bool PlaceConnectionDot(double xMm, double yMm)
     {
         if (CurrentSheet is not Sheet sheet) return false;
+        if (!IsWithinPaperLowerBound(xMm, yMm)) return false;
         if (sheet.ConnectionDots.Any(d => d.XMm == xMm && d.YMm == yMm)) return false;
         sheet.ConnectionDots.Add(new ConnectionDot { XMm = xMm, YMm = yMm });
         MarkDirty();
@@ -2021,15 +2030,33 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(FreeLineDraftPreview));
     }
 
+    /// <summary>T-125増分α: 記入中の自由線が用紙内(下限)に収まっているか判定する。記入中でなければ
+    /// true(判定対象が無い)。View側が確定拒否の理由(範囲外か長さ0か)を出し分けるために使う——
+    /// 要素配置のIsSelectedCellWithinGridと同じ作法(ViewModelが判定を公開し、Viewが文言を選ぶ)。
+    /// <para>
+    /// FreeLineDraftPreviewはMath.Min/Maxで正規化済みゆえX1&lt;=X2・Y1&lt;=Y2が成り立ち、原理的には
+    /// 始点(X1/Y1)だけ見れば足りる。それでも4座標すべてを見るのは、正規化という<b>他メソッドの
+    /// 実装詳細への依存を持ち込まぬ</b>ため(将来FreeLineDraftPreviewの正規化が外れても本判定は壊れない)。
+    /// 始点だけ見て終点を見落とす型の瑕疵はT-119で実際に起きている
+    /// (memory: feedback_geometric_transform_endpoint_oversight)。
+    /// </para></summary>
+    public bool IsFreeLineDraftWithinPaperBounds
+        => FreeLineDraftPreview is not { } p
+        || (IsWithinPaperLowerBound(p.X1Mm, p.Y1Mm) && IsWithinPaperLowerBound(p.X2Mm, p.Y2Mm));
+
     /// <summary>
     /// 記入中の自由線を確定する(Enter、T-041増分5)。StepCount==0(まだ伸縮していない)場合は
     /// 自由線として無意味なため確定せず記入モードに留める(戻り値false)。ConfirmConnectorDraftと
     /// 同様、主回路シート限定を防御的に再検証する(二重の安全網)。
+    /// T-125増分α: 用紙原点より外(負のmm座標)へ伸びた自由線は確定を拒む(戻り値false)。矢印キーで
+    /// 負方向へ伸ばすと起点より手前へ出るため、始点が負になりうる。<b>下限のみ</b>である理由は
+    /// IsWithinPaperLowerBoundのdocコメント参照。
     /// </summary>
     public bool ConfirmFreeLineDraft()
     {
         if (_freeLineDraft is not { } d || CurrentSheet is not Sheet sheet || !sheet.MainCircuit) return false;
         if (d.StepCount == 0) return false;
+        if (!IsFreeLineDraftWithinPaperBounds) return false;
         var preview = FreeLineDraftPreview!;
         sheet.FreeLines.Add(new FreeLine
         {
@@ -2699,6 +2726,26 @@ public sealed class MainWindowViewModel : ViewModelBase
         => topLeft.Row >= 0 && topLeft.Row + height - 1 < sheet.Grid.Rows
         && topLeft.Column >= 0 && topLeft.Column + width - 1 < sheet.Grid.Columns;
 
+    /// <summary>T-125増分α: mm実座標プリミティブ(接続点・自由線)が用紙原点より内側にあるか判定する。
+    /// <para>
+    /// <b>下限のみのガードであり、グリッド上限は意図的に課していない。</b>接続点・自由線はグリッドに
+    /// 依存しないmm実座標プリミティブとして設計されており(Element.cs の ConnectionDot/FreeLine docコメント)、
+    /// DiagramRendererもこれらがグリッド範囲を超えて広がる前提で実装されている(原本
+    /// GuiEcad DiagramRenderer.cs:73-75「mm実座標でグリッド行範囲を超えて広がりうる」)。原本の記入経路
+    /// (MainPage.Pointer.cs:234/248)も同じく <c>xMm &gt;= 0 &amp;&amp; yMm &gt;= 0</c> の下限のみを見ている。
+    /// </para>
+    /// <para>
+    /// ゆえに本ガードを持つ経路を「境界ガードあり」と数える際、<b>グリッド上限まで担保しているとは
+    /// 読んではならぬ</b>(家老指示2026-07-27、後年の指標追跡での誤読を防ぐため明記)。上限を課すと
+    /// 主回路作図(母線R/S/T・自由結線)の設計思想と衝突する。
+    /// </para>
+    /// <para>
+    /// 本ガードが実際に効くのは、SelectedCellが仕様として範囲外(行-1・列-2まで)を取りうるため
+    /// (P-022/P-024、殿教示2026-07-07)、CellToMmが負のmm座標を返す経路である。
+    /// </para>
+    /// </summary>
+    public static bool IsWithinPaperLowerBound(double xMm, double yMm) => xMm >= 0 && yMm >= 0;
+
     /// <summary>T-088: excludeを渡すと、その要素自身は占有判定の対象から除外する(移動時、元の
     /// セルに自分自身が居座っていることで「占有されている」と誤判定されるのを防ぐ)。新規配置時は
     /// exclude省略(null)で従来どおりの判定になる。</summary>
@@ -2822,8 +2869,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// ガードしOtherへフォールバックする。T-045増分B修正
     /// (隠密レビューCONFIRMED、ecad2-t045-increment-b-review-onmitsu.md): 固定Id完全一致判定は
     /// Explorerコピー由来のId再採番(PartFolderStore.cs:94-110、T-035)に耐性が無く誤分類する
-    /// ため廃止し、PartEntryToGlyphGeometryConverter.cs:53-63と同型のCategory/Role/IsOrEligible
-    /// 判定へ置換する(element.PartIdでPartPalette.Entriesを動的検索、Idの新旧に依存しない)。
+    /// ため廃止し、Category/Role/IsOrEligibleの組み合わせによる判定へ置換する(element.PartIdで
+    /// PartPalette.Entriesを動的検索、Idの新旧に依存しない)。
+    /// T-125増分α: 従来ここは「PartEntryToGlyphGeometryConverter.cs:53-63と同型」と記していたが、
+    /// 同クラスはT-071(コミットc779210)で廃止されており参照先が存在しなかったため、その一句を削った。
     /// Category==""(基本図形フォルダ直下)をゲートにするのは、自作パーツ(Category="自作")が
     /// 同じRole/IsOrEligibleの組を偶然持つ場合の誤判定を防ぐため
     /// (ecad2-t045-increment-b-fix-test-design-onmitsu.md 分類D)。

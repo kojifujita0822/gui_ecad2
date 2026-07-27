@@ -15,9 +15,13 @@ public static class PartThumbnailRenderer
     private const double K = 96.0 / 25.4;   // mm → WPF DIP(1/96インチ)
 
     // T-043(殿裁定): ORa/ORbはツールバーsF5/sF6(T-040)と同じGX様式グリフ(└┤├┘構図)で統一する。
-    // Path Dataは Ecad2.App.Converters.PartEntryToGlyphGeometryConverter のORa/ORbグリフと同一
-    // (App→Rendering.Wpfの参照方向のため値を複製している。ツールバー意匠を変える場合は両方を
-    // 合わせて直すこと)。座標系は18x18キャンバス基準(x2-16,y3-15相当、T-040の慣例)。
+    // Path Dataは MainWindow.xaml のツールバーボタン(sF5=OR a接点配置 / sF6=OR b接点配置)の
+    // Path.Data と同一の値を複製している(App→Rendering.Wpfの参照方向のため値渡しができない)。
+    // ツールバー意匠を変える場合は両方を合わせて直すこと。
+    // 座標系は18x18キャンバス基準(x2-16,y3-15相当、T-040の慣例)。
+    // T-125増分α: 従来ここは Ecad2.App.Converters.PartEntryToGlyphGeometryConverter を複製元として
+    // 指していたが、同クラスはT-071(コミットc779210)で廃止されており参照先が存在しなかった。
+    // 現存する複製元(MainWindow.xaml)を指すよう訂正した。
     private static readonly Geometry OrContactNoGlyph =
         Geometry.Parse("M2,9 L6,9 M12,9 L16,9 M6,4 L6,14 M12,4 L12,14 M2,4 L2,9 M16,4 L16,9");
     private static readonly Geometry OrContactNcGlyph =
