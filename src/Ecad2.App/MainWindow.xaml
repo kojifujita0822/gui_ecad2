@@ -949,6 +949,16 @@
                      (左パレット・出力パネル・右パネル)を既定として%AppData%配下へ保存する。
                      Ctrl+Alt+R(リセット)と対をなすキーバインド。 -->
                 <MenuItem Header="現在のレイアウトを既定として保存(_L)" InputGestureText="Ctrl+Alt+S" Click="SaveDockingLayoutMenuItem_Click"/>
+                <!-- T-128(殿裁可2026-07-27): レイアウトの「戻し方」を2つ並べる。両者は戻り先が異なる——
+                     こちらは保存済みカスタム(%AppData%のmain-layout.xml)へ、下は出荷時の既定(XAML初期状態)へ。
+                     本項目はCtrl+Alt+Rの挙動をそのままメニューへ露出させるだけで、挙動は一切変えない
+                     (T-058増分4・殿裁定(4)=保存ファイル優先は保たれる)。キーのみでメニューに現れず
+                     辿り着けなかったため、殿裁可により入口を設ける。 -->
+                <MenuItem Header="保存したレイアウトに戻す(_S)" InputGestureText="Ctrl+Alt+R" Click="ResetDockingLayoutMenuItem_Click"/>
+                <!-- T-128(殿裁可2026-07-27): 保存済みカスタムを一切見ず出荷時の既定へ戻す。保存ファイルには
+                     手を触れぬため、直後にCtrl+Alt+R(上記)を押せば元のカスタム配置へ復帰できる=取り消しになる
+                     (ゆえに確認ダイアログは設けぬ、殿裁定)。ショートカットは付けぬ(殿裁定)。 -->
+                <MenuItem Header="既定レイアウトに戻す(_R)" Click="RestoreFactoryDefaultLayoutMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="ツール(_T)">
                 <MenuItem Header="設計チェック実行(_D)" Command="{Binding OutputPanel.RunDrcCommand}"/>

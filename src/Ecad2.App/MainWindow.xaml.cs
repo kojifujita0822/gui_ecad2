@@ -739,6 +739,31 @@ public partial class MainWindow : Window
         _viewModel.StatusMessage = "パネルレイアウトを既定に戻しました";
     }
 
+    // T-128(殿裁可2026-07-27): 保存済みカスタム(%AppData%のmain-layout.xml)を一切見ず、出荷時の
+    // ハードコード既定へ戻す。上のResetDockingLayoutToDefaultが保存ファイルを優先するのは
+    // T-058増分4・殿裁定(4)による意図的な設計ゆえ、そちらには手を触れず別経路として設ける。
+    //
+    // _defaultDockingLayoutXmlは起動直後(コンストラクタ183行のSerializeDefaultDockingLayouts)に
+    // XAML初期状態から焼き付けたもので、保存ファイルの適用(同186行)より前にキャプチャされる。
+    // ゆえに保存ファイルの有無に関わらず常にXAMLの姿を保っており、そのまま戻し先として使える。
+    //
+    // 保存ファイルには手を触れない(殿裁定=案(i))。アプリ終了時のSaveDockingLayoutAsDefaultが
+    // この既定の姿をそのまま書き込むため次回起動も既定のままとなり、かつファイルが残っている間は
+    // Ctrl+Alt+Rで元のカスタム配置へ復帰できる——これが実質の取り消しとして働く
+    // (取り消しの道があるゆえ確認ダイアログは設けぬ、という釣り合いになっている)。
+    private void RestoreFactoryDefaultDockingLayout()
+    {
+        if (_defaultDockingLayoutXml is not null)
+            TryDeserializeDockingLayout(_defaultDockingLayoutXml);
+
+        // Deserialize直後のLayoutAnchorable.Titleは既定レイアウトXML焼き付け時点の初期値のままゆえ、
+        // 状況依存タイトルを再同期する(ResetDockingLayoutToDefaultと同じ後始末。T-058増分3の
+        // 隠密静的レビュー指摘1と同型の欠陥を作り直さぬため、必ず置くこと)。
+        UpdateOutputPanelTitle();
+        UpdateRightPanelBottomTitle();
+        _viewModel.StatusMessage = "パネルレイアウトを出荷時の既定に戻しました";
+    }
+
     // T-058増分4: 保存済みファイルの読込に失敗(破損等)した場合はnullを返し、呼び出し元で
     // ハードコード既定へフォールバックさせる(殿裁定(5))。
     private string? TryReadSavedDockingLayoutXml()
@@ -1138,6 +1163,14 @@ public partial class MainWindow : Window
 
     // T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド)。表示メニュー・Ctrl+Alt+S共通。
     private void SaveDockingLayoutMenuItem_Click(object sender, RoutedEventArgs e) => SaveDockingLayoutAsDefault();
+
+    // T-128(殿裁可2026-07-27): 既存のCtrl+Alt+R(保存済みカスタムへ戻す)をメニューからも呼べるようにする。
+    // キーのみでメニューに現れず、ショートカットを知らねば辿り着けなかったため入口を設けた。
+    // 挙動は一切変えていない——ResetDockingLayoutToDefaultをそのまま呼ぶだけ。
+    private void ResetDockingLayoutMenuItem_Click(object sender, RoutedEventArgs e) => ResetDockingLayoutToDefault();
+
+    // T-128(殿裁可2026-07-27): 出荷時の既定へ戻す。上とは戻り先が異なる(本文はメソッド側に記す)。
+    private void RestoreFactoryDefaultLayoutMenuItem_Click(object sender, RoutedEventArgs e) => RestoreFactoryDefaultDockingLayout();
 
     // 図面→ドキュメント情報。ダイアログ表示自体はView側の責務のためcode-behindで行い、
     // 結果の反映はViewModelのApplyDocumentInfoへ委譲する(RenameSheetButton_Clickと同型、T-065)。
