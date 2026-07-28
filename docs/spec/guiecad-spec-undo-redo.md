@@ -160,10 +160,15 @@ ecad2側は`UndoManager`・`ApplyUndoRedoSnapshot`関連のテスト件数は本
 
 ### (2) ecad2のみにある機能
 
-該当なし。ecad2のUndo/Redo対象範囲はGuiEcadの範囲に完全に包含される（シート追加/削除は
-GuiEcadでも`InsertRowCommand`等とは別カテゴリだが、シート単位の追加/削除相当コマンドが
-`ElementCommands.cs`一覧に見当たらない——**シート自体の追加/削除がGuiEcad側でUndo対象か否かは
-本調査では確認できず、不明点として残す**）。
+**【2026-07-28訂正】シート追加/削除のUndo/Redo対応（T-051 MVP対象範囲）。** 本節はかつて
+「該当なし」とし、上記の不明点（シート追加/削除がGuiEcad側でUndo対象か否か）を未解決のまま
+残していたが、原本ソース実在確認後の再調査（`docs/ecad2-spec-undo-redo-vs-guiecad-audit-onmitsu.md`）
+で解消した——**`MainPage.Sheets.cs`の`OnAddSheetBtn`・`OnDeleteSheetBtn`はいずれも`_history.Execute(...)`
+を一切呼ばず、`_document.Sheets`を直接操作するのみ**（削除時は`_history.RemoveCommandsForSheet`で
+そのシートに紐づく既存コマンドを履歴から除去するのみで、削除自体をUndo可能にするコマンドは
+生成しない）。**GuiEcad原本にはシート単位のUndo/Redoという概念自体が存在せず、ecad2のT-051 MVPは
+「原本の一部を移植した」ものではなく「原本に無い機能を新規に作った」ものと確定する**（T-135調査
+で判明した合流先確認モード＝T-102と同型の構図）。
 
 ### (3) 両方にあるが挙動が異なる点
 
@@ -173,6 +178,13 @@ GuiEcadでも`InsertRowCommand`等とは別カテゴリだが、シート単位�
 | ボタン`IsEnabled`連動 | 常時有効（無効化バインディングなし、空撃ちは内部でno-op） | 自動グレーアウト（WPF `CommandManager`標準機構） |
 | Redoスタッククリアのタイミング | `Execute`時（新規コマンド実行の都度） | `RecordSnapshot`時（操作実行の直前） — 実質同義だがメソッド粒度が異なる |
 | 履歴クリアの粒度 | 全体クリア＋シート単位の選択的除去の2種 | 全体クリアのみ（`ReplaceDocument`時） |
+| **`IsDirty`（未保存変更）判定方式** | **`_history.UndoDepth != _savedUndoDepth`という算出プロパティ**（`MainPage.xaml.cs:474`）。保存時に`_savedUndoDepth = UndoDepth`を記録し、Undoで保存時点の深さまで正確に戻れば**明示操作なしに自動で`false`へ戻る**。Undo対象外の変更（文書情報・シート設定・BOM・シート追加/削除/改名等）のみ`MarkDirty()`で`_savedUndoDepth=-1`という決して一致しないセンチネルを立てる | **単純なbool**（`MarkDirty()`で無条件に`true`を立てるのみ）。Undoで戻しても自動的に`false`には戻らない、明示的な再設定に依存する設計 |
+
+**【2026-07-28追記】`IsDirty`機構は本節が初出時に書き漏らしていたが、実際には`docs/archive/
+ecad2-guiecad-code-survey-onmitsu.md`（T-024、2026-07-03）が既に詳細に調査済みであった**
+（同節「Dirtyフラグの管理」参照。`docs/proposed.md` P-008「GuiEcadの同型問題の前例あり」の
+出所もここに当たる）。**本節と重複させぬため詳細は同文書へ譲り、ここでは比較表への追記のみ
+行う。**
 
 ---
 
