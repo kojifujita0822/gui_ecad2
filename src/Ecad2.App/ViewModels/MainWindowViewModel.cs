@@ -107,8 +107,10 @@ public sealed class MainWindowViewModel : ViewModelBase
                 ClearConnectorDraftIfAny();
                 ClearFreeLineDraftIfAny();
                 CancelImageInsertDraft();
-                // T-102: 記入中ドラフトのクリア対象に、要素配置ごと取消(解釈(i))を要するこのドラフトも
-                // 追加する(他の3種と異なり単純な破棄ではなく要素・機器登録のロールバックを伴う)。
+                // T-102: 記入中ドラフトのクリア対象に、合流先確認ドラフトも追加する。
+                // T-135(殿裁定2026-07-28=案(1)、AppModeも同じ扱い): ここでは要素を巻き戻さぬ。
+                // モード切替は「取消の意図が無い」経路ゆえ、他の3種と同じくドラフトを畳むだけとする
+                // (要素配置ごとの取消はEscに限る)。
                 ClearOrJoinTargetDraftIfAny();
                 Tool = ToolState.SelectDefault;
                 if (CurrentSheet is Sheet sheet) GetOrCreateTestSession(sheet).Evaluate();
@@ -482,6 +484,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             ClearFrameDraftIfAny();
             // T-102: 合流先確認ドラフトも同型でクリアする(5種目、他のドラフトと同じ理由=別セルへの
             // 移動が起きても記入中状態を残留させない)。
+            // T-135(殿裁定2026-07-28=案(1)): この経路こそがP-144の当該箇所。別セルをクリックしただけで
+            // 要素が消えていたのを改め、ドラフトを畳むだけにした。要素は残る(殿裁可=「残してよい」)。
             ClearOrJoinTargetDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
@@ -3127,6 +3131,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         MarkDirty();
         _orJoinTargetDraft = null;
         Tool = ToolState.SelectDefault;
+        // T-135(家老裁可2026-07-28): 正常確定でも案内文言を消す。忍者が報じたのは別セルクリックの
+        // 経路だが、Enter確定でも同じく残っていた(隠密のテスト設計が境界値として求めた観点で発覚)。
+        // EndOrJoinTargetDraftへ寄せぬのは、あちらがNotifySelectedElementChangedも呼ぶため——
+        // Enter確定では要素が残り選択も変わらぬゆえ、寄せると余計な通知が増える。
+        StatusMessage = "";
         OnPropertyChanged(nameof(OrJoinTargetPreview));
     }
 
@@ -3134,35 +3143,87 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <para>
     /// T-134(殿裁定2026-07-28=(U-1)): 要素配置ごと取り消されるため、配置時に積んだスナップショットも
     /// 破棄する——残すと「押しても何も変わらぬUndo」が1回生じる。<b>破棄は本経路(Escによる明示的な
-    /// 取消)に限る。</b> SelectedCellのsetter等から呼ばれるClearOrJoinTargetDraftIfAnyは、使い手が
-    /// 取消を意図していない巻き戻し(docs/proposed.md P-144)であり、そちらではスナップショットを
-    /// 残してUndoで回復できるようにする。DiscardLastSnapshotは深さが一致する場合のみ破棄するため、
-    /// ドラフト中に別の操作が積んでいた場合は安全側(破棄せず)に倒れる。
+    /// 取消)に限る。</b> DiscardLastSnapshotは深さが一致する場合のみ破棄するため、ドラフト中に別の
+    /// 操作が積んでいた場合は安全側(破棄せず)に倒れる。
+    /// </para>
+    /// <para>
+    /// <b>T-135(殿裁定2026-07-28=案(1)): 要素を巻き戻すのは本経路と文書差し替えだけである。</b>
+    /// 別セルクリック・モード切替は<see cref="ClearOrJoinTargetDraftIfAny"/>(非破壊)を呼ぶ。
+    /// T-134時点のコメントは「そちらではスナップショットを残してUndoで回復できるようにする」と
+    /// 述べていたが、<b>これは誤りであった</b>——配置時に積むのは「配置前」ゆえ、残しても
+    /// 巻き戻された要素は戻らぬ(docs/proposed.md P-144の訂正)。T-135は回復手段を足すのではなく、
+    /// <b>巻き戻し自体を起こさぬ</b>方向で決着した。
     /// </para></summary>
     public void CancelOrJoinTarget()
     {
         if (_orJoinTargetDraft is not { } draft) return;
         int expectedDepth = draft.UndoDepthAfterPlacement;
-        ClearOrJoinTargetDraftIfAny();
+        RollBackOrJoinTargetPlacementIfAny();
         UndoManager.DiscardLastSnapshot(expectedDepth);
     }
 
-    /// <summary>記入中(_orJoinTargetDraft)であれば取消してSelect状態へ戻す(ClearConnectorDraftIfAny
-    /// 等と同じ共通クリア入口パターン)。T-041の同型ドラフトと異なり、このドラフトは既に確定済みの
-    /// 要素(NewElement)を指しているため、単純にドラフトを破棄するだけでは要素がOR接続されない孤立
-    /// 要素として残ってしまう。よって取消時は要素配置そのものを取り消す(sheet.Elementsから除去し、
-    /// この配置で新規登録されたデバイスがあれば機器表からも除去する)。SelectedCellのsetter・
-    /// CancelResidualDraftForToolSwitch・ReplaceDocument・AppMode setterから呼ぶ(横展開、T-041の
-    /// 教訓)。</summary>
+    /// <summary>記入中(_orJoinTargetDraft)であれば<b>ドラフトだけを畳んで</b>Select状態へ戻す
+    /// (ClearConnectorDraftIfAny等と同じ共通クリア入口パターン)。<b>要素は残す。</b>
+    /// <para>
+    /// <b>【T-135で意味が変わった。古い理解のまま読まぬこと】</b> T-102からT-134までの間、本メソッドは
+    /// ドラフトを畳むだけでなく<b>要素配置そのものを巻き戻して</b>いた。Escの仕様(殿裁定=解釈(i)
+    /// 「要素配置ごと取消」)のために設けた処理が、ドラフトクリアの横展開に際して他の経路へも
+    /// そのまま波及したためである。だが<b>裁定はEscについてのものであり、別セルクリックは射程外</b>
+    /// であった——取消の意図が無いのに要素が消え、しかも配置時に積むスナップショットは「配置前」
+    /// ゆえUndoでも戻らぬ(docs/proposed.md P-144)。<b>殿裁定2026-07-28=案(1)により、巻き戻しは
+    /// <see cref="RollBackOrJoinTargetPlacementIfAny"/>へ分けた。</b>
+    /// </para>
+    /// <para>
+    /// <b>OR接続されぬ要素がシート上に残ることは殿の裁可を得ておる</b>(2026-07-28=「残してよい」)。
+    /// </para>
+    /// <para>
+    /// 呼ぶのは<b>SelectedCellのsetterとAppMode setterの2箇所</b>(いずれも取消の意図が無い経路)。
+    /// Escは<see cref="CancelOrJoinTarget"/>、文書差し替えは ReplaceDocument が、それぞれ
+    /// 巻き戻す版を呼ぶ。
+    /// </para></summary>
     private void ClearOrJoinTargetDraftIfAny()
+    {
+        if (_orJoinTargetDraft is null) return;
+        EndOrJoinTargetDraft();
+    }
+
+    /// <summary>記入中であれば<b>要素配置ごと</b>巻き戻す(Esc=殿裁定 解釈(i)、および文書差し替え)。
+    /// sheet.Elementsから除去し、この配置で新規登録されたデバイスがあれば機器表からも除去する。
+    /// <para>
+    /// 呼ぶのは<see cref="CancelOrJoinTarget"/>(Esc)と ReplaceDocument の2箇所。なお
+    /// CancelResidualDraftForToolSwitch(ツール切替ボタン)は<see cref="CancelOrJoinTarget"/>を
+    /// 経由するため<b>間接的に</b>本処理へ届く——T-102のコメントはこれを直接の呼び出し元として
+    /// 挙げていたが、実際には一段挟まる(T-135で数え直した)。
+    /// </para></summary>
+    private void RollBackOrJoinTargetPlacementIfAny()
     {
         if (_orJoinTargetDraft is not { } draft) return;
         draft.Sheet.Elements.Remove(draft.NewElement);
         if (draft.DeviceWasNewlyRegistered && draft.NewElement.DeviceName is string deviceName)
             draft.Document.Devices.ByName.Remove(deviceName);
         DeviceTable.Refresh();
+        EndOrJoinTargetDraft();
+    }
+
+    /// <summary>合流先確認ドラフトを畳む際の共通後始末(T-135)。ドラフト参照を落とし、Select状態へ戻し、
+    /// ステータスバーの案内文言を消す。
+    /// <para>
+    /// 文言を消すのはT-135で加えた(忍者の実機所見)。「上下キーで合流先候補を切替、Enterで確定、
+    /// Escで配置ごと取消」の案内はView層(MainWindow.xaml.cs の PlacementOkButton_Click)が
+    /// モード遷移時に設定するが、<b>抜ける側で消す処理がどこにも無く、以後ずっと残っていた</b>
+    /// (「モード: 作画／ツール: 選択」と食い違う)。両版の共通部へ置くことで、Esc・別セルクリック・
+    /// モード切替・文書差し替えのいずれで抜けても消える。
+    /// </para>
+    /// <para>
+    /// 無条件クリアで差し支えないのは、呼び出し元がいずれも「ドラフトが在る」ことを確かめてから
+    /// 呼ぶためである(ドラフト中に出ている案内は、この文言と見てよい)。既存の FinishRowCountChange・
+    /// ReplaceDocument も同じく無条件クリアの流儀を採る。
+    /// </para></summary>
+    private void EndOrJoinTargetDraft()
+    {
         _orJoinTargetDraft = null;
         Tool = ToolState.SelectDefault;
+        StatusMessage = "";
         NotifySelectedElementChanged();
         OnPropertyChanged(nameof(OrJoinTargetPreview));
     }
@@ -3262,10 +3323,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         ClearConnectorDraftIfAny();
         // T-041増分5: 自由線の記入中状態(_freeLineDraft)も同様。
         ClearFreeLineDraftIfAny();
-        // T-102: 合流先確認ドラフトも同様に、旧Documentの実体を持ち越さない。ClearOrJoinTargetDraftIfAny
-        // はドラフトが直接保持するSheet/Document参照(旧文書側)を操作するため、直前のDocument=newDocument
+        // T-102: 合流先確認ドラフトも同様に、旧Documentの実体を持ち越さない。本メソッドはドラフトが
+        // 直接保持するSheet/Document参照(旧文書側)を操作するため、直前のDocument=newDocument
         // (旧文書からの差し替え)より後にここで呼んでも問題なく旧文書側の要素・機器を正しく除去できる。
-        ClearOrJoinTargetDraftIfAny();
+        // T-135: 巻き戻す版を明示的に呼ぶ。旧文書は捨てられ直後にUndoManager.Clear()も走るゆえ
+        // 残しても結果は変わらぬが、「旧文書側の実体を確実に落とす」という本来の意図を保つ。
+        RollBackOrJoinTargetPlacementIfAny();
         // T-064追加往復(隠密フル観点レビュー指摘、殿裁定2026-07-13): 画像挿入の記入中状態
         // (_imageInsertDraft)も同様に、旧文書の情報を持ち越さないようクリアする必要があった
         // (横展開漏れ、ClearConnectorDraftIfAny/ClearFreeLineDraftIfAnyのみ呼ばれ本項が欠落)。

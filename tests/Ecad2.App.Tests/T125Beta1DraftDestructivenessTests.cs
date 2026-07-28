@@ -10,16 +10,21 @@ namespace Ecad2.App.Tests;
 /// 観点4（5種ドラフトの破壊性の表明）・観点5（行コメント編集への横展開）を実装する。
 ///
 /// 【本テストの性格】観点4は「バグを固定するテスト」ではなく<b>性質の記録</b>である。
-/// SelectedCellのsetter（MainWindowViewModel.cs:428-463）は値が変わらずとも5種のドラフトを常時
-/// クリアするが、5つは ClearXxxIfAny() という同じ形で横一列に並びながら、5種目
-/// （ClearOrJoinTargetDraftIfAny）だけが破壊的で配置済み要素と機器表エントリを削除する。
+/// SelectedCellのsetterは値が変わらずとも5種のドラフトを常時クリアするが、5つは ClearXxxIfAny()
+/// という同じ形で横一列に並びながら、5種目（ClearOrJoinTargetDraftIfAny）だけが破壊的で
+/// 配置済み要素と機器表エントリを削除していた。
 /// <b>並びの均質さが中身の非対称を隠す</b>——これが本件の根本原因であった。
-/// 将来また別の経路が SelectedCell=null を呼んだとき、この非対称が既知として残るよう表明しておく。
 ///
-/// 【T4-5は仕様どおりの正しい振る舞いである】合流先確認ドラフトの取消が要素配置ごと巻き戻すのは
-/// T-102殿裁定＝解釈(i)「要素配置ごと取消」のとおりで、Esc経路ではこれが正しい。
-/// <b>問題は処理そのものではなく、意図せぬ経路から呼ばれたことにあった。</b>
-/// ゆえにこのテストが落ちたら「バグが直った」ではなく「仕様が変わった」と読むこと。
+/// <para><b>【T-135で仕様が変わった。2026-07-28】</b>
+/// 上の段落は「非対称を記録に残す」ために書かれ、観点4のテストは<b>「このテストが落ちたら
+/// 『バグが直った』ではなく『仕様が変わった』と読め」</b>と申し送っていた。
+/// <b>その予言どおりになった。</b> T-102殿裁定＝解釈(i)「要素配置ごと取消」は<b>Escについての
+/// 裁定</b>であり、SelectedCellのsetter経由は射程外であった（docs/proposed.md P-144）。
+/// 殿裁定2026-07-28＝案(1)により、<b>巻き戻すのはEsc・文書差し替えの2経路に限り</b>、
+/// 別セルクリック・AppMode切替はドラフトだけを畳む。<b>5種の非対称は解消し、横一列の並びと
+/// 中身が一致した。</b>
+/// ゆえに観点4のテストは期待値を反転させ、対としてEsc経路の回帰も併せて置いた。
+/// T-135の網羅的な回帰は T135OrJoinDraftExitTests が受け持つ。</para>
 ///
 /// 【観点1〜3（実機）は本テストの対象外】修正対象は MainWindow.xaml.cs＝View層コードビハインドで
 /// テスト基盤が無く、RED先行証明は原理的に成り立たない（β-1と同じ理由、家老裁定2026-07-27）。
@@ -97,16 +102,29 @@ public class T125Beta1DraftDestructivenessTests : ViewModelTestBase
     }
 
     // ------------------------------------------------------------------
-    // 観点4【T4-5】合流先確認ドラフトだけが破壊的であることの明示的表明
+    // 観点4【T4-5】合流先確認ドラフトも他4種と同じく非破壊であること（T-135で揃えた）
     // ------------------------------------------------------------------
 
     /// <summary>
-    /// <b>これはバグの固定ではなく仕様の表明である。</b>合流先確認ドラフトの取消が要素配置ごと
-    /// 巻き戻すのは T-102 殿裁定＝解釈(i) のとおりで、Esc 経路では正しい。
-    /// 本テストは「5種の中でこれだけが破壊的」という非対称を記録に残すために置く。
+    /// <b>【T-135で期待値を反転させた。以前は逆を表明していたテストである】</b>
+    /// <para>
+    /// 当初（T-125β-1）は「5種の中で合流先確認ドラフトだけが破壊的」という非対称を記録に残すために
+    /// 置いた。T-102 殿裁定＝解釈(i)「要素配置ごと取消」がその根拠であった。
+    /// </para>
+    /// <para>
+    /// <b>だが裁定はEscについてのものであり、SelectedCellのsetter経由は射程外であった</b>
+    /// （docs/proposed.md P-144）。取消の意図が無いのに要素が消え、配置時のスナップショットは
+    /// 「配置前」ゆえUndoでも戻らぬ。<b>殿裁定2026-07-28＝案(1)により、この経路は要素を残す</b>
+    /// （OR接続されぬ要素が残ることも併せて裁可＝「残してよい」）。
+    /// </para>
+    /// <para>
+    /// <b>検出力について</b>：本テストの眼目は「非対称の記録」から「5種が揃ったことの記録」へ移った。
+    /// 巻き戻しが復活すれば要素・機器表の両方が落ちるゆえ、回帰の網としては以前より強い
+    /// （以前は「消えること」を期待していたため、誤って消し過ぎても気づけなかった）。
+    /// </para>
     /// </summary>
     [Fact]
-    public void 合流先確認ドラフト保持中のSelectedCellクリアは配置済み要素を取り消す_仕様の表明()
+    public void 合流先確認ドラフト保持中のSelectedCellクリアでも配置済み要素は残る()
     {
         var vm = CreateViewModel();
         vm.NewDocument();
@@ -122,7 +140,32 @@ public class T125Beta1DraftDestructivenessTests : ViewModelTestBase
 
         vm.SelectedCell = null;
 
-        // 2件目の要素と、その配置で新規登録された機器表エントリが消える。
+        // T-135: 要素も機器表エントリも残る。畳まれるのはドラフトだけ（他4種と同じ挙動）。
+        Assert.Equal(2, vm.CurrentSheet!.Elements.Count);
+        Assert.Equal("X002", vm.CurrentSheet!.Elements[1].DeviceName);
+        Assert.Equal(2, vm.Document.Devices.ByName.Count);
+        Assert.True(vm.Document.Devices.ByName.ContainsKey("X002"));
+        Assert.Equal(ToolMode.Select, vm.Tool.Mode);
+        Assert.False(vm.HasAnyDraft);
+    }
+
+    /// <summary>
+    /// T-135: Esc経路は従来どおり要素配置ごと巻き戻す（殿裁定 T102裁4＝解釈(i)は健在）。
+    /// 上のテストと対で置くことで、<b>「両経路とも非破壊にしてしまう」という行き過ぎ</b>を検出する。
+    /// </summary>
+    [Fact]
+    public void 合流先確認ドラフトのEsc取消は従来どおり要素配置ごと巻き戻す()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = FirstElementPos;
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X001", isOr: false);
+        vm.SelectedCell = OrElementPos;
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "X002", isOr: true);
+        Assert.Equal(ToolMode.ConfirmOrJoinTarget, vm.Tool.Mode);
+
+        vm.CancelOrJoinTarget();
+
         Assert.Single(vm.CurrentSheet!.Elements);
         Assert.Equal("X001", vm.CurrentSheet!.Elements[0].DeviceName);
         Assert.Single(vm.Document.Devices.ByName);
