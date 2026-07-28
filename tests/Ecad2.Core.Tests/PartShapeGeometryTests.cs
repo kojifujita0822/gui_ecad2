@@ -393,6 +393,63 @@ public class PartShapeGeometryTests
         Assert.Equal(5.0, y, Precision);
     }
 
+    // ===== 基準枠（T-133増分1、殿裁定6=基準点は中央） =====
+    // 入力値の選び方: 幅≠高さ・セル寸法も割り切れぬ値を選ぶ。幅と高さを取り違えても、
+    // 正方形なら結果が変わらず穴が残るため（samurai.md「テスト入力の対称性・退化性チェック」）。
+    // また「行は中心基準・列は境界基準」という非対称そのものが本メソッドの要ゆえ、
+    // X と Y を別々に検証する。
+
+    [Theory]
+    [InlineData(3, 5, 2.5, 7.5, 12.5, -6.25)]   // 幅<高さ
+    [InlineData(5, 3, 2.0, 10.0, 6.0, -3.0)]    // 幅>高さ（上と逆にして取り違えを炙る）
+    [InlineData(1, 4, 3.0, 3.0, 12.0, -6.0)]    // 幅1（列方向の退化）
+    public void FrameRect_RowIsCentered_ColumnStartsAtZero(
+        int widthCells, int heightCells, double cellMm,
+        double expectedWidth, double expectedHeight, double expectedY)
+    {
+        var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
+
+        Assert.Equal(0.0, x, Precision);                  // 列は境界基準ゆえ左辺は常に0
+        Assert.Equal(expectedY, y, Precision);            // 行は中心基準ゆえ上辺は -高さ/2
+        Assert.Equal(expectedWidth, w, Precision);
+        Assert.Equal(expectedHeight, h, Precision);
+    }
+
+    [Theory]
+    [InlineData(3, 5, 2.5)]
+    [InlineData(5, 3, 2.0)]
+    [InlineData(2, 7, 1.5)]
+    public void FrameRect_VerticalCenterSitsOnRowZero(int widthCells, int heightCells, double cellMm)
+    {
+        // 接続点の RowOffset=0 と枠の中心が同じ高さに来ることが本増分の眼目。
+        // 上辺+高さ/2 が 0 になることで、上辺と高さのどちらが誤っても検出できる。
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
+
+        Assert.Equal(0.0, y + h / 2, Precision);
+    }
+
+    [Fact]
+    public void FrameRect_HeightOne_SpansHalfCellEachWay()
+    {
+        // 高さ1（退化ケース）。ClampPort が行オフセット0のみを許す高さと対応する。
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 4, heightCells: 1, cellMm: 9.0);
+
+        Assert.Equal(-4.5, y, Precision);
+        Assert.Equal(9.0, h, Precision);
+    }
+
+    [Fact]
+    public void FrameRect_ZeroHeight_CollapsesToRowZero()
+    {
+        // 高さ0（退化ケース）。中心基準の式が0除算や符号反転を起こさぬことを押さえる。
+        var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells: 3, heightCells: 0, cellMm: 9.0);
+
+        Assert.Equal(0.0, x, Precision);
+        Assert.Equal(0.0, y, Precision);
+        Assert.Equal(27.0, w, Precision);
+        Assert.Equal(0.0, h, Precision);
+    }
+
     // ===== 接続点（T-068増分3-c） =====
     // 座標の対応に注意: 接続点の x は BoundaryOffset、y は RowOffset であり、PortDef の宣言順
     // (Name, RowOffset, BoundaryOffset) とは逆になる。入力値は幅≠高さ・x≠y を選び、取り違えが

@@ -71,6 +71,29 @@ public static class PartShapeGeometry
             Ry: Math.Max(0.05, Math.Abs(y2 - y1) / 2),
             Rot: 0);
 
+    // ===== 基準枠（T-133増分1、殿裁定6=基準点は中央） =====
+
+    /// <summary>
+    /// 基準枠の矩形（余白を含まない mm）。<b>行は中心基準・列は境界基準</b>で返す。
+    /// <para>
+    /// T-133増分1（殿裁定6）以前は左上原点 <c>(0,0)</c> から下へ描いていたため、
+    /// 接続点の <see cref="PortDef.RowOffset"/>（中心行を0とする上下、<see cref="ClampPort"/> 参照）と
+    /// 基準が食い違っていた。本メソッドは行だけを中心基準へ移して両者を揃える。
+    /// </para>
+    /// <para>
+    /// <b>列（X）を 0 のままにするのは意図的である。</b> 境界オフセットは
+    /// <see cref="ClampPort"/> が <c>0〜幅</c> で扱う左端基準ゆえ、枠の左辺も 0 でなければ揃わぬ。
+    /// 「中央基準」は行についてのみ言う。
+    /// </para>
+    /// </summary>
+    public static (double X, double Y, double Width, double Height) FrameRect(
+        int widthCells, int heightCells, double cellMm)
+    {
+        double w = widthCells * cellMm;
+        double h = heightCells * cellMm;
+        return (0.0, -h / 2, w, h);
+    }
+
     // ===== 接続点（T-068増分3-c、家老裁可2026-07-25） =====
 
     /// <summary>接続点の位置をセル格子（整数）へ丸め、基準枠の範囲へ収める。

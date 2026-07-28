@@ -670,8 +670,11 @@ public sealed class PartEditorCanvas : FrameworkElement
             var selectedStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 255, 69, 0), 0.5);
             var draftStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 30, 144, 255), 0.4, LineStyle.Dashed);
 
-            // 基準枠（プロパティ欄の幅・高さに連動する外形の目安）
-            renderer.DrawRectangle(new Rect2D(0, 0, _widthCells * _geo.CellMm, _heightCells * _geo.CellMm), frameStroke);
+            // 基準枠（プロパティ欄の幅・高さに連動する外形の目安）。T-133増分1(殿裁定6)で
+            // 行中心基準へ移した——接続点のRowOffsetと基準が揃う。算出はCore層の純粋関数へ。
+            var (frameX, frameY, frameW, frameH) =
+                PartShapeGeometry.FrameRect(_widthCells, _heightCells, _geo.CellMm);
+            renderer.DrawRectangle(new Rect2D(frameX, frameY, frameW, frameH), frameStroke);
 
             for (int i = 0; i < _primitives.Count; i++)
                 PartDrawing.DrawPrimitive(renderer, _theme, _primitives[i], _geo.CellMm,
