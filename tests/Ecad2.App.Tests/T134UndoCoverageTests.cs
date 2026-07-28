@@ -606,6 +606,70 @@ public class T134UndoCoverageTests : ViewModelTestBase
         Assert.True(vm.UndoManager.CanRedo);   // Redo履歴が生き残る
     }
 
+    /// <summary>
+    /// ダイアログが「何も変えずOK」で返す値。<see cref="DocumentInfoDialog"/> は
+    /// コンストラクタで <c>current.Date ?? ""</c> と表示し（`:23`）、OKで
+    /// <c>Result.Date = DateBox.Text</c> をそのまま代入する（`:40`）。ゆえに
+    /// <b><see cref="DocumentInfo.Date"/> が null の文書では、何も触らずとも "" が返る。</b>
+    /// 他7項目は <c>string</c>（既定 ""）ゆえ この食い違いは起きぬ——<b>Date だけが <c>string?</c></b>。
+    /// </summary>
+    private static DocumentInfo DialogEchoOfBlank() => new()
+    {
+        CompanyName = "", Title = "", DrawingNo = "", Customer = "",
+        Designer = "", Drafter = "", Checker = "", Date = "",
+    };
+
+    [Fact]
+    public void 文書情報_I5_Dateがnullの文書へダイアログが返す空文字列は同値と見なす()
+    {
+        var vm = NewVm();
+
+        // 前提: 新規文書の Date は null（他7項目は ""）。この非対称が本件の根にある。
+        Assert.Null(vm.Document.Info.Date);
+
+        vm.ApplyDocumentInfo(DialogEchoOfBlank());   // 何も変えずOK したのと同じ
+
+        Assert.False(vm.UndoManager.CanUndo);        // 空のスナップショットを積まない
+        Assert.False(vm.IsDirty);
+    }
+
+    [Fact]
+    public void 文書情報_I5_Dateがnullでも同値なら既存のRedo履歴を消さない()
+    {
+        var vm = NewVm();
+        vm.ApplyDocumentInfo(SampleInfo());
+        vm.UndoCommand.Execute(null);
+
+        // Undo で Date は null へ戻る。ここが実機の「新規文書で一度目に開く」状態にあたる。
+        Assert.Null(vm.Document.Info.Date);
+        Assert.True(vm.UndoManager.CanRedo);
+
+        vm.ApplyDocumentInfo(DialogEchoOfBlank());   // 何も変えずOK
+
+        Assert.True(vm.UndoManager.CanRedo);         // Redo履歴が生き残る
+    }
+
+    [Fact]
+    public void 文書情報_I6_Dateの実値を空へ消すのは変更として扱う()
+    {
+        // 正規化は「null と ""」の同一視に留め、実値のクリアまで呑み込んではならぬ。
+        // I5 の修正が広く効きすぎておらぬかを、逆側から押さえる。
+        var vm = NewVm();
+        vm.ApplyDocumentInfo(SampleInfo());
+        vm.UndoManager.Clear();
+
+        var cleared = SampleInfo();
+        cleared.Date = "";
+        vm.ApplyDocumentInfo(cleared);
+
+        Assert.True(vm.UndoManager.CanUndo);
+        Assert.Equal("", vm.Document.Info.Date);
+
+        vm.UndoCommand.Execute(null);
+
+        Assert.Equal("2026-07-28", vm.Document.Info.Date);
+    }
+
     [Fact]
     public void 文書情報_I4_Revisionsは編集対象外ゆえ変わらない()
     {

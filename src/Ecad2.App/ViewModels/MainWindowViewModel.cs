@@ -277,10 +277,17 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void ApplyDocumentInfo(DocumentInfo info)
     {
         var cur = Document.Info;
+        // T-134往復1周目(忍者の実機NG、殿裁定=(U-1)の範囲内欠陥): Dateだけは string? であり、
+        // 新規文書では null から始まる(他7項目は string で既定 "")。一方 DocumentInfoDialog は
+        // `current.Date ?? ""` で表示し(:23)、OKで DateBox.Text をそのまま返す(:40)ため、
+        // 何も触らずOKしただけで "" が返る。素の == では null != "" となり同値ガードを素通りし、
+        // 空のスナップショットが積まれて既存のRedo履歴まで消えていた。null と "" はいずれも
+        // 「未設定」を指すゆえ、比較の前に正規化して同一視する。
+        // 実値のクリア("2026-07-28" -> "")は依然として変更として検出される(テスト I6)。
         if (cur.CompanyName == info.CompanyName && cur.Title == info.Title
             && cur.DrawingNo == info.DrawingNo && cur.Customer == info.Customer
             && cur.Designer == info.Designer && cur.Drafter == info.Drafter
-            && cur.Checker == info.Checker && cur.Date == info.Date) return;
+            && cur.Checker == info.Checker && (cur.Date ?? "") == (info.Date ?? "")) return;
 
         UndoManager.RecordSnapshot(Document);
         Document.Info.CompanyName = info.CompanyName;
