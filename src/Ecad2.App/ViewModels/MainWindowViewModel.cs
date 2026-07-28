@@ -2670,9 +2670,15 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>指定行に要素(広義5種: ElementInstance/VerticalConnector/WireBreak/GroupFrame/
     /// RungComment、殿裁定2026-07-10)が存在するかを判定する(T-055増分1、削除拒否の判定に使う)。
-    /// internalはIVT経由のテスト用。</summary>
+    /// internalはIVT経由のテスト用。
+    /// <para>
+    /// T-133増分4(隠密の死角調査「漏れ1」、家老裁量2026-07-28): ElementInstance だけが行の一致比較
+    /// であり、同じ関数の中で Connectors・Frames が範囲で見るのと非対称であった。高さ2以上の要素の
+    /// 占有行が最終行にかかっていても「空き」と判じ、行を削除できてしまう(削除後、要素の占有が
+    /// グリッド範囲外へはみ出す)。<see cref="ElementInstance.ContainsRow"/> で範囲判定へ揃える。
+    /// </para></summary>
     internal static bool IsRowOccupied(Sheet sheet, int row)
-        => sheet.Elements.Any(e => e.Pos.Row == row)
+        => sheet.Elements.Any(e => e.ContainsRow(row))
             || sheet.Connectors.Any(c => Math.Min(c.TopRow, c.BottomRow) <= row && row <= Math.Max(c.TopRow, c.BottomRow))
             || sheet.WireBreaks.Any(w => w.Row == row)
             || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
@@ -2792,9 +2798,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </para></summary>
     private static bool IsWithinGridBounds(GridPos pos, int cellWidth, int cellHeight, Sheet sheet)
     {
-        // Math.Max は PartShapeGeometry.FrameRect/ClampPort と同じく、高さ0以下の退化入力を0段へ潰す
-        // (隠密レビュー所見2、2026-07-28)。ここが負になると範囲判定が緩み、グリッド外へ置けてしまう。
-        int rowSpan = Math.Max(0, cellHeight - 1);
+        // 退化入力(高さ0以下)の0段への潰しは ElementInstance.RowSpanOf が持つ(T-133増分4で一元化)。
+        // ここが負になると範囲判定が緩み、グリッド外へ置けてしまう。
+        int rowSpan = ElementInstance.RowSpanOf(cellHeight);
         return pos.Row - rowSpan >= 0 && pos.Row + rowSpan < sheet.Grid.Rows
             && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
     }
@@ -2837,17 +2843,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static bool IsOccupied(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
     {
         int left = pos.Column, right = pos.Column + cellWidth - 1;
-        // 退化入力(高さ0以下)は0段へ潰す。負のまま扱うと行の交差条件が常にfalseとなり、
-        // 「占有もヒットもせぬ幽霊要素」が生じる(隠密レビュー所見2、2026-07-28)。
-        int rowSpan = Math.Max(0, cellHeight - 1);
+        // 置く側の行範囲。退化入力(高さ0以下)の0段への潰しは RowSpanOf が持つ(T-133増分4で一元化)。
+        int rowSpan = ElementInstance.RowSpanOf(cellHeight);
         int top = pos.Row - rowSpan, bottom = pos.Row + rowSpan;
-        return sheet.Elements.Any(el =>
-        {
-            int elRowSpan = Math.Max(0, el.CellHeight - 1);
-            return el != exclude
-                && el.Pos.Row - elRowSpan <= bottom && top <= el.Pos.Row + elRowSpan
-                && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1;
-        });
+        // 既存要素側の行範囲との交差は OverlapsRows が持つ(置く側・既存側の双方が高さを持つ)。
+        return sheet.Elements.Any(el => el != exclude
+            && el.OverlapsRows(top, bottom)
+            && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
     }
 
     /// <summary>指定セル位置にヒットする要素を返す(T-069往復2周目修正1、右クリックメニューの
@@ -2859,13 +2861,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         // T-133増分3: CellHeight>1 の要素は行方向にもアンカー以外のセルを占める(殿裁定11=H-2、
         // 中心基準)。列に対して行った区間包含判定を、行にもそのまま適用する。高さ1なら
         // el.Pos.Row == pos.Row と等価に潰れる。
-        return sheet.Elements.FirstOrDefault(el =>
-        {
-            // 退化入力(高さ0以下)は0段へ潰す。IsOccupiedと同型のガード(隠密レビュー所見2、2026-07-28)。
-            int elRowSpan = Math.Max(0, el.CellHeight - 1);
-            return el.Pos.Row - elRowSpan <= pos.Row && pos.Row <= el.Pos.Row + elRowSpan
-                && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1;
-        });
+        return sheet.Elements.FirstOrDefault(el => el.ContainsRow(pos.Row)
+            && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1);
     }
 
     /// <summary>テストモード中のマウス押下処理(T-061第三歩、GuiEcad MainPage.Pointer.cs踏襲)。
@@ -3003,11 +3000,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
         // T-071バグ修正: Motor(WidthCells=3)等の複数セル幅パーツに対応するため、配置するパーツの
         // WidthCellsをPartLibraryから取得する(既定1、基本図形の大半は1セル幅のまま)。
-        int cellWidth = PartLibrary.Get(partId)?.WidthCells ?? 1;
-        // T-133増分3: 本経路(PartId指定の配置)で置かれる要素は CellHeight を設定しておらぬゆえ
-        // 既定1である。ここで高さ1を明示するのは挙動を変えぬため——高さを持つ要素を置くのは
-        // 増分4で新設する Kind 経路であり、そちらが DefaultCellHeight から取って渡す。
-        if (!ValidatePlacement(pos, cellWidth, cellHeight: 1, sheet)) return;
+        var definition = PartLibrary.Get(partId);
+        int cellWidth = definition?.WidthCells ?? 1;
+        // T-133増分4(殿裁定2026-07-28、隠密の静的レビュー所見1): 自作パーツの高さも結線する。
+        // 増分3までは幅のみ供給源(PartDefinition)から取り、高さは1固定という非対称が残っていた。
+        // 組込み15件がすべて HeightCells=1 ゆえ実害は無かったが、使い手が高さ2以上の自作パーツを
+        // 作ると、パーツエディタでは基準枠が 2h-1 行分に広がって描かれるのに(P-148)、図面では
+        // 1行しか占有せぬという食い違いが表に出る。ElementKind 経路が使う DefaultCellHeight とは
+        // 別系統(PartDefinition.HeightCells)であり、そちらの結線だけでは本経路の穴は埋まらぬ。
+        int cellHeight = definition?.HeightCells ?? 1;
+        if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet)) return;
 
         // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
         // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
@@ -3023,6 +3025,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             Pos = pos,
             PartId = partId,
             CellWidth = cellWidth,
+            CellHeight = cellHeight,
             DeviceName = deviceName.Length > 0 ? deviceName : null,
         };
         sheet.Elements.Add(newElement);

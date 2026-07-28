@@ -68,6 +68,40 @@ public sealed class ElementInstance
     /// <summary>色(G/R)・SW位置(閉/開)・ラベル等の付加情報。</summary>
     public Dictionary<string, string> Params { get; set; } = new();
 
+    /// <summary>高さ（セル数）から占有行の半径を求める（中心の行から上下へ何行か）。
+    /// <para>
+    /// 殿裁定11＝<b>H-2（中心基準）</b>ゆえ、高さ H の要素は <c>2H-1</c> 行を占める
+    /// （H=1 なら1行、H=2 なら3行、H=3 なら5行）。<b>「高さ2＝2行」ではない。</b>
+    /// <c>Math.Max</c> は高さ0以下の退化入力を0段へ潰す
+    /// （<see cref="PartShapeGeometry.ClampPort"/> の <c>rowLimit</c> と同じ式）。
+    /// </para>
+    /// <para>
+    /// <b>これから置く要素（まだ <see cref="ElementInstance"/> が無い段階）の判定にも使えるよう
+    /// 静的にしてある。</b> 既に在る要素については <see cref="RowSpan"/> を使う。
+    /// </para></summary>
+    public static int RowSpanOf(int cellHeight) => Math.Max(0, cellHeight - 1);
+
+    /// <summary>本要素の占有行の半径。<see cref="RowSpanOf"/> を <see cref="CellHeight"/> へ適用したもの。</summary>
+    public int RowSpan => RowSpanOf(CellHeight);
+
+    /// <summary>指定の行が本要素の占有行範囲に入るか（T-133増分4、家老裁定2026-07-28）。
+    /// <para>
+    /// 占有範囲は <c>[Pos.Row - RowSpan, Pos.Row + RowSpan]</c>。<b>高さ1なら <c>Pos.Row == row</c>
+    /// との一致比較に潰れる</b>ゆえ、高さを持たぬ要素の挙動は変わらぬ。
+    /// </para>
+    /// <para>
+    /// <b>この判定を各所へ書き写さず、本メソッドを呼ぶこと。</b> 同じ式が増分3〜4で4箇所
+    /// （占有判定・ヒットテスト・行占有判定・行削除）へ現れ、<c>Math.Max</c> による退化ガードの
+    /// 書き忘れが起きうるため一元化した（rule of three 超え）。
+    /// </para></summary>
+    public bool ContainsRow(int row) => Pos.Row - RowSpan <= row && row <= Pos.Row + RowSpan;
+
+    /// <summary>指定の行区間 <c>[topRow, bottomRow]</c> と本要素の占有行範囲が重なるか
+    /// （T-133増分4）。<see cref="ContainsRow"/> が「点と範囲」なのに対し、こちらは「範囲と範囲」。
+    /// 置く側も高さを持つ占有判定で使う。</summary>
+    public bool OverlapsRows(int topRow, int bottomRow)
+        => Pos.Row - RowSpan <= bottomRow && topRow <= Pos.Row + RowSpan;
+
     public ElementInstance DeepClone() => new()
     {
         Id = Guid.NewGuid(),

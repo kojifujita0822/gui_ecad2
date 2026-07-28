@@ -47,7 +47,11 @@ public static class RowOps
     /// <returns>削除されたElementInstanceの一覧（呼び出し元での機器表クリーンアップ用）。</returns>
     public static IReadOnlyList<ElementInstance> DeleteRow(Sheet sheet, int targetRow)
     {
-        var removedElements = sheet.Elements.Where(e => e.Pos.Row == targetRow).ToList();
+        // T-133増分4(隠密の死角調査「漏れ2」、殿裁定2026-07-28=(D-1)): 高さ2以上の要素は
+        // 2H-1 行を占める(中心基準)。アンカー行の一致だけを見ると、真上・真下の行を削除したとき
+        // その要素が削除されず -1 シフトして残る——画面に描かれておるのに消えぬ食い違いが出る。
+        // 殿裁定「対象行の要素は要素ごと削除」の趣旨に従い、占有範囲にかかれば削除する。
+        var removedElements = sheet.Elements.Where(e => e.ContainsRow(targetRow)).ToList();
         foreach (var e in removedElements) sheet.Elements.Remove(e);
 
         var removedConnectors = sheet.Connectors
