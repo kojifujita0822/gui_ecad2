@@ -399,10 +399,12 @@ public class PartShapeGeometryTests
     // また「行は中心基準・列は境界基準」という非対称そのものが本メソッドの要ゆえ、
     // X と Y を別々に検証する。
 
+    // P-148（殿裁定2026-07-28）で行方向の半径が ±h/2 から ±((h-1)+0.5) セルへ広がった。
+    // 高さ1は変わらず（±0.5）、高さ2以上で広がる。期待値は下記のとおり改めてある。
     [Theory]
-    [InlineData(3, 5, 2.5, 7.5, 12.5, -6.25)]   // 幅<高さ
-    [InlineData(5, 3, 2.0, 10.0, 6.0, -3.0)]    // 幅>高さ（上と逆にして取り違えを炙る）
-    [InlineData(1, 4, 3.0, 3.0, 12.0, -6.0)]    // 幅1（列方向の退化）
+    [InlineData(3, 5, 2.5, 7.5, 22.5, -11.25)]  // 幅<高さ。半径=(5-1+0.5)*2.5=11.25
+    [InlineData(5, 3, 2.0, 10.0, 10.0, -5.0)]   // 幅>高さ（上と逆にして取り違えを炙る）。半径=(3-1+0.5)*2.0=5.0
+    [InlineData(1, 4, 3.0, 3.0, 21.0, -10.5)]   // 幅1（列方向の退化）。半径=(4-1+0.5)*3.0=10.5
     public void FrameRect_RowIsCentered_ColumnStartsAtZero(
         int widthCells, int heightCells, double cellMm,
         double expectedWidth, double expectedHeight, double expectedY)
@@ -439,15 +441,57 @@ public class PartShapeGeometryTests
     }
 
     [Fact]
-    public void FrameRect_ZeroHeight_CollapsesToRowZero()
+    public void FrameRect_ZeroHeight_ClampsToOneRow()
     {
-        // 高さ0（退化ケース）。中心基準の式が0除算や符号反転を起こさぬことを押さえる。
+        // 高さ0（退化ケース）。P-148で式が ±((h-1)+0.5) になったため、素直に計算すると
+        // 半径が負（-0.5セル）になり矩形が反転する。ClampPort の rowLimit と同じく
+        // Math.Max で0段へ潰し、高さ1と同じ1セル分の枠を返すことを固定する。
         var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells: 3, heightCells: 0, cellMm: 9.0);
 
         Assert.Equal(0.0, x, Precision);
-        Assert.Equal(0.0, y, Precision);
+        Assert.Equal(-4.5, y, Precision);
         Assert.Equal(27.0, w, Precision);
-        Assert.Equal(0.0, h, Precision);
+        Assert.Equal(9.0, h, Precision);
+        Assert.True(h > 0, "枠の高さが負や0になってはならぬ（矩形の反転・消失を防ぐ）");
+    }
+
+    [Fact]
+    public void FrameRect_HeightOne_P148の前後で変わらない()
+    {
+        // 殿がP-148を裁可された際の材料＝「既存18件への影響なし（組込み15件は高さ1）」。
+        // 素直な ±(h-1) を採ると高さ1で枠が ±0 となり15件すべてで枠が消えるため、
+        // +0.5 を含む形が選ばれた。<b>その前提をここで固定する</b>——
+        // 将来 +0.5 を落とす変更が入れば、このテストが鳴る。
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 4, heightCells: 1, cellMm: 9.0);
+
+        Assert.Equal(-4.5, y, Precision);   // P-148以前と同値
+        Assert.Equal(9.0, h, Precision);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    [InlineData(5)]
+    [InlineData(12)]   // GuiEcadのHeightBoxが許す上限（Math.Clamp(...,1,12)）
+    public void FrameRect_接続点の可動範囲を必ず覆う(int heightCells)
+    {
+        // P-148の本題。枠・接続点の可動範囲・メイン図面の占有範囲（殿裁定11=H-2）の3者が
+        // 揃うことを、枠と接続点の2者について直接測る。
+        // 接続点は行の中心に描かれる（PartEditorCanvas の CellToLocalMm(x, RowOffset)）。
+        const double cellMm = 9.0;
+        const int widthCells = 4;
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
+
+        // ClampPort が返しうる上端・下端の RowOffset（枠外を大きく叩いてクランプさせる）
+        var (bottomRow, _) = PartShapeGeometry.ClampPort(0, 999, widthCells, heightCells);
+        var (topRow, _) = PartShapeGeometry.ClampPort(0, -999, widthCells, heightCells);
+
+        Assert.InRange(topRow * cellMm, y, y + h);
+        Assert.InRange(bottomRow * cellMm, y, y + h);
+        // 端の接続点は枠の内側に「半セル分」の余裕を持つ（線上に重ならぬ）。
+        Assert.True(topRow * cellMm - y >= cellMm / 2 - 1e-9, "上端の接続点が枠の外か線上にある");
+        Assert.True(y + h - bottomRow * cellMm >= cellMm / 2 - 1e-9, "下端の接続点が枠の外か線上にある");
     }
 
     // ===== 接続点（T-068増分3-c） =====

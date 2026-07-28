@@ -89,9 +89,14 @@ public static class PartShapeGeometry
     public static (double X, double Y, double Width, double Height) FrameRect(
         int widthCells, int heightCells, double cellMm)
     {
+        // P-148（殿裁定2026-07-28）: 行方向の半径は ±((h-1) + 0.5) セル。
+        // (h-1) は ClampPort の rowLimit と同じ式であり、+0.5 は「接続点が行の中心に置かれる」
+        // ゆえに要る半セル分（枠がその行のセルを覆うため）。これにより
+        // 枠・接続点の可動範囲・メイン図面の占有範囲（殿裁定11=H-2）の3者が揃う。
+        // Math.Max は ClampPort の rowLimit と同じく高さ0以下の退化入力を0段へ潰す。
         double w = widthCells * cellMm;
-        double h = heightCells * cellMm;
-        return (0.0, -h / 2, w, h);
+        double halfSpanMm = (Math.Max(0, heightCells - 1) + 0.5) * cellMm;
+        return (0.0, -halfSpanMm, w, halfSpanMm * 2);
     }
 
     // ===== 接続点（T-068増分3-c、家老裁可2026-07-25） =====
