@@ -129,6 +129,9 @@ public class T097LabelDyTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
         PlaceAt(vm, 0, 0, BasicPartTemplates.CoilId, "Y001");
+        // T-134(殿裁定2026-07-28): 要素の配置自体がUndo対象になったため、配置で積まれた履歴を
+        // 除いて起点を揃える。本テストの主眼は「同値設定で履歴が増えぬこと」ゆえ検出力は変わらない。
+        vm.UndoManager.Clear();
         vm.SelectedElementLabelDy = "3";
         Assert.True(vm.UndoCommand.CanExecute(null));   // 前提: 値変更でUndo履歴が1件作られる
         vm.UndoCommand.Execute(null);

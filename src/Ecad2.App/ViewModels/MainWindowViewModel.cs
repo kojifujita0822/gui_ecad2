@@ -265,9 +265,24 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void MarkDirty() => IsDirty = true;
 
     /// <summary>ドキュメント情報(T-065)を一括反映しMarkDirty()する。Revisions(改定履歴)は
-    /// 編集対象外(殿裁定2026-07-12)のため変更しない。</summary>
+    /// 編集対象外(殿裁定2026-07-12)のため変更しない。
+    /// <para>
+    /// T-134(明記なき漏れ#6、殿裁定2026-07-28): 本メソッドはUndo対象外であったうえ、同値ガードも
+    /// 持たなかった(ダイアログを開いて何も変えずOKしただけでMarkDirty()が走った)。同値ガード規約
+    /// (FindViewModel.cs:210-213、T-070隠密レビュー指摘A-5)が述べるとおり、変化しないのに
+    /// RecordSnapshotを呼ぶと「空のUndo」が積まれるだけでなく<b>既存のRedo履歴まで消える</b>
+    /// (RecordSnapshotがredoStackをClearするため)。よってガードの新設とRecordSnapshotの追加を
+    /// 併せて行う(殿裁定=両方正す)。Revisionsは編集対象外ゆえ比較にも含めない。
+    /// </para></summary>
     public void ApplyDocumentInfo(DocumentInfo info)
     {
+        var cur = Document.Info;
+        if (cur.CompanyName == info.CompanyName && cur.Title == info.Title
+            && cur.DrawingNo == info.DrawingNo && cur.Customer == info.Customer
+            && cur.Designer == info.Designer && cur.Drafter == info.Drafter
+            && cur.Checker == info.Checker && cur.Date == info.Date) return;
+
+        UndoManager.RecordSnapshot(Document);
         Document.Info.CompanyName = info.CompanyName;
         Document.Info.Title = info.Title;
         Document.Info.DrawingNo = info.DrawingNo;
@@ -2154,6 +2169,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             string newName = value.Trim();
             if (oldName == newName) return;
 
+            // T-134(明記なき漏れ#3、殿裁定2026-07-28): 機器名の変更をUndo対象へ加える。同値ガード
+            // (直上)の後に置くことで、値が変わらぬ場合に空のスナップショットを積まない
+            // (SelectedElementComment・SelectedElementLabelDy と同型の配置)。DeviceRenamer経由の
+            // 一括リネーム(同名の他要素・機器表エントリまで書き換わる)も、この1回で丸ごと戻る。
+            UndoManager.RecordSnapshot(Document);
             if (oldName.Length > 0 && newName.Length > 0)
             {
                 DeviceRenamer.Rename(Document, oldName, newName);
@@ -2421,6 +2441,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (CurrentSheet is not Sheet sheet || SelectedElement is not ElementInstance el) return false;
 
+        // T-134(明記なき漏れ#2、殿裁定2026-07-28): 要素の削除をUndo対象へ加える。直上の早期return
+        // (シート無し/要素未選択)を通過した後に置くことで、削除が起きぬ経路では積まない。
+        // 削除は機器表エントリにも及ぶ(下記RemoveDeviceIfUnreferenced)ため、Undo一回で要素と
+        // 機器表の双方が戻る。
+        UndoManager.RecordSnapshot(Document);
         string? deviceName = el.DeviceName;
         sheet.Elements.Remove(el);
         MarkDirty();
@@ -2612,6 +2637,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         string oldText = existing?.Text ?? "";
         if (oldText == trimmed) return;
 
+        // T-134(明記なき漏れ#5、殿裁定2026-07-28): 行コメントの編集をUndo対象へ加える。同値ガード
+        // (直上)の後に置く。空文字列による削除(下記)もこの1回で戻る。
+        UndoManager.RecordSnapshot(Document);
         if (trimmed.Length == 0)
         {
             if (existing is not null) sheet.RungComments.Remove(existing);
@@ -2921,6 +2949,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         int cellWidth = PartLibrary.Get(partId)?.WidthCells ?? 1;
         if (!ValidatePlacement(pos, cellWidth, sheet)) return;
 
+        // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
+        // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
+        // された経路では積まない(拒否でも積むと「押しても何も変わらぬUndo」が1回挟まる)。
+        // isOr配置は合流先確認モードへ遷移するが、ConfirmOrJoinTarget側では積まない——配置と
+        // 合流先確定は使い手から見て1つの操作であり、二度積むとUndo一回目で「合流先が未確定の、
+        // 宙ぶらりんな配置済み状態」が復活してしまうため。
+        UndoManager.RecordSnapshot(Document);
+        int undoDepthAfterPlacement = UndoManager.UndoDepth;
+
         var newElement = new ElementInstance
         {
             Pos = pos,
@@ -2955,7 +2992,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         // T-102(殿裁定=1-a・2-a): 配置確定後、自動で合流先確認モードへ遷移する(候補1件でも同様に
         // 遷移するが、Enter一発で確定できるため実質無操作、T-041のConnectorDraftと同型のUX)。
-        _orJoinTargetDraft = new OrJoinTargetDraft(sheet, Document, newElement, deviceWasNewlyRegistered, candidates, SelectedIndex: 0);
+        _orJoinTargetDraft = new OrJoinTargetDraft(sheet, Document, newElement, deviceWasNewlyRegistered,
+            candidates, SelectedIndex: 0, UndoDepthAfterPlacement: undoDepthAfterPlacement);
         Tool = new ToolState(ToolMode.ConfirmOrJoinTarget);
         OnPropertyChanged(nameof(OrJoinTargetPreview));
     }
@@ -3028,9 +3066,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     // 内ではDocument差し替え[Document = newDocument]がClear*IfAny呼び出しより先に走るため、その時点で
     // CurrentSheet/Documentを引くと新Document側を指してしまい、旧Documentにある要素/機器を正しく
     // 取り除けない)。
+    // T-134(殿裁定2026-07-28=(U-1)): UndoDepthAfterPlacement=配置時にRecordSnapshotを積んだ直後の
+    // UndoManager.UndoDepth。Escによる取消(CancelOrJoinTarget)で、そのスナップショットが今も
+    // スタックの最上位にあるかを確かめてから破棄するために控える(間に別の操作が積んでいれば
+    // 深さが合わず、その操作のスナップショットを誤って捨てずに済む)。
     private sealed record OrJoinTargetDraft(
         Sheet Sheet, LadderDocument Document, ElementInstance NewElement, bool DeviceWasNewlyRegistered,
-        IReadOnlyList<OrJoinCandidate> Candidates, int SelectedIndex);
+        IReadOnlyList<OrJoinCandidate> Candidates, int SelectedIndex, int UndoDepthAfterPlacement);
 
     private OrJoinTargetDraft? _orJoinTargetDraft;
 
@@ -3059,7 +3101,14 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>合流先確認モードを確定する(Enter、殿裁定=1-a)。選択中の候補で縦コネクタを生成する
     /// (既存のOR自動配線と同じ直接List操作+MarkDirty()の流儀)。候補は常に1件以上存在する状態でのみ
     /// このモードに入るため(PlaceElementAtSelectedCell参照)、T-041のConfirmConnectorDraftと異なり
-    /// 拒否条件(戻り値false)は無い。</summary>
+    /// 拒否条件(戻り値false)は無い。
+    /// <para>
+    /// <b>T-134(殿裁定2026-07-28=(U-1)): ここでRecordSnapshotを呼ばないのは意図的である。</b>
+    /// 配置と合流先確定は使い手から見て1つの操作(Enterを1回押すだけ)であり、両方で積むとUndoを
+    /// 2回押さねば配置前へ戻らず、しかも1回目で「合流先が未確定の、宙ぶらりんな配置済み状態」が
+    /// 復活する。スナップショットはPlaceElementAtSelectedCellが配置時に1回だけ積んでおり、
+    /// Undo一回でコネクタと要素がまとめて戻る。<b>漏れではない——足してはならぬ。</b>
+    /// </para></summary>
     public void ConfirmOrJoinTarget()
     {
         if (_orJoinTargetDraft is not { } draft) return;
@@ -3074,8 +3123,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(OrJoinTargetPreview));
     }
 
-    /// <summary>合流先確認モード中の取消(Esc、殿裁定=解釈(i)「要素配置ごと取消」)。</summary>
-    public void CancelOrJoinTarget() => ClearOrJoinTargetDraftIfAny();
+    /// <summary>合流先確認モード中の取消(Esc、殿裁定=解釈(i)「要素配置ごと取消」)。
+    /// <para>
+    /// T-134(殿裁定2026-07-28=(U-1)): 要素配置ごと取り消されるため、配置時に積んだスナップショットも
+    /// 破棄する——残すと「押しても何も変わらぬUndo」が1回生じる。<b>破棄は本経路(Escによる明示的な
+    /// 取消)に限る。</b> SelectedCellのsetter等から呼ばれるClearOrJoinTargetDraftIfAnyは、使い手が
+    /// 取消を意図していない巻き戻し(docs/proposed.md P-144)であり、そちらではスナップショットを
+    /// 残してUndoで回復できるようにする。DiscardLastSnapshotは深さが一致する場合のみ破棄するため、
+    /// ドラフト中に別の操作が積んでいた場合は安全側(破棄せず)に倒れる。
+    /// </para></summary>
+    public void CancelOrJoinTarget()
+    {
+        if (_orJoinTargetDraft is not { } draft) return;
+        int expectedDepth = draft.UndoDepthAfterPlacement;
+        ClearOrJoinTargetDraftIfAny();
+        UndoManager.DiscardLastSnapshot(expectedDepth);
+    }
 
     /// <summary>記入中(_orJoinTargetDraft)であれば取消してSelect状態へ戻す(ClearConnectorDraftIfAny
     /// 等と同じ共通クリア入口パターン)。T-041の同型ドラフトと異なり、このドラフトは既に確定済みの

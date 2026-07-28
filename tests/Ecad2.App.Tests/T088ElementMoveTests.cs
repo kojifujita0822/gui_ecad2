@@ -156,6 +156,9 @@ public class T088ElementMoveTests : ViewModelTestBase
         vm.NewDocument();
         PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
         var element = vm.SelectedElement!;
+        // T-134(殿裁定2026-07-28): 要素の配置自体がUndo対象になったため、配置で積まれた履歴を
+        // 除いて起点を揃える。本テストの主眼は「ドラッグ取消で履歴が増えぬこと」。
+        vm.UndoManager.Clear();
 
         vm.BeginDragElement(element);
         vm.UpdateDragElement(new GridPos(7, 8));
@@ -173,6 +176,9 @@ public class T088ElementMoveTests : ViewModelTestBase
         vm.NewDocument();
         PlaceAt(vm, 5, 5, BasicPartTemplates.ContactNOId, "X001");
         var element = vm.SelectedElement!;
+        // T-134(殿裁定2026-07-28): 要素の配置自体がUndo対象になったため、配置で積まれた履歴を
+        // 除いて起点を揃える。本テストの主眼は「無移動の確定で履歴が増えぬこと」。
+        vm.UndoManager.Clear();
 
         vm.BeginDragElement(element);
         vm.ConfirmDragElement();
