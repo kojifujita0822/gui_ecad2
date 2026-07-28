@@ -2760,7 +2760,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// cellWidth>1(Motor等)の場合、占有列範囲[pos.Column, pos.Column+cellWidth-1]と既存要素の占有列範囲
     /// [el.Pos.Column, el.Pos.Column+el.CellWidth-1]の交差判定に拡張する(T-071バグ修正、隠密テスト設計
     /// docs/ecad2-t071-bugfix-test-design-onmitsu.md 表1)。既定cellWidth=1は従来の単一セル一致判定と
-    /// 数学的に等価(区間[c,c]同士の一致比較になるため回帰なし)。</summary>
+    /// 数学的に等価(区間[c,c]同士の一致比較になるため回帰なし)。
     /// <para>
     /// T-133増分3: <paramref name="cellHeight"/>&gt;1 の要素は行方向にも範囲を持つ(殿裁定11=H-2、
     /// 中心基準3行)。既定1は従来どおり単一行の一致比較に潰れるため回帰しない。
@@ -2792,7 +2792,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </para></summary>
     private static bool IsWithinGridBounds(GridPos pos, int cellWidth, int cellHeight, Sheet sheet)
     {
-        int rowSpan = cellHeight - 1;
+        // Math.Max は PartShapeGeometry.FrameRect/ClampPort と同じく、高さ0以下の退化入力を0段へ潰す
+        // (隠密レビュー所見2、2026-07-28)。ここが負になると範囲判定が緩み、グリッド外へ置けてしまう。
+        int rowSpan = Math.Max(0, cellHeight - 1);
         return pos.Row - rowSpan >= 0 && pos.Row + rowSpan < sheet.Grid.Rows
             && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
     }
@@ -2826,7 +2828,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>T-088: excludeを渡すと、その要素自身は占有判定の対象から除外する(移動時、元の
     /// セルに自分自身が居座っていることで「占有されている」と誤判定されるのを防ぐ)。新規配置時は
-    /// exclude省略(null)で従来どおりの判定になる。</summary>
+    /// exclude省略(null)で従来どおりの判定になる。
     /// <para>
     /// T-133増分3: 行も区間交差で判定する。<b>置く側だけでなく既存要素の側も高さを持つ</b>ゆえ、
     /// 両者の占有行範囲 <c>[r-(H-1), r+(H-1)]</c> が重なるかを見る(列と同じ区間交差の形)。
@@ -2835,11 +2837,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static bool IsOccupied(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
     {
         int left = pos.Column, right = pos.Column + cellWidth - 1;
-        int rowSpan = cellHeight - 1;
+        // 退化入力(高さ0以下)は0段へ潰す。負のまま扱うと行の交差条件が常にfalseとなり、
+        // 「占有もヒットもせぬ幽霊要素」が生じる(隠密レビュー所見2、2026-07-28)。
+        int rowSpan = Math.Max(0, cellHeight - 1);
         int top = pos.Row - rowSpan, bottom = pos.Row + rowSpan;
         return sheet.Elements.Any(el =>
         {
-            int elRowSpan = el.CellHeight - 1;
+            int elRowSpan = Math.Max(0, el.CellHeight - 1);
             return el != exclude
                 && el.Pos.Row - elRowSpan <= bottom && top <= el.Pos.Row + elRowSpan
                 && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1;
@@ -2857,7 +2861,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         // el.Pos.Row == pos.Row と等価に潰れる。
         return sheet.Elements.FirstOrDefault(el =>
         {
-            int elRowSpan = el.CellHeight - 1;
+            // 退化入力(高さ0以下)は0段へ潰す。IsOccupiedと同型のガード(隠密レビュー所見2、2026-07-28)。
+            int elRowSpan = Math.Max(0, el.CellHeight - 1);
             return el.Pos.Row - elRowSpan <= pos.Row && pos.Row <= el.Pos.Row + elRowSpan
                 && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1;
         });

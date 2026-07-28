@@ -82,7 +82,9 @@ public class T133CellHeightPlacementTests : ViewModelTestBase
     public void 高さと幅は別の基準で判定される()
     {
         // 列は左上アンカー基準 [c, c+W-1]、行は中心基準 [r-(H-1), r+(H-1)]。
-        // 同じ式で扱っていれば、幅3・高さ1 の要素が行方向にもはみ出すと誤判定するはず。
+        // 【射程】本テストが炙るのは「幅を行の判定にも使う」型の取り違えのみである
+        // (隠密レビュー所見8、2026-07-28)。行を左上アンカー基準 [r, r+H-1] と取り違える型は
+        // H=1 のとき [r,r] へ潰れるゆえ、ここでは鳴らぬ——そちらは上の高さ2のTheoryが受け持つ。
         var vm = ArrangeSmallGrid();
         vm.SelectedCell = new GridPos(0, 7);   // 行は上端、列は右寄り
 
@@ -212,9 +214,91 @@ public class T133CellHeightPlacementTests : ViewModelTestBase
         Assert.True(vm.MoveSelectedElement(-1, 0));
         Assert.Equal(new GridPos(1, 6), vm.CurrentSheet!.Elements[0].Pos);
 
-        // さらに1行上へ（行-1を要する＝収まらぬ）。選択は移動先へ追随している前提を確かめてから測る。
-        vm.SelectedCell = new GridPos(1, 6);
+        // 選択は移動先へ追随している(MainWindowViewModel.MoveSelectedElement の SelectedCell = newPos)。
+        // 以前はここで代入していたが、それでは「追随している前提」を確かめたことにならぬため
+        // Assert へ改めた(隠密レビュー所見9、2026-07-28)。追随が壊れれば本行が鳴る。
+        Assert.Equal(new GridPos(1, 6), vm.SelectedCell);
+
+        // さらに1行上へ（行-1を要する＝収まらぬ）。
         Assert.False(vm.MoveSelectedElement(-1, 0));
         Assert.Equal(new GridPos(1, 6), vm.CurrentSheet!.Elements[0].Pos);   // 動いておらぬ
+    }
+
+    // ==================================================================
+    // 退化入力（高さ0以下）——P-148 の FrameRect/ClampPort と対称のガード
+    // （隠密レビュー所見2、2026-07-28）
+    //
+    // 通常経路では0は入らぬ（既定1・設定経路なし）。手書き/破損した .gcad の JSON、あるいは
+    // 将来 DefaultCellHeight が0を返す実装ミスでのみ顕在化する。ガードを持つ箇所は4つ
+    // （IsWithinGridBounds の rowSpan／IsOccupied の rowSpan・elRowSpan／HitTestElement の
+    // elRowSpan）で、下記3テストがその4つすべてを通る。
+    // 入力値は 0 と -3 の双方を通す（0だけでは「負のとき」の振る舞いを測れぬ）。
+    // ==================================================================
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void 高さ0以下でもグリッド範囲判定は緩まない(int degenerateHeight)
+    {
+        // ガードが無いと rowSpan が負になり、範囲【外】の行でも「収まる」と誤判定して範囲が緩む。
+        // 【入力値の選び方】上端の行0では差が出ぬ——ガードの有無にかかわらず true になるゆえ
+        // （0-0>=0 も 0+1>=0 も真）。緩みが現れるのは範囲の外側であり、そこを測らねばならぬ。
+        // 行-1 は選択自体は仕様として取りうる（P-022/P-024、殿教示2026-07-07）が、配置は弾かれねばならぬ。
+        var vm = ArrangeSmallGrid();
+
+        vm.SelectedCell = new GridPos(-1, 6);
+        Assert.False(vm.IsSelectedCellWithinGrid(cellWidth: 1, cellHeight: degenerateHeight));
+
+        // 内側は従来どおり通る（0段へ潰す処置が効きすぎておらぬかの逆側の網）。
+        vm.SelectedCell = new GridPos(0, 6);
+        Assert.True(vm.IsSelectedCellWithinGrid(cellWidth: 1, cellHeight: degenerateHeight));
+
+        // 対照＝列側は退化ガードの対象外ゆえ、従来どおりはみ出しを弾く（行だけを潰したことの確認）。
+        vm.SelectedCell = new GridPos(0, 9);
+        Assert.False(vm.IsSelectedCellWithinGrid(cellWidth: 2, cellHeight: degenerateHeight));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void 高さ0以下の既存要素は幽霊にならず占有しヒットする(int degenerateHeight)
+    {
+        // ガードが無いと elRowSpan が負になり、行の交差条件が常に false ＝
+        // 「占有もヒットもせぬ幽霊要素」（選択も削除もできぬ）が生じる。
+        var vm = ArrangeSmallGrid();
+        vm.CurrentSheet!.Elements.Add(new ElementInstance
+        {
+            Kind = ElementKind.ContactNO,
+            Pos = new GridPos(2, 6),
+            CellHeight = degenerateHeight,
+            DeviceName = "X001",
+        });
+
+        vm.SelectedCell = new GridPos(2, 6);
+        Assert.True(vm.IsSelectedCellOccupied());
+        Assert.Equal("X001", vm.HitTestElement(new GridPos(2, 6))?.DeviceName);
+
+        // 上下の行までは占有せぬ（高さ1と同じ＝0段へ潰れたことの確認。潰し方が過剰でないかの逆側の網）。
+        vm.SelectedCell = new GridPos(1, 6);
+        Assert.False(vm.IsSelectedCellOccupied());
+        Assert.Null(vm.HitTestElement(new GridPos(1, 6)));
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-3)]
+    public void 置く側の高さが0以下でも占有判定は高さ1と同じになる(int degenerateHeight)
+    {
+        // IsOccupied の「置く側」の rowSpan を測る（上のテストは「既存要素側」の elRowSpan）。
+        var vm = ArrangeSmallGrid();
+        vm.CurrentSheet!.Elements.Add(new ElementInstance
+        {
+            Kind = ElementKind.ContactNO, Pos = new GridPos(2, 6), DeviceName = "X001",
+        });
+
+        vm.SelectedCell = new GridPos(2, 6);
+        Assert.True(vm.IsSelectedCellOccupied(cellWidth: 1, cellHeight: degenerateHeight));
+        vm.SelectedCell = new GridPos(1, 6);
+        Assert.False(vm.IsSelectedCellOccupied(cellWidth: 1, cellHeight: degenerateHeight));
     }
 }
