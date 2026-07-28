@@ -13,6 +13,19 @@ namespace Ecad2.App.Tests;
 ///     :1620-1621に明記されている。SelectedCellのsetterは一方向にSelectedFrameをクリアするが、
 ///     逆方向(SelectedFrameを設定してもSelectedCellは消えない)は保証されない。
 ///
+/// 【2026-07-28 重要な追記】上記(2)の修正は撤回された(殿裁定=案A')。SelectedCell=nullは値が
+/// 変わらずとも5種のドラフトを常時クリアし、うち合流先確認ドラフトの取消が配置済み要素と機器表
+/// エントリを削除するため、記入中に枠境界をダブルクリックすると要素が失われる実害を生んだ
+/// (機序と回帰テストはT125Beta1DraftDestructivenessTestsを参照)。
+/// <b>ゆえにOpenFrameLabelEditorは現在も排他規約を満たさない。</b>そこから生じる両立状態
+/// (SelectedFrame≠null かつ SelectedElement≠null)はP-142として起票済みで、γ(MainWindowViewModelの
+/// 責務分割)で判ずる。
+///
+/// <b>この撤回により、本クラスの各テストの位置づけが変わった</b>——
+/// ・排他規約を対照する2件（違反の順／規約どおりの順）は「β-1の修正を守る網」ではなく
+///   <b>両立状態が実在することの記録</b>として残る。P-142を判ずる際の一次資料になる。
+/// ・(1)のreturn補填は撤回していないため、<b>二重ドラッグを扱う2件は引き続き回帰の網として働く</b>。
+///
 /// 【RED先行証明が成り立たぬ理由】上記2件はいずれもMainWindow.xaml.csのコードビハインドであり、
 /// マウス配線・ヒットテスト・ラベル編集オーバーレイにはテスト基盤が無い(T067GroupFrameTestsの
 /// クラスコメントに既述、T-088/T-070 A-7/T-087と同事情)。ゆえに修正の前後でRED→GREENの遷移を
@@ -143,8 +156,11 @@ public class T125BetaSelectionExclusivityTests : ViewModelTestBase
     [Fact]
     public void 規約どおりの順で枠を選び直してもラベル変更は従来どおり働く()
     {
-        // β-1でOpenFrameLabelEditorへSelectedCell=nullを足すため、枠ラベル編集の確定処理
-        // (RenameSelectedFrame)が従来どおり働くことを確かめる回帰。
+        // 【2026-07-28】元はβ-1でOpenFrameLabelEditorへSelectedCell=nullを足すことへの回帰として
+        // 置いた。その追加は案A'で撤回されたが、本テストが見ているのは「規約どおりの順
+        // (SelectedCell=null→SelectedFrame)で枠を選び直しても確定処理(RenameSelectedFrame)が働く」
+        // ことであり、既存3経路(左Up枠選択・右Down枠メニュー・ConfirmFrameDraft)がいずれもこの順序を
+        // 採るため、回帰の網として有効なまま残る。
         var vm = CreateViewModel();
         vm.NewDocument();
         var frame = CreateFrame(vm);
