@@ -3886,12 +3886,23 @@ public partial class MainWindow : Window
     private void OpenFrameLabelEditor(Ecad2.Model.GroupFrame frame)
     {
         _frameLabelEditingFrame = frame;
-        // T-125増分β-1: 枠選択の排他規約(SelectedFrameを設定する側が先にSelectedCell=nullを呼ぶ。
-        // 意図はMainWindowViewModel.cs:1441-1443/:1620-1621に明記。SelectedCellのsetterは一方向に
-        // SelectedFrameをクリアするが逆方向は保証されない)へ揃える。SelectedFrameを設定する4箇所の
-        // うち、ここだけが規約を破っており、要素選択を残したまま枠が選択される状態を作りうる唯一の
-        // 経路だった。
-        _viewModel.SelectedCell = null;
+        // 【意図的な不在】ここでSelectedCell=nullを呼んではならぬ(殿裁定2026-07-28=案A'、T-125増分β-1
+        // の実害修正)。β-1で「枠選択の排他規約へ揃える」目的で一度足したが、重大な実害を生んだため撤回した。
+        //
+        // 機序: SelectedCellのsetterは値が変わらずとも5種のドラフトを常時クリアする
+        // (MainWindowViewModel.cs:428-463)。うちClearOrJoinTargetDraftIfAny(:463)だけが破壊的で、
+        // 配置済み要素をsheet.Elementsから除去し機器表エントリも削除する(:3090-3092)。これはEsc経路
+        // では正しい振る舞いだが(T-102殿裁定=解釈(i)「要素配置ごと取消」)、本メソッドは:1527に明記の
+        // とおりツールモードを問わず発火するため、合流先確認ドラフト保持中に枠境界をダブルクリック
+        // すると意図せぬ取消が走った。要素配置はUndo対象外のため回復もできなかった。
+        //
+        // 行コメント編集(OpenRungCommentEditor :3776-3787)も同じく「モードを問わず」発火するが、
+        // 選択状態に一切触れぬゆえ無害である。本メソッドもそれに倣う——「モードを問わぬ」方針自体は
+        // 無害であり、無害だったのは選択状態に触れなかったからにござる。
+        //
+        // なお本経路が排他規約を満たさぬことで生じる両立状態(SelectedFrame≠null かつ
+        // SelectedElement≠null)はP-142として起票済みで、γ(MainWindowViewModelの責務分割)で判ずる。
+        // 二重ドラッグの実害自体はβ-1のもう一方の修正(:1704のreturn補填)が防いでいる。
         _viewModel.SelectedFrame = frame;
         FrameLabelBox.Text = frame.Label;
         _viewModel.IsFrameLabelEditorVisible = true;
