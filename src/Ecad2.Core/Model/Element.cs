@@ -48,6 +48,19 @@ public sealed class ElementInstance
     public GridPos Pos { get; set; }
     /// <summary>占有セル数（既定は ElementCatalog.DefaultCellWidth）。Motor=3・3極記号=2、他は1。</summary>
     public int CellWidth { get; set; } = 1;
+    /// <summary>占有セル高さ（既定は <see cref="ElementCatalog.DefaultCellHeight"/>）。Motor=2・3極記号=2、他は1。
+    /// <para>
+    /// T-133増分2で新設。それ以前は高さの器が無く、縦2セルを占める記号（三相モータ・主回路3極記号）でも
+    /// 占有・ヒットテストは1行分しか見ていなかった。<b>本増分では器を置くだけで、判定へ通すのは増分3、
+    /// 配置時に既定値を入れるのは増分4である</b>——器と結線を分ける段取りゆえ、しばらく
+    /// <see cref="ElementCatalog.DefaultCellHeight"/> の呼び出し元が無い状態が続く（意図的）。
+    /// </para>
+    /// <para>
+    /// 永続化＝JsonSerializer による自動反映（GcadSerializer は手書きのマッピングを持たぬ）。
+    /// <b>旧ファイル互換</b>：JSON に <c>cellHeight</c> が無ければ本既定値 1 のまま読まれる。
+    /// int は null を取らぬゆえ <c>JsonIgnoreCondition.WhenWritingNull</c> の対象外で、書き出しには常に含まれる。
+    /// </para></summary>
+    public int CellHeight { get; set; } = 1;
     /// <summary>機器名参照（CR11 等）。Device と紐付くキー。</summary>
     public string? DeviceName { get; set; }
     /// <summary>自作パーツ参照（PartLibrary の Id）。null なら組込み種別（<see cref="Kind"/>）。</summary>
@@ -61,6 +74,7 @@ public sealed class ElementInstance
         Kind = Kind,
         Pos = Pos,
         CellWidth = CellWidth,
+        CellHeight = CellHeight,
         DeviceName = DeviceName,
         PartId = PartId,
         Params = new Dictionary<string, string>(Params),

@@ -13,6 +13,22 @@ public static class ElementCatalog
         _ => 1,
     };
 
+    /// <summary>既定の占有セル高さ（T-133増分2）。縦2セルを占める記号のために置く。
+    /// <para>
+    /// <b>増分2の時点では呼び出し元が無い（意図的）。</b> 判定へ通すのは増分3（占有・ヒットテストの
+    /// 縦方向対応）、配置時に入れるのは増分4（<c>Kind</c> 経路の新設）である——器と結線を段階に分ける
+    /// 段取りゆえ。<c>docs/proposed.md</c> P-143「型はあるが結線が無い」を新たに作らぬよう、
+    /// <b>結線先を先に書き留めておく。</b>
+    /// </para></summary>
+    public static int DefaultCellHeight(ElementKind kind) => kind switch
+    {
+        // 三相モータの記号は縦2セル分を占める（計画書§2-2、描画の実測による）。
+        ElementKind.Motor => 2,
+        // 主回路3極記号は 2×2 セル（sample.png 準拠）。上の DefaultCellWidth の 2 と対になる。
+        ElementKind.Breaker3P or ElementKind.ContactorMain3P or ElementKind.ThermalOverload3P => 2,
+        _ => 1,
+    };
+
     /// <summary>
     /// 種別ごとの接続点（ポート）定義。実効幅 <paramref name="width"/> から端子境界を算出する。
     /// 2端子種別: 左端子=境界0／右端子=境界 width（先頭=NetA・末尾=NetB）。

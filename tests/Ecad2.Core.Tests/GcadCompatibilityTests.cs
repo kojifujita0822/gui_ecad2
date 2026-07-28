@@ -82,6 +82,68 @@ public class GcadCompatibilityTests
         Assert.Throws<NotSupportedException>(() => GcadSerializer.Deserialize(json));
     }
 
+    /// <summary>T-133増分2: ElementInstance.CellHeight が保存・読込で往復することを検証する。
+    /// <para>幅3・高さ2（Motor）と<b>非対称な値</b>を使う——2×2 の3極記号で試すと、
+    /// 幅と高さを取り違えても値が一致してしまい検出できぬ。</para></summary>
+    [Fact]
+    public void GcadSerializer_CellHeightが往復一致する()
+    {
+        var doc = new LadderDocument
+        {
+            Sheets =
+            {
+                new Sheet
+                {
+                    Name = "シート1",
+                    Elements =
+                    {
+                        new ElementInstance
+                        {
+                            Kind = ElementKind.Motor, Pos = new GridPos(2, 5),
+                            CellWidth = 3, CellHeight = 2, DeviceName = "M1",
+                        },
+                    },
+                },
+            },
+        };
+
+        string json = GcadSerializer.Serialize(doc);
+        var restored = GcadSerializer.Deserialize(json);
+
+        var element = restored.Sheets[0].Elements[0];
+        Assert.Equal(3, element.CellWidth);
+        Assert.Equal(2, element.CellHeight);
+    }
+
+    /// <summary>T-133増分2: <b>旧ファイル互換</b>——cellHeight を持たぬ .GCAD を読んでも既定値1になる。
+    /// <para>GcadSerializer は手書きのマッピングを持たず JsonSerializer へ委ねるため、
+    /// 未知/欠落プロパティはプロパティ既定値のまま残る。<b>この振る舞いに依存しておることを
+    /// テストで固定する</b>——シリアライザの設定（JsonOptions）が将来変われば、ここが落ちる。</para></summary>
+    [Fact]
+    public void Deserialize_cellHeightを持たぬ旧ファイルは高さ1として読まれる()
+    {
+        // cellWidth はあるが cellHeight が無い＝T-133増分2より前に保存された .GCAD の姿。
+        const string json = """
+            {
+              "schemaVersion": 1,
+              "sheets": [
+                {
+                  "name": "シート1",
+                  "elements": [
+                    { "kind": "motor", "pos": { "row": 2, "column": 5 }, "cellWidth": 3, "deviceName": "M1" }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        var restored = GcadSerializer.Deserialize(json);
+
+        var element = restored.Sheets[0].Elements[0];
+        Assert.Equal(3, element.CellWidth);     // 旧来の値は読めておる（前提の確認）
+        Assert.Equal(1, element.CellHeight);    // 欠落した高さは既定値
+    }
+
     /// <summary>T-107増分2 DoD(5): Device.Comment(デバイス単位で共有するコメント)が
     /// 保存・読込で正しく永続化されることを検証する。</summary>
     [Fact]
