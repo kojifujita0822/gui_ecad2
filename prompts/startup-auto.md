@@ -100,9 +100,25 @@ peer ツールの自動利用は行わない。判断に迷う場合は名乗ら
 
 役が確定したら、審議せず順に実行する：
 
-1. **第1バッチ（並列）**: `ToolSearch select:mcp__claude-peers__list_peers,...` ＋ `docs-notes/handover-next-session.md` 読み込み。
-2. 役割の自動決定（上記 step0〜6）→ `set_summary` で確定名乗り。
-3. 自分の役の `docs-notes/roles/{karo|samurai|ninja|onmitsu}.md` を読む（隠密2は `onmitsu.md` を読む）。
+1. **第1バッチ（並列）**: `ToolSearch select:mcp__claude-peers__list_peers,...` ＋ key 生成（step0 のコマンド）。
+   **ここで `handover-next-session.md` を読まない**（下記「役決めを最短で通す」参照）。
+2. 役割の自動決定（上記 step1〜6）→ `set_summary` で確定名乗り。
+3. **第2バッチ（並列）**: 自分の役の `docs-notes/roles/{karo|samurai|ninja|onmitsu}.md`（隠密2は `onmitsu.md`）
+   ＋ `docs-notes/handover-next-session.md` を読み込む。
 4. 家老のみ各 peer へ役割指示を送る。
+
+### 役決めを最短で通す（殿指示 2026-07-28）
+
+**役決めの経路には、役決めに要らぬ読み込みを混ぜない。**
+`handover-next-session.md` は 200 行を超える長文で、役決めには一切用いない。これを第1バッチに
+入れると、その読み込み時間だけ `list_peers`→`set_summary` が遅れる。
+
+**なぜ速さが要るか**：名乗りが遅れるほど、他セッションから見た空席状況が古いままになり、同時起動時の
+二重名乗り（key 比較による譲り合い＝step2 からのやり直し）が起きやすくなる。**key は実時刻ゆえ
+「早く起動した者が保持する」が、名乗りが遅れれば相手からは空席に見え続ける**——衝突の窓は
+「起動から `set_summary` までの時間」そのものにござる。
+
+**ゆえに**：役決めに要るのは (a) peer ツールの schema と (b) key の 2 つだけ。それ以外の読み込みは
+すべて step5 の確定後（上記 3.）へ回す。
    - このとき list_peers で隠密の在・不在を確認する。**隠密が不在なら、調査タスクは忍者に
      `【隠密として調査せよ】` で振る**（縮退運用）。隠密が在席していれば通常どおり隠密へ振る。
