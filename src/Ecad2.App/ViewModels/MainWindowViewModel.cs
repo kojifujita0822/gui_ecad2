@@ -891,7 +891,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     public bool PlaceWireBreakAtSelectedCell()
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return false;
-        if (!IsWithinGridBounds(pos, cellWidth: 1, sheet)) return false;
+        // T-133増分3: 配線分断は点系プリミティブ(ElementInstanceではない)ゆえ高さの概念を持たぬ。
+        // 幅と同じく1固定で従来の挙動を保つ。
+        if (!IsWithinGridBounds(pos, cellWidth: 1, cellHeight: 1, sheet)) return false;
         double boundary = pos.Column + 0.5;
         if (sheet.WireBreaks.Any(b => b.Row == pos.Row && b.Boundary == boundary)) return false;
         sheet.WireBreaks.Add(new WireBreak { Boundary = boundary, Row = pos.Row });
@@ -1693,7 +1695,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void UpdateDragElement(GridPos pos)
     {
         if (_draggingElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return;
-        if (ValidatePlacement(pos, element.CellWidth, sheet, exclude: element))
+        if (ValidatePlacement(pos, element.CellWidth, element.CellHeight, sheet, exclude: element))
             element.Pos = pos;
     }
 
@@ -1734,7 +1736,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return false;
         var newPos = new GridPos(element.Pos.Row + deltaRow, element.Pos.Column + deltaColumn);
         if (newPos == element.Pos) return false;
-        if (!ValidatePlacement(newPos, element.CellWidth, sheet, exclude: element)) return false;
+        if (!ValidatePlacement(newPos, element.CellWidth, element.CellHeight, sheet, exclude: element)) return false;
         UndoManager.RecordSnapshot(Document);
         element.Pos = newPos;
         MarkDirty();
@@ -2759,8 +2761,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// [el.Pos.Column, el.Pos.Column+el.CellWidth-1]の交差判定に拡張する(T-071バグ修正、隠密テスト設計
     /// docs/ecad2-t071-bugfix-test-design-onmitsu.md 表1)。既定cellWidth=1は従来の単一セル一致判定と
     /// 数学的に等価(区間[c,c]同士の一致比較になるため回帰なし)。</summary>
-    public bool IsSelectedCellOccupied(int cellWidth = 1)
-        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsOccupied(pos, cellWidth, sheet);
+    /// <para>
+    /// T-133増分3: <paramref name="cellHeight"/>&gt;1 の要素は行方向にも範囲を持つ(殿裁定11=H-2、
+    /// 中心基準3行)。既定1は従来どおり単一行の一致比較に潰れるため回帰しない。
+    /// <b>本引数を実際に渡す呼び出し元は増分4(Kind経路の新設)で入る</b>——それまでは既定のままである。
+    /// </para></summary>
+    public bool IsSelectedCellOccupied(int cellWidth = 1, int cellHeight = 1)
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsOccupied(pos, cellWidth, cellHeight, sheet);
 
     /// <summary>SelectedCellが現在のグリッド範囲内(行0〜Rows-1・列0〜Columns-1)か判定する
     /// (T-045増分C、View層のTryPlaceElementが配置バー表示前に境界外を弾くために使う。所見B=
@@ -2768,12 +2775,27 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 列-2まで選択可、殿教示2026-07-07・docs/proposed.md P-022/P-024)には触れず、配置前の
     /// フィードバック用の判定に留める(殿裁定2026-07-09=下限0、選択の仕様は不変)。cellWidthの
     /// 意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
-    public bool IsSelectedCellWithinGrid(int cellWidth = 1)
-        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, cellWidth, sheet);
+    public bool IsSelectedCellWithinGrid(int cellWidth = 1, int cellHeight = 1)
+        => SelectedCell is { } pos && CurrentSheet is Sheet sheet && IsWithinGridBounds(pos, cellWidth, cellHeight, sheet);
 
-    private static bool IsWithinGridBounds(GridPos pos, int cellWidth, Sheet sheet)
-        => pos.Row >= 0 && pos.Row < sheet.Grid.Rows
-        && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
+    /// <summary>グリッド範囲内か判定する。列は左上アンカー基準、<b>行は中心基準</b>である。
+    /// <para>
+    /// T-133増分3(殿裁定11=H-2「中心基準3行」): 高さ H の要素は <c>pos.Row</c> を中心として
+    /// 上下へ <c>H-1</c> 行ずつ、計 <c>2(H-1)+1</c> 行を占める。H=1 なら 1行(従来と同一)、
+    /// H=2 なら 3行。<b>接続点の <see cref="Ecad2.Model.PartShapeGeometry.ClampPort"/> が用いる
+    /// <c>rowLimit = heightCells - 1</c> と同じ式</b>であり、両者の基準が揃う。
+    /// </para>
+    /// <para>
+    /// <b>列と行で基準が違う点に注意せよ。</b> 列は <c>[c, c+W-1]</c>(左上アンカー)、
+    /// 行は <c>[r-(H-1), r+(H-1)]</c>(中心)。<b>幅と高さを同じ式で扱うと誤る。</b>
+    /// 殿裁定の経緯＝計画書§4-1（描画が及ぶ全行を覆うことを占有判定の本義とした）。
+    /// </para></summary>
+    private static bool IsWithinGridBounds(GridPos pos, int cellWidth, int cellHeight, Sheet sheet)
+    {
+        int rowSpan = cellHeight - 1;
+        return pos.Row - rowSpan >= 0 && pos.Row + rowSpan < sheet.Grid.Rows
+            && pos.Column >= 0 && pos.Column + cellWidth - 1 < sheet.Grid.Columns;
+    }
 
     /// <summary>T-067: GroupFrameが指定TopLeft/Width/Heightでグリッド範囲内に収まるか判定する
     /// (IsWithinGridBoundsの矩形版、複数行にまたがる点が要素と異なる)。GroupFrameは他要素との
@@ -2805,11 +2827,23 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>T-088: excludeを渡すと、その要素自身は占有判定の対象から除外する(移動時、元の
     /// セルに自分自身が居座っていることで「占有されている」と誤判定されるのを防ぐ)。新規配置時は
     /// exclude省略(null)で従来どおりの判定になる。</summary>
-    private static bool IsOccupied(GridPos pos, int cellWidth, Sheet sheet, ElementInstance? exclude = null)
+    /// <para>
+    /// T-133増分3: 行も区間交差で判定する。<b>置く側だけでなく既存要素の側も高さを持つ</b>ゆえ、
+    /// 両者の占有行範囲 <c>[r-(H-1), r+(H-1)]</c> が重なるかを見る(列と同じ区間交差の形)。
+    /// 高さ1どうしなら <c>[r,r]</c> 同士の一致比較に潰れ、従来と数学的に等価である。
+    /// </para></summary>
+    private static bool IsOccupied(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
     {
         int left = pos.Column, right = pos.Column + cellWidth - 1;
+        int rowSpan = cellHeight - 1;
+        int top = pos.Row - rowSpan, bottom = pos.Row + rowSpan;
         return sheet.Elements.Any(el =>
-            el != exclude && el.Pos.Row == pos.Row && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1);
+        {
+            int elRowSpan = el.CellHeight - 1;
+            return el != exclude
+                && el.Pos.Row - elRowSpan <= bottom && top <= el.Pos.Row + elRowSpan
+                && el.Pos.Column <= right && left <= el.Pos.Column + el.CellWidth - 1;
+        });
     }
 
     /// <summary>指定セル位置にヒットする要素を返す(T-069往復2周目修正1、右クリックメニューの
@@ -2818,8 +2852,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ElementInstance? HitTestElement(GridPos pos)
     {
         if (CurrentSheet is not Sheet sheet) return null;
+        // T-133増分3: CellHeight>1 の要素は行方向にもアンカー以外のセルを占める(殿裁定11=H-2、
+        // 中心基準)。列に対して行った区間包含判定を、行にもそのまま適用する。高さ1なら
+        // el.Pos.Row == pos.Row と等価に潰れる。
         return sheet.Elements.FirstOrDefault(el =>
-            el.Pos.Row == pos.Row && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1);
+        {
+            int elRowSpan = el.CellHeight - 1;
+            return el.Pos.Row - elRowSpan <= pos.Row && pos.Row <= el.Pos.Row + elRowSpan
+                && el.Pos.Column <= pos.Column && pos.Column <= el.Pos.Column + el.CellWidth - 1;
+        });
     }
 
     /// <summary>テストモード中のマウス押下処理(T-061第三歩、GuiEcad MainPage.Pointer.cs踏襲)。
@@ -2897,8 +2938,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
     /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
     /// 共有する(IsWithinGridBounds)。cellWidthの意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
-    private bool ValidatePlacement(GridPos pos, int cellWidth, Sheet sheet, ElementInstance? exclude = null)
-        => IsWithinGridBounds(pos, cellWidth, sheet) && !IsOccupied(pos, cellWidth, sheet, exclude);
+    private bool ValidatePlacement(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
+        => IsWithinGridBounds(pos, cellWidth, cellHeight, sheet) && !IsOccupied(pos, cellWidth, cellHeight, sheet, exclude);
 
     /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
     /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
@@ -2958,7 +2999,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         // T-071バグ修正: Motor(WidthCells=3)等の複数セル幅パーツに対応するため、配置するパーツの
         // WidthCellsをPartLibraryから取得する(既定1、基本図形の大半は1セル幅のまま)。
         int cellWidth = PartLibrary.Get(partId)?.WidthCells ?? 1;
-        if (!ValidatePlacement(pos, cellWidth, sheet)) return;
+        // T-133増分3: 本経路(PartId指定の配置)で置かれる要素は CellHeight を設定しておらぬゆえ
+        // 既定1である。ここで高さ1を明示するのは挙動を変えぬため——高さを持つ要素を置くのは
+        // 増分4で新設する Kind 経路であり、そちらが DefaultCellHeight から取って渡す。
+        if (!ValidatePlacement(pos, cellWidth, cellHeight: 1, sheet)) return;
 
         // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
         // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
