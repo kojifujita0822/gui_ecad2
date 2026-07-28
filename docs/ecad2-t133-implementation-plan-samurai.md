@@ -143,6 +143,53 @@
 
 ---
 
+#### 【増分0で実施・2026-07-28】`.Kind` 全件列挙の結果——**`src` 全体で26箇所、うち本件の対象は16箇所**
+
+`src` 配下（`obj`/`bin` を除く）の `\.Kind\b` を機械的に洗い、**個々を判別してから合計を出した**。
+
+**(A) `ElementInstance.Kind` を参照する＝16箇所**（うちコメント2件・実コード14件）
+
+| 箇所 | 中身 | 増分4で3極記号が置かれた時 |
+|---|---|---|
+| `MainWindowViewModel.cs:2135` | `KindDisplayName(el.Kind)` | **要対応**——3極記号の表示名が要る |
+| `MainWindowViewModel.cs:2372` | `ResolveLabelKind` のフォールバック | **到達する**（`CreatesComponent=false` 側）。`DefaultLabelDy` は `_ => 0.0` |
+| `MainWindowViewModel.cs:2867` | コメント（過去実装の記述） | — |
+| `LadderCanvas.cs:711` | `KindDisplayName(element.Kind)` | **要対応**（上と同じ） |
+| `PartResolver.cs:14` | `ElementCatalog.Ports(e.Kind, …)` | 空配列を返す（`ElementCatalog.cs:31-32`）＝**設計どおり** |
+| `PartResolver.cs:33` | `ElementCatalog.CreatesComponent(e.Kind)` | false＝**設計どおり** |
+| `PartResolver.cs:37` | XMLコメント | — |
+| `PartResolver.cs:46` | `ComponentKind` のフォールバック | `PartId` が null なら `e.Kind` |
+| `DiagramRenderer.cs:455` / `:456` | `IsPassthrough(e.Kind)`／前要素の同判定 | false＝**設計どおり** |
+| `DiagramRenderer.cs:995` | `resolvedKind` のフォールバック | **到達する**（`PartId` 経由でないため） |
+| `DiagramRenderer.cs:1000` | `IsLoad(e.Kind)` | false＝**設計どおり** |
+| `DiagramRenderer.cs:1023` | `isContact` 判定 | false＝**正しくなる方向**（先に挙げた1件） |
+| `DiagramRenderer.cs:1038` / `:1131` | `SymbolGlyphs.Draw(…, e.Kind, …)` | **要確認**——3極記号の描画分岐が在るか |
+| `DiagramRenderer.cs:1044` | `if (e.Kind == ElementKind.Breaker3P)` | **既に3極記号を名指し済み** |
+
+**(B) `ElementInstance.Kind` ではない＝対象外10箇所**
+
+- `PdfPreviewDialog.xaml.cs:44` `:80`・`PdfExporter.cs:37` ＝ **`PdfPage.Kind`（別の型）**
+- `Evaluator.cs:148/153/157/161/169/173/178` ＝ **`Component.Kind`**。
+  **`Component` の生成は `NetlistBuilder.cs:325` の1箇所のみ**で、**直前の `:307` が
+  `CreatesComponent=false` を `continue` で弾く**（コメントに「記号のみ(三相モータ・非シミュ自作)は
+  評価対象外」と明記）。**ゆえに3極記号はここへ到達せぬ**——一次ソースで確認済み
+
+**(C) 併せて見つけた——`CreatesComponent` で弾くガード7箇所**（`.Kind` の直接参照ではないが、
+増分4で3極記号が置かれた時の振る舞いを決めるゆえ記す）
+
+`NetlistBuilder.cs:165` `:233` `:307`／`DiagramRenderer.cs:1087`／`CrossReference.cs:68`／
+`DesignRuleCheck.cs:63` `:124` ——**いずれも素通し（`continue`）＝「記号のみ・非シミュレート」の設計どおり**。
+
+> **【射程を区切る】**
+> 1. **本列挙の軸は「`.Kind` という語の直接参照」である。** 先に挙げた `MapToDeviceClass` は
+>    この軸に掛からぬ（`ElementKind` を引数で受ける形）——**軸が違えば網も違う**。
+>    **「`.Kind` の全件」は言えるが、「3極記号の影響を受ける箇所の全件」とは言えぬ**
+> 2. **「要対応」「要確認」の判定は呼び出し箇所の一行を読んだものであり、
+>    `KindDisplayName`・`SymbolGlyphs.Draw` の中身までは追っておらぬ**（増分4で追う）
+> 3. `src` のみを対象とし、**`tests` は洗っておらぬ**
+
+---
+
 ### 増分1：基準枠の中央基準化（殿裁定6）
 
 **隠密の調査を待たずに着手できる。T-133の他増分と独立にござる。**
@@ -392,6 +439,11 @@ STAスレッド包み込みは最後の手段とする。
 家老のご指示は `:27` のみであった。**§2-6 のとおり同一ファイルにもう1件見つけた**ゆえ、
 **併せて直すのが筋**と考えるが、**指示された範囲の外**ゆえ裁可を仰ぐ
 （`samurai.md`「予定範囲の厳守・差し戻し【MUST】」）。
+
+> **【裁可済み・2026-07-28】家老裁量で「含めてよい」と裁された。**
+> **物差し**＝単一ファイルに閉じ、公開仕様・データ形式・依存関係を変えぬコメントのみの修正ゆえ
+> `karo.md` のauto-OK。**同型の陳腐化が並んでおるのに片方だけ直すのは、次の者を惑わす**（家老の弁）。
+> **増分0で2件とも訂正済み。**
 
 ---
 

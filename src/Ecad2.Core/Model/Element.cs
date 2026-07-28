@@ -24,7 +24,7 @@ public enum ElementKind
     TimerInstantContactNO, TimerInstantContactNC,
     // 三相モータ（多端子）。三相動力回路は制御回路と別系統のため初期は記号のみ・非シミュレート。
     Motor,
-    // 主回路（三相動力）用の3極記号。すべて非シミュレート・3セル幅・縦流れ（上→下）。
+    // 主回路（三相動力）用の3極記号。すべて非シミュレート・2セル幅・縦流れ（上→下）。
     // Breaker3P は Params["Type"]=NFB/MCCB/ELB でラベル・付加印を出し分ける。
     Breaker3P, ContactorMain3P, ThermalOverload3P
 }
@@ -46,7 +46,7 @@ public sealed class ElementInstance
     public Guid Id { get; set; } = Guid.NewGuid();
     public ElementKind Kind { get; set; }
     public GridPos Pos { get; set; }
-    /// <summary>占有セル数（既定は ElementCatalog.DefaultCellWidth）。SelectSwitch=3 等。</summary>
+    /// <summary>占有セル数（既定は ElementCatalog.DefaultCellWidth）。Motor=3・3極記号=2、他は1。</summary>
     public int CellWidth { get; set; } = 1;
     /// <summary>機器名参照（CR11 等）。Device と紐付くキー。</summary>
     public string? DeviceName { get; set; }
