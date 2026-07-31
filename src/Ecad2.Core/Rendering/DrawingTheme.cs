@@ -47,6 +47,25 @@ public sealed class DrawingTheme
     /// <summary>線幅の最小クランプ(mm)。画面(Win2D)とPDFで同一に保ち、極細線がどちらでも消えないようにする。</summary>
     public const double MinStrokeWidthMm = 0.05;
 
+    /// <summary>
+    /// ズーム倍率に依らず<b>画面上の太さを一定に保つ</b>ための線幅(mm)を返す（T-137、殿裁定2026-07-31）。
+    /// <para>
+    /// 呼び出し側が <c>PushTransform</c> でズーム倍率を掛ける前提にて、その分をあらかじめ割っておく。
+    /// 作図の実体（記号・配線）は縮尺に従うべきだが、<b>格子・区切り線のような補助線は縮尺に依らぬ方が
+    /// 読みやすい</b>——ズームアウトすると線が細って背景に沈むため。
+    /// </para>
+    /// <para>
+    /// <b>【射程】高倍率では一定にならぬ。</b> 描画バックエンドが <see cref="MinStrokeWidthMm"/> で
+    /// 下限クランプするため（WPF版は <c>WpfRenderer.Pen</c>）、<c>baseWidthMm / zoom</c> がそれを下回る
+    /// 倍率から先は太くなっていく。既定の 0.10mm なら <c>zoom &lt;= 2.0</c> までが一定の範囲。
+    /// <b>それを超えてもクランプ無しの場合より常に細い</b>ゆえ、後退にはならぬ。
+    /// </para>
+    /// <param name="baseWidthMm">ズーム1.0のときに見せたい太さ(mm)。</param>
+    /// <param name="zoom">呼び出し側が掛けるズーム倍率。0以下は退化入力として素の値を返す。</param>
+    /// </summary>
+    public static double ZoomInvariantWidthMm(double baseWidthMm, double zoom)
+        => zoom > 0 ? baseWidthMm / zoom : baseWidthMm;
+
     // 破線の ON,OFF 長（線幅の倍数）。全バックエンドで同一比率にして見た目を揃える。
     public const double DashOn = 4.0, DashOff = 2.0;   // Dashed
     public const double DotOn = 1.0, DotOff = 2.0;     // Dotted

@@ -733,7 +733,11 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// </summary>
     private void DrawCellGrid(IRenderer renderer, double canvasWidthDip, double canvasHeightDip)
     {
-        var inner = _theme.Get(StrokeRole.Grid);
+        var baseStroke = _theme.Get(StrokeRole.Grid);
+        // ズーム倍率の分を先に割り、画面上の太さを一定に保つ（殿裁定2026-07-31）。
+        // 忍者の実測＝倍率0.20では線が背景に沈み、在るべき13本のうち5本が区別できなかった
+        // （PushTransform が ScaleTransform を積むゆえ、ペンの太さにも倍率が掛かるため）。
+        var inner = baseStroke with { Width = DrawingTheme.ZoomInvariantWidthMm(baseStroke.Width, _zoom) };
         // 枠の外は同じ色のまま不透明度を半分にする（枠の範囲を線の中でも際立たせるため）。
         var outer = inner with { Color = inner.Color with { A = (byte)(inner.Color.A / 2) } };
 
