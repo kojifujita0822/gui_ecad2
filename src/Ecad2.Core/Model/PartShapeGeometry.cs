@@ -99,6 +99,54 @@ public static class PartShapeGeometry
         return (0.0, -halfSpanMm, w, halfSpanMm * 2);
     }
 
+    // ===== セルの区切り線（T-137、殿裁定2026-07-31＝案B・キャンバス全域） =====
+
+    /// <summary>
+    /// 縦の区切り線（列の境目）が入る位置を、指定した範囲から昇順で返す（セル単位）。
+    /// <para>
+    /// <b>列は境界基準</b>（<see cref="FrameRect"/> 参照）ゆえ、線は整数のセルX座標に入る。
+    /// 両端がちょうど整数の場合はその線を含む——基準枠の範囲を渡せば、枠の左右の辺と
+    /// 端の線が一致する。
+    /// </para>
+    /// </summary>
+    public static double[] GridLineXs(double minCellX, double maxCellX)
+    {
+        int first = (int)Math.Ceiling(minCellX);
+        int last = (int)Math.Floor(maxCellX);
+        // 線が1本も入らぬ狭い範囲・範囲の逆転（max<min）とも、ここで last<first になり捕まる
+        // （逆転を別途弾く要は無い——実測で確かめた）。外すと配列長が負になり例外。
+        if (last < first) return [];
+        var xs = new double[last - first + 1];
+        for (int i = 0; i < xs.Length; i++) xs[i] = first + i;
+        return xs;
+    }
+
+    /// <summary>
+    /// 横の区切り線（行の境目）が入る位置を、指定した範囲から昇順で返す（セル単位）。
+    /// <para>
+    /// <b>行は中心基準</b>——中心行の<i>中心</i>が <c>y=0</c> ゆえ、行の<i>境目</i>は
+    /// 半整数（<c>±0.5, ±1.5, ...</c>）に入る。<see cref="FrameRect"/> の上下の辺
+    /// <c>±((h-1)+0.5)</c> も半整数ゆえ、枠の範囲を渡せば端の線が枠の辺と一致し、
+    /// 線は <c>2h</c> 本・囲まれる行は <c>2h-1</c> になる。
+    /// </para>
+    /// <para>
+    /// メイン図面の格子（<c>DiagramRenderer.DrawGrid</c>）は<b>横線を行の中心</b>に引いており、
+    /// 本メソッドとは線の意味が異なる（あちらは行番号・要素中心と揃えるための設計）。
+    /// 本メソッドが境目を返すのは、T-137の狙いが「枠の中が何セル分あるか数えられること」ゆえ。
+    /// </para>
+    /// </summary>
+    public static double[] GridLineYs(double minCellY, double maxCellY)
+    {
+        // y = k + 0.5 が範囲に入る整数 k を求める。
+        int first = (int)Math.Ceiling(minCellY - 0.5);
+        int last = (int)Math.Floor(maxCellY - 0.5);
+        // ガードの意味は GridLineXs と同じ。
+        if (last < first) return [];
+        var ys = new double[last - first + 1];
+        for (int i = 0; i < ys.Length; i++) ys[i] = first + i + 0.5;
+        return ys;
+    }
+
     // ===== 接続点（T-068増分3-c、家老裁可2026-07-25） =====
 
     /// <summary>接続点の位置をセル格子（整数）へ丸め、基準枠の範囲へ収める。

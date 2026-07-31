@@ -670,6 +670,9 @@ public sealed class PartEditorCanvas : FrameworkElement
             var selectedStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 255, 69, 0), 0.5);
             var draftStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 30, 144, 255), 0.4, LineStyle.Dashed);
 
+            // セルの区切り線。基準枠より前＝最背面に描く（枠・図形・接続点を覆わぬため）。
+            DrawCellGrid(renderer, w, h);
+
             // 基準枠（プロパティ欄の幅・高さに連動する外形の目安）。T-133増分1(殿裁定6)で
             // 行中心基準へ移した——接続点のRowOffsetと基準が揃う。算出はCore層の純粋関数へ。
             var (frameX, frameY, frameW, frameH) =
@@ -713,6 +716,47 @@ public sealed class PartEditorCanvas : FrameworkElement
             renderer.PopTransform();
         }
         _children.Add(visual);
+    }
+
+    /// <summary>
+    /// セルの区切り線を描く（T-137、殿裁定2026-07-31）。狙いは「基準枠の中が何セル分あるか」を
+    /// 絵で示すこと——高さ設定 h に対し枠が覆う行は 2h-1 であり、設定値と実体が食い違う。
+    /// <para>
+    /// 殿裁定＝<b>案B（キャンバス全域）＋枠の外は一段薄く</b>。中心行の強調・表示の入切は設けぬ。
+    /// 線の意味はセルの境目——縦は列の境界（整数）、横は行の境目（半整数。行は中心基準ゆえ）。
+    /// 位置の算出は <see cref="PartShapeGeometry.GridLineXs"/>／<see cref="PartShapeGeometry.GridLineYs"/>。
+    /// </para>
+    /// <para>
+    /// 線の本数はズーム倍率だけで決まり、<see cref="Zoom"/> の下限 0.2 のとき 1セル＝約6.8DIP。
+    /// 既定の大きさなら計180本弱にて、本数の上限ガードは設けておらぬ。
+    /// </para>
+    /// </summary>
+    private void DrawCellGrid(IRenderer renderer, double canvasWidthDip, double canvasHeightDip)
+    {
+        var inner = _theme.Get(StrokeRole.Grid);
+        // 枠の外は同じ色のまま不透明度を半分にする（枠の範囲を線の中でも際立たせるため）。
+        var outer = inner with { Color = inner.Color with { A = (byte)(inner.Color.A / 2) } };
+
+        // 可視範囲をセル座標へ逆算する（パン・ズームで動くため毎回求める）。
+        var visibleTopLeft = DipToCell(new Point(0, 0));
+        var visibleBottomRight = DipToCell(new Point(canvasWidthDip, canvasHeightDip));
+        DrawCellGridLines(renderer, visibleTopLeft, visibleBottomRight, outer);
+
+        // 枠の内側だけ、同じ線を濃く重ねる。FrameRect は mm ゆえセル単位へ戻す。
+        var (frameX, frameY, frameW, frameH) =
+            PartShapeGeometry.FrameRect(_widthCells, _heightCells, _geo.CellMm);
+        var frameTopLeft = new Point2D(frameX / _geo.CellMm, frameY / _geo.CellMm);
+        var frameBottomRight = new Point2D((frameX + frameW) / _geo.CellMm, (frameY + frameH) / _geo.CellMm);
+        DrawCellGridLines(renderer, frameTopLeft, frameBottomRight, inner);
+    }
+
+    /// <summary>指定した範囲（セル座標）へ区切り線を引く。範囲の端に乗る線は含む。</summary>
+    private void DrawCellGridLines(IRenderer renderer, Point2D topLeft, Point2D bottomRight, StrokeStyle stroke)
+    {
+        foreach (double x in PartShapeGeometry.GridLineXs(topLeft.X, bottomRight.X))
+            renderer.DrawLine(CellToLocalMm(x, topLeft.Y), CellToLocalMm(x, bottomRight.Y), stroke);
+        foreach (double y in PartShapeGeometry.GridLineYs(topLeft.Y, bottomRight.Y))
+            renderer.DrawLine(CellToLocalMm(topLeft.X, y), CellToLocalMm(bottomRight.X, y), stroke);
     }
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)

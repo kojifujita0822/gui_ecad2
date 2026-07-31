@@ -494,6 +494,120 @@ public class PartShapeGeometryTests
         Assert.True(y + h - bottomRow * cellMm >= cellMm / 2 - 1e-9, "下端の接続点が枠の外か線上にある");
     }
 
+    // ===== セルの区切り線（T-137、殿裁定2026-07-31＝案B） =====
+    // 入力値の選び方: 幅と高さに別の値を採り、行と列を取り違える改変が結果に現れるようにする
+    // （samurai.md「テスト入力の対称性・退化性チェック」。正方形なら入れ替えても同じ絵になり穴が残る）。
+    // 縦線は整数・横線は半整数という非対称そのものが本メソッドの要ゆえ、X と Y を別々に検証する。
+
+    [Theory]
+    [InlineData(1, 2)]    // 幅1（列方向の退化）
+    [InlineData(3, 4)]
+    [InlineData(12, 13)]  // WidthBox が許す上限（Math.Clamp(...,1,12)）
+    public void GridLineXs_枠の範囲では幅プラス1本になる(int widthCells, int expectedCount)
+    {
+        const double cellMm = 9.0;
+        // 高さは幅と別の値を採る（取り違えを炙るため）。
+        var (x, _, w, _) = PartShapeGeometry.FrameRect(widthCells, heightCells: 5, cellMm);
+
+        var xs = PartShapeGeometry.GridLineXs(x / cellMm, (x + w) / cellMm);
+
+        Assert.Equal(expectedCount, xs.Length);
+    }
+
+    [Theory]
+    [InlineData(1, 2)]    // 中心1行 -> 上端・下端の2本
+    [InlineData(2, 4)]    // 中心±1＝3行 -> 4本
+    [InlineData(3, 6)]    // 中心±2＝5行 -> 6本
+    [InlineData(12, 24)]  // HeightBox が許す上限
+    public void GridLineYs_枠の範囲では高さの2倍の本数になる(int heightCells, int expectedCount)
+    {
+        const double cellMm = 9.0;
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 4, heightCells, cellMm);
+
+        var ys = PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm);
+
+        Assert.Equal(expectedCount, ys.Length);
+        // T-137の狙いそのもの: 線が 2h 本ゆえ、囲まれる行は 2h-1 になる。
+        // 「高さ2の設定で3行」という名と実体の食い違いを、この式で固定する。
+        Assert.Equal(2 * heightCells - 1, ys.Length - 1);
+    }
+
+    [Fact]
+    public void GridLineXs_幅3の枠では整数の位置に入る()
+    {
+        Assert.Equal([0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLineXs(0.0, 3.0));
+    }
+
+    [Fact]
+    public void GridLineYs_高さ2の枠では半整数の位置に入る()
+    {
+        // 高さ2の枠は ±((2-1)+0.5)＝±1.5。行の境目は半整数ゆえ4本入る。
+        Assert.Equal([-1.5, -0.5, 0.5, 1.5], PartShapeGeometry.GridLineYs(-1.5, 1.5));
+    }
+
+    [Fact]
+    public void GridLineXsとGridLineYsは同じ範囲でも別の位置を返す()
+    {
+        // 縦は整数・横は半整数。両者を取り違えれば半セルずれ、線が枠の辺と合わなくなる。
+        Assert.Equal([-1.0, 0.0, 1.0], PartShapeGeometry.GridLineXs(-1.5, 1.5));
+        Assert.Equal([-1.5, -0.5, 0.5, 1.5], PartShapeGeometry.GridLineYs(-1.5, 1.5));
+    }
+
+    [Fact]
+    public void GridLineYs_高さ0の枠でも2本へ潰れる()
+    {
+        // 高さ0（退化ケース）。FrameRect が Math.Max で0段へ潰すのと歩調を合わせ、
+        // 高さ1と同じ2本（1行分）になることを固定する。
+        const double cellMm = 9.0;
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 3, heightCells: 0, cellMm);
+
+        Assert.Equal([-0.5, 0.5], PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm));
+    }
+
+    [Theory]
+    [InlineData(3, 2)]
+    [InlineData(1, 5)]   // 幅と高さを入れ替えた組（取り違えを炙る）
+    [InlineData(12, 1)]
+    public void GridLines_端の線が基準枠の辺と一致する(int widthCells, int heightCells)
+    {
+        // 枠の内側へ濃い線を重ねる描画（案B）が成り立つ前提。端がずれれば二重線・欠けになる。
+        const double cellMm = 9.0;
+        var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
+
+        var xs = PartShapeGeometry.GridLineXs(x / cellMm, (x + w) / cellMm);
+        var ys = PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm);
+
+        Assert.Equal(x, xs[0] * cellMm, Precision);
+        Assert.Equal(x + w, xs[^1] * cellMm, Precision);
+        Assert.Equal(y, ys[0] * cellMm, Precision);
+        Assert.Equal(y + h, ys[^1] * cellMm, Precision);
+    }
+
+    [Fact]
+    public void GridLineXs_範囲の内側の整数だけを返す()
+    {
+        // 案B（キャンバス全域）では、パン・ズームにより範囲の端が半端な値になる。
+        Assert.Equal([-2.0, -1.0, 0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLineXs(-2.3, 3.7));
+    }
+
+    [Fact]
+    public void GridLineYs_範囲の内側の半整数だけを返す()
+    {
+        Assert.Equal([-1.5, -0.5, 0.5, 1.5, 2.5], PartShapeGeometry.GridLineYs(-2.3, 3.4));
+    }
+
+    [Theory]
+    [InlineData(0.2, 0.4)]   // 整数を1つも含まぬ狭い範囲
+    [InlineData(3.0, 1.0)]   // 範囲が逆転（退化）
+    public void GridLineXs_線が入らぬ範囲では空を返す(double min, double max)
+        => Assert.Empty(PartShapeGeometry.GridLineXs(min, max));
+
+    [Theory]
+    [InlineData(0.7, 1.2)]   // 半整数を1つも含まぬ狭い範囲
+    [InlineData(3.0, 1.0)]   // 範囲が逆転（退化）
+    public void GridLineYs_線が入らぬ範囲では空を返す(double min, double max)
+        => Assert.Empty(PartShapeGeometry.GridLineYs(min, max));
+
     // ===== 接続点（T-068増分3-c） =====
     // 座標の対応に注意: 接続点の x は BoundaryOffset、y は RowOffset であり、PortDef の宣言順
     // (Name, RowOffset, BoundaryOffset) とは逆になる。入力値は幅≠高さ・x≠y を選び、取り違えが
