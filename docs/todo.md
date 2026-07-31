@@ -1262,6 +1262,20 @@ null判定で二分岐」という同じ形**（`:10-68`、侍が直読）にて
 **`memory: feedback_code_comments_are_secondary_source`は「コメントは実装とずれうる」と説くが、
 本件はコメントが正しく、しかも先回りしておった実例にござる。**
 
+**【非対称が数で裏づいた 2026-07-31・忍者の実測】**
+制御回路シートで`PlacementPartComboBox`を展開し全項目を採取——**`ListItem` 24件すべて`IsEnabled=True`。**
+
+| 検体 | **パレット** | **配置バーのコンボ** |
+|---|---|---|
+| `T136AFFMAIN`（主回路専用） | **False（灰）** | **True（選べる）** |
+| `T136UIMAIN`（主回路専用） | **False（灰）** | **True（選べる）** |
+| `T136AFFCTRL`（制御専用） | True | True |
+| `T136AFFANY`ほか | True | True |
+
+**すなわち予防はパレットにのみ届き、コンボには届いておらぬ**——**「同じシートで同じ部品が、
+一方は灰・一方は黒」**という形にて、**家老の推量「使い手を惑わせる」が数の上でも裏づいた**。
+**証跡**＝`docs-notes/images/t136a-inc2-combo-asymmetry.png`。
+
 **【殿へ諮る2案】**
 - **(案1・侍推奨／家老も傾く)＝経路2にも予防を掛ける。** `PlacementPartComboBox`の`ItemContainerStyle`へ
   **`<Setter Property="IsEnabled" Value="{Binding IsPlaceable}"/>`の1行**で済む
