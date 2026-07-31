@@ -526,6 +526,21 @@ Ecad2.Appの内容だけが正しく撮れることを実証済み**（旧実装
     $bb = $target.Current.BoundingRectangle   # ★送った「後で」取り直すこと
     ```
     **矩形を送る前に取ってしまうと、古い（画面外の）座標を叩き続ける。**
+  - **【もう一つの型・2026-07-31、T-139検証、忍者】末尾まで送ってから探すと、中ほどの項目を
+    通り過ぎる**——**上の`IsOffscreen`が「送りが足りぬ」型なら、こちらは「送りすぎ」型にござる。**
+    **実例＝全24件のうち中ほどに在る「モータ」を、`LargeIncrement`を6回送ってから探して取り逃した**
+    （`RESULT: パーツ 'モータ' がリストに見当たらず`）。**末尾付近の自作パーツばかり探しておった間は
+    露見せなんだ**——**探す対象がリストの何処に在るかで、同じ手順が通ったり通らなんだりする。**
+    **対処＝先頭へ戻し、段階的に下りながら探す**（見つかった時点で打ち切る）——
+    ```powershell
+    for ($k=0; $k -lt 9; $k++) { $sp.ScrollVertical([...ScrollAmount]::LargeDecrement); Start-Sleep -Milliseconds 150 }
+    $target = $null
+    for ($pass = 0; $pass -lt 10 -and $null -eq $target; $pass++) {
+        # ...この時点で見えておる項目から探す...
+        if ($null -eq $target) { $sp.ScrollVertical([...ScrollAmount]::LargeIncrement); Start-Sleep -Milliseconds 250 }
+    }
+    ```
+    **`scratchpad\place-part.ps1`（自作パーツ配置の補助）は本方式へ改修済み。**
 
 ### 6.2 操作（Invoke／Toggle／Click／SetValue）しても反映されない
 
