@@ -3014,10 +3014,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         int cellWidth = definition?.WidthCells ?? 1;
         // T-133増分4(殿裁定2026-07-28、隠密の静的レビュー所見1): 自作パーツの高さも結線する。
         // 増分3までは幅のみ供給源(PartDefinition)から取り、高さは1固定という非対称が残っていた。
-        // 組込み15件がすべて HeightCells=1 ゆえ実害は無かったが、使い手が高さ2以上の自作パーツを
-        // 作ると、パーツエディタでは基準枠が 2h-1 行分に広がって描かれるのに(P-148)、図面では
-        // 1行しか占有せぬという食い違いが表に出る。ElementKind 経路が使う DefaultCellHeight とは
-        // 別系統(PartDefinition.HeightCells)であり、そちらの結線だけでは本経路の穴は埋まらぬ。
+        // 組込み15件がすべて HeightCells=1 ゆえ実害は無かったが、この結線が無ければ「パーツエディタの
+        // 枠だけが高さに応じて大きくなり、図面では1行しか占有せぬ」という食い違いが表に出る。
+        // ElementKind 経路が使う DefaultCellHeight とは別系統(PartDefinition.HeightCells)であり、
+        // そちらの結線だけでは本経路の穴は埋まらぬ。
+        // 【T-139(殿裁定2026-07-31)で改まった点】当初ここは「基準枠が 2h-1 行分に広がって描かれる
+        // (P-148)」と記していたが、枠は h セルちょうどへ改まり P-148 は覆った。枠の大きさは変わったが、
+        // 「枠と図面の占有が食い違いうる」という本コメントの趣旨そのものは変わらぬ。
         int cellHeight = definition?.HeightCells ?? 1;
         // T-136(A)増分1: シート種別の枷。definition は直上で解決済みゆえそこから引く。
         // 【非対称の記録＝増分1の壊す実測で露見】移動の2経路は PartResolver.SheetAffinityOf を通るが、
