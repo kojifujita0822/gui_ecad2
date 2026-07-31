@@ -18,6 +18,28 @@ public enum PartRole
 }
 
 /// <summary>
+/// 部品を置けるシートの種別（T-136(A)、殿裁定2026-07-31＝3値・既定は <see cref="Any"/>）。
+/// <para>
+/// 原本GuiEcadは3極部品を制御回路シートへ置けてしまい、DRCも効かぬまま中心接続点を左右母線へ
+/// 引いていた。ecad2はその構図を引き継いでおり、本enumはその枷を土台から入れるためのもの。
+/// </para>
+/// <para>
+/// <b>既定を <see cref="Any"/> としたのは段取りのため</b>——既存の組込み15件・自作部品を
+/// 無改修のまま従来どおり置けるようにし、殿が絞りたいものから順に設定なされる運用を採る
+/// （殿裁定＝3値。2値＝全部品がどちらかに属す案は、既存部品すべての設定が揃うまで使えぬため不採用）。
+/// </para>
+/// </summary>
+public enum SheetAffinity
+{
+    /// <summary>どちらのシートにも置ける（既定）。</summary>
+    Any,
+    /// <summary>制御回路シート専用（<see cref="Sheet.MainCircuit"/> が false のシートのみ）。</summary>
+    ControlOnly,
+    /// <summary>主回路シート専用（<see cref="Sheet.MainCircuit"/> が true のシートのみ）。</summary>
+    MainCircuitOnly,
+}
+
+/// <summary>
 /// パーツ図形プリミティブ（パーツローカル座標＝セル単位。原点=最左ポート点・行中心線=y0、+x右/+y下）。
 /// JSON 多態シリアライズ対応。
 /// </summary>
@@ -57,6 +79,12 @@ public sealed class PartDefinition
     /// 独立した分類——セレクトSW等はシミュレーション上ContactNO扱いだがOR対象ではないため、
     /// Role単独では区別できない（T-037往復2周目）。</summary>
     public bool IsOrEligible { get; set; }
+    /// <summary>置けるシートの種別（T-136(A)）。既定は <see cref="Model.SheetAffinity.Any"/>。
+    /// <para>
+    /// 永続化＝<c>JsonSerializer</c> による自動反映（<c>PartLibrarySerializer</c> は手書きの
+    /// マッピングを持たぬ）。旧 <c>.gcadpart</c> に本フィールドが無ければ既定値のまま読まれる。
+    /// </para></summary>
+    public SheetAffinity SheetAffinity { get; set; } = SheetAffinity.Any;
     /// <summary>接続点。2端子役割は先頭=NetA・末尾=NetB（境界オフセット昇順を想定）。</summary>
     public List<PortDef> Ports { get; set; } = new();
     public List<PartPrimitive> Primitives { get; set; } = new();

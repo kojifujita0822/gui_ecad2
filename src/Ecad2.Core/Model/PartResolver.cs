@@ -33,6 +33,35 @@ public static class PartResolver
         return ElementCatalog.CreatesComponent(e.Kind);
     }
 
+    /// <summary>要素が置けるシートの種別（T-136(A)増分1）。自作パーツは
+    /// <see cref="PartDefinition.SheetAffinity"/>、組込み種別は <see cref="ElementCatalog.SheetAffinityOf"/> から。
+    /// <para>
+    /// 本メソッドがあることで、呼び出し側（配置・移動の関門）は<b>組込みか自作かを知らずに済む</b>。
+    /// 台帳の「T-133裁定4もこの箱に乗る」という物差しは、箱を <see cref="PartDefinition"/> と読めば
+    /// 3極記号へ届かぬが、<b>箱を本クラスと読めば届く</b>——上の <see cref="Ports"/>・
+    /// <see cref="CreatesComponent"/>・<see cref="ComponentKind"/> と同じ二分岐の形にしてある。
+    /// </para>
+    /// <para>
+    /// 未解決の PartId（<see cref="IsUnresolvedPartId"/>）は <see cref="ElementCatalog.SheetAffinityOf"/> へ
+    /// フォールバックする——<see cref="ComponentKind"/> が同じ場合に <see cref="ElementInstance.Kind"/> へ
+    /// 静かに落ちるのと同じ扱いにて、ライブラリを失った要素が移動すらできなくなるのを避ける。
+    /// </para></summary>
+    public static SheetAffinity SheetAffinityOf(ElementInstance e, PartLibrary? lib)
+    {
+        var part = lib?.Get(e.PartId);
+        if (part is not null) return part.SheetAffinity;
+        return ElementCatalog.SheetAffinityOf(e.Kind);
+    }
+
+    /// <summary>その種別のシートへ置けるか（T-136(A)増分1）。
+    /// <paramref name="mainCircuit"/> は <see cref="Sheet.MainCircuit"/> をそのまま渡す。</summary>
+    public static bool IsAllowedOnSheet(SheetAffinity affinity, bool mainCircuit) => affinity switch
+    {
+        SheetAffinity.ControlOnly => !mainCircuit,
+        SheetAffinity.MainCircuitOnly => mainCircuit,
+        _ => true,   // Any
+    };
+
     /// <summary>PartId が設定されているのに <paramref name="lib"/> で解決できないか（未解決参照）。
     /// true の場合 <see cref="ComponentKind"/> は静かに <see cref="ElementInstance.Kind"/>
     /// （既定値=ContactNO）へフォールバックする（<see cref="Ecad2.Simulation.DesignRuleCheck.CheckUnresolvedPartId"/> 対象）。</summary>

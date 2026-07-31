@@ -29,6 +29,26 @@ public static class ElementCatalog
         _ => 1,
     };
 
+    /// <summary>組込み種別が置けるシートの種別（T-136(A)増分1）。
+    /// <para>
+    /// <b>主回路3極記号3種を主回路シート専用と宣言する</b>——T-133の殿裁定4（3極記号は主回路シート限定）が
+    /// ここに乗る。<see cref="PartDefinition.SheetAffinity"/> は自作パーツにしか届かぬゆえ、組込み種別の側は
+    /// 本メソッドが受け持ち、両者を <see cref="PartResolver.SheetAffinityOf(ElementInstance, PartLibrary)"/> が
+    /// 一元的に解決する（<c>Ports</c>／<c>CreatesComponent</c>／<c>ComponentKind</c> と同じ二分岐の形）。
+    /// </para>
+    /// <para>
+    /// <b>結線の現状</b>：移動の2経路（ドラッグ・矢印キー）には本増分で結線済み。
+    /// 一方 <b>Kind 経路の配置導線はまだ無い</b>——3極記号を新規配置する導線自体が未実装（T-133増分4で新設予定）
+    /// ゆえ、そちらは増分4で <c>ValidatePlacement</c> へ渡す形になる。<c>ValidatePlacement</c> の
+    /// 当該引数に既定値を置いておらぬのは、その折の渡し忘れをコンパイラに検出させるため。
+    /// </para></summary>
+    public static SheetAffinity SheetAffinityOf(ElementKind kind) => kind switch
+    {
+        ElementKind.Breaker3P or ElementKind.ContactorMain3P or ElementKind.ThermalOverload3P
+            => SheetAffinity.MainCircuitOnly,
+        _ => SheetAffinity.Any,
+    };
+
     /// <summary>
     /// 種別ごとの接続点（ポート）定義。実効幅 <paramref name="width"/> から端子境界を算出する。
     /// 2端子種別: 左端子=境界0／右端子=境界 width（先頭=NetA・末尾=NetB）。

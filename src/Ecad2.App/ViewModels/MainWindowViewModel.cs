@@ -1695,7 +1695,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public void UpdateDragElement(GridPos pos)
     {
         if (_draggingElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return;
-        if (ValidatePlacement(pos, element.CellWidth, element.CellHeight, sheet, exclude: element))
+        if (ValidatePlacement(pos, element.CellWidth, element.CellHeight, sheet,
+                              PartResolver.SheetAffinityOf(element, PartLibrary), exclude: element))
             element.Pos = pos;
     }
 
@@ -1736,7 +1737,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedElement is not ElementInstance element || CurrentSheet is not Sheet sheet) return false;
         var newPos = new GridPos(element.Pos.Row + deltaRow, element.Pos.Column + deltaColumn);
         if (newPos == element.Pos) return false;
-        if (!ValidatePlacement(newPos, element.CellWidth, element.CellHeight, sheet, exclude: element)) return false;
+        if (!ValidatePlacement(newPos, element.CellWidth, element.CellHeight, sheet,
+                               PartResolver.SheetAffinityOf(element, PartLibrary), exclude: element)) return false;
         UndoManager.RecordSnapshot(Document);
         element.Pos = newPos;
         MarkDirty();
@@ -2940,8 +2942,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>posへの配置可否を判定する(T-045 P-025、P-021占有再チェック+P-022/P-024境界ガードの
     /// 統合)。境界外、または既に要素があればfalse。IsSelectedCellWithinGridと境界判定ロジックを
     /// 共有する(IsWithinGridBounds)。cellWidthの意味はIsSelectedCellOccupiedと同じ(T-071バグ修正)。</summary>
-    private bool ValidatePlacement(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
-        => IsWithinGridBounds(pos, cellWidth, cellHeight, sheet) && !IsOccupied(pos, cellWidth, cellHeight, sheet, exclude);
+    /// <remarks>
+    /// T-136(A)増分1: 第5引数でシート種別の枷を見る。<b>既定値を置いておらぬ</b>——呼び出し元すべてに
+    /// 手を入れる代わりに、渡し忘れが原理的に起き得ぬ形にする（T-133増分3で採ったのと同じ作法）。
+    /// とりわけ T-133増分4 で Kind 経路の配置導線が新設される折、そこで渡し忘れればコンパイルが通らぬ。
+    /// 拒否はサイレント（殿裁定2026-07-31＝既存の前例に倣う。予防はメニュー・パレット側の無効化＝増分2）。
+    /// </remarks>
+    private bool ValidatePlacement(GridPos pos, int cellWidth, int cellHeight, Sheet sheet,
+                                   SheetAffinity affinity, ElementInstance? exclude = null)
+        => PartResolver.IsAllowedOnSheet(affinity, sheet.MainCircuit)
+        && IsWithinGridBounds(pos, cellWidth, cellHeight, sheet) && !IsOccupied(pos, cellWidth, cellHeight, sheet, exclude);
 
     /// <summary>ElementKindから機器表のDeviceClass分類を導出する(T-045 P-020対応、殿裁可済み案A)。
     /// ContactNO/NC・Coil・ContactorMain3P→Relay(MCコイルと同一機器名参照ゆえ配置順による種別揺れ防止)、
@@ -3009,7 +3019,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 1行しか占有せぬという食い違いが表に出る。ElementKind 経路が使う DefaultCellHeight とは
         // 別系統(PartDefinition.HeightCells)であり、そちらの結線だけでは本経路の穴は埋まらぬ。
         int cellHeight = definition?.HeightCells ?? 1;
-        if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet)) return;
+        // T-136(A)増分1: シート種別の枷。definition は直上で解決済みゆえそこから引く。
+        // 【非対称の記録＝増分1の壊す実測で露見】移動の2経路は PartResolver.SheetAffinityOf を通るが、
+        // 本経路だけは通っておらぬ——配置時にはまだ ElementInstance が無いためである。
+        // 未解決の partId（definition が null）でも、ここで作る要素の Kind は既定値ゆえ
+        // ElementCatalog.SheetAffinityOf(既定)＝Any となり、結果は下の式と一致する（今は実害なし）。
+        // T-133増分4 で Kind 経路の配置導線が新設される際、そちらは Kind から引く要があるゆえ、
+        // その折に PartResolver 側へ (PartDefinition?, ElementKind) を受けるオーバーロードを設けて
+        // 本経路もろとも一元化するのが筋。今それを作れば呼び出し元1つの器が先に立つゆえ見送る。
+        var affinity = definition?.SheetAffinity ?? SheetAffinity.Any;
+        if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet, affinity)) return;
 
         // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
         // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
