@@ -1613,6 +1613,11 @@
                                         </ListBox.ItemTemplate>
                                         <ListBox.ItemContainerStyle>
                                             <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                                                <!-- T-136(A)増分2: 現在のシートへ置けぬ部品は選ばせぬ(予防)。
+                                                     IsEnabled=False は PreviewMouseLeftButtonDown ごと止めるゆえ、
+                                                     クリック経路の遮断もこれ1つで足りる。実際の拒否は
+                                                     ValidatePlacement が受け持つ(防御・サイレント)。 -->
+                                                <Setter Property="IsEnabled" Value="{Binding IsPlaceable}"/>
                                                 <EventSetter Event="PreviewMouseLeftButtonDown" Handler="PartSelectionItem_Clicked"/>
                                             </Style>
                                         </ListBox.ItemContainerStyle>

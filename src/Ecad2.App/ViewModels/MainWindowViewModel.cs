@@ -399,6 +399,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsControlCircuitSheet));
         OnPropertyChanged(nameof(CanPlaceOnMainCircuit));
         OnPropertyChanged(nameof(CanPlaceOnControlCircuit));
+        // T-136(A)増分2: 部品パレットの配置可否はシート種別で変わる。上の各プロパティは
+        // 「シート種別だけで決まる単一の値」だが、パレットは<b>部品ごとに可否が変わる</b>ゆえ
+        // エントリを個別に当て直す要がある(プロパティ1つでは足りぬ)。
+        PartPalette.RefreshPlaceability(CurrentSheet?.MainCircuit == true);
     }
 
     /// <summary>

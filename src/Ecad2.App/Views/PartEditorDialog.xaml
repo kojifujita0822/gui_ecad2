@@ -50,7 +50,14 @@
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
             <TextBlock Text="役割:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="RoleCombo" Width="180" VerticalAlignment="Center"
+            <ComboBox x:Name="RoleCombo" Width="180" VerticalAlignment="Center" Margin="0,0,16,0"
+                      Background="{DynamicResource InputBackgroundBrush}"
+                      Foreground="{DynamicResource InputForegroundBrush}"/>
+
+            <!-- T-136(A)増分2: 置けるシートの種別。RoleComboと同じ enum→日本語ラベルの形。 -->
+            <TextBlock Text="配置先:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+            <ComboBox x:Name="AffinityCombo" Width="150" VerticalAlignment="Center"
+                      ToolTip="この部品を置けるシートを限ります（既定＝どちらでも）"
                       Background="{DynamicResource InputBackgroundBrush}"
                       Foreground="{DynamicResource InputForegroundBrush}"/>
         </WrapPanel>

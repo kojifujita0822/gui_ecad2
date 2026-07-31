@@ -76,6 +76,27 @@ public sealed class PartPaletteViewModel : ViewModelBase
             selectionEntries.Add(new PartSelectionEntryViewModel(entry, PartThumbnailRenderer.Render(entry.Definition, Library, isOr: true), isOr: true));
 
         SelectionEntries = selectionEntries;
+        // T-136(A)増分2: 一覧を作り直した直後にも配置可否を当て直す。Load は保存・削除でも
+        // 呼ばれるゆえ、ここを抜かすとシート切替まで新しいエントリが常に「置ける」ままになる。
+        ApplyPlaceability();
+    }
+
+    // T-136(A)増分2: 直近に通知されたシート種別。Load がシート種別を引数に取らぬため保持する。
+    private bool _lastSheetIsMainCircuit;
+
+    /// <summary>現在のシート種別に応じて各エントリの配置可否を更新する(T-136(A)増分2)。
+    /// <see cref="RefreshThumbnails"/> と同型——シート切替のたびに MainWindowViewModel から呼ぶ
+    /// (<c>NotifyCurrentSheetDependentPropertiesChanged</c>)。</summary>
+    public void RefreshPlaceability(bool sheetIsMainCircuit)
+    {
+        _lastSheetIsMainCircuit = sheetIsMainCircuit;
+        ApplyPlaceability();
+    }
+
+    private void ApplyPlaceability()
+    {
+        foreach (var entry in SelectionEntries)
+            entry.IsPlaceable = PartResolver.IsAllowedOnSheet(entry.Definition.SheetAffinity, _lastSheetIsMainCircuit);
     }
 
     /// <summary>T-068増分1: 新規自作パーツを保存し一覧を最新化する。</summary>

@@ -25,6 +25,20 @@ public sealed class PartSelectionEntryViewModel : ViewModelBase
         set => SetProperty(ref _thumbnail, value);
     }
 
+    private bool _isPlaceable = true;
+    /// <summary>現在のシートへ置ける部品か(T-136(A)増分2)。false の間はリスト項目を無効化し、
+    /// 置けぬ部品をそもそも選ばせぬ(<b>予防</b>)。実際の拒否は <c>ValidatePlacement</c> が受け持つ
+    /// (<b>防御</b>)——両建ては殿裁定2026-07-31。
+    /// <para>
+    /// エントリ自身は現在のシート種別を知らぬゆえ、外から設定する形とした(<see cref="Thumbnail"/> と同型)。
+    /// 設定するのは <c>PartPaletteViewModel.RefreshPlaceability</c>。
+    /// </para></summary>
+    public bool IsPlaceable
+    {
+        get => _isPlaceable;
+        set => SetProperty(ref _isPlaceable, value);
+    }
+
     /// <summary>OR接続配置用の論理エントリか(T-037、殿裁定=案A)。true時は配置操作(TryPlaceElement)
     /// のisOr引数へそのまま渡す。Entry(PartFolderEntry)自体は通常版と共有し、Core層は無変更
     /// (隠密調査`docs/ecad2-p010-or-fixed-parts-investigation-onmitsu.md`の案1どおり)。</summary>

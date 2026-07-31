@@ -31,6 +31,15 @@ public partial class PartEditorDialog : Window
         (PartRole.InputNC, "外部入力 b接点 (NC)"),
     };
 
+    // T-136(A)増分2: 置けるシートの種別（殿裁定2026-07-31＝3値・既定はどちらでも）。
+    // RoleChoices と同じ「enum→日本語ラベル」の形。原本GuiEcadには無い、ecad2独自の設定である。
+    private static readonly (SheetAffinity Affinity, string Label)[] AffinityChoices =
+    {
+        (SheetAffinity.Any, "どちらでも"),
+        (SheetAffinity.ControlOnly, "制御回路シート専用"),
+        (SheetAffinity.MainCircuitOnly, "主回路シート専用"),
+    };
+
     private const int MinCells = 1;
     private const int MaxCells = 12;
 
@@ -52,6 +61,8 @@ public partial class PartEditorDialog : Window
 
         foreach (var (role, label) in RoleChoices)
             RoleCombo.Items.Add(new ComboBoxItem { Content = label, Tag = role });
+        foreach (var (affinity, label) in AffinityChoices)
+            AffinityCombo.Items.Add(new ComboBoxItem { Content = label, Tag = affinity });
 
         if (edit is not null)
         {
@@ -60,6 +71,7 @@ public partial class PartEditorDialog : Window
             WidthBox.Text = edit.WidthCells.ToString();
             HeightBox.Text = edit.HeightCells.ToString();
             SelectRole(edit.Role);
+            SelectAffinity(edit.SheetAffinity);
         }
         else
         {
@@ -67,6 +79,7 @@ public partial class PartEditorDialog : Window
             WidthBox.Text = "1";
             HeightBox.Text = "1";
             RoleCombo.SelectedIndex = 0;
+            AffinityCombo.SelectedIndex = 0;   // 既定＝どちらでも（AffinityChoices の先頭）
         }
 
         // T-068増分3-b2: Undo/RedoのスナップショットはGuiEcad原本のEditorSnapshotと同じ5項目
@@ -107,6 +120,18 @@ public partial class PartEditorDialog : Window
 
     private PartRole SelectedRole()
         => RoleCombo.SelectedItem is ComboBoxItem { Tag: PartRole r } ? r : PartRole.ContactNO;
+
+    private void SelectAffinity(SheetAffinity affinity)
+    {
+        foreach (ComboBoxItem item in AffinityCombo.Items)
+        {
+            if (item.Tag is SheetAffinity a && a == affinity) { AffinityCombo.SelectedItem = item; return; }
+        }
+        AffinityCombo.SelectedIndex = 0;   // 将来 SheetAffinity が増えた場合のフォールバック（SelectRoleと同じ流儀）
+    }
+
+    private SheetAffinity SelectedAffinity()
+        => AffinityCombo.SelectedItem is ComboBoxItem { Tag: SheetAffinity a } ? a : SheetAffinity.Any;
 
     /// <summary>セル数の入力欄を読む。入力途中の空文字・不正値では既定値を返す(例外を投げない)。</summary>
     private static int ParseCells(string text, int fallback)
@@ -232,13 +257,15 @@ public partial class PartEditorDialog : Window
     private PartEditorExternalState CaptureExternalState() => new(
         ParseCells(WidthBox.Text, MinCells),
         ParseCells(HeightBox.Text, MinCells),
-        SelectedRole());
+        SelectedRole(),
+        SelectedAffinity());
 
     private void RestoreExternalState(PartEditorExternalState state)
     {
         WidthBox.Text = state.WidthCells.ToString();
         HeightBox.Text = state.HeightCells.ToString();
         SelectRole(state.Role);
+        SelectAffinity(state.SheetAffinity);
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)
@@ -315,15 +342,18 @@ public partial class PartEditorDialog : Window
         // キャンセルした場合はもちろん、OK後もキャンバス側の並びは影響を受けない)。
         var primitives = PartOptimizer.MergeCollinearLines(ShapeCanvas.Primitives);
 
+        var affinity = SelectedAffinity();   // T-136(A)増分2
         Result = _editing is { } original
             ? new PartDefinition
             {
                 Id = original.Id, Name = name, WidthCells = width, HeightCells = height, Role = role,
+                SheetAffinity = affinity,
                 IsOrEligible = original.IsOrEligible, Ports = ports, Primitives = primitives,
             }
             : new PartDefinition
             {
                 Name = name, WidthCells = width, HeightCells = height, Role = role,
+                SheetAffinity = affinity,
                 Ports = ports, Primitives = primitives,
             };
 

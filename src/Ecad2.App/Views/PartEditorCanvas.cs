@@ -15,7 +15,13 @@ public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate, Te
 /// GuiEcad原本の EditorSnapshot は Prims/Ports/W/H/Role の5項目を持つ。増分3-cで端子（Ports）が
 /// キャンバスへ統合されたため、キャンバスの外に残るのは幅・高さ・役割の3項目。
 /// </summary>
-public sealed record PartEditorExternalState(int WidthCells, int HeightCells, PartRole Role);
+/// <remarks>
+/// T-136(A)増分2で <see cref="SheetAffinity"/> を第4項目として加えた。<b>既定値は置いておらぬ</b>
+/// ——生成箇所が <c>PartEditorDialog.CaptureExternalState</c> の1つしかなく改修の代償が小さいゆえ、
+/// 渡し忘れをコンパイラに検出させる側を採った（T-133増分3・T-136増分1と同じ作法）。
+/// </remarks>
+public sealed record PartEditorExternalState(
+    int WidthCells, int HeightCells, PartRole Role, SheetAffinity SheetAffinity);
 
 /// <summary>
 /// T-068増分3-b2: 自作パーツの形状編集キャンバス（選択/線/折れ線/矩形/円/弧/回転の7ツール）。
