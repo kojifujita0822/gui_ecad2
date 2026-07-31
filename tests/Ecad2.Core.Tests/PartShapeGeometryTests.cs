@@ -413,12 +413,12 @@ public class PartShapeGeometryTests
     // また「行は中心基準・列は境界基準」という非対称そのものが本メソッドの要ゆえ、
     // X と Y を別々に検証する。
 
-    // P-148（殿裁定2026-07-28）で行方向の半径が ±h/2 から ±((h-1)+0.5) セルへ広がった。
-    // 高さ1は変わらず（±0.5）、高さ2以上で広がる。期待値は下記のとおり改めてある。
+    // T-139（殿裁定2026-07-31）で行方向の半径を ±((h-1)+0.5) から ±h/2 セルへ改めた
+    // ＝高さ h セルちょうど（原本GuiEcadと同じ形）。P-148 はこの裁定で覆っている。
     [Theory]
-    [InlineData(3, 5, 2.5, 7.5, 22.5, -11.25)]  // 幅<高さ。半径=(5-1+0.5)*2.5=11.25
-    [InlineData(5, 3, 2.0, 10.0, 10.0, -5.0)]   // 幅>高さ（上と逆にして取り違えを炙る）。半径=(3-1+0.5)*2.0=5.0
-    [InlineData(1, 4, 3.0, 3.0, 21.0, -10.5)]   // 幅1（列方向の退化）。半径=(4-1+0.5)*3.0=10.5
+    [InlineData(3, 5, 2.5, 7.5, 12.5, -6.25)]   // 幅<高さ。半径=5/2*2.5=6.25
+    [InlineData(5, 3, 2.0, 10.0, 6.0, -3.0)]    // 幅>高さ（上と逆にして取り違えを炙る）。半径=3/2*2.0=3.0
+    [InlineData(1, 4, 3.0, 3.0, 12.0, -6.0)]    // 幅1（列方向の退化）。半径=4/2*3.0=6.0
     public void FrameRect_RowIsCentered_ColumnStartsAtZero(
         int widthCells, int heightCells, double cellMm,
         double expectedWidth, double expectedHeight, double expectedY)
@@ -457,9 +457,9 @@ public class PartShapeGeometryTests
     [Fact]
     public void FrameRect_ZeroHeight_ClampsToOneRow()
     {
-        // 高さ0（退化ケース）。P-148で式が ±((h-1)+0.5) になったため、素直に計算すると
-        // 半径が負（-0.5セル）になり矩形が反転する。ClampPort の rowLimit と同じく
-        // Math.Max で0段へ潰し、高さ1と同じ1セル分の枠を返すことを固定する。
+        // 高さ0（退化ケース）。T-139の式 ±h/2 では素直に計算すると半径0＝枠が消える。
+        // Math.Max(1, h) で高さ1へ潰し、1セル分の枠を返すことを固定する
+        // （原本の ApplyDefinition が _h = Math.Max(1, def.HeightCells) とするのと同じ扱い）。
         var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells: 3, heightCells: 0, cellMm: 9.0);
 
         Assert.Equal(0.0, x, Precision);
@@ -470,126 +470,147 @@ public class PartShapeGeometryTests
     }
 
     [Fact]
-    public void FrameRect_HeightOne_P148の前後で変わらない()
+    public void FrameRect_HeightOne_歴代の裁定を通じて不変()
     {
-        // 殿がP-148を裁可された際の材料＝「既存18件への影響なし（組込み15件は高さ1）」。
-        // 素直な ±(h-1) を採ると高さ1で枠が ±0 となり15件すべてで枠が消えるため、
-        // +0.5 を含む形が選ばれた。<b>その前提をここで固定する</b>——
-        // 将来 +0.5 を落とす変更が入れば、このテストが鳴る。
+        // 高さ1の枠は ±0.5 セルであり、<b>P-148以前・P-148・T-139のいずれでも同値</b>。
+        // これは殿がP-148を裁可された際の材料「既存18件への影響なし（組込み15件は高さ1）」を
+        // 支えた前提であり、T-139で式が ±h/2 へ変わった後もそのまま活きる
+        // （1/2 = (1-1)+0.5 = 0.5 ゆえ）。
+        // <b>組込み15件が高さ1である限り、枠の式を変えても影響が出ぬことを固定する網である。</b>
         var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 4, heightCells: 1, cellMm: 9.0);
 
-        Assert.Equal(-4.5, y, Precision);   // P-148以前と同値
+        Assert.Equal(-4.5, y, Precision);
         Assert.Equal(9.0, h, Precision);
     }
 
+    // T-139（殿裁定2026-07-31）＝<b>「枠は目安であって柵ではない」</b>。
+    // P-148 は「枠が接続点の可動範囲を必ず覆う」ことを求めたが、本裁定でそれは覆った。
+    // 原本GuiEcad が枠 h セル・接続点 ±(h-1) と定めており、高さ3以上で接続点が枠を越える
+    // ——その姿へ戻したものである。<b>下の2件は、越えることと越えぬことの両方を固定する。</b>
+
     [Theory]
-    [InlineData(1)]
-    [InlineData(2)]
-    [InlineData(3)]
-    [InlineData(5)]
-    [InlineData(12)]   // GuiEcadのHeightBoxが許す上限（Math.Clamp(...,1,12)）
-    public void FrameRect_接続点の可動範囲を必ず覆う(int heightCells)
+    [InlineData(1)]   // 接続点は0のみ＝枠(±0.5セル)の中心
+    [InlineData(2)]   // 接続点±1＝枠(±1.0セル)の辺のちょうど上（はみ出しはせぬ）
+    public void FrameRect_T139_高さ2までは接続点が枠に収まる(int heightCells)
     {
-        // P-148の本題。枠・接続点の可動範囲・メイン図面の占有範囲（殿裁定11=H-2）の3者が
-        // 揃うことを、枠と接続点の2者について直接測る。
-        // 接続点は行の中心に描かれる（PartEditorCanvas の CellToLocalMm(x, RowOffset)）。
         const double cellMm = 9.0;
         const int widthCells = 4;
         var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
 
-        // ClampPort が返しうる上端・下端の RowOffset（枠外を大きく叩いてクランプさせる）
         var (bottomRow, _) = PartShapeGeometry.ClampPort(0, 999, widthCells, heightCells);
         var (topRow, _) = PartShapeGeometry.ClampPort(0, -999, widthCells, heightCells);
 
         Assert.InRange(topRow * cellMm, y, y + h);
         Assert.InRange(bottomRow * cellMm, y, y + h);
-        // 端の接続点は枠の内側に「半セル分」の余裕を持つ（線上に重ならぬ）。
-        Assert.True(topRow * cellMm - y >= cellMm / 2 - 1e-9, "上端の接続点が枠の外か線上にある");
-        Assert.True(y + h - bottomRow * cellMm >= cellMm / 2 - 1e-9, "下端の接続点が枠の外か線上にある");
     }
 
-    // ===== セルの区切り線（T-137、殿裁定2026-07-31＝案B） =====
-    // 入力値の選び方: 幅と高さに別の値を採り、行と列を取り違える改変が結果に現れるようにする
-    // （samurai.md「テスト入力の対称性・退化性チェック」。正方形なら入れ替えても同じ絵になり穴が残る）。
-    // 縦線は整数・横線は半整数という非対称そのものが本メソッドの要ゆえ、X と Y を別々に検証する。
+    [Theory]
+    [InlineData(3, 2, 1.5)]     // 接続点±2 に対し枠は±1.5セル
+    [InlineData(5, 4, 2.5)]
+    [InlineData(12, 11, 6.0)]   // HeightBox が許す上限
+    public void FrameRect_T139_高さ3以上では接続点が枠の外へ出る(
+        int heightCells, int expectedRowLimit, double expectedHalfSpanCells)
+    {
+        // 「はみ出す」という事実だけでなく、<b>どこまで出るか</b>も固定する
+        // ——可動範囲(h-1)と枠(h/2)の両方が誤れば、はみ出しの有無だけでは気づけぬため。
+        const double cellMm = 9.0;
+        const int widthCells = 4;
+        var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
+
+        var (bottomRow, _) = PartShapeGeometry.ClampPort(0, 999, widthCells, heightCells);
+
+        Assert.Equal(expectedRowLimit, bottomRow);
+        Assert.Equal(expectedHalfSpanCells * cellMm, y + h, Precision);
+        Assert.True(bottomRow * cellMm > y + h, "高さ3以上では接続点が枠の下辺を越えるはず");
+        Assert.True(-bottomRow * cellMm < y, "上側も同じだけ越えるはず（中心基準ゆえ対称）");
+    }
+
+    // ===== パーツエディタの作図グリッド（T-137新設、T-139で原本の形へ組み直し） =====
+    // T-139（殿裁定2026-07-31）＝原本GuiEcadの DrawGrid へ揃える。原本は「0.25刻みの薄線」と
+    // 「整数境界の縦線」を重ね、行中心線 y=0 を別途最も濃く引く。
+    // T-137の「行の境目＝半整数」の線は取り除いた——原本に無く、かつ枠が h セルへ戻ると
+    // h が偶数のとき枠の辺（整数位置）と半整数の線が一致せぬため。
+    //
+    // 【入力値の選び方】幅と高さに別の値を採り、取り違えが結果に現れるようにする。
+    // 刻みも 1.0 と 0.25 の両方を測る——片方だけでは刻みを引数化した意味が検証できぬ。
 
     [Theory]
     [InlineData(1, 2)]    // 幅1（列方向の退化）
     [InlineData(3, 4)]
     [InlineData(12, 13)]  // WidthBox が許す上限（Math.Clamp(...,1,12)）
-    public void GridLineXs_枠の範囲では幅プラス1本になる(int widthCells, int expectedCount)
+    public void GridLinesAt_刻み1では枠の幅プラス1本になる(int widthCells, int expectedCount)
     {
         const double cellMm = 9.0;
         // 高さは幅と別の値を採る（取り違えを炙るため）。
         var (x, _, w, _) = PartShapeGeometry.FrameRect(widthCells, heightCells: 5, cellMm);
 
-        var xs = PartShapeGeometry.GridLineXs(x / cellMm, (x + w) / cellMm);
+        var xs = PartShapeGeometry.GridLinesAt(x / cellMm, (x + w) / cellMm, 1.0);
 
         Assert.Equal(expectedCount, xs.Length);
     }
 
     [Theory]
-    [InlineData(1, 2)]    // 中心1行 -> 上端・下端の2本
-    [InlineData(2, 4)]    // 中心±1＝3行 -> 4本
-    [InlineData(3, 6)]    // 中心±2＝5行 -> 6本
-    [InlineData(12, 24)]  // HeightBox が許す上限
-    public void GridLineYs_枠の範囲では高さの2倍の本数になる(int heightCells, int expectedCount)
+    [InlineData(1, 5)]    // 枠1セル -> 0.25刻みで 4区画+1本
+    [InlineData(2, 9)]    // 枠2セル -> 8区画+1本
+    [InlineData(3, 13)]   // 枠3セル -> 12区画+1本
+    [InlineData(12, 49)]  // HeightBox が許す上限
+    public void GridLinesAt_刻み025では枠の高さの4倍プラス1本になる(int heightCells, int expectedCount)
     {
+        // T-139で枠は h セルちょうど（旧 2h-1 から改めた）。1セルを4分割ゆえ 4h+1 本。
         const double cellMm = 9.0;
         var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 4, heightCells, cellMm);
 
-        var ys = PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm);
+        var ys = PartShapeGeometry.GridLinesAt(y / cellMm, (y + h) / cellMm, 0.25);
 
         Assert.Equal(expectedCount, ys.Length);
-        // T-137の狙いそのもの: 線が 2h 本ゆえ、囲まれる行は 2h-1 になる。
-        // 「高さ2の設定で3行」という名と実体の食い違いを、この式で固定する。
-        Assert.Equal(2 * heightCells - 1, ys.Length - 1);
+        // 殿の御要望「1セルを4×4に割った位置」——枠の中の区画は 4h 個になる。
+        Assert.Equal(4 * heightCells, ys.Length - 1);
     }
 
     [Fact]
-    public void GridLineXs_幅3の枠では整数の位置に入る()
+    public void GridLinesAt_刻み1は整数の位置に入る()
+        => Assert.Equal([0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLinesAt(0.0, 3.0, 1.0));
+
+    [Fact]
+    public void GridLinesAt_刻み025は4分の1の位置に入る()
+        => Assert.Equal([0.0, 0.25, 0.5, 0.75, 1.0], PartShapeGeometry.GridLinesAt(0.0, 1.0, 0.25));
+
+    [Fact]
+    public void GridLinesAt_同じ範囲でも刻みで本数が変わる()
     {
-        Assert.Equal([0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLineXs(0.0, 3.0));
+        // 刻みを引数化した意味そのもの。両者が同数なら刻みが効いておらぬ。
+        var coarse = PartShapeGeometry.GridLinesAt(-1.0, 1.0, 1.0);
+        var fine = PartShapeGeometry.GridLinesAt(-1.0, 1.0, 0.25);
+
+        Assert.Equal([-1.0, 0.0, 1.0], coarse);
+        Assert.Equal(9, fine.Length);
+        Assert.Equal(-0.75, fine[1], Precision);
     }
 
     [Fact]
-    public void GridLineYs_高さ2の枠では半整数の位置に入る()
+    public void GridLinesAt_高さ0の枠は高さ1と同じ本数になる()
     {
-        // 高さ2の枠は ±((2-1)+0.5)＝±1.5。行の境目は半整数ゆえ4本入る。
-        Assert.Equal([-1.5, -0.5, 0.5, 1.5], PartShapeGeometry.GridLineYs(-1.5, 1.5));
-    }
-
-    [Fact]
-    public void GridLineXsとGridLineYsは同じ範囲でも別の位置を返す()
-    {
-        // 縦は整数・横は半整数。両者を取り違えれば半セルずれ、線が枠の辺と合わなくなる。
-        Assert.Equal([-1.0, 0.0, 1.0], PartShapeGeometry.GridLineXs(-1.5, 1.5));
-        Assert.Equal([-1.5, -0.5, 0.5, 1.5], PartShapeGeometry.GridLineYs(-1.5, 1.5));
-    }
-
-    [Fact]
-    public void GridLineYs_高さ0の枠でも2本へ潰れる()
-    {
-        // 高さ0（退化ケース）。FrameRect が Math.Max で0段へ潰すのと歩調を合わせ、
-        // 高さ1と同じ2本（1行分）になることを固定する。
+        // 高さ0（退化ケース）。FrameRect が Math.Max(1, h) で高さ1へ潰すのと歩調を合わせる。
         const double cellMm = 9.0;
         var (_, y, _, h) = PartShapeGeometry.FrameRect(widthCells: 3, heightCells: 0, cellMm);
 
-        Assert.Equal([-0.5, 0.5], PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm));
+        Assert.Equal([-0.5, -0.25, 0.0, 0.25, 0.5],
+            PartShapeGeometry.GridLinesAt(y / cellMm, (y + h) / cellMm, 0.25));
     }
 
     [Theory]
     [InlineData(3, 2)]
     [InlineData(1, 5)]   // 幅と高さを入れ替えた組（取り違えを炙る）
     [InlineData(12, 1)]
-    public void GridLines_端の線が基準枠の辺と一致する(int widthCells, int heightCells)
+    public void GridLinesAt_端の線が基準枠の辺と一致する(int widthCells, int heightCells)
     {
-        // 枠の内側へ濃い線を重ねる描画（案B）が成り立つ前提。端がずれれば二重線・欠けになる。
+        // 枠の内側へ濃い線を重ねる描画が成り立つ前提。端がずれれば二重線・欠けになる。
+        // T-139の枠は ±h/2 ゆえ h が偶数なら整数・奇数なら半整数——いずれも 0.25 の倍数ゆえ一致する。
         const double cellMm = 9.0;
         var (x, y, w, h) = PartShapeGeometry.FrameRect(widthCells, heightCells, cellMm);
 
-        var xs = PartShapeGeometry.GridLineXs(x / cellMm, (x + w) / cellMm);
-        var ys = PartShapeGeometry.GridLineYs(y / cellMm, (y + h) / cellMm);
+        var xs = PartShapeGeometry.GridLinesAt(x / cellMm, (x + w) / cellMm, 1.0);
+        var ys = PartShapeGeometry.GridLinesAt(y / cellMm, (y + h) / cellMm, 0.25);
 
         Assert.Equal(x, xs[0] * cellMm, Precision);
         Assert.Equal(x + w, xs[^1] * cellMm, Precision);
@@ -598,29 +619,20 @@ public class PartShapeGeometryTests
     }
 
     [Fact]
-    public void GridLineXs_範囲の内側の整数だけを返す()
+    public void GridLinesAt_範囲の内側の線だけを返す()
     {
-        // 案B（キャンバス全域）では、パン・ズームにより範囲の端が半端な値になる。
-        Assert.Equal([-2.0, -1.0, 0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLineXs(-2.3, 3.7));
-    }
-
-    [Fact]
-    public void GridLineYs_範囲の内側の半整数だけを返す()
-    {
-        Assert.Equal([-1.5, -0.5, 0.5, 1.5, 2.5], PartShapeGeometry.GridLineYs(-2.3, 3.4));
+        // キャンバス全域へ引く際は、パン・ズームにより範囲の端が半端な値になる。
+        Assert.Equal([-2.0, -1.0, 0.0, 1.0, 2.0, 3.0], PartShapeGeometry.GridLinesAt(-2.3, 3.7, 1.0));
+        Assert.Equal([-2.25, -2.0, -1.75], PartShapeGeometry.GridLinesAt(-2.3, -1.7, 0.25));
     }
 
     [Theory]
-    [InlineData(0.2, 0.4)]   // 整数を1つも含まぬ狭い範囲
-    [InlineData(3.0, 1.0)]   // 範囲が逆転（退化）
-    public void GridLineXs_線が入らぬ範囲では空を返す(double min, double max)
-        => Assert.Empty(PartShapeGeometry.GridLineXs(min, max));
-
-    [Theory]
-    [InlineData(0.7, 1.2)]   // 半整数を1つも含まぬ狭い範囲
-    [InlineData(3.0, 1.0)]   // 範囲が逆転（退化）
-    public void GridLineYs_線が入らぬ範囲では空を返す(double min, double max)
-        => Assert.Empty(PartShapeGeometry.GridLineYs(min, max));
+    [InlineData(0.2, 0.4, 1.0)]    // 刻みの倍数を1つも含まぬ狭い範囲
+    [InlineData(3.0, 1.0, 1.0)]    // 範囲が逆転（退化）
+    [InlineData(0.0, 3.0, 0.0)]    // 刻み0（退化）——ゼロ除算も無限ループも起こさぬ
+    [InlineData(0.0, 3.0, -1.0)]   // 刻みが負（退化）
+    public void GridLinesAt_線が入らぬ範囲や退化した刻みでは空を返す(double min, double max, double step)
+        => Assert.Empty(PartShapeGeometry.GridLinesAt(min, max, step));
 
     // ===== 接続点（T-068増分3-c） =====
     // 座標の対応に注意: 接続点の x は BoundaryOffset、y は RowOffset であり、PortDef の宣言順

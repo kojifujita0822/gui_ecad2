@@ -98,62 +98,56 @@ public static class PartShapeGeometry
     public static (double X, double Y, double Width, double Height) FrameRect(
         int widthCells, int heightCells, double cellMm)
     {
-        // P-148（殿裁定2026-07-28）: 行方向の半径は ±((h-1) + 0.5) セル。
-        // (h-1) は ClampPort の rowLimit と同じ式であり、+0.5 は「接続点が行の中心に置かれる」
-        // ゆえに要る半セル分（枠がその行のセルを覆うため）。これにより
-        // 枠・接続点の可動範囲・メイン図面の占有範囲（殿裁定11=H-2）の3者が揃う。
-        // Math.Max は ClampPort の rowLimit と同じく高さ0以下の退化入力を0段へ潰す。
+        // T-139（殿裁定2026-07-31）: 行方向の半径は ±h/2 セル＝高さ h セルちょうど。
+        // <b>原本GuiEcad と同じ形へ戻したものである</b>（PartEditorWindow.xaml.cs:265 の
+        // DrawRectangle(Sx(0), Sy(-_h/2), _w*_cellPx, _h*_cellPx) と、:196 の Sy(cy) が同型）。
+        //
+        // 【P-148 は本裁定で覆った】P-148（2026-07-28）は ±((h-1)+0.5) を採り、枠・接続点の
+        // 可動範囲・図面の占有範囲の3者を揃えていた。だが枠が 2h-1 セルへ広がるため
+        // 「高さ2の設定で枠が3セル」という名と実体の食い違いが生じ、殿の
+        // 「設定値と見た目の差異が大きい」というご指摘を招いた。
+        // <b>本裁定では「枠は目安であって柵ではない」を採り、接続点が枠外へ出ることを許す</b>
+        // （h≧3 の奇数で ClampPort の可動範囲が枠を越える。それが原本の姿である）。
+        //
+        // Math.Max(1, ...) は高さ0以下の退化入力を高さ1へ潰す（原本の ApplyDefinition が
+        // _h = Math.Max(1, def.HeightCells) でクランプするのと同じ扱い）。
         double w = widthCells * cellMm;
-        double halfSpanMm = (Math.Max(0, heightCells - 1) + 0.5) * cellMm;
+        double halfSpanMm = Math.Max(1, heightCells) / 2.0 * cellMm;
         return (0.0, -halfSpanMm, w, halfSpanMm * 2);
     }
 
-    // ===== セルの区切り線（T-137、殿裁定2026-07-31＝案B・キャンバス全域） =====
+    // ===== パーツエディタの作図グリッド（T-137新設、T-139で原本の形へ組み直し） =====
 
     /// <summary>
-    /// 縦の区切り線（列の境目）が入る位置を、指定した範囲から昇順で返す（セル単位）。
+    /// 指定の刻みで、範囲に入る線の位置を昇順で返す（セル単位。原点 <c>0</c> を基準とする）。
     /// <para>
-    /// <b>列は境界基準</b>（<see cref="FrameRect"/> 参照）ゆえ、線は整数のセルX座標に入る。
-    /// 両端がちょうど整数の場合はその線を含む——基準枠の範囲を渡せば、枠の左右の辺と
-    /// 端の線が一致する。
+    /// T-139（殿裁定2026-07-31）で<b>原本GuiEcadの作図グリッドへ揃えた</b>
+    /// （<c>PartEditorWindow.xaml.cs:244-266</c> の <c>DrawGrid</c>）。原本は次の3種を重ねて描く——
+    /// <list type="number">
+    /// <item><b>0.25刻みの薄線</b>（縦・横とも。1セルを4×4に割る）</item>
+    /// <item><b>整数境界の縦線</b>（やや濃く。要素の左右ポート位置）</item>
+    /// <item><b>行中心線 <c>y=0</c></b>（最も濃く。配線が通る基準線）</item>
+    /// </list>
+    /// 本メソッドは 1・2 の位置を返す（刻みを引数で切り替える）。3 は単線ゆえ呼び出し側で直に引く。
     /// </para>
+    /// <para>
+    /// <b>T-137で用いた「行の境目＝半整数」の線は本裁定で取り除いた</b>——原本に無い線であり、
+    /// かつ枠が <c>h</c> セルへ戻ると（<see cref="FrameRect"/>）<b>h が偶数のとき枠の辺が整数位置に来て
+    /// 半整数の線と一致せぬ</b>ため、端が合わなくなる。
+    /// </para>
+    /// <param name="stepCells">刻み（セル単位）。0以下は退化入力として空を返す。</param>
     /// </summary>
-    public static double[] GridLineXs(double minCellX, double maxCellX)
+    public static double[] GridLinesAt(double minCell, double maxCell, double stepCells)
     {
-        int first = (int)Math.Ceiling(minCellX);
-        int last = (int)Math.Floor(maxCellX);
+        if (stepCells <= 0) return [];
+        int first = (int)Math.Ceiling(minCell / stepCells);
+        int last = (int)Math.Floor(maxCell / stepCells);
         // 線が1本も入らぬ狭い範囲・範囲の逆転（max<min）とも、ここで last<first になり捕まる
         // （逆転を別途弾く要は無い——実測で確かめた）。外すと配列長が負になり例外。
         if (last < first) return [];
         var xs = new double[last - first + 1];
-        for (int i = 0; i < xs.Length; i++) xs[i] = first + i;
+        for (int i = 0; i < xs.Length; i++) xs[i] = (first + i) * stepCells;
         return xs;
-    }
-
-    /// <summary>
-    /// 横の区切り線（行の境目）が入る位置を、指定した範囲から昇順で返す（セル単位）。
-    /// <para>
-    /// <b>行は中心基準</b>——中心行の<i>中心</i>が <c>y=0</c> ゆえ、行の<i>境目</i>は
-    /// 半整数（<c>±0.5, ±1.5, ...</c>）に入る。<see cref="FrameRect"/> の上下の辺
-    /// <c>±((h-1)+0.5)</c> も半整数ゆえ、枠の範囲を渡せば端の線が枠の辺と一致し、
-    /// 線は <c>2h</c> 本・囲まれる行は <c>2h-1</c> になる。
-    /// </para>
-    /// <para>
-    /// メイン図面の格子（<c>DiagramRenderer.DrawGrid</c>）は<b>横線を行の中心</b>に引いており、
-    /// 本メソッドとは線の意味が異なる（あちらは行番号・要素中心と揃えるための設計）。
-    /// 本メソッドが境目を返すのは、T-137の狙いが「枠の中が何セル分あるか数えられること」ゆえ。
-    /// </para>
-    /// </summary>
-    public static double[] GridLineYs(double minCellY, double maxCellY)
-    {
-        // y = k + 0.5 が範囲に入る整数 k を求める。
-        int first = (int)Math.Ceiling(minCellY - 0.5);
-        int last = (int)Math.Floor(maxCellY - 0.5);
-        // ガードの意味は GridLineXs と同じ。
-        if (last < first) return [];
-        var ys = new double[last - first + 1];
-        for (int i = 0; i < ys.Length; i++) ys[i] = first + i + 0.5;
-        return ys;
     }
 
     // ===== 接続点（T-068増分3-c、家老裁可2026-07-25） =====

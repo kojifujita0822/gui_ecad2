@@ -731,37 +731,62 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// 既定の大きさなら計180本弱にて、本数の上限ガードは設けておらぬ。
     /// </para>
     /// </summary>
+    /// <summary>刻み（セル単位）。原本の DrawGrid が 0.25 刻みの薄線と整数境界の線を重ねるのに倣う。</summary>
+    private const double FineGridStepCells = 0.25;
+    private const double BoundaryGridStepCells = 1.0;
+
     private void DrawCellGrid(IRenderer renderer, double canvasWidthDip, double canvasHeightDip)
     {
         var baseStroke = _theme.Get(StrokeRole.Grid);
         // ズーム倍率の分を先に割り、画面上の太さを一定に保つ（殿裁定2026-07-31）。
         // 忍者の実測＝倍率0.20では線が背景に沈み、在るべき13本のうち5本が区別できなかった
         // （PushTransform が ScaleTransform を積むゆえ、ペンの太さにも倍率が掛かるため）。
-        var inner = baseStroke with { Width = DrawingTheme.ZoomInvariantWidthMm(baseStroke.Width, _zoom) };
-        // 枠の外は同じ色のまま不透明度を半分にする（枠の範囲を線の中でも際立たせるため）。
-        var outer = inner with { Color = inner.Color with { A = (byte)(inner.Color.A / 2) } };
+        double lineWidth = DrawingTheme.ZoomInvariantWidthMm(baseStroke.Width, _zoom);
+
+        // 濃さは3段。原本（PartEditorWindow.xaml.cs:246-249）の faint / line / center に対応する。
+        var fineInner = new StrokeStyle(Fade(baseStroke.Color, 1.0 / 3.0), lineWidth);
+        var boundaryInner = baseStroke with { Width = lineWidth };
+        // 枠の外は同じ色のまま不透明度を半分にする（T-137殿裁定＝枠の範囲を線の中でも際立たせる）。
+        var fineOuter = fineInner with { Color = Fade(fineInner.Color, 0.5) };
+        var boundaryOuter = boundaryInner with { Color = Fade(boundaryInner.Color, 0.5) };
 
         // 可視範囲をセル座標へ逆算する（パン・ズームで動くため毎回求める）。
         var visibleTopLeft = DipToCell(new Point(0, 0));
         var visibleBottomRight = DipToCell(new Point(canvasWidthDip, canvasHeightDip));
-        DrawCellGridLines(renderer, visibleTopLeft, visibleBottomRight, outer);
 
-        // 枠の内側だけ、同じ線を濃く重ねる。FrameRect は mm ゆえセル単位へ戻す。
+        // 枠の範囲（FrameRect は mm ゆえセル単位へ戻す）。
         var (frameX, frameY, frameW, frameH) =
             PartShapeGeometry.FrameRect(_widthCells, _heightCells, _geo.CellMm);
         var frameTopLeft = new Point2D(frameX / _geo.CellMm, frameY / _geo.CellMm);
         var frameBottomRight = new Point2D((frameX + frameW) / _geo.CellMm, (frameY + frameH) / _geo.CellMm);
-        DrawCellGridLines(renderer, frameTopLeft, frameBottomRight, inner);
+
+        // 薄い順に重ねる（後から描くものが上に乗る）。
+        DrawCellGridLines(renderer, visibleTopLeft, visibleBottomRight, FineGridStepCells, fineOuter, horizontal: true);
+        DrawCellGridLines(renderer, visibleTopLeft, visibleBottomRight, BoundaryGridStepCells, boundaryOuter, horizontal: false);
+        DrawCellGridLines(renderer, frameTopLeft, frameBottomRight, FineGridStepCells, fineInner, horizontal: true);
+        DrawCellGridLines(renderer, frameTopLeft, frameBottomRight, BoundaryGridStepCells, boundaryInner, horizontal: false);
+
+        // 行中心線 y=0（配線が通る基準線）。原本は最も濃い色を用いる（:262）。
+        // 枠の幅だけに引く——原本と同じ範囲であり、かつ「この部品の基準線」という意味に適う。
+        var centerStroke = new StrokeStyle(Fade(_theme.Foreground, 0.55), lineWidth * 1.5);
+        renderer.DrawLine(CellToLocalMm(frameTopLeft.X, 0), CellToLocalMm(frameBottomRight.X, 0), centerStroke);
     }
 
-    /// <summary>指定した範囲（セル座標）へ区切り線を引く。範囲の端に乗る線は含む。</summary>
-    private void DrawCellGridLines(IRenderer renderer, Point2D topLeft, Point2D bottomRight, StrokeStyle stroke)
+    /// <summary>指定した範囲（セル座標）へ格子線を引く。範囲の端に乗る線は含む。
+    /// <paramref name="horizontal"/> が true なら横線も引く（薄線は縦横とも、整数境界は縦のみ——原本と同じ）。</summary>
+    private void DrawCellGridLines(IRenderer renderer, Point2D topLeft, Point2D bottomRight,
+                                   double stepCells, StrokeStyle stroke, bool horizontal)
     {
-        foreach (double x in PartShapeGeometry.GridLineXs(topLeft.X, bottomRight.X))
+        foreach (double x in PartShapeGeometry.GridLinesAt(topLeft.X, bottomRight.X, stepCells))
             renderer.DrawLine(CellToLocalMm(x, topLeft.Y), CellToLocalMm(x, bottomRight.Y), stroke);
-        foreach (double y in PartShapeGeometry.GridLineYs(topLeft.Y, bottomRight.Y))
+        if (!horizontal) return;
+        foreach (double y in PartShapeGeometry.GridLinesAt(topLeft.Y, bottomRight.Y, stepCells))
             renderer.DrawLine(CellToLocalMm(topLeft.X, y), CellToLocalMm(bottomRight.X, y), stroke);
     }
+
+    /// <summary>色の不透明度を割合で下げる（0.5 なら半分）。</summary>
+    private static Ecad2.Rendering.Color Fade(Ecad2.Rendering.Color c, double factor)
+        => c with { A = (byte)Math.Clamp(c.A * factor, 0, 255) };
 
     protected override void OnRenderSizeChanged(SizeChangedInfo sizeInfo)
     {
