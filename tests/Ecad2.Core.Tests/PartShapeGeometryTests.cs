@@ -22,20 +22,34 @@ public class PartShapeGeometryTests
     private const int Precision = 9;
 
     // ===== Snap（丸めを素通しにするとRED） =====
+    // T-138（殿裁定2026-07-31）で刻みを 1/16 から 1/4 へ改めた。
+    // 【入力値の選び方】<b>1/16 と 1/4 で結果が異なる値を選ぶ</b>——両方で同じ結果になる値
+    // （例：旧テストの 1.2345 は 1/16 でも 1/4 でも 1.25）では、刻みが元へ戻る変更を検出できぬ。
 
     [Theory]
     [InlineData(0.0, 0.0)]
-    [InlineData(0.03, 0.0)]        // 1/32未満は0へ落ちる
-    [InlineData(0.04, 0.0625)]     // 1/32超は1/16へ上がる
-    [InlineData(0.5, 0.5)]         // 刻みの整数倍はそのまま
-    [InlineData(-0.04, -0.0625)]   // 負値も対称に丸まる
-    [InlineData(1.2345, 1.25)]
-    public void Snap_RoundsToSixteenthOfCell(double input, double expected)
+    [InlineData(0.12, 0.0)]     // 1/8未満は0へ落ちる（1/16刻みなら 0.125 になり、ここで分かれる）
+    [InlineData(0.13, 0.25)]    // 1/8超は1/4へ上がる（1/16刻みなら 0.125）
+    [InlineData(0.5, 0.5)]      // 刻みの整数倍はそのまま
+    [InlineData(-0.13, -0.25)]  // 負値も対称に丸まる
+    [InlineData(0.3, 0.25)]     // 1/16刻みなら 0.3125——刻みが戻れば必ず落ちる
+    public void Snap_RoundsToQuarterOfCell(double input, double expected)
         => Assert.Equal(expected, PartShapeGeometry.Snap(input), Precision);
 
     [Fact]
+    public void Snap_既定の刻みは1辺4等分()
+    {
+        // 殿裁定2026-07-31そのものを固定する網（samurai.md「裁定の根拠を回帰テストの対象にする」）。
+        // 上の Theory は「丸めが正しいか」を測るが、本件は「刻みの値が裁定どおりか」を測る。
+        Assert.Equal(0.25, PartShapeGeometry.DefaultSnapFractionCells, Precision);
+    }
+
+    [Fact]
     public void Snap_CustomFraction_UsesGivenStep()
-        => Assert.Equal(0.5, PartShapeGeometry.Snap(0.3, fractionCells: 0.5), Precision);
+    {
+        // 明示指定は既定値に依らぬ（ゆえに本件は刻みの変更を検出せぬ——それが正しい）。
+        Assert.Equal(0.5, PartShapeGeometry.Snap(0.3, fractionCells: 0.5), Precision);
+    }
 
     [Theory]
     [InlineData(0.0, 0.0)]

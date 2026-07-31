@@ -14,8 +14,17 @@ namespace Ecad2.Model;
 /// </summary>
 public static class PartShapeGeometry
 {
-    /// <summary>既定のスナップ刻み（1/16セル）。増分0のPoCで操作感を確認済みの値。</summary>
-    public const double DefaultSnapFractionCells = 1.0 / 16.0;
+    /// <summary>既定のスナップ刻み（<b>1辺を4等分</b>＝1セル内に 4×4＝16点）。
+    /// <para>
+    /// T-138（殿裁定2026-07-31）で <c>1/16</c> から改めた。<c>1/16</c> は増分0のPoC由来にて、
+    /// <b>原本GuiEcad の <c>SnapStep = 1.0/16</c> と完全に同型</b>であった（隠密の一次ソース調査）。
+    /// すなわち本件は移植の誤りを正すものではなく、<b>殿が原本から離れる道をお選びになった仕様変更</b>である。
+    /// </para>
+    /// <para>
+    /// 訴えは「マウスで狙った位置になかなか置けぬ」——1辺16等分では1セル内に 16×16＝256点あり、
+    /// 手ぶれに対して点の間隔が狭すぎた。<b>4等分にすると点は16点となり、1辺あたり4倍・面積あたり16倍粗くなる。</b>
+    /// </para></summary>
+    public const double DefaultSnapFractionCells = 1.0 / 4.0;
 
     /// <summary>ヒット判定の既定許容距離（セル単位）。GuiEcad原本の点-線分距離しきい値と同値。</summary>
     public const double DefaultHitToleranceCells = 0.3;
