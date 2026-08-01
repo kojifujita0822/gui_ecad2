@@ -70,16 +70,32 @@ public sealed class ElementInstance
 
     /// <summary>高さ（セル数）から占有行の半径を求める（中心の行から上下へ何行か）。
     /// <para>
-    /// 殿裁定11＝<b>H-2（中心基準）</b>ゆえ、高さ H の要素は <c>2H-1</c> 行を占める
-    /// （H=1 なら1行、H=2 なら3行、H=3 なら5行）。<b>「高さ2＝2行」ではない。</b>
+    /// <b>殿裁定2026-07-31（T-139(C)）＝奇数は <c>h</c> 行、偶数は <c>h+1</c> 行。</b>
+    /// 占有範囲は中心基準で上下対称ゆえ行数は必ず奇数になり、両者は <c>半径 = h / 2</c>
+    /// （整数除算）という一つの式に収まる（h=1→1行、h=2→3行、h=3→3行、h=4→5行、h=12→13行）。
+    /// </para>
+    /// <para>
+    /// <b>従前は <c>h-1</c>（＝2h-1行）であった</b>——T-133増分2の殿裁定11「H-2（中心基準）」に由来する。
+    /// T-139で枠の描画を原本の形（<c>h</c>セル）へ戻したのに伴い、占有行も改めた。
+    /// <b>原本GuiEcadには「図面上の占有行」という概念自体が無い</b>（<c>ElementInstance</c> に
+    /// <c>CellHeight</c> を持たず、<c>CellEmpty</c>/<c>HitTest</c> は <c>e.Pos.Row != row</c> の
+    /// 厳密一致のみで、上下に別要素を置くことを妨げぬ）ゆえ、本式はecad2独自の判断である。
+    /// </para>
+    /// <para>
+    /// <b>【式を変える者への注意】高さ1・2では新旧が同値になる</b>（1→0、2→1）。
+    /// <b>変わるのは高さ3以上のみ</b>ゆえ、高さ2だけを見て確かめても式の違いは現れぬ。
+    /// </para>
+    /// <para>
     /// <c>Math.Max</c> は高さ0以下の退化入力を0段へ潰す
     /// （<see cref="PartShapeGeometry.ClampPort"/> の <c>rowLimit</c> と同じ式）。
+    /// <b>整数除算は0方向へ丸めるゆえ h=-1 では 0 になるが、h≦-2 では負になる</b>——
+    /// ゆえにガードは式を改めた後も要る。
     /// </para>
     /// <para>
     /// <b>これから置く要素（まだ <see cref="ElementInstance"/> が無い段階）の判定にも使えるよう
     /// 静的にしてある。</b> 既に在る要素については <see cref="RowSpan"/> を使う。
     /// </para></summary>
-    public static int RowSpanOf(int cellHeight) => Math.Max(0, cellHeight - 1);
+    public static int RowSpanOf(int cellHeight) => Math.Max(0, cellHeight / 2);
 
     /// <summary>本要素の占有行の半径。<see cref="RowSpanOf"/> を <see cref="CellHeight"/> へ適用したもの。</summary>
     public int RowSpan => RowSpanOf(CellHeight);

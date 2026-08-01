@@ -9,6 +9,11 @@ namespace Ecad2.App.Tests;
 /// 殿裁定11＝<b>H-2（中心基準3行）</b>——高さ H の要素は <c>Pos.Row</c> を中心に上下へ <c>H-1</c> 行ずつ、
 /// 計 <c>2(H-1)+1</c> 行を占める。H=1 なら1行（従来と同一）、H=2 なら3行。
 ///
+/// <para><b>【T-139(C)で式が改まった 2026-08-01】</b>殿裁定2026-07-31により
+/// <b>奇数は <c>h</c> 行、偶数は <c>h+1</c> 行</b>（半径 <c>h/2</c>）となった。<b>直上の
+/// 「計 2(H-1)+1 行」は旧仕様の記述である</b>——高さ1・2は新旧同値ゆえ本ファイルの既存テストは
+/// 影響を受けぬが、<b>高さ3以上を扱う際にそのまま引くと期待値が狂う</b>。</para>
+///
 /// <para><b>【入力値の選び方】計画書§増分3の勘所3点を事前適用した。</b>
 /// (a) <b>高さ1と高さ2を混ぜる</b>——高さ1どうしだけでは行の区間判定が <c>[r,r]</c> に潰れ、
 /// 縦方向の実装が丸ごと誤っていても「正しく見える」。
@@ -76,6 +81,30 @@ public class T133CellHeightPlacementTests : ViewModelTestBase
         vm.SelectedCell = new GridPos(row, 6);
 
         Assert.Equal(expected, vm.IsSelectedCellWithinGrid(cellWidth: 1, cellHeight: 2));
+    }
+
+    /// <summary>
+    /// T-139(C)の網（殿裁定2026-07-31＝奇数は <c>h</c> 行、偶数は <c>h+1</c> 行）。
+    /// <b>高さ3は3行を占める</b>ゆえ、必要な余地は高さ2と同じ上下1行ずつになる（旧仕様では5行）。
+    /// <para><b>【なぜApp層にも置くか】</b>本ファイルの既存テストは<b>高さ1・2しか使うておらず</b>、
+    /// T-139(C)で式を <c>h-1</c> → <c>h/2</c> へ改めた際、<b>旧式へ戻す壊す実測でApp層は0件RED</b>で
+    /// あった——高さ1・2は<b>新旧同値</b>ゆえ。結線（<c>IsWithinGridBounds</c> が <c>RowSpanOf</c> を
+    /// 通ること）は高さ2でも測れるが、<b>式の改めそのものはこの層で一つも守られておらなんだ。</b>
+    /// 「テストは在り、経路も通っておるのに、与える入力値の選び方だけが検出力を奪う」型にござる。</para>
+    /// <para><b>【検出力の所在】</b>鳴るのは行1・行3のケースのみ。行0・行4は<b>両仕様とも false</b>で
+    /// あり対照として置く（枷が効きすぎて全部 false になっても気づけるように）。</para>
+    /// </summary>
+    [Theory]
+    [InlineData(0, false)]   // 行-1 へはみ出す（旧仕様でも false ＝対照）
+    [InlineData(1, true)]    // 行0,1,2 を占める＝収まる（旧仕様なら行-1まで要り false）
+    [InlineData(3, true)]    // 行2,3,4 を占める＝収まる（旧仕様なら行5まで要り false）
+    [InlineData(4, false)]   // 行5 へはみ出す（旧仕様でも false ＝対照）
+    public void 高さ3が要する余地は高さ2と同じ上下1行ずつ(int row, bool expected)
+    {
+        var vm = ArrangeSmallGrid();
+        vm.SelectedCell = new GridPos(row, 6);
+
+        Assert.Equal(expected, vm.IsSelectedCellWithinGrid(cellWidth: 1, cellHeight: 3));
     }
 
     [Fact]

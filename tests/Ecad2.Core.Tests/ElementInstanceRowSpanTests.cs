@@ -7,9 +7,17 @@ namespace Ecad2.Core.Tests;
 /// ことの単体テスト。同じ式が増分3〜4で4箇所（占有判定・ヒットテスト・行占有判定・行削除）へ
 /// 現れ、<c>Math.Max</c> による退化ガードの書き忘れが起きうるため寄せたもの。
 ///
-/// <para><b>【期待値の要】占有行数は 2H-1 である</b>——殿裁定11＝H-2（中心基準）ゆえ、
-/// 高さ2は<b>3行</b>、高さ3は<b>5行</b>を占める。「高さ2＝2行」と読めば期待値が狂う
-/// （忍者の期待値表 `docs/ecad2-t133-increment4-expected-values-ninja.md` §0）。</para>
+/// <para><b>【期待値の要】占有行数は「奇数の高さは h 行、偶数の高さは h+1 行」</b>——
+/// T-139(C)の殿裁定2026-07-31。中心基準ゆえ上下対称で行数は必ず奇数になり、半径は
+/// <c>h/2</c>（整数除算）という一つの式に収まる。高さ2は<b>3行</b>、高さ3も<b>3行</b>、高さ4は<b>5行</b>。</para>
+///
+/// <para><b>【従前は 2H-1 行（半径 h-1）であった】</b>T-133増分2の殿裁定11「H-2（中心基準）」に由来し、
+/// T-139で枠の描画を原本の形（<c>h</c>セル）へ戻したのに伴い改めた。<b>旧仕様では高さ3が5行</b>で
+/// あった点に注意——忍者の期待値表 `docs/ecad2-t133-increment4-expected-values-ninja.md` §0 は
+/// 旧仕様の記述ゆえ、そのまま引くと期待値が狂う。</para>
+///
+/// <para><b>【この式を測る者への注意】高さ1・2では新旧が同値</b>（半径0・1）。
+/// <b>違いが現れるのは高さ3以上のみ</b>ゆえ、高さ2だけを見て確かめても式の改めは検出できぬ。</para>
 ///
 /// <para><b>【入力値の選び方】</b>要素の位置を <c>(行3, 列7)</c> と<b>非対称</b>に取る。
 /// 行と列を取り違える実装であれば結果が変わる（T-125増分α・T-134で、非対称入力が
@@ -25,12 +33,36 @@ public class ElementInstanceRowSpanTests
     [Theory]
     [InlineData(1, 0)]
     [InlineData(2, 1)]
-    [InlineData(3, 2)]
-    [InlineData(12, 11)]   // 仕様上の上限（原本GuiEcadの HeightBox が Math.Clamp(...,1,12) で許す端）
-    public void 高さから求めた行半径はH引く1になる(int cellHeight, int expectedSpan)
+    [InlineData(3, 1)]     // 旧仕様では 2。ここが T-139(C) で改まった
+    [InlineData(4, 2)]     // 偶数の非境界（h=2 だけでは偶数側が境界に偏る）
+    [InlineData(5, 2)]     // 奇数の非境界
+    [InlineData(12, 6)]    // 仕様上の上限（原本GuiEcadの HeightBox が Math.Clamp(...,1,12) で許す端）。旧仕様では 11
+    public void 高さから求めた行半径は高さの半分になる(int cellHeight, int expectedSpan)
     {
         Assert.Equal(expectedSpan, ElementInstance.RowSpanOf(cellHeight));
         Assert.Equal(expectedSpan, At(cellHeight).RowSpan);
+    }
+
+    /// <summary>
+    /// 殿裁定の言葉（<b>奇数は h 行、偶数は h+1 行</b>）を、そのままの単位＝<b>行数</b>で固定する。
+    /// 上の半径は実装の内部表現ゆえ、裁定の言葉に近い側でも押さえておく。
+    /// <para><b>【偶奇という軸を持ち込んだゆえ、境界と非境界の両方を置く】</b>
+    /// 奇数側は h=1（境界）と h=3・5、偶数側は h=2（境界）と h=4・12。
+    /// 片側が境界のみだと、境界に特有の振る舞いを軸の性質と読み違える
+    /// （<c>samurai.md</c>「分類軸を持ち込んだら境界と非境界の両方を確かめよ」）。</para>
+    /// <para><b>【集約値ゆえ、これ1つでは足りぬ】</b>行数は位置を潰す。どの行を占めるかは
+    /// 下の <c>ContainsRow</c> 群が受け持つ。</para>
+    /// </summary>
+    [Theory]
+    [InlineData(1, 1)]     // 奇数 → h 行
+    [InlineData(2, 3)]     // 偶数 → h+1 行
+    [InlineData(3, 3)]     // 奇数
+    [InlineData(4, 5)]     // 偶数
+    [InlineData(5, 5)]     // 奇数
+    [InlineData(12, 13)]   // 偶数・仕様上の上限
+    public void 占有行数は奇数の高さでh行_偶数の高さでh足す1行になる(int cellHeight, int expectedRows)
+    {
+        Assert.Equal(expectedRows, 2 * ElementInstance.RowSpanOf(cellHeight) + 1);
     }
 
     [Theory]
@@ -65,13 +97,24 @@ public class ElementInstanceRowSpanTests
     }
 
     [Theory]
+    [InlineData(1, false)]   // 2行上＝届かぬ（旧仕様では届いておった）
+    [InlineData(2, true)]    // 1行上
+    [InlineData(3, true)]    // アンカー
+    [InlineData(4, true)]    // 1行下
+    [InlineData(5, false)]   // 2行下＝届かぬ（旧仕様では届いておった）
+    public void 高さ3は上下1行ずつを含めた3行を占める(int row, bool expected)
+        => Assert.Equal(expected, At(3).ContainsRow(row));
+
+    /// <summary>偶数の非境界（h=4）。<b>位置</b>を測る側で偶奇の軸を押さえる——
+    /// 上の行数テストは集約値ゆえ、上下どちらかへ寄った実装を検出できぬ。</summary>
+    [Theory]
     [InlineData(0, false)]
     [InlineData(1, true)]    // 2行上
     [InlineData(3, true)]    // アンカー
     [InlineData(5, true)]    // 2行下
     [InlineData(6, false)]
-    public void 高さ3は上下2行ずつを含めた5行を占める(int row, bool expected)
-        => Assert.Equal(expected, At(3).ContainsRow(row));
+    public void 高さ4は上下2行ずつを含めた5行を占める(int row, bool expected)
+        => Assert.Equal(expected, At(4).ContainsRow(row));
 
     [Theory]
     [InlineData(0)]
@@ -94,6 +137,32 @@ public class ElementInstanceRowSpanTests
     {
         // 境界ちょうど（触れる）を両側とも測る。片側だけでは不等号の向きの誤りが残る。
         Assert.Equal(expected, At(2).OverlapsRows(topRow, bottomRow));
+    }
+
+    /// <summary>
+    /// <b>殿裁定2026-07-31(C)の「根拠」を固定する網</b>（<c>samurai.md</c>「裁定そのものでなく、
+    /// 裁定の根拠を回帰テストの対象にする」）。裁定の材料は<b>「3極記号(V)が触れる行帯は3本であり、
+    /// 偶数の h+1 行と数として一致する」</b>という忍者・隠密の調査であった。
+    /// <para>
+    /// ゆえに固定するのは <c>RowSpanOf</c> の式だけではなく、<b>「3極記号の高さは2」という
+    /// <see cref="ElementCatalog"/> 側の宣言と、そこから導かれる占有行数3の結線</b>である——
+    /// カタログ側の高さが将来変われば、裁定の前提そのものが崩れる。
+    /// </para>
+    /// <para>
+    /// <b>【鳴らぬのが正しい網である】</b>本テストは今回の改め（<c>h-1</c> → <c>h/2</c>）では
+    /// RED にならぬ。高さ2は新旧いずれも半径1ゆえ——それを承知のうえで、崩れうる前提の側に置く。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(ElementKind.Breaker3P)]
+    [InlineData(ElementKind.ContactorMain3P)]
+    [InlineData(ElementKind.ThermalOverload3P)]
+    public void T139C_組込み3極記号は3行を占める(ElementKind kind)
+    {
+        int cellHeight = ElementCatalog.DefaultCellHeight(kind);
+
+        Assert.Equal(2, cellHeight);                                        // 裁定の材料＝高さ2
+        Assert.Equal(3, 2 * ElementInstance.RowSpanOf(cellHeight) + 1);      // ゆえに3行（＝h+1）
     }
 
     [Fact]
