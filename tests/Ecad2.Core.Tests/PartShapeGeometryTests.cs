@@ -734,16 +734,29 @@ public class PartShapeGeometryTests
     /// <para><b>【入力値の選び方】</b>既定の 9.0 だけでなく<b>拡大・縮小の両側</b>を測る。
     /// 単一の値では「<c>cellMm</c> を掛け忘れて定数をそのまま返す」型の改変が、
     /// たまたま近い値になって通り抜けうる。</para>
+    /// <para><b>【覆う側の値を入れておらぬ理由】</b>覆うのは <c>cellMm &lt; 1.25</c> のときのみ
+    /// （<c>0.20·cellMm - 0.075 &lt; 0.14·cellMm</c> を解いた値。1.25ちょうどは等号で覆う）。
+    /// <b><c>cellMm</c> は <c>PartEditorCanvas.cs:41</c> で 9.0 固定ゆえ 1.25 を下回らぬ</b>——
+    /// <c>readonly</c> フィールドにて変更経路が無く、ズームは描画変換ゆえ塗り・リング・線幅が
+    /// 等しくスケールされて比は変わらぬ。<b>可変にする際は本テストへ小さい値を足せ</b>
+    /// （足せば現に鳴る。<c>cellMm=1.0</c> で実測済み）。
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData(9.0)]    // 既定のセル寸法
     [InlineData(2.5)]    // 縮小側
     [InlineData(20.0)]   // 拡大側
-    public void 選択リングは塗り円より大きい(double cellMm)
+    public void 選択リングは塗り円を覆わぬ(double cellMm)
     {
         var (fill, ring) = PartShapeGeometry.PortVisualRadiiMm(cellMm);
 
-        Assert.True(ring > fill, $"リング({ring})が塗り({fill})以下では、増分4で入る種類色が隠れる");
+        // リングは輪郭線ゆえ、覆うか否かを決めるのは中心線ではなく【内縁】にござる。
+        // 中心線どうしの大小（ring > fill）では、線幅ぶんの食い込みを見逃す
+        // （隠密の静的レビュー2026-08-01。「測っておるもの」と「守るべきもの」が一段ずれておった）。
+        double ringInnerEdge = ring - PartShapeGeometry.PortRingStrokeMm / 2;
+
+        Assert.True(ringInnerEdge > fill,
+            $"リング内縁({ringInnerEdge})が塗り({fill})以下では、増分4で入る種類色が隠れる");
     }
 
     /// <summary>半径はセル寸法に比例する（ズームに追随する）。上の大小関係とは別軸——
