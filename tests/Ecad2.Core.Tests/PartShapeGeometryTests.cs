@@ -725,6 +725,53 @@ public class PartShapeGeometryTests
     public void HitTestPort_EmptyList_ReturnsMinusOne()
         => Assert.Equal(-1, PartShapeGeometry.HitTestPort(new List<PortDef>(), 0, 0));
 
+    // ===== 接続点の描画寸法（T-136(B)増分3、殿裁定2026-07-31＝選択表現をリングへ） =====
+
+    /// <summary>
+    /// <b>この関数の要は「リングは塗りより大きい」という大小関係</b>にござる——
+    /// 逆転すれば、増分4で入る「種類色」をリングが覆い隠す。値の一致だけを測ると、
+    /// <b>両方を同じ率にする改変</b>（リング率を塗り率と同値にする等）を見逃す。
+    /// <para><b>【入力値の選び方】</b>既定の 9.0 だけでなく<b>拡大・縮小の両側</b>を測る。
+    /// 単一の値では「<c>cellMm</c> を掛け忘れて定数をそのまま返す」型の改変が、
+    /// たまたま近い値になって通り抜けうる。</para>
+    /// </summary>
+    [Theory]
+    [InlineData(9.0)]    // 既定のセル寸法
+    [InlineData(2.5)]    // 縮小側
+    [InlineData(20.0)]   // 拡大側
+    public void 選択リングは塗り円より大きい(double cellMm)
+    {
+        var (fill, ring) = PartShapeGeometry.PortVisualRadiiMm(cellMm);
+
+        Assert.True(ring > fill, $"リング({ring})が塗り({fill})以下では、増分4で入る種類色が隠れる");
+    }
+
+    /// <summary>半径はセル寸法に比例する（ズームに追随する）。上の大小関係とは別軸——
+    /// あちらは順序、こちらは値そのもの。</summary>
+    [Theory]
+    [InlineData(9.0, 1.26, 1.80)]     // 0.14／0.20 セル
+    [InlineData(2.5, 0.35, 0.50)]     // 比例していなければ、この行が合わぬ
+    public void 接続点の半径はセル寸法に比例する(double cellMm, double expectedFill, double expectedRing)
+    {
+        var (fill, ring) = PartShapeGeometry.PortVisualRadiiMm(cellMm);
+
+        Assert.Equal(expectedFill, fill, 6);
+        Assert.Equal(expectedRing, ring, 6);
+    }
+
+    [Fact]
+    public void セル寸法が0なら両半径とも0になる()
+    {
+        // GridGeometry は readonly struct にて、new GridGeometry() では宣言した既定値が効かず
+        // CellMm=0 になりうる（T-125増分αで判明した罠。samurai.md の境界検証チェックリスト項目0）。
+        // その場合も負にならず「描画が消えるだけ」で済むことを固定する——負の半径は
+        // 描画バックエンドによっては例外を招く。
+        var (fill, ring) = PartShapeGeometry.PortVisualRadiiMm(0.0);
+
+        Assert.Equal(0.0, fill);
+        Assert.Equal(0.0, ring);
+    }
+
     // ===== CenterOf =====
 
     [Fact]

@@ -701,12 +701,28 @@ public sealed class PartEditorCanvas : FrameworkElement
             }
 
             // 接続点は図形の上に重ねて描く（ヒットテストで優先するのと同じ順序）
+            //
+            // T-136(B)増分3（殿裁定2026-07-31、逸脱の承知は2026-08-01）: 選択を「色」でなく「形」で表す。
+            // 従来は塗り色そのものを選択で切り替えており（選択=OrangeRed／非選択=DodgerBlue）、
+            // 一つの色軸が「選択」と「種類」を兼ねられなんだ。選択リングを重ねる形へ改め、
+            // 赤を空ける——増分4で入る「接続点の種類」の色は、この塗りの側が受け持つ。
+            //
+            // 塗り色は本増分では全ポート共通（従来の非選択色）。種類色の決定は増分4の領分にて、
+            // ここで中立色へ寄せても増分4で再び変えることになるゆえ、中間状態を増やさぬ（家老裁定）。
+            //
+            // リング色は _theme.Foreground の流用（ライト=黒／ダーク=明灰）。殿裁定3=「リングは
+            // 『形』で既に選択を表しており、色に意味を負わせずとも足りる」。
+            // なお原本GuiEcadは選択を色で表し（青=選択／赤=非選択）、常時描かれる白い輪郭は縁取りで
+            // あって選択表現ではない——リングで表すのはecad2独自の形にて、殿が承知のうえで裁可なされた。
+            var (portFillRadius, portRingRadius) = PartShapeGeometry.PortVisualRadiiMm(_geo.CellMm);
+            var portFillColor = new Ecad2.Rendering.Color(255, 30, 144, 255);
+            var portRingStroke = new StrokeStyle(_theme.Foreground, PartShapeGeometry.PortRingStrokeMm);
             for (int i = 0; i < _ports.Count; i++)
             {
                 var c = CellToLocalMm(_ports[i].BoundaryOffset, _ports[i].RowOffset);
-                bool selected = i == _selectedPortIndex;
-                renderer.FillCircle(c, _geo.CellMm * 0.14,
-                    selected ? new Ecad2.Rendering.Color(255, 255, 69, 0) : new Ecad2.Rendering.Color(255, 30, 144, 255));
+                renderer.FillCircle(c, portFillRadius, portFillColor);
+                if (i == _selectedPortIndex)
+                    renderer.DrawCircle(c, portRingRadius, portRingStroke);
             }
 
             if (_tool == PartEditTool.Rotate && _selectedIndex >= 0)

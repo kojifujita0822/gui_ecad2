@@ -35,6 +35,38 @@ public static class PartShapeGeometry
     /// <summary>縮退（面積・長さゼロ）とみなす許容誤差。</summary>
     private const double DegenerateEps = 1e-6;
 
+    // ===== 接続点の描画寸法（T-136(B)増分3、殿裁定2026-07-31＝選択表現をリングへ） =====
+
+    /// <summary>接続点（塗り円）の半径（セル単位）。従来からの値を保つ。</summary>
+    public const double PortFillRadiusCells = 0.14;
+
+    /// <summary>選択リングの半径（セル単位）。<b>塗り円より一回り大きく取る</b>——
+    /// リングが塗りを覆えば、増分4で入る「種類色」が隠れてしまう（隠密の調査書 案A）。</summary>
+    public const double PortRingRadiusCells = 0.20;
+
+    /// <summary>選択リングの線幅（mm）。既存のストローク幅（0.3／0.5mm）と同じく<b>mm固定</b>にて、
+    /// ズーム倍率に依らず一定に見える（T-137の殿裁定5「ズームに依らず一定」と同じ考え方）。</summary>
+    public const double PortRingStrokeMm = 0.15;
+
+    /// <summary>接続点の描画半径（塗り円と選択リング、いずれもmm）を求める。
+    /// <para>
+    /// <b>選択を色ではなく「形」で表す</b>——殿裁定2026-07-31（T-136(B)）。従来は塗り色そのものを
+    /// 選択で切り替えており（選択＝OrangeRed／非選択＝DodgerBlue）、<b>一つの色軸が「選択」と
+    /// 「種類」の二つを兼ねられぬ</b>のが変更の理由にござる。
+    /// </para>
+    /// <para>
+    /// <b>【この関数の要】リング半径は塗り半径より必ず大きい。</b> 逆転すれば種類色が隠れる——
+    /// 大小関係そのものをテストで固定する（値の一致だけを見ると、両方を同じ率にする改変を見逃す）。
+    /// </para>
+    /// <para>
+    /// <b>原本GuiEcadは選択を色で表しており（青＝選択／赤＝非選択、<c>PartEditorWindow.xaml.cs</c>の
+    /// <c>DrawPort</c>）、常時描かれる白い輪郭は縁取りであって選択表現ではない。</b>
+    /// すなわちリングで選択を表すのはecad2独自の形であり、<b>殿が原本からの逸脱を承知のうえで
+    /// 裁可なされた</b>（2026-08-01）。
+    /// </para></summary>
+    public static (double FillRadiusMm, double RingRadiusMm) PortVisualRadiiMm(double cellMm)
+        => (cellMm * PortFillRadiusCells, cellMm * PortRingRadiusCells);
+
     // ===== スナップ =====
 
     /// <summary>座標値を刻み幅の倍数へ丸める。</summary>
