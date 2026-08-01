@@ -93,6 +93,26 @@ try {
             + '正しい字体で言い直せ。'
         $out = @{ decision = 'block'; reason = $reason } | ConvertTo-Json -Compress
         Write-Output $out
+        exit 0
+    }
+
+    # キリル文字混入検知（殿ご下命2026-08-01。型C＝自己生成テキストへの異常トークン混入のうち、
+    # 2026-07-27以降に集中しておる型。記録簿 #20/#21/#22/#23/#24/#25 が該当）。
+    # 実例＝двух(二つ、#20と#24と#25で3度)／риск(リスク、#21)／как(と、#23)／от(由来、#22)／морь(#19)。
+    # 検知範囲＝U+0400-U+04FF(Cyrillic) と U+0500-U+052F(Cyrillic Supplement)。
+    # 記録簿・分析書を引用して論ずる際は正当に出現しうるゆえ、その場合は誤検知として無視してよい
+    # （検知そのものは残す＝「引用のつもりが混入であった」場合を取りこぼさぬため）。
+    if ($joined -cmatch '[Ѐ-ԯ]') {
+        $hits = [regex]::Matches($joined, '[Ѐ-ԯ]+') |
+            ForEach-Object { $_.Value } | Select-Object -Unique -First 8
+        $reason = '【キリル文字混入検知(Stop hook機械検知)】このターンの出力にキリル文字を検知した: ' `
+            + ($hits -join '／') `
+            + '。破損記録簿・分析書を引用しておるだけなら無視してよい。地の文への混入なら ' `
+            + '(1) 正しい日本語で言い直せ (2) docs-notes/output-corruption-log.md へ1行追記せよ' `
+            + '(型C／直前に殿の差し込み依頼があったか／同一系列の再発か否かを明記) ' `
+            + '(3) 同一セッション2回目以降なら long-horizon-discipline スキル§5の離脱プロトコルに従え。'
+        $out = @{ decision = 'block'; reason = $reason } | ConvertTo-Json -Compress
+        Write-Output $out
     }
     exit 0
 }
