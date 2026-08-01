@@ -65,9 +65,18 @@ public class ElementInstanceRowSpanTests
         Assert.Equal(expectedRows, 2 * ElementInstance.RowSpanOf(cellHeight) + 1);
     }
 
+    /// <summary>
+    /// <b>【T-139(C)で境界が動いた 2026-08-01】</b>旧式 <c>h-1</c> ではガードは <c>h≦0</c> のすべてで
+    /// 効いておったが、新式 <c>h/2</c> は<b>整数除算が0方向へ丸める</b>ゆえ <c>h=0</c>・<c>h=-1</c> は
+    /// ガード無しでも0になる。<b>負に振れる最初の入力は <c>h=-2</c></b>（<c>-2/2 = -1</c>）——
+    /// すなわち<b>ガードが効かなくなったのではなく、効く要のある範囲が狭まった</b>（隠密の裏づけ）。
+    /// <para><b>ゆえに新しい境界そのもの（-2）を突く。</b> 従前は -1 と -3 のみを持っており、
+    /// <b>-3 が実害を防いではおったが、境界ちょうどは測れておらなんだ</b>（隠密の静的レビュー采配）。</para>
+    /// </summary>
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
+    [InlineData(-2)]   // 新しい境界ちょうど。ガード無しなら -1 になる最初の入力
     [InlineData(-3)]
     public void 高さ0以下の退化入力は0段へ潰れる(int degenerateHeight)
     {
