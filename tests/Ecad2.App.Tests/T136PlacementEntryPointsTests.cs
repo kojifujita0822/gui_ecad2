@@ -1,5 +1,6 @@
 using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text.RegularExpressions;
 
 namespace Ecad2.App.Tests;
 
@@ -21,18 +22,34 @@ namespace Ecad2.App.Tests;
 /// </summary>
 public class T136PlacementEntryPointsTests
 {
+    /// <summary>
+    /// <b>【偽陰性経路を塞いだ経緯 2026-08-01】</b>初版は「<c>IsPlaceable</c> を含む行を1つ拾い、
+    /// そこに <c>IsEnabled</c> があるか」を見ておった。<b>隠密の静的レビューがその穴を捕らえた</b>——
+    /// パレット側のコメント（<c>MainWindow.xaml:1616-1619</c>）は既に <c>IsEnabled</c> の語を含んでおり、
+    /// <b>そこへ <c>IsPlaceable</c> の語が一つ加わるだけで、Setter本体を消してもGREENのまま</b>通る。
+    /// しかもそのコメントは両者の関係を説く箇所そのものにて、<b>次に触る者のごく自然な筆で失われる。</b>
+    /// <para>
+    /// 手当ては二重。(1)<b>コメントを取り除いてから探す</b>——コメントは実装ではないゆえ、
+    /// そこに何が書かれておっても判定に混ざってはならぬ。(2)<b><c>Property="IsEnabled"</c> と
+    /// <c>{Binding IsPlaceable}</c> の対応を1行で照合する</b>（家老裁定＝隠密の案b）——
+    /// これにより<b>取り違え</b>（片方の入口へ他方のバインドを書く）も同時に塞がる。
+    /// </para>
+    /// <para><b>【ソーススキャン型に固有の性質】</b>RED証明は<b>測った時点の本文にしか効かぬ</b>。
+    /// 改変Bが当時REDになったのは「その時コメントに語が無かった」だけであり、実装の堅さの証では
+    /// なかった（隠密の指摘）。<b>本文が変われば同じ証明が同じ結論を与えるとは限らぬ。</b></para>
+    /// </summary>
     [Theory]
     [InlineData("ListBox", "PartSelectionList")]        // 右パネルのパレット（増分2で対処済み）
     [InlineData("ComboBox", "PlacementPartComboBox")]   // 配置バーのコンボ（経路2、本増分）
     public void 部品を選べる入口はいずれもIsPlaceableで項目を無効化する(string tagName, string controlName)
     {
-        var block = ExtractElementBlock(ReadMainWindowXaml(), tagName, controlName);
+        var block = StripXmlComments(ExtractElementBlock(ReadMainWindowXaml(), tagName, controlName));
 
-        var setterLine = block.Split('\n').FirstOrDefault(line => line.Contains("IsPlaceable"));
+        var setter = block.Split('\n').FirstOrDefault(line =>
+            line.Contains("Property=\"IsEnabled\"") && line.Contains("{Binding IsPlaceable}"));
 
-        Assert.True(setterLine is not null,
-            $"{controlName} の宣言に IsPlaceable のバインドが無い（置けぬ部品を選ばせてしまう）");
-        Assert.Contains("IsEnabled", setterLine!);
+        Assert.True(setter is not null,
+            $"{controlName} の宣言に IsEnabled を IsPlaceable へ結ぶ Setter が無い（置けぬ部品を選ばせてしまう）");
     }
 
     /// <summary>
@@ -66,6 +83,11 @@ public class T136PlacementEntryPointsTests
 
         return xaml.Substring(start, end - start);
     }
+
+    /// <summary>XMLコメントを取り除く。<b>コメントは実装ではない</b>——そこに書かれた語が
+    /// 判定に混ざれば、実装を消してもテストが通る偽陰性を生む（隠密の静的レビュー2026-08-01）。</summary>
+    private static string StripXmlComments(string xaml)
+        => Regex.Replace(xaml, "<!--.*?-->", string.Empty, RegexOptions.Singleline);
 
     private static string ReadMainWindowXaml([CallerFilePath] string thisFilePath = "")
     {
