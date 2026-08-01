@@ -1840,6 +1840,14 @@
                              暗黙的スタイル(TargetType=ComboBoxItem)を継承せずWPF既定のまま
                              (ダークモード非対応)に戻ってしまうため明示的に継承する。 -->
                         <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                            <!-- T-136(A)経路2の予防(殿裁可2026-08-01): 配置バーのコンボからも、現在の
+                                 シートへ置けぬ部品は選ばせぬ。パレット(PartSelectionList)側の同名Setterと
+                                 対をなす——配置を実際に起こすのは PlacementOkButton_Click ただ1つにて、
+                                 パレットのクリックは「配置バーを開く」までしかせぬ。開いた後にこのコンボで
+                                 別の部品へ切り替えられるため、パレットだけを塞いでも非対称が残っていた
+                                 (忍者の実機実測: 同じシートで主回路専用の部品がパレット=灰・コンボ=選択可)。
+                                 実際の拒否は ValidatePlacement が受け持つ(防御・サイレント)——両建ては据え置く。 -->
+                            <Setter Property="IsEnabled" Value="{Binding IsPlaceable}"/>
                             <Setter Property="ToolTip" Value="{Binding DisplayName}"/>
                             <Setter Property="AutomationProperties.Name" Value="{Binding DisplayName}"/>
                         </Style>
