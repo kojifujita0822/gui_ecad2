@@ -367,20 +367,43 @@ public partial class PartEditorDialog : Window
     // 判定そのものは PartEditorUndoRules.ShouldRecord（純粋関数・単体テスト済み）が持つ。
 
     /// <summary>Undo/Redo による外部状態の復元中か。復元が誘発する入力欄イベントで履歴を積まぬための門。
-    /// <see cref="_syncingPortKind"/> と同じ役目を、外部状態（幅・高さ・役割・シート種別）に対して負う。</summary>
+    /// <see cref="_syncingPortKind"/> と同じ役目を、外部状態（幅・高さ・役割・シート種別）に対して負う。
+    /// <para>
+    /// <b>【本フラグが守れる範囲は、イベントが同期発火することに依存する】</b>
+    /// <c>WidthBox.Text</c> への代入や <c>ComboBox.SelectedItem</c> の差し替えが
+    /// <c>LostFocus</c>／<c>SelectionChanged</c> を<b>その場で</b>呼ぶからこそ、<c>try/finally</c> の
+    /// 内側で受け止められる。<b>もし将来これらが遅延発火する形（Dispatcher 経由等）へ変われば、
+    /// フラグを戻した後に発火してこの守りは素通しになる。</b>
+    /// そのときは下の <see cref="_lastRecordedExternal"/> による第二の守りだけが残る。
+    /// </para></summary>
     private bool _restoringExternalState;
 
     /// <summary>直近に履歴へ積んだ（または復元した）時点の外部状態。次の変更を判ずる基準。
     /// <b>「フォーカスを得た時点」ではなくこれを基準にする理由</b>：ComboBox は
     /// <c>GotFocus</c> を経ずに値が変わりうる（ドロップダウンからの選択・キーボード操作）ゆえ、
-    /// 契機ごとに基準を取り直す形では取りこぼす。</summary>
+    /// 契機ごとに基準を取り直す形では取りこぼす。
+    /// <para>
+    /// <b>【第二の守りでもある】</b><see cref="RestoreExternalState"/> の末尾でこれを復元後の値へ
+    /// 更新するため、仮に上のフラグを抜けてイベントが発火しても、判定は同値となり履歴は積まれぬ。
+    /// </para>
+    /// <para>
+    /// <b>【T-136(B)増分5 との違い——「同じ形」と読まぬこと】</b>
+    /// あちら（<see cref="_syncingPortKind"/> ＋ <see cref="PartEditorPortKindRules.ShouldApply"/>）も
+    /// 二層で守るが、<b>第二の守りの機序が別物である</b>。増分5の第二の守りは
+    /// <b>WPF の ComboBox 標準挙動</b>（値が変わらねば <c>SelectionChanged</c> がそもそも発火せぬ）に
+    /// 支えられているのに対し、こちらは<b>独自のステート管理</b>（本フィールドの更新）に支えられている。
+    /// <b>4項目を一括で復元するという操作の性質上この形にならざるを得ぬ</b>が、
+    /// 「同じ形ゆえ同じように直せる」と読めば誤る（隠密の静的レビューによる指摘、2026-08-02）。
+    /// </para></summary>
     private PartEditorExternalState? _lastRecordedExternal;
 
     /// <summary>幅・高さの欄からフォーカスが外れたとき、変更を1段の履歴として積む。
     /// <para>
-    /// <b>不正値（空文字・範囲外）で離れた場合は、表示を直前の有効値へ戻す</b>——
+    /// <b>不正値（空文字・範囲外）で離れた場合は、表示を直前の有効値へ戻して打ち切る</b>——
     /// <see cref="ParseCells"/> は不正値で既定値へ落ちるため、放置すると「欄は空なのに内部値は1」という
-    /// 食い違いが残り、その状態が履歴へ積まれる。戻したうえで判定するので、この場合は同値となり履歴も積まれぬ。
+    /// 食い違いが残り、その状態が履歴へ積まれる。
+    /// <b>戻した後は判定へ進まず打ち切る</b>——戻した値は <c>before</c> そのものゆえ判定しても同値で
+    /// 積まれぬが、判定を通す意味が無い。
     /// <b>OK 確定時の検証（範囲外を弾く）は従来どおり残る</b>——あちらは値の妥当性、こちらは表示と内部値の一致が目的。
     /// </para></summary>
     private void SizeBox_LostFocus(object sender, RoutedEventArgs e)

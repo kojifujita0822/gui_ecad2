@@ -15,7 +15,10 @@ namespace Ecad2.App.Views;
 /// <b>なぜ <see cref="PartEditorDialog"/> の中に書かず切り出したか</b>：この判定は WPF の何にも依存せぬ
 /// 純粋な条件にて、ダイアログの中に置けば「View層ゆえ単体テスト困難」となる。切り出せば境界を実測で
 /// 押さえられる（<c>samurai.md</c>「『テストしにくい』は設計の匂い——まず設計を変えて純粋関数にできぬかを問う」）。
-/// <b>T-136(B)増分5の <see cref="PartEditorPortKindRules"/> と同じ形である。</b>
+/// <b>切り出しの動機は T-136(B)増分5 の <see cref="PartEditorPortKindRules"/> と同じである。</b>
+/// <b>ただし「二層で守る」形まで同じと読んではならぬ</b>——増分5の第二の守りは WPF の ComboBox 標準挙動
+/// （値が変わらねば <c>SelectionChanged</c> が発火せぬ）に支えられるのに対し、T-144 のそれは
+/// ダイアログ側の独自のステート管理に支えられる。詳細は <c>PartEditorDialog._lastRecordedExternal</c> の説明を参照。
 /// </para>
 /// <para>
 /// <b>本クラスが測れぬもの</b>：<c>RestoreExternalState</c> が入力欄を書き換えることで
