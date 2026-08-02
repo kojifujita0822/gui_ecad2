@@ -707,6 +707,26 @@ Ecad2.Appの内容だけが正しく撮れることを実証済み**（旧実装
 **本節冒頭「UIAはClickハンドラを迂回する」の新実例**——**`Select()` が成功を返しても、
 アプリ側の状態が変わったかを別途確かめること。**
 
+#### 逆に「選択済みだが未確定」の見た目だけを観測したいときは`Select()`が使える（2026-08-02、T-140系統2検証、忍者）
+
+**上項の裏返し**——`PartSelectionList`の行を物理クリックすると`PartSelectionItem_Clicked`が
+即座に発火し配置フローへ進んでしまい、「選択されただけ」の視覚状態（選択行の背景色等）を
+Escでキャンセルする前に測る間が無い。**`SelectionItemPattern.Select()`はクリックハンドラを
+迂回するため配置を起こさず、`IsSelected=True`の見た目だけを安定して再現できる。**
+
+```powershell
+$sel = $item.GetCurrentPattern([System.Windows.Automation.SelectionItemPattern]::Pattern)
+$sel.Select()
+[Ecad2Native]::SetCursorPos(2700, 700)   # カーソルをリストから退避（下記ホバー色混入を防ぐ）
+```
+
+**【対になる罠】マウスホバー色と真の選択色は見た目が近く誤認しやすい**——ホバー色
+（`#1F26A0DA`半透明、白地との合成で`#E5F3FB`）と選択色（`#0078D7`）は共に薄い青系で似ており、
+物理クリック→Escで配置をキャンセルした直後にカーソルがまだリスト上へ残っておると、
+ホバー色を選択色と取り違えかねぬ（本検証で実際に一度取り違えかけ、`IsSelected`を確認して
+自己訂正した）。**画素を採る前に必ずUIAの`IsSelected`で「本当に選択されておるか」を確かめること**
+——「選択されて見える」ことと「本当に選択されておる」ことは別。
+
 #### `Invoke-Ecad2Button` で Undo/Redo ボタンが効かぬ（2026-07-28、T-134実機確認、忍者）
 
 **「やり直し (Ctrl+Y)」を `Invoke-Ecad2Button`（UIA `InvokePattern`）で押しても、何も起こらぬ。**
@@ -843,6 +863,23 @@ T-134では`Ctrl+Y`が2度不発となり実装の瑕疵を疑ったが、**一�
 
 ### 6.4 座標・色の測定手法
 
+- **【設定値が効いておらぬ疑いは、リサイズThumbのBounds比率で見抜ける】**（2026-08-02、
+  T-130実機確認、忍者）。**`AutoHideWidth`等の設定値は、読んでも「保存されておるか」しか分からず
+  「実際に効いておるか」は分からぬ**——T-130ではコード上`AutoHideWidth=280`が正しく保存されて
+  いたにもかかわらず、実際の描画には一切反映されておらなんだ（別軸`AutoHideHeight`が支配的
+  だったため）。**見抜いた決め手はリサイズ用`Thumb`要素の`BoundingRectangle`比率**——
+  ```powershell
+  $thumbCond = New-Object System.Windows.Automation.PropertyCondition(
+      [System.Windows.Automation.AutomationElement]::ControlTypeProperty,
+      [System.Windows.Automation.ControlType]::Thumb)
+  $thumb = (Get-Ecad2Root).FindAll([System.Windows.Automation.TreeScope]::Descendants, $thumbCond) |
+      Where-Object { $_.Current.BoundingRectangle.Width -gt 1000 -and $_.Current.BoundingRectangle.Height -lt 20 }
+  # 幅≫高さ（横長の水平バー）＝上下方向にのみドラッグ可能＝Height軸が支配的
+  # 高さ≫幅（縦長の垂直バー）＝左右方向にのみドラッグ可能＝Width軸が支配的
+  ```
+  **一般化＝「設定値は読むだけでは足りぬ、実際に動く方向（Thumbの向き）を見て初めて、
+  どちらの軸が生きておるかが分かる」。** 数値が保存されているのに見た目が変わらぬ時、
+  実装バグを疑う前にこの一手を挟むと安い。
 - **【撮影に頼らぬ機械判定】「記入されたか」は重複ガードの警告文言で確定できる**（2026-07-27、
   T-125増分α、忍者）。範囲内で配線分断を記入した直後、スクリーンショットでマーカーを視認できず
   「ガードが効きすぎておる」と**誤報しかけた**。**同じセルへ2度目を押し「この位置には既に配線分断が
