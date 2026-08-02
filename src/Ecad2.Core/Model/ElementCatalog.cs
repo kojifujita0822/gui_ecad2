@@ -57,11 +57,15 @@ public static class ElementCatalog
     /// </summary>
     public static IReadOnlyList<PortDef> Ports(ElementKind kind, int width) => kind switch
     {
+        // T-136(B)増分5 論点5（殿裁定2026-08-02）: モータのみ青、3端子とも同色。他の組込み16種は
+        // 赤＝PortDef の既定値のまま（明示引数は置かず、T136Increment5PortKindAssignmentTests で固定する）。
+        // 青とした理由＝モータは T-136(C) で結線から外れ、いかなる母線にも繋がらぬ。ゆえに赤の定義
+        // 「電源に接続される点」が実態と合わず、青の定義「DRC無効な点」が現状をそのまま言い表す。
         ElementKind.Motor => new[]
         {
-            new PortDef("U", 0, 0),
-            new PortDef("V", 0, 1),
-            new PortDef("W", 0, 2),
+            new PortDef("U", 0, 0, PortKind.DrcExempt),
+            new PortDef("V", 0, 1, PortKind.DrcExempt),
+            new PortDef("W", 0, 2, PortKind.DrcExempt),
         },
         // 主回路3極記号は自由配線（FreeLine）で結線するため接続点を持たない（ネットリスト非関与）。
         ElementKind.Breaker3P or ElementKind.ContactorMain3P or ElementKind.ThermalOverload3P

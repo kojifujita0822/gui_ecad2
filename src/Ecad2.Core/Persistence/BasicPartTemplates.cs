@@ -43,12 +43,18 @@ public static class BasicPartTemplates
         new PortDef("R", 0, 1),
     };
 
-    /// <summary>三相モータの3端子（U/V/W、境界0/1/2）。ElementCatalog.Ports(Motor,...)と同型。</summary>
+    /// <summary>三相モータの3端子（U/V/W、境界0/1/2）。ElementCatalog.Ports(Motor,...)と同型。
+    /// <para>
+    /// T-136(B)増分5 論点5（殿裁定2026-08-02）: <b>モータのみ青、3端子とも同色</b>。
+    /// 組込み側（<c>ElementCatalog</c>）のモータと同じ扱いに揃えてある。
+    /// 他の14件は赤＝<see cref="PortDef"/> の既定値のまま（明示引数は置かず、
+    /// <c>T136Increment5PortKindAssignmentTests</c> で固定する）。
+    /// </para></summary>
     private static List<PortDef> MotorPorts() => new()
     {
-        new PortDef("U", 0, 0),
-        new PortDef("V", 0, 1),
-        new PortDef("W", 0, 2),
+        new PortDef("U", 0, 0, PortKind.DrcExempt),
+        new PortDef("V", 0, 1, PortKind.DrcExempt),
+        new PortDef("W", 0, 2, PortKind.DrcExempt),
     };
 
     /// <summary>同梱テンプレート一式（基本図形）。</summary>
