@@ -1617,6 +1617,27 @@
                                     </DockPanel>
                                     <ListBox x:Name="PartSelectionList" ItemsSource="{Binding PartPalette.SelectionEntries}" BorderThickness="0"
                                              Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource BoolToVisibility}}">
+                                        <!-- T-140系統2 追い直し(殿裁可2026-08-02、案3+方向A): 選択行のコントラストを
+                                             この一覧の中だけで直す。案W(固定灰を消すのみ)では選択時ライトが実測
+                                             3.89〜4.28:1で不適合、しかもライトの選択背景は文字を純白にしても理論上限が
+                                             ちょうど4.50:1にて、文字色側では構造的に届かぬ(隠密が理論値を独立に再現。
+                                             docs/ecad2-t140-partlist-selected-light-contrast-proposal-onmitsu.md §6)。
+                                             ゆえに背景側へ踏み込むが、射程はこの一覧だけに閉じる——テーマ側の値を
+                                             変えれば使い方ウィンドウのトピック一覧・DataGridの行/セル・ComboBoxの項目まで
+                                             巻き込む(殿は全体を変える案4を退けられた)。
+                                             【なぜItemContainerStyleのSetterではないか】選択時の背景はApp.xamlの
+                                             ListBoxItemのControlTemplate.TriggersがTargetName指定で内側のBorderへ
+                                             直接当てておる。外側のStyleからListBoxItemの背景を変えても、その値は
+                                             TemplateBinding経由でしか内側へ届かずトリガーに上書きされる(値は正しいが
+                                             描画に反映されぬ型)。トリガーが参照しておるのは動的リソースゆえ、それを
+                                             この一覧の範囲だけで差し替えるのが、テンプレートを複製せずに済む道である。
+                                             【値の出所】ダーク側で使うており忍者の実測(5.25〜5.53:1)がある値をそのまま
+                                             転用する(方向A)。推測を介さぬのが決め手。ダーク側の定義は動かしておらぬ
+                                             ——結果としてライトがダークへ歩み寄る形になる。
+                                             前景は両テーマとも白で既に揃うており、変える要はない。 -->
+                                        <ListBox.Resources>
+                                            <SolidColorBrush x:Key="PanelContentSelectedBackgroundBrush" Color="#FF0E639C"/>
+                                        </ListBox.Resources>
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" Margin="2">
