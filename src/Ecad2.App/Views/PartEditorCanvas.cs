@@ -619,9 +619,23 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// ここで再判定はせぬ——判定に要る「変更前の状態」を持っているのは呼び出し側であり、
     /// 二重に持たせれば食い違いの余地が生まれる。
     /// </para>
+    /// <para>
+    /// <b>【<see cref="Notify"/> を必ず呼ぶこと】</b>履歴を積んだだけでは「元に戻す」ボタンが有効にならぬ。
+    /// <see cref="PartEditorDialog"/> は <see cref="StateChanged"/> を購読して
+    /// <c>UndoButton.IsEnabled = CanUndo</c> を更新する設計ゆえ、通知を欠くと
+    /// <b>履歴は内部に積まれておるのに UI から辿り着けぬ</b>状態になる。
+    /// <b>本メソッドの初版はこれを欠き、忍者の実機確認で観点1がNGとなった</b>（2026-08-02）——
+    /// 幅・高さ・役割・配置先のいずれを変えてもボタンが一度も有効にならず、
+    /// Undo を実行する手段が無かった（<c>Ctrl+Z</c> のキーバインドは未実装ゆえ、ボタンが唯一の経路）。
+    /// <b>履歴を積む他の経路（<see cref="SetSelectedPortKind"/> 等）はいずれも直後に
+    /// <see cref="Notify"/> を呼んでおり、本メソッドだけが作法から外れていた。</b>
+    /// </para>
     /// </summary>
     public void PushExternalStateSnapshot(PartEditorExternalState before)
-        => PushUndoSnapshot(new Snapshot(_primitives.ToList(), _ports.ToList(), before));
+    {
+        PushUndoSnapshot(new Snapshot(_primitives.ToList(), _ports.ToList(), before));
+        Notify();
+    }
 
     public void Undo()
     {
