@@ -171,7 +171,7 @@ public class T136CCustomNonSimulatedWiringTests
     /// 測っておるのと、ちょうど裏返しの関係にある。
     /// </summary>
     [Fact]
-    public void T136C_S6_Solenoid_ContributesNets_UnlikeMotor()
+    public void T136C_S6_Solenoid_ContributesNets_UnlikeMotor_HoleStillOpen()
     {
         var withSolenoid = NetlistBuilder.Build(MakeSheet(withSolenoid: true), MakeLibrary());
         var control = NetlistBuilder.Build(MakeSheet(withSolenoid: false), MakeLibrary());
