@@ -139,6 +139,10 @@ public static class NetlistBuilder
             var ports = PartResolver.Ports(e, parts);
             // ポート0個（接続点なし）の自作パーツは電気的に寄与しない。配列はデフォルトのまま残し、後段の配線・Component 化から除外する。
             if (ports.Count == 0) continue;
+            // T-136(C) 殿裁定2026-08-02「モーターだけ除外すればいい」: 三相モータは結線へ参加させない。
+            // hasPorts を立てぬまま抜けることで、ノード生成・母線 union（下記）・行索引・横配線結合の
+            // 4経路すべてから一括で外れる（ポート0個の要素と同じ扱い）。
+            if (!PartResolver.ParticipatesInWiring(e, parts)) continue;
             hasPorts[i] = true;
             // 全ポートのノードを作成。中間ポート（多端子）も座標一致で自動結線される。
             foreach (var p in ports)

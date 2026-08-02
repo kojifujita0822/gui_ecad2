@@ -33,6 +33,26 @@ public static class PartResolver
         return ElementCatalog.CreatesComponent(e.Kind);
     }
 
+    /// <summary>
+    /// ネットリストの結線へ参加するか（T-136(C)、殿裁定2026-08-02）。false は三相モータのみ。
+    /// <para>
+    /// <b>自作パーツは常に参加する</b>——殿裁定が対象をモータのみと定めたゆえ。
+    /// <see cref="PartRole"/> にモータは無く、<see cref="ComponentKind"/> も
+    /// <see cref="ElementKind.Motor"/> へ写像せぬゆえ、自作パーツがモータになる経路は存在せぬ。
+    /// <c>PartRole.NonSimulated</c> かつ接続点を持つパーツの扱いは <c>proposed.md</c> P-161。
+    /// </para>
+    /// <para>
+    /// 生の <see cref="ElementInstance.Kind"/> でなく本メソッドを経るのは、上の <see cref="Ports"/>・
+    /// <see cref="CreatesComponent"/>・<see cref="SheetAffinityOf"/> と同じ二分岐の形に揃えるためである
+    /// ——自作パーツの <see cref="ElementInstance.Kind"/> は定義と食い違いうる。
+    /// </para></summary>
+    public static bool ParticipatesInWiring(ElementInstance e, PartLibrary? lib)
+    {
+        var part = lib?.Get(e.PartId);
+        if (part is not null) return true;
+        return ElementCatalog.ParticipatesInWiring(e.Kind);
+    }
+
     /// <summary>要素が置けるシートの種別（T-136(A)増分1）。自作パーツは
     /// <see cref="PartDefinition.SheetAffinity"/>、組込み種別は <see cref="ElementCatalog.SheetAffinityOf"/> から。
     /// <para>

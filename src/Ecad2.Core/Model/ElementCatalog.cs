@@ -96,6 +96,26 @@ public static class ElementCatalog
     /// <summary>ネットリストの電気要素（Component）を生成する種別か。false は記号のみ（非シミュレート）。</summary>
     public static bool CreatesComponent(ElementKind k) => IsContact(k) || IsLoad(k) || IsPassthrough(k);
 
+    /// <summary>
+    /// ネットリストの結線（ノード生成・母線接続・横配線）へ参加する種別か（T-136(C)、殿裁定2026-08-02）。
+    /// <para>
+    /// <b>false は三相モータのみ。</b> モータは <see cref="CreatesComponent"/> が false ゆえ Component には
+    /// ならぬが、<b>それが効くのは Component 生成の段だけ</b>で、ノード生成・母線 union・横配線結合には
+    /// 参加しておった。その結果、モータが行の最左（最右）に居ると母線への接続を横取りし、同じ行の負荷を
+    /// 母線から切り離す——DRC が <c>DRC-LOAD-001/002</c> を誤って鳴らす（工程1の実測。
+    /// <c>tests/Ecad2.Core.Tests/T136CNonSimulatedWiringTests.cs</c>）。
+    /// </para>
+    /// <para>
+    /// 主回路3極記号（<see cref="ElementKind.Breaker3P"/> 等）は接続点を0個しか持たぬゆえ
+    /// <see cref="NetlistBuilder"/> の入口で既に除外されており、本述語の対象外である
+    /// （<see cref="Ports"/> 参照）。<b>本述語が真に効くのはモータただ一つ。</b>
+    /// </para>
+    /// <para>
+    /// <b>射程</b>：自作パーツで <c>PartRole.NonSimulated</c> かつ接続点を持つものは、モータと同じ形で
+    /// 結線に参加する。殿裁定は対象をモータのみと定めており、そちらは <c>proposed.md</c> P-161 で別途判ずる。
+    /// </para></summary>
+    public static bool ParticipatesInWiring(ElementKind k) => k is not ElementKind.Motor;
+
     /// <summary>接点（導通/非導通を切り替える要素）か。</summary>
     public static bool IsContact(ElementKind k) => k is
         ElementKind.ContactNO or ElementKind.ContactNC or
