@@ -671,7 +671,10 @@ public sealed class PartEditorCanvas : FrameworkElement
             renderer.PushTransform(_panMm.X, _panMm.Y, _zoom);            // 外側: パン・ズーム
             renderer.PushTransform(_geo.MarginMm, _geo.MarginMm, 1.0);    // 内側: 原点余白
 
-            var frameStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 180, 180, 180), 0.1, LineStyle.Dashed);
+            // T-140系統2・P-150(殿裁可2026-08-02): 基準枠の色をDrawingTheme.FrameGuide(原本回帰の青、
+            // テーマ非依存の意味色)へ委ねる。View層から色・太さ・線種の直書きが消える
+            // (docs/ecad2-t140-keitou2-test-design-onmitsu.md §3.1案あ、本日のPortColorと同じ形)。
+            var frameStroke = _theme.Get(StrokeRole.PartFrameGuide);
             var normalStroke = new StrokeStyle(_theme.Foreground, 0.3);
             var selectedStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 255, 69, 0), 0.5);
             var draftStroke = new StrokeStyle(new Ecad2.Rendering.Color(255, 30, 144, 255), 0.4, LineStyle.Dashed);

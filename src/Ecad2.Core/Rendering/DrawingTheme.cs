@@ -3,7 +3,7 @@ using Ecad2.Model;
 namespace Ecad2.Rendering;
 
 /// <summary>線の役割。実際の線スタイルは <see cref="DrawingTheme"/> から引く（1か所変更で全体反映）。</summary>
-public enum StrokeRole { Wire, BusRail, SymbolOutline, GroupFrame, Grid }
+public enum StrokeRole { Wire, BusRail, SymbolOutline, GroupFrame, Grid, PartFrameGuide }
 
 /// <summary>文字の役割。</summary>
 public enum TextRole { DeviceName, LineNumber, CrossRef, Title, Comment }
@@ -46,6 +46,12 @@ public sealed class DrawingTheme
     // 危険（描画中の例外＝画面が落ちパーツ喪失）で買う」ため撤回(隠密指摘)。既存配色に現れぬ
     // マゼンタとし、case行が消えても即座に目に立つ形で異常時のみ検出できるようにする。
     public static readonly Color PortUnknown = new(255, 255, 0, 255);
+    // T-140系統2・P-150(殿裁可2026-08-02、色案=docs/ecad2-t140-keitou2-color-proposal-onmitsu.md):
+    // パーツエディタの基準枠(目安の補助線)。原本GuiEcad(PartEditorWindow.xaml.cs:244-265)は
+    // 灰3本(格子・境界・中心線)の中に枠だけ青を置き、色相で弁別させる設計だった。ecad2は移植時に
+    // 枠へ固定灰(180)を当ててしまい、Light/Darkいずれも灰4本目に埋没していた。原本の値
+    // (96,150,230)をテーマ非依存の意味色として戻す。線種(破線)は本裁定の対象外のため据え置く。
+    public static readonly Color FrameGuide = new(255, 96, 150, 230);
 
     // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
     public const double TableLineWidth = 0.18;
@@ -98,6 +104,9 @@ public sealed class DrawingTheme
         StrokeRole.BusRail => new(Foreground, 0.35),
         StrokeRole.GroupFrame => new(Foreground, 0.18, LineStyle.Dashed),
         StrokeRole.Grid => new(GridColor, 0.10),
+        // T-140系統2・P-150: 太さ・線種は現状維持(色だけ変える裁定ゆえ、PartEditorCanvas.cs旧674行の
+        // frameStroke直書きと同値=0.1・Dashed)。
+        StrokeRole.PartFrameGuide => new(FrameGuide, 0.1, LineStyle.Dashed),
         _ => new(Foreground, 0.25),   // Wire / SymbolOutline
     };
 
