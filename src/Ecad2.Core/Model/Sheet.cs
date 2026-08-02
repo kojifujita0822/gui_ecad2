@@ -35,6 +35,22 @@ public sealed class GridSpec
     /// <summary>行数の上限（T-055、殿裁定）。</summary>
     public const int MaxRows = 60;
 
+    /// <summary>列数の下限（T-132、殿裁定2026-07-27＝原本 GuiEcad 準拠）。</summary>
+    public const int MinColumns = 2;
+    /// <summary>列数の上限（T-132、殿裁定2026-07-27）。
+    /// <para>
+    /// <b>原本 GuiEcad の上限は 20 だが、ecad2 は 40 を採る。</b> 原本準拠の 20 とすると
+    /// <see cref="Columns"/> の既定値 40 と矛盾し、既定のまま作られたシートをシート設定ダイアログで
+    /// 表現できなくなるため、上限のみ ecad2 側の既定値に合わせた。
+    /// </para>
+    /// <para>
+    /// <b>UI の新規シート作成が使う 20 とは別物である</b>——`SheetNavigationViewModel` 等は
+    /// `new GridSpec { Rows = 10, Columns = 20 }` と明示指定しており、本クラスの既定値 40 を使っていない
+    /// （P-162 として起票済み。どちらが意図された既定かの確定は本タスクの範囲外）。
+    /// 本定数が縛るのは「ダイアログで入力できる範囲」であって、新規シートの既定寸法ではない。
+    /// </para></summary>
+    public const int MaxColumns = 40;
+
     public int Rows { get; set; } = 22;
     public int Columns { get; set; } = 40;
 }
