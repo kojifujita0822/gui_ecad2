@@ -990,6 +990,35 @@
                           IsEnabled="{Binding CanEditDiagram}">
                     <MenuItem Header="(読み込み中...)" IsEnabled="False"/>
                 </MenuItem>
+                <!-- T-133増分4-C: 主回路3極記号の配置導線（殿裁定2026-07-28＝案B・B-1「メニュー→
+                     キャンバス単クリック配置」）。配置バーは通さぬ——3極記号はデバイス名を取らず、
+                     名前は配置後にプロパティパネルで付ける（原本 GuiEcad と同じ作法）。
+
+                     【文言と並びは暫定であり、殿の裁可を要する】
+                     台帳 T-131節が「メニューの並び・文言はUI/UX分岐ゆえ殿へ諮る」と定めており、
+                     殿ご不在のため原本 GuiEcad の OtherBuiltins 配列（MainPage.Tools.cs:238-252）
+                     から文言・並びをそのまま写して暫定とした（家老裁定2026-08-02＝暫定実装のうえ
+                     【報告】として諮る）。殿が別の形をお望みなら、変えるのは本節の Header 6箇所と
+                     MenuItemPlacementToolTests の期待値のみで済む。
+                     「サーマル(OL) 2極」が型名 ThermalOverload3P と食い違うのは原本がそう記すゆえで、
+                     書き誤りではない（KindDisplayName のコメントに同旨）。
+
+                     【IsEnabled＝(f) 主回路限定の予防側】殿裁定2026-07-28＝「制御回路シートでは
+                     メニュー項目を無効化（グレーアウト）」。配置時の拒否（ValidatePlacement）は
+                     到達せぬ前提の最終防御として別に在る（家老裁定＝両建て）。
+                     CanPlaceOnMainCircuit は T-136(A)増分2 で既に3箇所（1255/1265/1285行）に
+                     使用実績があり、通知経路も結線済み。
+
+                     【子要素を静的に6件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
+                     要ったもの。本サブメニューは静的ゆえ HasItems=true が最初から保たれ、同じ手当ては要らぬ。 -->
+                <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)" IsEnabled="{Binding CanPlaceOnMainCircuit}">
+                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click"/>
+                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click"/>
+                    <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click"/>
+                    <MenuItem Header="電磁接触器 主接点 横" Tag="ContactorMain3P#H" Click="OtherSymbolMenuItem_Click"/>
+                    <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click"/>
+                    <MenuItem Header="サーマル(OL) 2極 横" Tag="ThermalOverload3P#H" Click="OtherSymbolMenuItem_Click"/>
+                </MenuItem>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
                 <!-- T-077増分1(家老采配2026-07-21、殿裁定=F1割当): AboutMenuItem_Clickと同型パターン。 -->

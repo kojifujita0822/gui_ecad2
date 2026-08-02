@@ -2384,10 +2384,67 @@ public partial class MainWindow : Window
     // (家老采配「両経路で挙動を揃える」)。SelectedCellのnull/占有チェックはTryPlaceElement側で行う。
     private void TryPlaceActiveTool()
     {
-        if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement || _viewModel.Tool.PartId is not string partId)
+        if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement) return;
+
+        // T-133増分4-C: Kind 経路（主回路3極記号）。従来ここは `Tool.PartId is not string` で
+        // 早期 return しており、PartId を持たぬツールは素通しされていた——本増分で初めて分岐が要る。
+        if (_viewModel.Tool.Kind is { } kind)
+        {
+            TryPlaceKindElement(kind, _viewModel.Tool.Orient);
             return;
+        }
+
+        if (_viewModel.Tool.PartId is not string partId) return;
         var entry = _viewModel.PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == partId);
         if (entry is not null) TryPlaceElement(entry, _viewModel.Tool.IsOr);
+    }
+
+    /// <summary>
+    /// Kind 経路の配置（T-133増分4-C）。<b>配置バーを通さず即座に置く</b>
+    /// ——3極記号はデバイス名を取らず、名前は配置後にプロパティパネルで付ける
+    /// （殿裁定2026-07-28＝B-1「メニュー→キャンバス単クリック配置」、原本 GuiEcad と同じ作法）。
+    /// <para>
+    /// <b>【拒否の見せ方＝家老裁定2026-08-02。暫定であり殿の裁可を要する】</b>
+    /// 範囲外・占有済みは <c>StatusMessage</c> で知らせる——既存の <see cref="TryPlaceElement"/> が
+    /// そうしており、<b>新経路だけが黙る非対称を作らぬため</b>（T-125のC-1＝ecad2内の一貫性を採る、と同じ筋）。
+    /// </para>
+    /// <para>
+    /// <b>【一方、主回路限定の枷による拒否はサイレントである】</b>（殿裁定2026-07-31）。
+    /// <b>この違いは「予防できるか否か」で分かれておる</b>——枷は<b>予防できる</b>ゆえメニューを
+    /// 無効化してあり（<c>MainWindow.xaml</c> の <c>CanPlaceOnMainCircuit</c>）、
+    /// <c>ValidatePlacement</c> の拒否は到達せぬ前提の最終防御にすぎぬ。
+    /// 対して範囲外・占有済みは<b>予防できず</b>、使い手の操作ミスゆえ理由を示すのが親切である。
+    /// </para>
+    /// <para>
+    /// <b>【プレチェックと最終防御の二段】</b>ここでの3つの検査は案内のためのものであり、
+    /// 実際に配置を拒むのは <c>PlaceElementAtSelectedCell</c> 側の <c>ValidatePlacement</c> である
+    /// （<see cref="TryPlaceElement"/> が同じ二段構えを採るのと同型）。
+    /// <b>高さを渡すのを忘れぬこと</b>——3極記号は高さ2で3行を占めるゆえ、
+    /// 既定値（高さ1）のまま呼べばプレチェックだけが緩み、案内と実際の可否が食い違う。
+    /// </para>
+    /// </summary>
+    private void TryPlaceKindElement(Ecad2.Model.ElementKind kind, string? orient)
+    {
+        if (_viewModel.SelectedCell is null)
+        {
+            _viewModel.StatusMessage = "配置するセルを先に選択してください";
+            return;
+        }
+
+        int cellWidth = Ecad2.Model.ElementCatalog.DefaultCellWidth(kind);
+        int cellHeight = Ecad2.Model.ElementCatalog.DefaultCellHeight(kind);
+        if (!_viewModel.IsSelectedCellWithinGrid(cellWidth, cellHeight))
+        {
+            _viewModel.StatusMessage = "選択したセルはグリッド範囲外です";
+            return;
+        }
+        if (_viewModel.IsSelectedCellOccupied(cellWidth, cellHeight))
+        {
+            _viewModel.StatusMessage = "選択したセルには既に要素があります";
+            return;
+        }
+
+        _viewModel.PlaceElementAtSelectedCell(kind, orient);
     }
 
     // design-brief 4節の7原則の全体配線（段階8、最小実装）:
@@ -3304,6 +3361,37 @@ public partial class MainWindow : Window
     {
         bool isOr = tag.StartsWith("OR:");
         return (isOr ? tag[3..] : tag, isOr);
+    }
+
+    /// <summary>
+    /// 「その他図形」メニューから主回路3極記号の配置ツールを選ぶ（T-133増分4-C）。
+    /// <para>
+    /// <b>直上の <see cref="ActivateBuiltinTool"/> と同型</b>だが、<c>Tool</c> に載せるのが
+    /// <c>PartId</c> ではなく <c>Kind</c>／<c>Orient</c> である点が異なる——3極記号は
+    /// <c>PartDefinition</c> を持たぬゆえ（殿裁定2026-07-28＝案B）。
+    /// </para>
+    /// <para>
+    /// <b>【タグの解析を <see cref="ViewModels.SymbolTagParser"/> へ委ねる理由】</b>
+    /// 同じファイルに <see cref="ParseBuiltinTag"/>（<c>"OR:"</c> 接頭辞の形式）も在るが、
+    /// タグの形が別物ゆえ統合はできぬ。<b>解析を切り出してあるのは、不正なタグ・綴り誤りを
+    /// テストで捕らえられるようにするため</b>（<c>SymbolTagParserTests</c>）。
+    /// </para>
+    /// <para>
+    /// <b>【配置してもツールは残す】</b><c>Tool</c> をここで戻さぬゆえ、続けて別のセルをクリックすれば
+    /// 同じ記号を置き続けられる。原本 GuiEcad も単クリックで置き続けられる形であり、
+    /// 選択モードへ戻すのは既存どおり <c>Esc</c> が担う。
+    /// </para>
+    /// </summary>
+    private void OtherSymbolMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag, Header: string header }) return;
+        if (!ViewModels.SymbolTagParser.TryParse(tag, out var kind, out var orient)) return;
+
+        // T-069往復4周目修正1(隠密テスト設計書、殿裁可済み)と同じ理由: 記入中ドラフトを保持したまま
+        // Tool.Mode を上書きすると HasAnyDraft が意図せず真のまま残る。切替前に必ずクリアする。
+        _viewModel.CancelResidualDraftForToolSwitch();
+        _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, Kind: kind, Orient: orient);
+        _viewModel.StatusMessage = $"配置ツール: {header} - キャンバスをクリックして配置位置を指定してください";
     }
 
     private void BuiltinPlaceButton_Click(object sender, RoutedEventArgs e)
