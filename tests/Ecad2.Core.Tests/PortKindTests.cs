@@ -52,14 +52,19 @@ public class PortKindTests
     /// PartOptimizer.ClampPortsToFrame（PartEditorCanvas.UpdatePortDragと同型の`with`式を使う）が
     /// Kindを温存することの実測。隠密の留保「positional record structの既定引数埋めは型の性質からの
     /// 推論であり実測しておらぬ」への回答（親計画書§4増分4）。
-    /// クランプが発生する経路・発生しない経路の両方でKindが変わらぬことを確認する
-    /// （`with`式は指定したプロパティのみ変更するため理屈の上では自明だが、実測で確かめる）。
+    /// 【往復1周目訂正・家老の静的レビュー指摘】クランプが発生しない経路（RowOffset/BoundaryOffsetが
+    /// 範囲内）では、実装が`row == p.RowOffset &amp;&amp; boundary == p.BoundaryOffset`の分岐で
+    /// <c>p</c>自身をそのまま返すため、<c>with</c>式そのものを通らない——すなわちこの経路のテストは
+    /// 「Kindの温存」を検証しておらず、検出力を持たぬ（壊す実測で確認済み。下記参照）。
+    /// 検出力があるのは「クランプが発生する」経路（<c>with</c>式を実際に通る）のみ。
     /// </summary>
     [Theory]
     [InlineData(PortKind.Power)]
     [InlineData(PortKind.DrcExempt)]
     public void ClampPortsToFrame_範囲内でもKindは変わらない(PortKind kind)
     {
+        // 【検出力なし・記録のみ】この経路はwith式を通らずpがそのまま返るため、Kindが壊れる余地が
+        // 無い（実装が分岐そのものを削って常にwith式を通す形へ変わった場合のみ効く安全網）。
         var result = PartOptimizer.ClampPortsToFrame(
             new[] { new PortDef("P1", 0, 1, kind) }, widthCells: 4, heightCells: 2);
 
@@ -73,6 +78,9 @@ public class PortKindTests
     {
         // RowOffset=-3はheightCells=2(rowLimit=1)の範囲外ゆえクランプが発生する経路
         // （PartOptimizerClampPortsTests.ClampPortsToFrame_RowOffsetBelowRange...と同じ入力）。
+        // 【検出力の限界・家老の静的レビュー指摘で判明】"Kind=Powerへ強制上書き"という壊し方では、
+        // このケースのうちkind=Power側は改変後も期待値と一致してしまい検出できぬ（偽陰性）。
+        // kind=DrcExempt側のみ検出できる。両側の検出力は次の反転検証で別途確かめる。
         var result = PartOptimizer.ClampPortsToFrame(
             new[] { new PortDef("P1", -3, 1, kind) }, widthCells: 4, heightCells: 2);
 
@@ -84,12 +92,17 @@ public class PortKindTests
     [Fact]
     public void ClampPortsToFrame_PowerとDrcExemptが混在しても個別に温存される()
     {
-        // 退化（単一種類のみ）を避け、複数種類が混在する検体でも取り違えが無いことを確かめる。
+        // 【往復1周目訂正・家老の静的レビュー指摘】旧版はRowOffset/BoundaryOffsetとも範囲内で
+        // with式を通らず検出力ゼロだった。クランプが発生する値へ改め、真にwith式を通る経路で
+        // 複数種類の混在を確かめる（退化＝単一種類のみを避ける趣旨は維持）。
         var result = PartOptimizer.ClampPortsToFrame(
-            new[] { new PortDef("A", 0, 0, PortKind.Power), new PortDef("B", 0, 1, PortKind.DrcExempt) },
+            new[] { new PortDef("A", -3, 1, PortKind.Power), new PortDef("B", 5, 2, PortKind.DrcExempt) },
             widthCells: 4, heightCells: 2);
 
+        Assert.Equal(-1, result[0].RowOffset); // クランプされたことの確認（両方とも範囲外→範囲内）
+        Assert.Equal(1, result[1].RowOffset);
         Assert.Equal(PortKind.Power, result[0].Kind);
         Assert.Equal(PortKind.DrcExempt, result[1].Kind);
     }
+
 }

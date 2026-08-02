@@ -99,12 +99,16 @@ public sealed class DrawingTheme
 
     /// <summary>T-136(B)増分4: 接続点の種類→色。View層(PartEditorCanvas)に色分岐を持たせず
     /// 純粋関数として切り出すことでテスト可能にする(samurai.md「テストしにくいは設計の匂い」)。
-    /// テーマ非依存の意味色ゆえインスタンスに依らずstaticでよいが、Text/Getと並びを揃えるためstaticメソッドとする。</summary>
+    /// テーマ非依存の意味色ゆえインスタンスに依らずstaticでよいが、Text/Getと並びを揃えるためstaticメソッドとする。
+    /// 【往復1周目訂正・家老の静的レビュー指摘】既定値へ寄せるフォールバック(`_ => PortPower`)は
+    /// 「Power行そのものが削除される」誤りを隠蔽することが壊す実測で判明した(全11件PASSのまま=
+    /// 検出力ゼロ)。Get/Textのような「意図的な広いデフォルト」とは性質が異なる2値enumゆえ、
+    /// 未知の値は例外で止める形へ改める(実測で穴を確認したうえでの恒久修正)。</summary>
     public static Color PortColor(PortKind kind) => kind switch
     {
         PortKind.Power => PortPower,
         PortKind.DrcExempt => PortDrcExempt,
-        _ => PortPower,
+        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知のPortKind"),
     };
 
     public TextStyle Text(TextRole role) => role switch
