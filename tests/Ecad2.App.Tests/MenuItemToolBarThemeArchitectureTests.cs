@@ -41,6 +41,19 @@ public class MenuItemToolBarThemeArchitectureTests
         Assert.Contains(definitionPattern, content);
     }
 
+    /// <summary>
+    /// T-140往復1周目(隠密静的レビュー指摘、家老采配2026-08-02): 設計書§1にContextMenuの観点が
+    /// 漏れていた(殿裁定で(i)が追加された際、設計書側への反映が漏れていた)ことを受け追加する。
+    /// </summary>
+    [Fact]
+    public void App_xaml_ContextMenuの暗黙的スタイルが定義されている()
+    {
+        var content = File.ReadAllText(GetAppXamlPath());
+        var definitionPattern = "<Style TargetType=\"{x:Type ContextMenu}\">";
+
+        Assert.Contains(definitionPattern, content);
+    }
+
     private static string GetAppXamlPath([CallerFilePath] string thisFilePath = "")
     {
         var testProjectDir = Path.GetDirectoryName(thisFilePath)!; // tests/Ecad2.App.Tests

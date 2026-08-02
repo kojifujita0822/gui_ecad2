@@ -1241,10 +1241,21 @@
                  する。一次ソース(dotnet/wpf ContextMenu.xaml Aero/Aero2共通セクション)の構造(Border+
                  ScrollViewer+ItemsPresenter)を踏襲しつつ色のみDynamicResource化する。影演出
                  (SystemDropShadowChrome)・半透明背景対策(OpaqueRect)は意匠の細部のため簡略化して
-                 省く(T-106(7)ScrollBar・EcadComboBoxTemplateと同型の判断)。 -->
+                 省く(T-106(7)ScrollBar・EcadComboBoxTemplateと同型の判断)。
+                 【往復1周目(隠密静的レビュー指摘、家老采配2026-08-02)】暗黙的StyleがテーマStyleを
+                 置き換えると既定値Setterも失われる(T-089 Stack overflow事故と同根、App.xaml上部
+                 コメント253-255行参照)ため、Font系4項目(FontFamily/FontSize/FontStyle/FontWeight)
+                 とVerticalContentAlignmentを明示移植する(HasDropShadowは簡略化の対象として除外済み、
+                 ScrollViewer.PanningMode/Stylus.IsFlicksEnabledは実害の指摘なくPadding/構造に影響
+                 しないため見送り)。 -->
             <Style TargetType="{x:Type ContextMenu}">
                 <Setter Property="Background" Value="{DynamicResource MenuBarBackgroundBrush}"/>
+                <Setter Property="FontFamily" Value="{DynamicResource {x:Static SystemFonts.MenuFontFamilyKey}}"/>
+                <Setter Property="FontSize" Value="{DynamicResource {x:Static SystemFonts.MenuFontSizeKey}}"/>
+                <Setter Property="FontStyle" Value="{DynamicResource {x:Static SystemFonts.MenuFontStyleKey}}"/>
+                <Setter Property="FontWeight" Value="{DynamicResource {x:Static SystemFonts.MenuFontWeightKey}}"/>
                 <Setter Property="Foreground" Value="{DynamicResource MenuBarForegroundBrush}"/>
+                <Setter Property="VerticalContentAlignment" Value="Center"/>
                 <Setter Property="BorderBrush" Value="{DynamicResource MenuPopupBorderBrush}"/>
                 <Setter Property="BorderThickness" Value="1"/>
                 <Setter Property="Padding" Value="2"/>
