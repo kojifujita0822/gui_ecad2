@@ -24,29 +24,23 @@ namespace Ecad2.App.Views;
 internal static class DockingLayoutDefaults
 {
     /// <summary>
-    /// AutoHideフライアウトで意味を持つ寸法の軸。ドック先のサイドで決まる。
+    /// AutoHideフライアウトの既定寸法1件分。
     /// <para>
-    /// AvalonDock一次ソース <c>LayoutAutoHideWindowControl.cs</c> の <c>_side</c> 分岐がこの対応を
-    /// 決めている——右(<c>:297</c>)・左(<c>:306</c>)は <c>AutoHideWidth</c>、
-    /// 上(<c>:316</c>)・下(<c>:327</c>)は <c>AutoHideHeight</c> を見る。いずれも
-    /// <b>値が 0.0 のとき対応する <c>AutoHideMinXxx</c>（既定100.0）を採る</b>という
-    /// <b>完全に同型の構造</b>であり、軸が違うだけで穴の性質は同一である。
+    /// 【2026-08-02改訂・T-130機序調査（隠密）】当初は「ドック先のサイドで軸が1つに決まる」前提で
+    /// <c>FlyoutAxis</c>単一軸の設計だったが、機序調査（<c>docs/ecad2-t130-flyout-axis-mechanism-onmitsu.md</c>）
+    /// で誤りと判明した——AvalonDockが軸を決める材料は「親<c>LayoutPanel</c>の<c>Orientation</c>」
+    /// のみであり、「そのパネルが画面のどちらに在るか」は一切見ない。ecad2の右列
+    /// （機器表・プロパティ）は<c>Orientation="Vertical"</c>の下に在るため、画面上は右にありながら
+    /// <c>AnchorSide.Top</c>/<c>Bottom</c>へ解決され、<c>AutoHideWidth</c>ではなく
+    /// <c>AutoHideHeight</c>を見る——「値は正しいが描画に反映されない」型（PR-20系）の一種。
+    /// <b>案4（殿裁可2026-08-02）＝軸の解決を当てにせず、幅・高さの両方に値を入れる。</b>
+    /// どちらに解決されても既定100.0にはならず、レイアウト構造を変えても破綻しない。
     /// </para>
     /// </summary>
-    internal enum FlyoutAxis
-    {
-        /// <summary>左右にドックされたパネル（幅が意味を持つ）。</summary>
-        Width,
-
-        /// <summary>上下にドックされたパネル（高さが意味を持つ）。</summary>
-        Height,
-    }
-
-    /// <summary>AutoHideフライアウトの既定寸法1件分。</summary>
     /// <param name="ContentId"><c>MainWindow.xaml</c> の宣言と一致させること。</param>
-    /// <param name="Axis">ドック先のサイドで決まる軸。</param>
-    /// <param name="Size">通常ドック時の <c>DockWidth</c>／<c>DockHeight</c> に揃える値（DIP）。</param>
-    internal readonly record struct FlyoutDefault(string ContentId, FlyoutAxis Axis, double Size);
+    /// <param name="Width">幅側の既定値。この軸を持たない（触れさせぬ）パネルは<c>null</c>。</param>
+    /// <param name="Height">高さ側の既定値。同上。</param>
+    internal readonly record struct FlyoutDefault(string ContentId, double? Width, double? Height);
 
     /// <summary>
     /// AutoHideしうる全パネルの既定寸法。
@@ -65,9 +59,12 @@ internal static class DockingLayoutDefaults
     /// 明記している）。ゆえに残る4件を対象とする。
     /// </para>
     /// <para>
-    /// <b>各値は <c>MainWindow.xaml</c> の <c>DockWidth</c>／<c>DockHeight</c> と揃えること。</b>
-    /// 片方だけ変えるとドック時とAutoHide時で寸法が食い違う。この不変条件は
-    /// <c>T130AutoHideSizesTests</c> が全行について固定している。
+    /// <b>機器表・プロパティは幅・高さ両方を持つ（案4）。</b>
+    /// 高さの値<c>160.0</c>は殿裁定（2026-08-02、案(あ)＝出力パネルと同じ値）。通常ドック時の高さは
+    /// <c>DockMinHeight="80"</c>のみで分割により決まる動的値のため、通常時に揃えるという従来の根拠
+    /// （<c>MainWindow.xaml</c>の<c>DockWidth</c>／<c>DockHeight</c>）が使えず、目安として定めたもの。
+    /// 幅の値<c>280.0</c>は従来どおり親<c>LayoutPanel</c>の<c>DockWidth="280"</c>と揃える。
+    /// シート（左）・出力（下）は現に正しく解決されている（軸の食い違いが無い）ため、片軸のみ据え置く。
     /// </para>
     /// <para>
     /// <b>留意</b>——<c>AutoHideWidth</c>／<c>AutoHideHeight</c> の setter はいずれも
@@ -79,10 +76,10 @@ internal static class DockingLayoutDefaults
     /// </summary>
     internal static readonly IReadOnlyList<FlyoutDefault> All = new FlyoutDefault[]
     {
-        new("LeftPalette", FlyoutAxis.Width, 190.0),          // シート（左）
-        new("DeviceTable", FlyoutAxis.Width, 280.0),          // 機器表（右上）
-        new("RightPanelBottom", FlyoutAxis.Width, 280.0),     // プロパティ（右下）
-        new("OutputPanel", FlyoutAxis.Height, 160.0),         // 出力（下）——軸が高さである点に注意
+        new("LeftPalette", Width: 190.0, Height: null),          // シート（左）
+        new("DeviceTable", Width: 280.0, Height: 160.0),         // 機器表（右上）——案4：両軸とも設定
+        new("RightPanelBottom", Width: 280.0, Height: 160.0),    // プロパティ（右下）——案4：両軸とも設定
+        new("OutputPanel", Width: null, Height: 160.0),          // 出力（下）
     };
 
     /// <summary>
@@ -107,18 +104,13 @@ internal static class DockingLayoutDefaults
         }
     }
 
-    /// <summary>1件分の適用。保存値（0.0以外）があれば触れない。</summary>
+    /// <summary>1件分の適用。各軸とも、その軸に既定値が定義されており、かつ保存値（0.0以外）が
+    /// 無ければ入れる。両軸を持つパネル（案4）では、それぞれ独立に判定する。</summary>
     private static void ApplyOne(LayoutAnchorable anchorable, FlyoutDefault target)
     {
-        if (target.Axis == FlyoutAxis.Width)
-        {
-            if (anchorable.AutoHideWidth != 0.0) return;
-            anchorable.AutoHideWidth = target.Size;
-        }
-        else
-        {
-            if (anchorable.AutoHideHeight != 0.0) return;
-            anchorable.AutoHideHeight = target.Size;
-        }
+        if (target.Width is { } width && anchorable.AutoHideWidth == 0.0)
+            anchorable.AutoHideWidth = width;
+        if (target.Height is { } height && anchorable.AutoHideHeight == 0.0)
+            anchorable.AutoHideHeight = height;
     }
 }

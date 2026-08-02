@@ -90,25 +90,47 @@ public class T130AutoHideSizesTests
     }
 
     /// <summary>
-    /// 【軸の取り違え検出・その1】幅のパネルへ高さを入れていないこと。
+    /// 【第3段の本命・T-130機序調査（隠密）】機器表・プロパティは幅・高さ両方に既定値が入ること（案4）。
     /// <para>
-    /// 実装が <c>Axis</c> を見ずに両方へ代入すれば、ここが落ちる。
+    /// 機序調査で判明したとおり、AvalonDockはドック先の見た目でなく親<c>LayoutPanel</c>の
+    /// <c>Orientation</c>だけで軸を決めるため、右列に在る両パネルも<c>AnchorSide.Top</c>へ解決され
+    /// <c>AutoHideHeight</c>を見る。<c>AutoHideWidth</c>だけでは効かない実害があった
+    /// （<c>docs/ecad2-t130-otherpanels-verification-ninja.md</c>）。
     /// </para>
     /// </summary>
     [Theory]
-    [InlineData("LeftPalette")]
     [InlineData("DeviceTable")]
     [InlineData("RightPanelBottom")]
-    public void ApplyAutoHideSizes_幅のパネルの高さには触れない(string contentId)
+    public void ApplyAutoHideSizes_機器表とプロパティは幅高さ両方に既定値が入る(string contentId)
     {
         var (layout, anchorable) = BuildLayoutWith(contentId);
+        Assert.Equal(0.0, anchorable.AutoHideWidth);
+        Assert.Equal(0.0, anchorable.AutoHideHeight);
+
+        DockingLayoutDefaults.ApplyAutoHideSizes(layout);
+
+        Assert.Equal(280.0, anchorable.AutoHideWidth);
+        Assert.Equal(160.0, anchorable.AutoHideHeight);
+    }
+
+    /// <summary>
+    /// 【軸の取り違え検出】片軸のみを持つパネル（シート・出力）は、持たぬ軸には触れないこと。
+    /// <para>
+    /// 案4以降も、片軸のみのパネル（<c>Height</c>が<c>null</c>のシート、<c>Width</c>が<c>null</c>の
+    /// 出力）は従来どおり片方に限る。実装が<c>null</c>判定を見ず両方へ代入すれば、ここが落ちる。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void ApplyAutoHideSizes_シートパネルの高さには触れない()
+    {
+        var (layout, anchorable) = BuildLayoutWith("LeftPalette");
 
         DockingLayoutDefaults.ApplyAutoHideSizes(layout);
 
         Assert.Equal(0.0, anchorable.AutoHideHeight);
     }
 
-    /// <summary>【軸の取り違え検出・その2】高さのパネルへ幅を入れていないこと。</summary>
+    /// <summary>【軸の取り違え検出】高さのみのパネル（出力）へ幅を入れていないこと。</summary>
     [Fact]
     public void ApplyAutoHideSizes_出力パネルの幅には触れない()
     {
@@ -213,22 +235,47 @@ public class T130AutoHideSizesTests
         => DockingLayoutDefaults.ApplyAutoHideSizes(null);
 
     /// <summary>
-    /// 既定値は <c>MainWindow.xaml</c> の <c>DockWidth</c>／<c>DockHeight</c> と揃っていること。
+    /// 幅の既定値は <c>MainWindow.xaml</c> の <c>DockWidth</c> と揃っていること。
     /// 片方だけ変えると、ドック時とAutoHide時で寸法が食い違う。
     /// <para>
-    /// シートパネル1件だった頃の単数形テストを、表の全行へ広げたもの。
+    /// シートパネル1件だった頃の単数形テストを、幅を持つ3行へ広げたもの。
+    /// 【2026-08-02改訂】高さ（案4で機器表・プロパティへ追加した160.0）は、通常ドック時が
+    /// <c>DockMinHeight="80"</c>のみで分割により決まる動的値のため「揃える」対象が無く、
+    /// 本テストの対象外（別テストで殿裁定値そのものを固定する）。
     /// </para>
     /// </summary>
     [Theory]
     [InlineData("LeftPalette", 190.0)]        // 親ペインの DockWidth="190"
     [InlineData("DeviceTable", 280.0)]        // 親LayoutPanelの DockWidth="280"
     [InlineData("RightPanelBottom", 280.0)]   // 同上
-    [InlineData("OutputPanel", 160.0)]        // 親ペインの DockHeight="160"
-    public void 既定値はMainWindowXamlの宣言と揃っている(string contentId, double expected)
+    public void 幅の既定値はMainWindowXamlのDockWidthと揃っている(string contentId, double expected)
     {
         var target = DockingLayoutDefaults.All.Single(d => d.ContentId == contentId);
 
-        Assert.Equal(expected, target.Size);
+        Assert.Equal(expected, target.Width);
+    }
+
+    /// <summary>出力パネルの高さは <c>MainWindow.xaml</c> の <c>DockHeight="160"</c> と揃っている。</summary>
+    [Fact]
+    public void 出力パネルの高さはMainWindowXamlのDockHeightと揃っている()
+    {
+        var target = DockingLayoutDefaults.All.Single(d => d.ContentId == "OutputPanel");
+
+        Assert.Equal(160.0, target.Height);
+    }
+
+    /// <summary>
+    /// 【T-130機序調査（隠密）・殿裁定2026-08-02】機器表・プロパティの高さは案(あ)＝出力パネルと
+    /// 同じ160.0。通常ドック時の高さに揃える相手が無いため、殿裁定値そのものを固定する。
+    /// </summary>
+    [Theory]
+    [InlineData("DeviceTable")]
+    [InlineData("RightPanelBottom")]
+    public void 機器表とプロパティの高さは殿裁定の160である(string contentId)
+    {
+        var target = DockingLayoutDefaults.All.Single(d => d.ContentId == contentId);
+
+        Assert.Equal(160.0, target.Height);
     }
 
     /// <summary>
@@ -247,21 +294,31 @@ public class T130AutoHideSizesTests
     }
 
     /// <summary>
-    /// 軸の割り当て——下ドックの出力パネルだけが高さ、他は幅であること。
+    /// 【2026-08-02改訂・案4】軸の持ち方——シートは幅のみ、出力は高さのみ、機器表・プロパティは
+    /// 両方を持つこと。
     /// <para>
-    /// ドック先のサイドが変われば軸も変わる。表の軸欄が実際のドック位置と食い違えば、
-    /// 寸法を入れても効かない（幅を入れても下ドックのフライアウトは高さしか見ない）。
+    /// ドック先のサイドが変わっても軸の解決を当てにしない（機序調査の結論）。
+    /// 表の軸欄が実際のドック位置と食い違えば、寸法を入れても効かない
+    /// （幅を入れても、AnchorSide.Top/Bottomへ解決されるフライアウトは高さしか見ない）。
     /// </para>
     /// </summary>
     [Fact]
-    public void 出力パネルだけが高さ軸で他は幅軸()
+    public void シートは幅のみ出力は高さのみ機器表とプロパティは両方持つ()
     {
-        var outputPanel = DockingLayoutDefaults.All.Single(d => d.ContentId == "OutputPanel");
-        Assert.Equal(DockingLayoutDefaults.FlyoutAxis.Height, outputPanel.Axis);
+        var leftPalette = DockingLayoutDefaults.All.Single(d => d.ContentId == "LeftPalette");
+        Assert.NotNull(leftPalette.Width);
+        Assert.Null(leftPalette.Height);
 
-        Assert.All(
-            DockingLayoutDefaults.All.Where(d => d.ContentId != "OutputPanel"),
-            d => Assert.Equal(DockingLayoutDefaults.FlyoutAxis.Width, d.Axis));
+        var outputPanel = DockingLayoutDefaults.All.Single(d => d.ContentId == "OutputPanel");
+        Assert.Null(outputPanel.Width);
+        Assert.NotNull(outputPanel.Height);
+
+        foreach (var contentId in new[] { "DeviceTable", "RightPanelBottom" })
+        {
+            var target = DockingLayoutDefaults.All.Single(d => d.ContentId == contentId);
+            Assert.NotNull(target.Width);
+            Assert.NotNull(target.Height);
+        }
     }
 
     /// <summary>
@@ -279,15 +336,15 @@ public class T130AutoHideSizesTests
         foreach (var target in DockingLayoutDefaults.All)
         {
             var anchorable = new LayoutAnchorable();
-            if (target.Axis == DockingLayoutDefaults.FlyoutAxis.Width)
+            if (target.Width is { } width)
             {
-                anchorable.AutoHideWidth = target.Size;
-                Assert.Equal(target.Size, anchorable.AutoHideWidth);
+                anchorable.AutoHideWidth = width;
+                Assert.Equal(width, anchorable.AutoHideWidth);
             }
-            else
+            if (target.Height is { } height)
             {
-                anchorable.AutoHideHeight = target.Size;
-                Assert.Equal(target.Size, anchorable.AutoHideHeight);
+                anchorable.AutoHideHeight = height;
+                Assert.Equal(height, anchorable.AutoHideHeight);
             }
         }
     }
