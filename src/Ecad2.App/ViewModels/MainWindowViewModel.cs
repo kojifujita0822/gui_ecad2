@@ -2155,7 +2155,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private static string KindDisplayName(ElementKind kind) => kind switch
+    /// <summary>種別の日本語表示名（T-023、UI表示は日本語ラダー用語で統一＝T-031方針）。
+    /// <para>
+    /// <b>【同じ switch が <c>LadderCanvas.KindDisplayName</c> にもある】</b>片方だけへ種別を足せば、
+    /// プロパティパネルの表示と UI Automation の Name が食い違う。<b>必ず両方へ足すこと</b>
+    /// （家老裁定2026-07-28＝rule of three 未達ゆえ共通化はせず、2箇所へ個別に足す。
+    /// 共通化は T-125 の領分）。<c>KindDisplayNameParityTests</c> が両者の一致を測っておる。
+    /// </para>
+    /// <para>
+    /// <c>internal</c> は IVT 経由のテスト用（<see cref="IsRowOccupied"/>・<see cref="IsColumnOccupied"/> と同じ扱い）
+    /// ——<b>2箇所の一致という観点は、双方の値を並べねば測れぬ</b>ためである。
+    /// </para></summary>
+    internal static string KindDisplayName(ElementKind kind) => kind switch
     {
         ElementKind.ContactNO => "a接点",
         ElementKind.ContactNC => "b接点",
@@ -2167,6 +2178,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         ElementKind.Terminal => "端子台",
         ElementKind.Timer => "タイマ",
         ElementKind.Counter => "カウンタ",
+        // T-133増分4-A: 主回路3極記号。Kind 経路の配置導線（増分4-C）が新設されて初めて
+        // ここへ落ちる——既存の配置はすべて PartId 経由ゆえ、Kind は常に既定値 ContactNO であった。
+        // 【文言の出所】原本 GuiEcad のメニュー文言（MainPage.Tools.cs:238-252）から向きを除いたもの。
+        // 表示名は向きを含めぬ——向きは Params[Orient] が持ち、記号の見た目に現れるため。
+        // 【要注意】ThermalOverload3P の表示が「2極」なのは原本がそう記しておるためである
+        // （型名は 3P だが原本のメニュー文言は「サーマル(OL) 2極」）。書き誤りではない。
+        // なお1極の ThermalOverload は PartId 経路（BasicPartTemplates「サーマル」）ゆえここへは落ちぬ。
+        ElementKind.Breaker3P => "ブレーカ",
+        ElementKind.ContactorMain3P => "電磁接触器 主接点",
+        ElementKind.ThermalOverload3P => "サーマル(OL) 2極",
         _ => kind.ToString(),
     };
 

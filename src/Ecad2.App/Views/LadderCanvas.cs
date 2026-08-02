@@ -711,7 +711,12 @@ public sealed class LadderCanvas : FrameworkElement
         return KindDisplayName(element.Kind);
     }
 
-    private static string KindDisplayName(ElementKind kind) => kind switch
+    /// <summary>種別の日本語表示名（UI Automation の Name 用）。
+    /// <b>同じ switch が <c>MainWindowViewModel.KindDisplayName</c> にもある</b>——
+    /// <b>片方だけへ種別を足せば、UIA の Name とプロパティパネルの表示が食い違う。必ず両方へ足すこと</b>
+    /// （<c>KindDisplayNameParityTests</c> が一致を測っておる）。
+    /// <c>internal</c> は IVT 経由のテスト用——<b>一致という観点は双方の値を並べねば測れぬ</b>ゆえ。</summary>
+    internal static string KindDisplayName(ElementKind kind) => kind switch
     {
         ElementKind.ContactNO => "a接点",
         ElementKind.ContactNC => "b接点",
@@ -723,6 +728,12 @@ public sealed class LadderCanvas : FrameworkElement
         ElementKind.Terminal => "端子台",
         ElementKind.Timer => "タイマ",
         ElementKind.Counter => "カウンタ",
+        // T-133増分4-A: 主回路3極記号。文言の出所と「2極」表記の由来は
+        // MainWindowViewModel.KindDisplayName のコメントに記した（一字一句同じ switch ゆえ、
+        // 説明は片方に置き、こちらからは参照する形とする）。
+        ElementKind.Breaker3P => "ブレーカ",
+        ElementKind.ContactorMain3P => "電磁接触器 主接点",
+        ElementKind.ThermalOverload3P => "サーマル(OL) 2極",
         _ => kind.ToString(),
     };
 }
