@@ -130,6 +130,11 @@ public partial class PartEditorDialog : Window
         ShapeCanvas.RequestText = AskShapeText;
         ShapeCanvas.StateChanged += (_, _) => UpdateShapeStatus();
 
+        // T-144: 変更判定の基準を、コンストラクタで入力欄を組み終えた時点に据える。
+        // ここより前は _lastRecordedExternal が null にて、項目構築中に発火する
+        // SelectionChanged（RoleCombo.SelectedIndex への代入等）では履歴を積まぬ。
+        _lastRecordedExternal = CaptureExternalState();
+
         Loaded += (_, _) =>
         {
             NameBox.Focus();
@@ -332,10 +337,84 @@ public partial class PartEditorDialog : Window
 
     private void RestoreExternalState(PartEditorExternalState state)
     {
-        WidthBox.Text = state.WidthCells.ToString();
-        HeightBox.Text = state.HeightCells.ToString();
-        SelectRole(state.Role);
-        SelectAffinity(state.SheetAffinity);
+        // T-144: Undo/Redo による復元中は、入力欄の書き換えが LostFocus/SelectionChanged を
+        // 誘発しても履歴を積まぬ。これを怠ると Undo の最中に新しい履歴が生まれる（再入）。
+        _restoringExternalState = true;
+        try
+        {
+            WidthBox.Text = state.WidthCells.ToString();
+            HeightBox.Text = state.HeightCells.ToString();
+            SelectRole(state.Role);
+            SelectAffinity(state.SheetAffinity);
+        }
+        finally
+        {
+            _restoringExternalState = false;   // 途中return・例外のいずれでも必ず戻す
+        }
+
+        // 復元後の状態が、次の変更判定の基準になる。
+        _lastRecordedExternal = state;
+    }
+
+    // ===== T-144: 入力欄（幅・高さ・役割・シート種別）の変更を Undo 対象にする =====
+    // （殿ご裁可2026-08-02＝「undo対象に含めて」／積む契機は案A＝TextBox は LostFocus）
+    //
+    // 【原本からの意図的な逸脱である】原本 GuiEcad は入力欄の直接変更を Undo 対象にしていない
+    // （PartEditorWindow.xaml.cs:795 のコメントより、サイズ・役割がスナップショットに入るのは
+    // LoadTemplate がそれらを変えるからであって、入力欄の直接変更を対象にする意図は無い）。
+    // 「配置先を変えたのに Undo で戻せぬのは使い勝手として違和感がある」という所見を添えて諮り、
+    // 殿がご裁定なされたもの。後の者が「原本ではどうか」を根拠に差し戻さぬよう、ここに残す。
+    // 判定そのものは PartEditorUndoRules.ShouldRecord（純粋関数・単体テスト済み）が持つ。
+
+    /// <summary>Undo/Redo による外部状態の復元中か。復元が誘発する入力欄イベントで履歴を積まぬための門。
+    /// <see cref="_syncingPortKind"/> と同じ役目を、外部状態（幅・高さ・役割・シート種別）に対して負う。</summary>
+    private bool _restoringExternalState;
+
+    /// <summary>直近に履歴へ積んだ（または復元した）時点の外部状態。次の変更を判ずる基準。
+    /// <b>「フォーカスを得た時点」ではなくこれを基準にする理由</b>：ComboBox は
+    /// <c>GotFocus</c> を経ずに値が変わりうる（ドロップダウンからの選択・キーボード操作）ゆえ、
+    /// 契機ごとに基準を取り直す形では取りこぼす。</summary>
+    private PartEditorExternalState? _lastRecordedExternal;
+
+    /// <summary>幅・高さの欄からフォーカスが外れたとき、変更を1段の履歴として積む。
+    /// <para>
+    /// <b>不正値（空文字・範囲外）で離れた場合は、表示を直前の有効値へ戻す</b>——
+    /// <see cref="ParseCells"/> は不正値で既定値へ落ちるため、放置すると「欄は空なのに内部値は1」という
+    /// 食い違いが残り、その状態が履歴へ積まれる。戻したうえで判定するので、この場合は同値となり履歴も積まれぬ。
+    /// <b>OK 確定時の検証（範囲外を弾く）は従来どおり残る</b>——あちらは値の妥当性、こちらは表示と内部値の一致が目的。
+    /// </para></summary>
+    private void SizeBox_LostFocus(object sender, RoutedEventArgs e)
+    {
+        if (_restoringExternalState || _lastRecordedExternal is not { } before) return;
+        if (sender is not TextBox box) return;
+
+        // 不正値なら表示を直前の有効値へ戻す（内部値との食い違いを残さない）。
+        bool valid = int.TryParse(box.Text, out var v) && v >= MinCells && v <= MaxCells;
+        if (!valid)
+        {
+            box.Text = (ReferenceEquals(box, WidthBox) ? before.WidthCells : before.HeightCells).ToString();
+            return;
+        }
+
+        RecordExternalStateChangeIfAny(before);
+    }
+
+    /// <summary>役割・配置先のコンボが変わったとき、変更を1段の履歴として積む。</summary>
+    private void ExternalStateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        // InitializeComponent 中・項目の構築中は _lastRecordedExternal がまだ無い。
+        if (_restoringExternalState || _lastRecordedExternal is not { } before) return;
+        RecordExternalStateChangeIfAny(before);
+    }
+
+    /// <summary>現在の外部状態が <paramref name="before"/> から変わっていれば、変更前を履歴へ積む。</summary>
+    private void RecordExternalStateChangeIfAny(PartEditorExternalState before)
+    {
+        var now = CaptureExternalState();
+        if (!PartEditorUndoRules.ShouldRecord(before, now)) return;
+
+        ShapeCanvas.PushExternalStateSnapshot(before);
+        _lastRecordedExternal = now;
     }
 
     private void OkButton_Click(object sender, RoutedEventArgs e)

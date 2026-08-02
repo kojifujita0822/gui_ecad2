@@ -602,6 +602,27 @@ public sealed class PartEditorCanvas : FrameworkElement
         _redoStack.Clear();
     }
 
+    /// <summary>
+    /// T-144（殿ご裁可2026-08-02）: 入力欄（幅・高さ・役割・シート種別）の変更を Undo 履歴へ積む。
+    /// <para>
+    /// <b>なぜ <see cref="PushUndo"/> をそのまま使えぬか</b>：<see cref="PushUndo"/> は
+    /// <see cref="CaptureSnapshot"/> 経由で<b>現在の</b>外部状態を取るが、本経路が呼ばれる時点では
+    /// 入力欄は既に変わっている。積むべきは<b>変更前</b>の状態ゆえ、呼び出し側が保持しているものを
+    /// 受け取る形にした。
+    /// </para>
+    /// <para>
+    /// 図形と接続点は現在の値をそのまま写す——入力欄の変更でそれらは変わらぬゆえ、
+    /// 変更前後で同一である。
+    /// </para>
+    /// <para>
+    /// <b>積むか否かの判定は呼び出し側が <see cref="PartEditorUndoRules.ShouldRecord"/> で行う。</b>
+    /// ここで再判定はせぬ——判定に要る「変更前の状態」を持っているのは呼び出し側であり、
+    /// 二重に持たせれば食い違いの余地が生まれる。
+    /// </para>
+    /// </summary>
+    public void PushExternalStateSnapshot(PartEditorExternalState before)
+        => PushUndoSnapshot(new Snapshot(_primitives.ToList(), _ports.ToList(), before));
+
     public void Undo()
     {
         if (_undoStack.Count == 0) return;

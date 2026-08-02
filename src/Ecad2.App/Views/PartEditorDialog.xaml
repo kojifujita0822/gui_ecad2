@@ -37,26 +37,32 @@
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
+            <!-- T-144(殿ご裁可2026-08-02): 入力欄の変更をUndo対象にする。TextBox側はLostFocusで
+                 積む(殿ご裁定=案A)——TextChangedは一文字ごとに発火するため「40」と打つだけで
+                 履歴が2段になる。ComboBoxのSelectionChangedが「確定した一回」と対応するのに
+                 合わせ、四項目の作法を揃える形。 -->
             <TextBlock Text="幅(セル、1〜12):" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBox x:Name="WidthBox" Width="48" VerticalAlignment="Center" Margin="0,0,16,0"
-                     TextChanged="SizeBox_TextChanged"
+                     TextChanged="SizeBox_TextChanged" LostFocus="SizeBox_LostFocus"
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
             <TextBlock Text="高さ(セル、1〜12):" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <TextBox x:Name="HeightBox" Width="48" VerticalAlignment="Center" Margin="0,0,16,0"
-                     TextChanged="SizeBox_TextChanged"
+                     TextChanged="SizeBox_TextChanged" LostFocus="SizeBox_LostFocus"
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
             <TextBlock Text="役割:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="RoleCombo" Width="180" VerticalAlignment="Center" Margin="0,0,16,0"
+                      SelectionChanged="ExternalStateCombo_SelectionChanged"
                       Background="{DynamicResource InputBackgroundBrush}"
                       Foreground="{DynamicResource InputForegroundBrush}"/>
 
             <!-- T-136(A)増分2: 置けるシートの種別。RoleComboと同じ enum→日本語ラベルの形。 -->
             <TextBlock Text="配置先:" VerticalAlignment="Center" Margin="0,0,6,0"/>
             <ComboBox x:Name="AffinityCombo" Width="150" VerticalAlignment="Center"
+                      SelectionChanged="ExternalStateCombo_SelectionChanged"
                       ToolTip="この部品を置けるシートを限ります（既定＝どちらでも）"
                       Background="{DynamicResource InputBackgroundBrush}"
                       Foreground="{DynamicResource InputForegroundBrush}"/>
