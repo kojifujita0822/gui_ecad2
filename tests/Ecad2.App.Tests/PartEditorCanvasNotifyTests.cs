@@ -27,22 +27,10 @@ namespace Ecad2.App.Tests;
 /// </summary>
 public class PartEditorCanvasNotifyTests
 {
-    /// <summary>WPF の <c>FrameworkElement</c> は STA スレッドでしか生成できぬため、
-    /// テスト本体を STA スレッドで走らせる。例外は呼び出し元へ運び直す
-    /// （でなければ失敗が「テスト成功」として素通りする）。</summary>
-    private static void RunSta(Action action)
-    {
-        Exception? captured = null;
-        var thread = new Thread(() =>
-        {
-            try { action(); }
-            catch (Exception ex) { captured = ex; }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        if (captured is not null) throw captured;
-    }
+    /// <summary>STA スレッドでテスト本体を走らせる（実体は <see cref="StaTestRunner"/>）。
+    /// T-132増分3で二人目の使い手が現れたため共有クラスへ切り出した。
+    /// 呼び名はここに残し、本テスト群の見た目は変えていない。</summary>
+    private static void RunSta(Action action) => StaTestRunner.Run(action);
 
     private static PartEditorExternalState State(int width = 3, int height = 5)
         => new(width, height, PartRole.ContactNO, SheetAffinity.Any);
