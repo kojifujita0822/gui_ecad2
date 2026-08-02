@@ -40,8 +40,36 @@ public partial class PartEditorDialog : Window
         (SheetAffinity.MainCircuitOnly, "主回路シート専用"),
     };
 
+    // T-136(B)増分5（殿裁定2026-08-02＝案イ）: 接続点の種類。RoleChoices・AffinityChoices と同じ
+    // 「enum→日本語ラベル」の形。色は増分4で決まっており（電源=赤／DRC無効=青）、ラベルにも添える
+    // ——選択欄の文字だけでは、キャンバス上のどの色に対応するか分からぬため。
+    private static readonly (PortKind Kind, string Label)[] PortKindChoices =
+    {
+        (PortKind.Power, "電源に接続される点（赤）"),
+        (PortKind.DrcExempt, "DRC無効な点（青）"),
+    };
+
     private const int MinCells = 1;
     private const int MaxCells = 12;
+
+    /// <summary>接続点の種類欄を「表示合わせ」で更新しておる間だけ真。
+    /// <para>
+    /// ComboBox は <c>SelectedItem</c> をプログラムから変えても <c>SelectionChanged</c> を発火する。
+    /// 選択中の接続点が切り替わった際、欄の表示を新しい接続点の現在の種類へ合わせるのだが、
+    /// ガードが無ければその発火が<b>「今選んでおる接続点の種類を書き換える」操作として扱われる</b>。
+    /// </para>
+    /// <para>
+    /// <b>弧の縦半径欄にはこの罠が無い</b>——あちらは <c>KeyDown</c>（Enter）でしか反応せぬゆえ、
+    /// 表示を差し替えても何も起きぬ。<b>案イが既存の型を踏襲できぬ唯一の点がここにある</b>
+    /// （隠密の指摘、2026-08-02）。
+    /// </para>
+    /// <para>
+    /// <b>二重の守りである</b>——本フラグに加え、<see cref="PartEditorPortKindRules.ShouldApply"/> が
+    /// 同値の書き込みを弾く。<b>ただし両者は別の役目を持つ</b>：本フラグは<b>表示合わせの間だけ</b>
+    /// 書き込みを止めるもの、述語の同値判定は<b>誰が呼んでも</b>無意味な履歴を積ませぬためのもの。
+    /// 片方が他方の言い換えではないゆえ、二つ置いてある。
+    /// </para></summary>
+    private bool _syncingPortKind;
 
     private readonly PartDefinition? _editing;
 
@@ -63,6 +91,8 @@ public partial class PartEditorDialog : Window
             RoleCombo.Items.Add(new ComboBoxItem { Content = label, Tag = role });
         foreach (var (affinity, label) in AffinityChoices)
             AffinityCombo.Items.Add(new ComboBoxItem { Content = label, Tag = affinity });
+        foreach (var (kind, label) in PortKindChoices)
+            PortKindCombo.Items.Add(new ComboBoxItem { Content = label, Tag = kind });
 
         if (edit is not null)
         {
@@ -204,6 +234,34 @@ public partial class PartEditorDialog : Window
         e.Handled = true;   // IsDefault="True"のOKボタンが発火してダイアログが閉じるのを防ぐ
     }
 
+    /// <summary>接続点の種類が選ばれたら即座に反映する（T-136(B)増分5、案イ）。
+    /// 表示合わせ中の発火は <see cref="_syncingPortKind"/> で弾く。</summary>
+    private void PortKindCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_syncingPortKind) return;
+        if (PortKindCombo.SelectedItem is not ComboBoxItem { Tag: PortKind kind }) return;
+        ShapeCanvas.SetSelectedPortKind(kind);
+    }
+
+    /// <summary>接続点の種類欄の表示を、選択中の接続点の現在の値へ合わせる。
+    /// <b>この操作自体が <c>SelectionChanged</c> を呼ぶ</b>ゆえ、必ずガードで包む。</summary>
+    private void SyncPortKindCombo(PortKind kind)
+    {
+        _syncingPortKind = true;
+        try
+        {
+            foreach (ComboBoxItem item in PortKindCombo.Items)
+            {
+                if (item.Tag is PortKind k && k == kind) { PortKindCombo.SelectedItem = item; return; }
+            }
+            PortKindCombo.SelectedIndex = 0;   // 将来 PortKind が増えた場合のフォールバック（SelectRoleと同じ流儀）
+        }
+        finally
+        {
+            _syncingPortKind = false;   // 途中return・例外のいずれでも必ず戻す
+        }
+    }
+
     private void UpdateShapeStatus()
     {
         if (ShapeCanvas.SelectedArc is { } arc)
@@ -216,6 +274,18 @@ public partial class PartEditorDialog : Window
         {
             ArcRyLabel.Visibility = Visibility.Collapsed;
             ArcRyBox.Visibility = Visibility.Collapsed;
+        }
+
+        if (ShapeCanvas.SelectedPort is { } port)
+        {
+            PortKindLabel.Visibility = Visibility.Visible;
+            PortKindCombo.Visibility = Visibility.Visible;
+            SyncPortKindCombo(port.Kind);
+        }
+        else
+        {
+            PortKindLabel.Visibility = Visibility.Collapsed;
+            PortKindCombo.Visibility = Visibility.Collapsed;
         }
 
         UndoButton.IsEnabled = ShapeCanvas.CanUndo;

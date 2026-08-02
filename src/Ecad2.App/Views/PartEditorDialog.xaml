@@ -104,6 +104,8 @@
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
 
             <TextBlock x:Name="StatusText" Grid.Column="0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
@@ -115,7 +117,18 @@
                      Background="{DynamicResource InputBackgroundBrush}"
                      Foreground="{DynamicResource InputForegroundBrush}"/>
 
-            <StackPanel Grid.Column="3" Orientation="Horizontal" Margin="12,0,0,0">
+            <!-- T-136(B)増分5(殿裁定2026-08-02、案イ): 接続点を選んでおる間だけ現れる種類の選択欄。
+                 弧の縦半径欄と同じ出し入れ式にし、中身は役割・配置先の欄と同じ「enum→日本語ラベル」で埋める。
+                 弧の欄との違いは反応の仕方——あちらはEnterで確定する引き型、こちらは選んだ瞬間に
+                 反映する押し型ゆえ、表示合わせが誤って値を書き換えぬよう呼び出し側に再入ガードを置く
+                 (PartEditorDialog.xaml.cs の _syncingPortKind)。 -->
+            <TextBlock x:Name="PortKindLabel" Grid.Column="3" Text="接続点の種類:" VerticalAlignment="Center"
+                       Margin="8,0,4,0" Visibility="Collapsed"/>
+            <ComboBox x:Name="PortKindCombo" Grid.Column="4" Width="150" VerticalAlignment="Center" Visibility="Collapsed"
+                      SelectionChanged="PortKindCombo_SelectionChanged"
+                      ToolTip="選んだ接続点の種類を切り替えます"/>
+
+            <StackPanel Grid.Column="5" Orientation="Horizontal" Margin="12,0,0,0">
                 <Button Content="OK" Width="70" IsDefault="True" Click="OkButton_Click"/>
                 <Button Content="キャンセル" Width="70" IsCancel="True" Margin="8,0,0,0"/>
             </StackPanel>

@@ -179,6 +179,11 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// <summary>選択中プリミティブが弧の場合のみ非null（扁平率の事後調整用）。</summary>
     public PartArc? SelectedArc => _selectedIndex >= 0 && _primitives[_selectedIndex] is PartArc a ? a : null;
 
+    /// <summary>選択中の接続点。選ばれておらぬ場合はnull（T-136(B)増分5、種類の表示合わせ用）。
+    /// <see cref="SelectedArc"/> と同じ流儀。</summary>
+    public PortDef? SelectedPort
+        => _selectedPortIndex >= 0 && _selectedPortIndex < _ports.Count ? _ports[_selectedPortIndex] : null;
+
     /// <summary>作図中・ドラッグ中の状態があるか（Escで取り消せるものがあるか）。</summary>
     private bool HasDraft => _draftPrimitive is not null || _polylinePoints.Count > 0
         || _moveDragStartCell is not null || _rotateCenterCell is not null || _portDragStartCell is not null;
@@ -203,6 +208,24 @@ public sealed class PartEditorCanvas : FrameworkElement
         if (_selectedIndex < 0 || _primitives[_selectedIndex] is not PartArc a) return;
         PushUndo();
         _primitives[_selectedIndex] = a with { Ry = Math.Max(0.05, ry) };
+        Notify();
+    }
+
+    /// <summary>選択中の接続点の種類を変える（T-136(B)増分5、殿裁定2026-08-02＝案イ）。
+    /// <para>
+    /// 書き込むか否かの判定は <see cref="PartEditorPortKindRules.ShouldApply"/> が持つ——
+    /// WPFに依らぬ条件ゆえ切り出してある（境界の実測は App.Tests 側）。
+    /// </para>
+    /// <para>
+    /// Undoは <c>Snapshot.Ports</c> 経由で自動的に効く（<c>_ports.ToList()</c> の値コピーゆえ
+    /// 参照共有の懸念も無い）。<c>PartEditorExternalState</c> は幅・高さ・役割・配置先の4項目専用にて
+    /// <c>Ports</c> を含まぬ設計ゆえ、そちらへの追加は不要である。
+    /// </para></summary>
+    public void SetSelectedPortKind(PortKind kind)
+    {
+        if (!PartEditorPortKindRules.ShouldApply(_ports, _selectedPortIndex, kind)) return;
+        PushUndo();
+        _ports[_selectedPortIndex] = _ports[_selectedPortIndex] with { Kind = kind };
         Notify();
     }
 
