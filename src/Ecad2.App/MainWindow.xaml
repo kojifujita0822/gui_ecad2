@@ -1305,13 +1305,16 @@
                      同型)。キーボードショートカットは既存F5〜F11が埋まっているため今回は未割当
                      (範囲外、必要になれば別途家老へ上申)。シート種別の制限はGuiEcad原本・Core層とも
                      無いためCanEditDiagramのみでガードする。 -->
+                <!-- T-141(殿ご指示2026-08-02): キー割当が無く空文字列だったラベルへ「枠」を付す。
+                     既存の「部品」(自作パーツボタン)・「テスト」(テストモードボタン)と同じ
+                     PlacementToolBarKeyLabelStyleへ文言を入れるだけの形式を踏襲する。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="グループ枠記入"
                         AutomationProperties.Name="グループ枠記入"
                         Tag="Frame" Click="FrameToolButton_Click"
                         PreviewKeyDown="ToolButtonPreviewKeyDown">
                     <StackPanel>
                         <Path Style="{StaticResource PlacementToolBarIconStyle}" Data="M2,2 L16,2 L16,16 L2,16 Z"/>
-                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text=""/>
+                        <TextBlock Style="{StaticResource PlacementToolBarKeyLabelStyle}" Text="枠"/>
                     </StackPanel>
                 </Button>
                 <Separator/>
