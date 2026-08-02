@@ -36,6 +36,12 @@ public sealed class DrawingTheme
     // T-107(殿裁定=GX Works3同様の緑色): 機器コメント表示。ライト/ダーク両テーマで固定
     // (背景とのコントラストのみ確認、色自体はテーマ非依存)。
     public static readonly Color Comment = new(255, 0, 128, 0);
+    // T-136(B)増分4(殿裁定2026-08-02): パーツエディタの接続点の種類色。ライト/ダーク両テーマで固定。
+    // 【仮の値・論点7】赤(PortPower)は実装後に実機の絵を殿へお見せしてから裁可を仰ぐ暫定値
+    // (docs/ecad2-t136-increment4-plan-samurai.md 論点7、選択リング色=論点3の前例に倣う)。
+    // 青(PortDrcExempt)は増分3以前からの塗り色(DodgerBlue)をそのまま流用、据え置き確定値。
+    public static readonly Color PortPower = new(255, 220, 20, 20);       // 仮値: 電源に接続される点
+    public static readonly Color PortDrcExempt = new(255, 30, 144, 255); // 確定: 制御配線でDRC無効な点
 
     // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
     public const double TableLineWidth = 0.18;
@@ -89,6 +95,16 @@ public sealed class DrawingTheme
         StrokeRole.GroupFrame => new(Foreground, 0.18, LineStyle.Dashed),
         StrokeRole.Grid => new(GridColor, 0.10),
         _ => new(Foreground, 0.25),   // Wire / SymbolOutline
+    };
+
+    /// <summary>T-136(B)増分4: 接続点の種類→色。View層(PartEditorCanvas)に色分岐を持たせず
+    /// 純粋関数として切り出すことでテスト可能にする(samurai.md「テストしにくいは設計の匂い」)。
+    /// テーマ非依存の意味色ゆえインスタンスに依らずstaticでよいが、Text/Getと並びを揃えるためstaticメソッドとする。</summary>
+    public static Color PortColor(PortKind kind) => kind switch
+    {
+        PortKind.Power => PortPower,
+        PortKind.DrcExempt => PortDrcExempt,
+        _ => PortPower,
     };
 
     public TextStyle Text(TextRole role) => role switch

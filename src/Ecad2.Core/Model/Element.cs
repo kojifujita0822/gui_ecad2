@@ -34,11 +34,27 @@ public enum ElementKind
 public readonly record struct GridPos(int Row, int Column);
 
 /// <summary>
+/// T-136(B)増分4（殿裁定2026-08-02）: 接続点の種類。パーツエディタでの見た目（赤丸／青丸）を決める。
+/// 【射程】本増分では見た目のみが対象——NetlistBuilder等の接続処理へは反映しない（接続方法の設計は別途、
+/// 台帳T-136節「やらぬこと」参照）。
+/// </summary>
+public enum PortKind
+{
+    /// <summary>電源に接続される点（赤）。</summary>
+    Power,
+    /// <summary>制御配線でDRC無効な点（青）。</summary>
+    DrcExempt,
+}
+
+/// <summary>
 /// 接続点（ポート／端子）の定義。種別固定でカタログが宣言する（docs/data-model.md「接続点（Port）モデル」）。
 /// 実ノード座標 = (要素 Pos.Row + RowOffset, 列境界 Pos.Column + BoundaryOffset)。
 /// 列境界は左母線=0、右母線=Columns。同一ノード座標に載るポート同士が電気的に同一ネット。
+/// T-136(B)増分4: <see cref="Kind"/> 追加。既定値=Power（殿裁定2026-08-02、論点6=(D-1)）——既存の
+/// 全接続点は組込み・自作テンプレートの大半が最終的に赤へ落ちる見込み（論点5対応、
+/// docs/ecad2-t136-increment4-plan-samurai.md §3）ゆえ、既定と実態の食い違いが少ない側を選んだ。
 /// </summary>
-public readonly record struct PortDef(string Name, int RowOffset, int BoundaryOffset);
+public readonly record struct PortDef(string Name, int RowOffset, int BoundaryOffset, PortKind Kind = PortKind.Power);
 
 /// <summary>グリッドに配置された1要素。記号（見た目）は描画側カタログが Kind で引く。</summary>
 public sealed class ElementInstance

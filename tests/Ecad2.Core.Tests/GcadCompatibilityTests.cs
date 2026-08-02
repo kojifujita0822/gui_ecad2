@@ -42,6 +42,9 @@ public class GcadCompatibilityTests
         Assert.Equal(PartRole.ContactNO, part.Role);
         Assert.Equal(2, part.Ports.Count);
         Assert.Equal(5, part.Primitives.Count);
+        // T-136(B)増分4: このJSONはKindフィールドを持たぬ旧形式そのもの（gui_ecad実サンプル）。
+        // 追加時に既定値Powerで復元されることの実測（新規フィールドの後方互換）。
+        Assert.All(part.Ports, p => Assert.Equal(PortKind.Power, p.Kind));
         Assert.IsType<PartCircle>(part.Primitives[0]);
         Assert.IsType<PartLine>(part.Primitives[2]);
     }
