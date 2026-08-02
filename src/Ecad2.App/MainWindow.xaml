@@ -1306,8 +1306,11 @@
                      (範囲外、必要になれば別途家老へ上申)。シート種別の制限はGuiEcad原本・Core層とも
                      無いためCanEditDiagramのみでガードする。 -->
                 <!-- T-141(殿ご指示2026-08-02): キー割当が無く空文字列だったラベルへ「枠」を付す。
-                     既存の「部品」(自作パーツボタン)・「テスト」(テストモードボタン)と同じ
-                     PlacementToolBarKeyLabelStyleへ文言を入れるだけの形式を踏襲する。 -->
+                     既存の「部品」(自作パーツボタン)と同じPlacementToolBarKeyLabelStyleへ文言を
+                     入れるだけの形式を踏襲する。【往復1周目訂正(隠密静的レビュー指摘、家老采配
+                     2026-08-02)】「テスト」(テストモードボタン)は1段目用の別スタイル
+                     (ToolBarKeyLabelStyle、ボタン本体もTestModeToolBarButtonStyleと一式が別系統)
+                     であり根拠として不適切だったため除く。 -->
                 <Button Style="{StaticResource PlacementToolBarButtonStyle}" ToolTip="グループ枠記入"
                         AutomationProperties.Name="グループ枠記入"
                         Tag="Frame" Click="FrameToolButton_Click"
