@@ -4,42 +4,37 @@ using Ecad2.Simulation;
 namespace Ecad2.Core.Tests;
 
 /// <summary>
-/// T-136(C) 判断材料の実測——<b>自作パーツの非シミュレート部品にも同じ穴が空いておるか</b>。
+/// T-142 自作パーツの非シミュレート部品が結線を断つ穴を塞いだことの回帰テスト
+/// （殿ご下命2026-08-02「穴を発見したのに放置はしておけぬ」）。
 /// <para>
-/// <b>【本テスト群は「まだ塞がっておらぬ穴」を記録するものである】</b>
-/// 殿裁定2026-08-02「モーターだけ除外すればいい」により、<c>2d272e8</c> が塞いだのは
-/// <see cref="ElementKind.Motor"/> ただ一つ。自作パーツは <c>PartResolver.ParticipatesInWiring</c> が
-/// 無条件に true を返すゆえ、従来どおり結線に参加する（＝非破壊）。
-/// <b>本テスト群はその現状を写し取ったものであり、穴が開いておることを期待値としておる。</b>
-/// 殿が対象を「非シミュレート全般」へ広げると裁定なされたら、
-/// <b>本ファイルの期待値は反転させる</b>（<c>proposed.md</c> P-161）。
+/// <b>塞ぐ前は何が起きておったか</b>：<c>Role=NonSimulated</c> で接続点を持つ部品は、左右ポートを
+/// 繋ぐ union が <c>CreatesComponent</c> を見るゆえ通らず、左右が結ばれぬ。にもかかわらず母線への
+/// 直接 union と横配線の結合には参加するため、<b>行の最左（最右）に居ると母線接続を横取りし、
+/// 同じ行の負荷を切り離しておった</b>——三相モータと寸分違わぬ「壁」である。
+/// 症状は <c>DRC-LOAD-001/002</c> が誤って鳴ること（T-136(C)で実測。<c>bb20aee</c>）。
 /// </para>
 /// <para>
-/// <b>部品の定義は現物に合わせてある</b>——<c>sample/big_sample.gcad</c> のライブラリに実在する
+/// <b>塞いだ形</b>：<c>PartResolver.ParticipatesInWiring</c> の自作パーツ分岐を
+/// <c>part.Role != PartRole.NonSimulated</c> へ改めた一行。組込み側（<see cref="ElementCatalog"/>）は
+/// 触れておらぬ——組込みは殿裁定により <see cref="ElementKind.Motor"/> のみが対象で、
+/// そちらは T-136(C)（<c>2d272e8</c>）で既に塞がっておる。
+/// </para>
+/// <para>
+/// <b>本テスト群の要</b>：非シミュレート部品を置いても置かなくても、同じ行の負荷の結線は変わらぬこと。
+/// 各観点に「部品不在」の対照を対で置いてある
+/// （<c>memory: feedback_control_experiment_needs_naive_baseline</c>）。
+/// </para>
+/// <para>
+/// <b>部品の定義は現物に合わせてある</b>——<c>sample/big_sample.gcad</c> のライブラリに在った
 /// 「ソレノイド」（<c>Role=NonSimulated</c>・1セル幅・2端子＝境界0と1）を写した。
+/// なお<b>そのソレノイド自体は殿の自作図形にて、実装が固まる前に作られた設定の名残</b>であり、
+/// 殿は「今後新規に作成するものは『コイル』として設定する」と仰せである（既存データの手当ては殿の領分）。
+/// <b>本テスト群が守っておるのは、その1件のデータではなく機序の側である</b>——
+/// 「実例が無い」ことと「機序が無い」ことは別ゆえ。
 /// </para>
 /// <para>
-/// <b>【殿裁定2026-08-02＝この型は実運用に無い。P-161は closed】</b>
-/// 上記ソレノイドは<b>殿の自作図形にて、実装が固まる前に作られた設定の名残</b>であり、
-/// <b>本来はコイル属性のもの</b>と殿が仰せになった（「無視してよい。今後新規に作成するものは
-/// 『コイル』として設定する」）。<b>他の <c>NonSimulated</c> かつ接続点を持つ部品は、いずれも
-/// T-068/T-126の検証残置物</b>——<b>すなわち実運用の実例はゼロである。</b>
-/// <b>ゆえに対象を非シミュレート全般へ広げる話は立ち消え、実装は Motor のみで確定した。</b>
-/// </para>
-/// <para>
-/// <b>それでも本ファイルを残す理由</b>：<b>穴そのものは実測で確かめられた構造上の性質であり、
-/// 「実例が無い」ことと「機序が無い」ことは別である。</b> 将来ふたたび <c>NonSimulated</c> かつ
-/// 接続点を持つ部品が現れたとき、本ファイルが<b>その時点で何が起きるかを示す</b>。
-/// 誰かが正しく塞げば6件が RED になり、冒頭の指示（期待値を反転させよ）へ辿り着ける。
-/// </para>
-/// <para>
-/// <b>機序はモータと同一の見込み</b>：左右ポートを繋ぐ union は通過接続要素の枝ただ一つで、
-/// これは <c>CreatesComponent</c> を見る。非シミュレートは通らぬゆえ左右ポートが結ばれず、
-/// 行の最左（最右）に居ると母線 union を横取りして同じ行の負荷を切り離す。
-/// <b>本テスト群はその見込みを実測で確かめるためのものである。</b>
-/// </para>
-/// <para>
-/// <b>射程</b>：測っておるのは下記2配置のみ。縦コネクタ・配線分断を伴う配置は測っておらぬ。
+/// <b>射程</b>：測っておるのは下記2配置（部品が行の最左／右端）のみである。縦コネクタ・配線分断を
+/// 伴う配置は測っておらぬ。
 /// </para>
 /// </summary>
 public class T136CCustomNonSimulatedWiringTests
@@ -88,6 +83,26 @@ public class T136CCustomNonSimulatedWiringTests
 
     private static Component LoadM1(Netlist net) => net.Components.Single(c => c.DeviceName == "M1");
 
+    // ---- フィクスチャそのものの健全性 ----
+
+    /// <summary>
+    /// <b>フィクスチャが接続点を持っておること自体を測る。</b>
+    /// 下の S3・S4・S6 はいずれも「非シミュレート部品が結線に加わらぬ」ことを確かめるが、
+    /// <b>接続点を1つも持たぬ部品もまた結線に加わらぬ</b>——ゆえに <see cref="MakeLibrary"/> の
+    /// <c>Ports</c> が空になると、3件とも<b>塞いだからではなく接続点が無いゆえ</b>に通ってしまう。
+    /// 共有フィクスチャが感度を左右する形ゆえ、ここで直に押さえる
+    /// （<c>samurai.md</c>「RED証明を済ませたら、このテストの感度を失わせる編集は他に無いかを一度問う」）。
+    /// </summary>
+    [Fact]
+    public void T136C_S0_Fixture_SolenoidHasTwoPortsAtBoundaryZeroAndOne()
+    {
+        var part = MakeLibrary().Get(SolenoidId);
+
+        Assert.NotNull(part);
+        Assert.Equal(PartRole.NonSimulated, part.Role);
+        Assert.Equal([0, 1], part.Ports.Select(p => p.BoundaryOffset).Order());
+    }
+
     // ---- 対照（ソレノイド不在） ----
 
     /// <summary>対照。ソレノイドを置かねば負荷は左右いずれの母線へも届く。</summary>
@@ -114,47 +129,43 @@ public class T136CCustomNonSimulatedWiringTests
         Assert.Empty(DesignRuleCheck.CheckLoadReachability(sheet, net));
     }
 
-    // ---- 穴の実在（ソレノイド在。現時点では塞がっておらぬ） ----
+    // ---- 穴が塞がっておること ----
 
     /// <summary>
-    /// <b>穴の実在（左）。</b> ソレノイドが行の最左に居ると、同じ行の負荷が左母線から切り離され、
-    /// <c>DRC-LOAD-001</c> が誤って鳴る。モータで測ったのと同じ症状である。
+    /// ソレノイドが行の最左に居ても、同じ行の負荷は左母線から切り離されぬ。
+    /// 塞ぐ前はここが別ネットとなり、<c>DRC-LOAD-001</c> が誤って鳴っておった。
     /// </summary>
     [Fact]
-    public void T136C_S3_SolenoidLeftmostInRow_SeversLoadFromLeftRail_HoleStillOpen()
+    public void T136C_S3_SolenoidLeftmostInRow_DoesNotSeverLoadFromLeftRail()
     {
         var sheet = MakeSheet(withSolenoid: true);
         var net = NetlistBuilder.Build(sheet, MakeLibrary());
+        var m1 = LoadM1(net);
 
-        Assert.NotEqual(net.LeftRailNet, LoadM1(net).NetA);
-
-        var d = Assert.Single(DesignRuleCheck.CheckLoadReachability(sheet, net));
-        Assert.Equal(DesignRuleCheck.LoadNotReachableFromLeft, d.Code);
-        Assert.Equal("M1", d.DeviceName);
+        Assert.Equal(net.LeftRailNet, m1.NetA);
+        Assert.Equal(net.RightRailNet, m1.NetB);
+        Assert.Empty(DesignRuleCheck.CheckLoadReachability(sheet, net));
     }
 
     /// <summary>
-    /// <b>穴の実在（右）。</b> 右端にソレノイドを置くと <c>DRC-LOAD-002</c> が誤って鳴る。
-    /// 右母線側は左とは別の経路が働くゆえ別に測る。
+    /// 右端にソレノイドを置いても負荷は右母線から切り離されぬ。
+    /// 右母線側は左とは別の経路が働くゆえ別に測る。塞ぐ前は <c>DRC-LOAD-002</c> が誤って鳴っておった。
     /// </summary>
     [Fact]
-    public void T136C_S4_SolenoidAtRightEdge_SeversLoadFromRightRail_HoleStillOpen()
+    public void T136C_S4_SolenoidAtRightEdge_DoesNotSeverLoadFromRightRail()
     {
         var sheet = MakeSheetRightEdge(withSolenoid: true);
         var net = NetlistBuilder.Build(sheet, MakeLibrary());
 
-        Assert.NotEqual(net.RightRailNet, LoadM1(net).NetB);
-
-        var d = Assert.Single(DesignRuleCheck.CheckLoadReachability(sheet, net));
-        Assert.Equal(DesignRuleCheck.LoadNotReachableFromRight, d.Code);
-        Assert.Equal("M1", d.DeviceName);
+        Assert.Equal(net.RightRailNet, LoadM1(net).NetB);
+        Assert.Empty(DesignRuleCheck.CheckLoadReachability(sheet, net));
     }
 
-    // ---- 機序がモータと同一であることの裏づけ ----
+    // ---- 機序の側 ----
 
     /// <summary>
-    /// ソレノイドは <c>Role=NonSimulated</c> ゆえ Component にならぬ——モータと同じ立場である。
-    /// にもかかわらず結線には参加しておることを、上の S3・S4 と併せて示す。
+    /// ソレノイドは <c>Role=NonSimulated</c> ゆえ Component にならぬ。
+    /// これは塞ぐ前後で変わらぬ挙動であり、対照として据え置く。
     /// </summary>
     [Fact]
     public void T136C_S5_Solenoid_DoesNotBecomeComponent()
@@ -166,16 +177,16 @@ public class T136CCustomNonSimulatedWiringTests
     }
 
     /// <summary>
-    /// ソレノイドはネットを増やす——すなわち結線に加わっておる。
-    /// モータ側の同名テスト（<c>T136C_D2_Motor_ContributesNoNets</c>）が「増やさぬ」ことを
-    /// 測っておるのと、ちょうど裏返しの関係にある。
+    /// ソレノイドはネットを一つも増やさぬ——すなわち結線に加わっておらぬ。
+    /// 上の S3・S4 が「結果として無害か」を測るのに対し、本テストは「そもそも加わっておらぬか」を
+    /// 直に測る。モータ側の <c>T136C_D2_Motor_ContributesNoNets</c> と同じ形である。
     /// </summary>
     [Fact]
-    public void T136C_S6_Solenoid_ContributesNets_UnlikeMotor_HoleStillOpen()
+    public void T136C_S6_Solenoid_ContributesNoNets_LikeMotor()
     {
         var withSolenoid = NetlistBuilder.Build(MakeSheet(withSolenoid: true), MakeLibrary());
         var control = NetlistBuilder.Build(MakeSheet(withSolenoid: false), MakeLibrary());
 
-        Assert.True(withSolenoid.Nets.Count > control.Nets.Count);
+        Assert.Equal(control.Nets.Count, withSolenoid.Nets.Count);
     }
 }

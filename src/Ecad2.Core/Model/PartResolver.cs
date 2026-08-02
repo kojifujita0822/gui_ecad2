@@ -34,12 +34,22 @@ public static class PartResolver
     }
 
     /// <summary>
-    /// ネットリストの結線へ参加するか（T-136(C)、殿裁定2026-08-02）。false は三相モータのみ。
+    /// ネットリストの結線へ参加するか。false は<b>非シミュレートの部品</b>——
+    /// 組込みの三相モータ（T-136(C)、殿裁定2026-08-02）と、
+    /// 自作パーツの <see cref="PartRole.NonSimulated"/>（T-142、殿ご下命2026-08-02）。
     /// <para>
-    /// <b>自作パーツは常に参加する</b>——殿裁定が対象をモータのみと定めたゆえ。
-    /// <see cref="PartRole"/> にモータは無く、<see cref="ComponentKind"/> も
-    /// <see cref="ElementKind.Motor"/> へ写像せぬゆえ、自作パーツがモータになる経路は存在せぬ。
-    /// <c>PartRole.NonSimulated</c> かつ接続点を持つパーツの扱いは <c>proposed.md</c> P-161。
+    /// <b>なぜ結線から外すか</b>：非シミュレート部品は左右ポートを繋ぐ union
+    /// （<see cref="Ecad2.Simulation.NetlistBuilder"/> の通過接続要素の枝）が
+    /// <see cref="CreatesComponent"/> を見るゆえ通らず、左右のポートが結ばれぬ。
+    /// にもかかわらず母線への直接 union と横配線の結合には参加するため、
+    /// <b>行の最左（最右）に居ると母線接続を横取りし、同じ行の負荷を切り離しておった</b>
+    /// ——DRC が <c>DRC-LOAD-001/002</c> を誤って鳴らす
+    /// （<c>tests/Ecad2.Core.Tests/T136C{,Custom}NonSimulatedWiringTests.cs</c> で実測）。
+    /// </para>
+    /// <para>
+    /// <b>組込みと自作で判定の軸が違う</b>のは、殿裁定が組込み側を
+    /// <see cref="ElementKind.Motor"/> ただ一つに限られたゆえである
+    /// （他の非シミュレート組込み＝主回路3極記号は接続点を0個しか持たず、元より結線に加わらぬ）。
     /// </para>
     /// <para>
     /// 生の <see cref="ElementInstance.Kind"/> でなく本メソッドを経るのは、上の <see cref="Ports"/>・
@@ -49,7 +59,7 @@ public static class PartResolver
     public static bool ParticipatesInWiring(ElementInstance e, PartLibrary? lib)
     {
         var part = lib?.Get(e.PartId);
-        if (part is not null) return true;
+        if (part is not null) return part.Role != PartRole.NonSimulated;
         return ElementCatalog.ParticipatesInWiring(e.Kind);
     }
 
