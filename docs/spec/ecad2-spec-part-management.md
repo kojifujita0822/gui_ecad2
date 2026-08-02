@@ -87,17 +87,33 @@ App層のどこからも参照されていない「孤立したクラス」。
 
 ## 3. サムネイル生成
 
-`PartThumbnailRenderer.Render(PartDefinition, PartLibrary, isOr, cellMm)`：`DiagramRenderer.DrawPreview`
+`PartThumbnailRenderer.Render(PartDefinition, PartLibrary, isOr, cellMm, foreground)`：`DiagramRenderer.DrawPreview`
 を`DrawingVisual`→`RenderTargetBitmap`化する薄いラッパー。1セル分の正方形として、`MarginMm=0`・
-`Pos=(0,0)`の専用`DiagramRenderer`で原点合わせして描画。
+`Pos=(0,0)`の専用`DiagramRenderer`で原点合わせして描画。`foreground`は省略可（既定＝黒）。
 
 - OR論理エントリ（`isOr=true`かつ`definition.IsOrEligible`）の場合、ツールバーF5/F6と同一のGX様式
   グリフ（Path Geometry）で描画。**判定はId非依存、`IsOrEligible`/`Role`ベース**——Explorer複製由来の
   再採番パーツでもOR表現が欠落しないための設計。
-- 呼び出しは`PartPaletteViewModel`のコンストラクタ内で`SelectionEntries`全件分を**起動時一括生成**
-  （パーツ数が少ないためKISS、増えたら遅延生成へ切替検討というコメントあり）。
-- 表示は`PartSelectionList`（`ListBox`）の各行に`Image`(24x24)＋`Category`（灰色小文字）＋
-  `DisplayName`。
+- 呼び出しは`PartPaletteViewModel.Load()`で`SelectionEntries`全件分を**一括生成**（パーツ数が少ないため
+  KISS、増えたら遅延生成へ切替検討というコメントあり）。`Load()`はコンストラクタのほか**自作パーツの
+  保存・削除でも呼ばれる**ため、そのたびに作り直される。
+- **テーマ切替時は`RefreshThumbnails(Color)`が前景色を渡して全件を再生成する**（T-083）。サムネイルは
+  `RenderTargetBitmap`による事前レンダリングゆえ、ブラシ差し替えでは追随できないための措置。
+  呼び出し元は`MainWindow.xaml.cs`の`IsDarkMode`変更ハンドラ。
+- 表示は`PartSelectionList`（`ListBox`）の各行に`Image`(24x24)＋`Category`（`FontSize=10`・`Width=40`）＋
+  `DisplayName`。**`Category`は固定色を持たず前景を継承に委ねる**——T-140系統2で`Foreground="Gray"`を
+  除いた（非選択時は`PanelContentForegroundBrush`、選択時は`PanelContentSelectedForegroundBrush`）。
+- **選択行の背景は、この一覧の中だけ`#FF0E639C`へ差し替える**（T-140系統2の追い直し、殿裁可2026-08-02
+  ＝案3＋方向A）。`ListBox.Resources`で`PanelContentSelectedBackgroundBrush`を上書きする形を採り、
+  **テーマ側の定義は動かさない**——動かせば使い方ウィンドウのトピック一覧・`DataGrid`の行/セル・
+  `ComboBox`の項目まで巻き込むため（殿は全体を変える案4を退けられた）。
+  なお`ItemContainerStyle`の`Setter`では届かない：選択時の背景は`App.xaml`の`ListBoxItem`の
+  `ControlTemplate.Triggers`が`TargetName`指定で内側の`Border`へ直接当てており、外側の`Style`からの
+  値は上書きされる（値は正しいが描画に反映されない型）。
+  **選択時のコントラストはWCAG AA適合**（忍者の実機実測で確認済み）。**具体的な比の値は本書に置かない**
+  ——検証記録と二重に持てば必ず片方が腐るため。値が要るときは`docs/todo.md`のT-140系統2節、および
+  忍者の検証記録（`docs/ecad2-t130-flyout-and-partcategory-verification-ninja.md`ほか）を引くこと。
+  **測定は時点ごとに別物である点に注意**——案W時点と方向A（本実装）時点とで対象も値も異なる。
 
 ### 関連タスク
 
