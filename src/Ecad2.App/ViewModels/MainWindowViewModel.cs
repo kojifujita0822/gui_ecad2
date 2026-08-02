@@ -2690,6 +2690,44 @@ public sealed class MainWindowViewModel : ViewModelBase
             || sheet.Frames.Any(f => row >= f.TopLeft.Row && row < f.TopLeft.Row + f.Height)
             || sheet.RungComments.Any(rc => rc.Row == row);
 
+    /// <summary>指定列に要素が存在するかを判定する（T-132増分2、列数の縮小拒否に使う）。
+    /// <see cref="IsRowOccupied"/> の列版。<c>internal</c> は IVT 経由のテスト用。
+    /// <para>
+    /// <b>対象は4種</b>——<c>Elements</c>／<c>Connectors</c>／<c>WireBreaks</c>／<c>Frames</c>。
+    /// <c>RungComments</c> は列座標を持たぬ（<c>Row</c> のみ）ため対象外、
+    /// <c>Lines</c>（<c>CircuitLine</c>）も同様。
+    /// <b>mm 座標を持つもの（<c>FreeLines</c>／<c>ConnectionDots</c>／<c>Images</c>／
+    /// <c>Frames.VisualXMm</c>）は殿ご裁定2026-08-02＝案1により対象外</b>——行側も mm を見ておらず、
+    /// 自由線はグリッド非依存として設計されているため。<b>殿は「自由線が紙面外へ出るのを止められぬ」
+    /// という限界を承知のうえでご裁定なされた</b>ゆえ、後の者はこれを欠陥と判じて直しにかかる前に殿へ諮ること。
+    /// </para>
+    /// <para>
+    /// <b>【境界と列は別物である】</b><c>Elements.Pos.Column</c>／<c>Frames.TopLeft.Column</c> は
+    /// <b>列そのもの</b>（半開区間 <c>[Column, Column+幅)</c>）だが、
+    /// <c>Connectors.Column</c>／<c>WireBreaks.Boundary</c> は <b>列境界</b>で 0.5 刻みを取る。
+    /// 列 <paramref name="column"/> が占める区間を閉区間 <c>[column, column+1]</c> とし、
+    /// 境界 <c>b</c> が <c>column &lt;= b &amp;&amp; b &lt;= column + 1</c> を満たすとき「掛かる」と判ずる
+    /// （隠密のテスト設計書 §2、家老裁定2026-08-02）。
+    /// これにより<b>整数境界は左右両方の列に掛かり、セル中央（X.5）は一意に一列だけに掛かる</b>。
+    /// </para>
+    /// <para>
+    /// <b>整数境界を「両方」とするのは、安全側（過剰検出）へ倒す設計である</b>——本判定の用途は
+    /// 「列を縮小してよいか」の拒否であり、過剰検出は「本当は消せる列を消せない」不便に留まるが、
+    /// 見落としは「消してはならぬ列を消す」データ損壊に至る。<b>両者は同じ重さの誤りではない。</b>
+    /// </para>
+    /// <para>
+    /// <b>【範囲外の列にガードを置かぬ理由】</b>本述語は <c>column</c> が負、あるいはグリッドの列数以上でも
+    /// <c>true</c> を返しうる（例：境界 <c>b=0</c> は列 <c>-1</c> にも掛かる）。
+    /// <b>これは足し忘れではない。</b> 範囲の限定は呼び出し側が負う——<see cref="IsRowOccupied"/> も
+    /// 同じ作法で、行範囲外のガードを持たない。<b>片方だけにガードを足せば、次に読む者が
+    /// 「なぜ列だけ」と迷う。</b> 呼び出し側（増分4）が回すのはグリッド内の列のみである。
+    /// </para></summary>
+    internal static bool IsColumnOccupied(Sheet sheet, int column)
+        => sheet.Elements.Any(e => e.Pos.Column <= column && column < e.Pos.Column + e.CellWidth)
+            || sheet.Connectors.Any(c => column <= c.Column && c.Column <= column + 1)
+            || sheet.WireBreaks.Any(w => column <= w.Boundary && w.Boundary <= column + 1)
+            || sheet.Frames.Any(f => f.TopLeft.Column <= column && column < f.TopLeft.Column + f.Width);
+
     /// <summary>指定行が占有されていれば拒否メッセージ(message)をStatusMessageへ設定してtrueを返す
     /// (T-055増分3往復1周目、隠密レビュー指摘c=DeleteRowCommand/UpdateSheetSettingsCommand/
     /// DeleteRowAtCommandの3箇所到達によるrule of three解消)。呼び出し元はtrueが返ればreturnすること。
