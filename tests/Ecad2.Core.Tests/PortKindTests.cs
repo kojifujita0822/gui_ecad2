@@ -49,6 +49,27 @@ public class PortKindTests
     }
 
     /// <summary>
+    /// 【往復2周目・家老裁定】throw化を撤回し、未知の値は目立つ色(PortUnknown)へ寄せる形に改めた
+    /// (描画中の例外は画面が落ちパーツを喪失しうるため)。JSON経由で数値表記("kind": 99)を渡すと
+    /// JsonStringEnumConverterが検めず未知の値のままPortColorへ届く経路が実在する(隠密指摘、
+    /// JsonOptions.cs:18)。
+    /// </summary>
+    [Fact]
+    public void DrawingTheme_PortColor_未知の値はPortUnknownを返す()
+    {
+        Assert.Equal(DrawingTheme.PortUnknown, DrawingTheme.PortColor((PortKind)99));
+    }
+
+    [Fact]
+    public void DrawingTheme_PortUnknownはPortPowerともPortDrcExemptとも異なる色である()
+    {
+        // PortUnknownが既存2色のいずれかと同値では、フォールバックが働いても目に立たない
+        // （案2の狙い＝「case行が消えても即座に目立つ」が成立しなくなる）。
+        Assert.NotEqual(DrawingTheme.PortPower, DrawingTheme.PortUnknown);
+        Assert.NotEqual(DrawingTheme.PortDrcExempt, DrawingTheme.PortUnknown);
+    }
+
+    /// <summary>
     /// PartOptimizer.ClampPortsToFrame（PartEditorCanvas.UpdatePortDragと同型の`with`式を使う）が
     /// Kindを温存することの実測。隠密の留保「positional record structの既定引数埋めは型の性質からの
     /// 推論であり実測しておらぬ」への回答（親計画書§4増分4）。

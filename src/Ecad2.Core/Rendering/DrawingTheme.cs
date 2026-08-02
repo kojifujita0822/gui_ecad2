@@ -42,6 +42,10 @@ public sealed class DrawingTheme
     // 青(PortDrcExempt)は増分3以前からの塗り色(DodgerBlue)をそのまま流用、据え置き確定値。
     public static readonly Color PortPower = new(255, 220, 20, 20);       // 仮値: 電源に接続される点
     public static readonly Color PortDrcExempt = new(255, 30, 144, 255); // 確定: 制御配線でDRC無効な点
+    // 【往復2周目・家老裁定】PortColorのフォールバック専用。throw化は「開発時の実装ミスを実行時の
+    // 危険（描画中の例外＝画面が落ちパーツ喪失）で買う」ため撤回(隠密指摘)。既存配色に現れぬ
+    // マゼンタとし、case行が消えても即座に目に立つ形で異常時のみ検出できるようにする。
+    public static readonly Color PortUnknown = new(255, 255, 0, 255);
 
     // 表（機器表・クロスリファレンス・表題欄）の罫線幅と、テスト通電配線の強調線幅(mm)。
     public const double TableLineWidth = 0.18;
@@ -102,13 +106,18 @@ public sealed class DrawingTheme
     /// テーマ非依存の意味色ゆえインスタンスに依らずstaticでよいが、Text/Getと並びを揃えるためstaticメソッドとする。
     /// 【往復1周目訂正・家老の静的レビュー指摘】既定値へ寄せるフォールバック(`_ => PortPower`)は
     /// 「Power行そのものが削除される」誤りを隠蔽することが壊す実測で判明した(全11件PASSのまま=
-    /// 検出力ゼロ)。Get/Textのような「意図的な広いデフォルト」とは性質が異なる2値enumゆえ、
-    /// 未知の値は例外で止める形へ改める(実測で穴を確認したうえでの恒久修正)。</summary>
+    /// 検出力ゼロ)。
+    /// 【往復2周目訂正・家老裁定】いったんthrow化したが撤回した——本メソッドは`PartEditorCanvas.Draw()`
+    /// から呼ばれ、描画中の例外は画面が落ちパーツが失われうる(隠密指摘「開発時の実装ミスを実行時の
+    /// 危険で買っておる」)。`Kind`はJSON経由で数値表記(`"kind": 99`)を許すため未知の値が実際に
+    /// 届く経路がある(JsonStringEnumConverterは文字列のみ検める、JsonOptions.cs:18)。ゆえに
+    /// throwではなく<see cref="PortUnknown"/>（既存配色に無いマゼンタ）へ寄せ、case行削除を
+    /// 検出しつつ実行時は落とさない形とする。</summary>
     public static Color PortColor(PortKind kind) => kind switch
     {
         PortKind.Power => PortPower,
         PortKind.DrcExempt => PortDrcExempt,
-        _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "未知のPortKind"),
+        _ => PortUnknown,
     };
 
     public TextStyle Text(TextRole role) => role switch
