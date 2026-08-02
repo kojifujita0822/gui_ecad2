@@ -2754,13 +2754,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>シート設定ダイアログ(T-055増分2)からUpdateSheetSettingsCommandへ渡すパラメータ。
-    /// Grid.RowsとBus.LeftName/RightNameをまとめて変更する。</summary>
-    public sealed record SheetSettings(int Rows, string LeftName, string RightName);
+    /// Grid.Rows/ColumnsとBus.LeftName/RightName/PowerLabelをまとめて変更する。
+    /// <para>
+    /// T-132増分4: ColumnsとPowerLabelを追加。<b>並びはRows→Columnsと寸法を隣り合わせ、
+    /// ダイアログの項目順(殿ご裁定の案ア)とも揃えた。</b>
+    /// </para></summary>
+    public sealed record SheetSettings(int Rows, int Columns, string LeftName, string RightName, string? PowerLabel);
 
-    /// <summary>シート設定(Grid.Rows・Bus.LeftName/RightName)をまとめて更新する(T-055増分2)。
-    /// Rowsが上限/下限(GridSpec.MaxRows/MinRows)外の場合は何も変更せず拒否する(ダイアログ側の
-    /// 入力制約をすり抜けた場合の安全弁、AddRowCommand/DeleteRowCommandと同じ二重化方針)。
-    /// Bus名の空文字は許容する(殿裁定、GuiEcad踏襲)。</summary>
+    /// <summary>シート設定(Grid.Rows/Columns・Bus.LeftName/RightName/PowerLabel)をまとめて更新する(T-055増分2)。
+    /// Rows/Columnsが上限/下限(GridSpec.MaxRows/MinRows・MaxColumns/MinColumns)外の場合は
+    /// 何も変更せず拒否する(ダイアログ側の入力制約をすり抜けた場合の安全弁、
+    /// AddRowCommand/DeleteRowCommandと同じ二重化方針)。
+    /// Bus名の空文字は許容する(殿裁定、GuiEcad踏襲)。PowerLabelはnull(未設定)を許容する。</summary>
     public ICommand UpdateSheetSettingsCommand { get; }
 
     /// <summary>右クリックコンテキストメニューから、指定行(int、CommandParameter)の前に1行挿入する
@@ -3560,6 +3565,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             if (CurrentSheet is not Sheet sheet || param is not SheetSettings settings) return;
             if (settings.Rows < GridSpec.MinRows || settings.Rows > GridSpec.MaxRows) return;
+            // T-132増分4: 列も行と同じく範囲外は拒否する(ダイアログ側の制約をすり抜けた場合の安全弁)。
+            if (settings.Columns < GridSpec.MinColumns || settings.Columns > GridSpec.MaxColumns) return;
             // T-055増分2往復1周目(隠密レビュー指摘、殿裁定): DeleteRowCommandは最終行のみ判定するが、
             // UpdateSheetSettingsCommandはダイアログ経由で一気に大きく縮小できるため、縮小される
             // 全行(新Rows〜旧Rows-1)のいずれかに要素があれば拒否する(キーボードのみ到達不能・
@@ -3572,9 +3579,31 @@ public sealed class MainWindowViewModel : ViewModelBase
                 // 拒否した実際の行番号(表示は1始まり、SelectedCellDisplayと同じ規約)を含める。
                 if (TryRejectOccupiedRow(sheet, row, $"行{row + 1}に要素があるため削除できません")) return;
             }
+            // T-132増分4: 列も同様に、縮小で消える全列(新Columns〜旧Columns-1)を検査する。
+            // 【行と違い列番号に +1 しない】SelectedCellDisplay が "行{Row+1}/列{Column}" と
+            // 行のみ1始まりで表示するためである(列は負の値も取りうる仕様ゆえ、そのまま表示する)。
+            // ここで行に倣って +1 すれば、使い手は表示上の列番号と食い違う場所を見に行き、
+            // T-055増分2往復2周目で正した「誤誘導」を列で再現することになる。
+            // 【TryRejectOccupiedRow のような共通ヘルパーを作らぬ理由】行版は3箇所から呼ばれて
+            // rule of three により共通化されたが、列数を変えるのは本コマンドのみである。
+            for (int column = settings.Columns; column < sheet.Grid.Columns; column++)
+            {
+                if (IsColumnOccupied(sheet, column))
+                {
+                    StatusMessage = $"列{column}に要素があるため削除できません";
+                    return;
+                }
+            }
             sheet.Grid.Rows = settings.Rows;
+            sheet.Grid.Columns = settings.Columns;
             sheet.Bus.LeftName = settings.LeftName;
             sheet.Bus.RightName = settings.RightName;
+            sheet.Bus.PowerLabel = settings.PowerLabel;
+            // T-132増分4: 選択セルの列クランプ。行のクランプは FinishRowCountChange が行うが、
+            // あちらは行数を変える5箇所の共通後処理であり、列数を変えるのは本コマンドのみ。
+            // rule of three に達しておらぬゆえ、共通化せずここに置く。
+            if (SelectedCell is GridPos selected && selected.Column >= sheet.Grid.Columns)
+                SelectedCell = selected with { Column = sheet.Grid.Columns - 1 };
             FinishRowCountChange(sheet);
         },
         _ => CurrentSheet is not null);

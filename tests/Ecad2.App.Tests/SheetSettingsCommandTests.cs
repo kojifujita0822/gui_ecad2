@@ -10,13 +10,24 @@ namespace Ecad2.App.Tests;
 /// </summary>
 public class SheetSettingsCommandTests : ViewModelTestBase
 {
+    /// <summary>
+    /// T-132増分4で <c>SheetSettings</c> へ <c>Columns</c>／<c>PowerLabel</c> が加わったことへの機械的な追随。
+    /// <b>既存の各観点は行数・母線名を測るものゆえ、列数・電源ラベルには現状維持の値を渡す</b>
+    /// ——ここに別の値を入れると、行を測っているつもりのテストが列の変更も巻き込んで測ることになる。
+    /// <para>
+    /// <b>列数・電源ラベルそのものの検証は <c>SheetSettingsColumnsCommandTests</c> に置いた</b>
+    /// （既存の観点と新規の観点を混ぜず、どちらが何を守っているかを分けておくため）。
+    /// </para></summary>
+    private static MainWindowViewModel.SheetSettings Settings(MainWindowViewModel vm, int rows, string left, string right)
+        => new(rows, vm.CurrentSheet!.Grid.Columns, left, right, vm.CurrentSheet!.Bus.PowerLabel);
+
     [Fact]
     public void Execute_UpdatesGridRows()
     {
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(15, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 15, "N24", "P24"));
 
         Assert.Equal(15, vm.CurrentSheet!.Grid.Rows);
     }
@@ -27,7 +38,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(10, "L1", "R1"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 10, "L1", "R1"));
 
         Assert.Equal("L1", vm.CurrentSheet!.Bus.LeftName);
         Assert.Equal("R1", vm.CurrentSheet!.Bus.RightName);
@@ -40,7 +51,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(10, "", ""));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 10, "", ""));
 
         Assert.Equal("", vm.CurrentSheet!.Bus.LeftName);
         Assert.Equal("", vm.CurrentSheet!.Bus.RightName);
@@ -52,7 +63,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(10, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 10, "N24", "P24"));
 
         Assert.True(vm.IsDirty);
     }
@@ -66,7 +77,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         var vm = CreateViewModel();
         vm.NewDocument();
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(boundaryRows, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, boundaryRows, "N24", "P24"));
 
         Assert.Equal(boundaryRows, vm.CurrentSheet!.Grid.Rows);
     }
@@ -87,7 +98,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.NewDocument();
         int before = vm.CurrentSheet!.Grid.Rows;
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(invalidRows, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, invalidRows, "N24", "P24"));
 
         Assert.Equal(before, vm.CurrentSheet!.Grid.Rows);
     }
@@ -101,7 +112,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.CurrentSheet!.Bus.LeftName = "元L";
         vm.CurrentSheet!.Bus.RightName = "元R";
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(61, "新L", "新R"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 61, "新L", "新R"));
 
         Assert.Equal("元L", vm.CurrentSheet!.Bus.LeftName);
         Assert.Equal("元R", vm.CurrentSheet!.Bus.RightName);
@@ -127,7 +138,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.CurrentSheet!.Grid.Rows = 10;
         vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(elementRow, 1) });
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 5, "N24", "P24"));
 
         Assert.Equal(10, vm.CurrentSheet!.Grid.Rows);
     }
@@ -152,7 +163,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.CurrentSheet!.Grid.Rows = 10;
         vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(elementRow, 1) });
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 5, "N24", "P24"));
 
         Assert.Equal($"行{elementRow + 1}に要素があるため削除できません", vm.StatusMessage);
     }
@@ -166,7 +177,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.CurrentSheet!.Grid.Rows = 10;
         vm.CurrentSheet!.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(2, 1) });
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 5, "N24", "P24"));
 
         Assert.Equal(5, vm.CurrentSheet!.Grid.Rows);
     }
@@ -183,7 +194,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.CurrentSheet!.Grid.Rows = 10;
         vm.SelectedCell = new GridPos(9, 3);
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(5, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 5, "N24", "P24"));
 
         Assert.Equal(new GridPos(4, 3), vm.SelectedCell);
     }
@@ -193,8 +204,9 @@ public class SheetSettingsCommandTests : ViewModelTestBase
     {
         var vm = CreateViewModel();
 
+        // CurrentSheet が無い状態を測るゆえ、現在値を引くヘルパーは使えない（直に組む）。
         Assert.False(vm.UpdateSheetSettingsCommand.CanExecute(
-            new MainWindowViewModel.SheetSettings(10, "N24", "P24")));
+            new MainWindowViewModel.SheetSettings(10, 20, "N24", "P24", null)));
     }
 
     /// <summary>T-055増分1往復2周目の教訓(Add/DeleteRowCommand成功パスのStatusMessage残留)を
@@ -206,7 +218,7 @@ public class SheetSettingsCommandTests : ViewModelTestBase
         vm.NewDocument();
         vm.StatusMessage = "最終行に要素があるため削除できません";
 
-        vm.UpdateSheetSettingsCommand.Execute(new MainWindowViewModel.SheetSettings(10, "N24", "P24"));
+        vm.UpdateSheetSettingsCommand.Execute(Settings(vm, 10, "N24", "P24"));
 
         Assert.Equal("", vm.StatusMessage);
     }

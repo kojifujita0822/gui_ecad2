@@ -1240,9 +1240,8 @@ public partial class MainWindow : Window
 
     // T-055増分2: シート設定ボタン。RenameSheetButton_Clickと同型、ダイアログ表示はView側の責務で
     // UpdateSheetSettingsCommandへ(行数, 左母線名, 右母線名)を渡す。
-    // T-132増分3: ダイアログへ列数・電源ラベルの現在値も渡す。ただし受け取り側の
-    // UpdateSheetSettingsCommandはまだそれらを受け取らぬため、この時点では変更しても反映されない
-    // (意図した中間状態。増分4で繋ぎ込む。SheetSettingsDialogのクラスコメント参照)。
+    // T-132増分3: ダイアログへ列数・電源ラベルの現在値も渡す。
+    // T-132増分4: その結果をUpdateSheetSettingsCommandへも渡し、実際にシートへ反映する。
     private void SheetSettingsButton_Click(object sender, RoutedEventArgs e)
     {
         if (_viewModel.SheetNavigation.SelectedSheet is not ViewModels.SheetListItem sheetItem) return;
@@ -1251,7 +1250,8 @@ public partial class MainWindow : Window
         var dialog = new Views.SheetSettingsDialog(sheet.Grid.Rows, sheet.Bus.LeftName, sheet.Bus.RightName,
             sheet.Grid.Columns, sheet.Bus.PowerLabel) { Owner = this };
         if (dialog.ShowDialog() == true)
-            _viewModel.UpdateSheetSettingsCommand.Execute(new ViewModels.MainWindowViewModel.SheetSettings(dialog.Rows, dialog.LeftName, dialog.RightName));
+            _viewModel.UpdateSheetSettingsCommand.Execute(new ViewModels.MainWindowViewModel.SheetSettings(
+                dialog.Rows, dialog.Columns, dialog.LeftName, dialog.RightName, dialog.PowerLabel));
     }
 
     private const string GcadFileFilter = "GCADファイル (*.gcad)|*.gcad";

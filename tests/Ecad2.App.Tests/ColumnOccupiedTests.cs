@@ -180,6 +180,34 @@ public class ColumnOccupiedTests
         Assert.Equal(expected, MainWindowViewModel.IsColumnOccupied(sheet, column));
     }
 
+    // ===== 観点C-2: 定義域（T-132増分4で追加・隠密の指摘＋家老の裁可2026-08-02） =====
+
+    /// <summary>
+    /// <b>【述語の定義域と、呼び出し側の責務の対・その1】</b>
+    /// 本述語は範囲外の列（負・グリッドの列数以上）でも<b>ガードせず</b>判定する。
+    /// <b>これは足し忘れではない</b>——範囲の限定は呼び出し側が負うという設計であり、
+    /// <see cref="MainWindowViewModel.IsRowOccupied"/> も同じ作法で行範囲外のガードを持たない。
+    /// <para>
+    /// 対をなす呼び出し側の固定は <c>SheetSettingsColumnsCommandTests</c> の
+    /// 「負の列に掛かる要素があっても縮小できる」。<b>この2件で「述語は弾かぬ／呼び出し側が弾く」
+    /// という責務分担が形として残り、将来どちらかにガードを足せば必ず鳴る。</b>
+    /// </para>
+    /// <para>
+    /// <b>増分2では敢えて足さなかった</b>——呼び出し側がまだ無い段階で定義域を凍らせると、
+    /// 呼び出し側を書いてみて初めて分かることを先回りで仕様にしてしまうため。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void 範囲外の列でもガードせずに判定する()
+    {
+        var sheet = NewSheet();   // Columns = 20
+        sheet.WireBreaks.Add(new WireBreak { Boundary = 0, Row = 1 });
+        sheet.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, Pos = new GridPos(1, 100) });
+
+        Assert.True(MainWindowViewModel.IsColumnOccupied(sheet, -1));    // 境界0は列-1にも掛かる
+        Assert.True(MainWindowViewModel.IsColumnOccupied(sheet, 100));   // グリッドの列数(20)を超える列
+    }
+
     // ===== 観点D: 対称性点検（Elements／Frames のみ・設計書§6） =====
 
     /// <summary>
