@@ -1518,7 +1518,15 @@
                             <avalonDock:LayoutAnchorable Title="プロパティ" ContentId="RightPanelBottom" CanClose="False" CanFloat="False" CanDockAsTabbedDocument="False">
                                 <Grid>
                                     <DockPanel Visibility="{Binding IsPartSelectionVisible, Converter={StaticResource InverseBoolToVisibility}}">
-                                        <TextBlock Text="要素を選択してください" Foreground="Gray" Margin="4" TextWrapping="Wrap"
+                                        <!-- T-140系統2・P-158(殿裁可2026-08-02、色案=docs/ecad2-t140-keitou2-color-proposal-onmitsu.md):
+                                             原本GuiEcad(MainPage.Properties.cs:140-147)は固定色を指定せず
+                                             Opacity=0.6で弱める方式。ecad2は移植時にGray固定色(前景色属性へ
+                                             直値指定)へ置き換えてしまい、ダーク(3.47:1)・ライト(3.95:1)とも
+                                             4.5:1未満でWCAG不適合だった(ライト側は誰も測っておらなんだ)。
+                                             原本方式へ戻す。PanelContentForegroundBrushへの継承には頼らず
+                                             明示指定する(DockPanelにForeground設定は無く、他の兄弟要素も
+                                             個別に明示している)。 -->
+                                        <TextBlock Text="要素を選択してください" Foreground="{DynamicResource PanelContentForegroundBrush}" Opacity="0.6" Margin="4" TextWrapping="Wrap"
                                                    Visibility="{Binding HasNoPropertySelection, Converter={StaticResource BoolToVisibility}}"/>
                                         <!-- T-083新規発見1(殿直接指摘2026-07-17): 増分5の対応表がプロパティパネルの
                                              背景透過(層Bペイン背景が透けて暗くなる)は把握済みだったが、中身のラベル
@@ -1602,7 +1610,8 @@
                                              ため数値入力は設けず、ファイルパス表示+トレーストグルのみとする。 -->
                                         <StackPanel Margin="4" Visibility="{Binding HasSelectedImage, Converter={StaticResource BoolToVisibility}}">
                                             <TextBlock Text="画像" FontWeight="SemiBold" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
-                                            <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="Gray"/>
+                                            <!-- T-140系統2・P-158(殿裁可2026-08-02): プレースホルダと同じ理由・同じ対処。 -->
+                                            <TextBlock Text="{Binding SelectedImage.FilePath}" TextWrapping="Wrap" Margin="0,4,0,4" Foreground="{DynamicResource PanelContentForegroundBrush}" Opacity="0.6"/>
                                             <CheckBox Content="トレース用下絵(印刷に含めない)" IsChecked="{Binding SelectedImageIsTracingOnly, Mode=TwoWay}" Foreground="{DynamicResource PanelContentForegroundBrush}"/>
                                         </StackPanel>
                                     </DockPanel>
