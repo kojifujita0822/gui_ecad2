@@ -15,10 +15,12 @@ public static class ElementCatalog
 
     /// <summary>既定の占有セル高さ（T-133増分2）。縦2セルを占める記号のために置く。
     /// <para>
-    /// <b>増分2の時点では呼び出し元が無い（意図的）。</b> 判定へ通すのは増分3（占有・ヒットテストの
-    /// 縦方向対応）、配置時に入れるのは増分4（<c>Kind</c> 経路の新設）である——器と結線を段階に分ける
-    /// 段取りゆえ。<c>docs/proposed.md</c> P-143「型はあるが結線が無い」を新たに作らぬよう、
-    /// <b>結線先を先に書き留めておく。</b>
+    /// <b>増分2の時点では呼び出し元が無かった（意図的）</b>——判定へ通すのは増分3（占有・ヒットテストの
+    /// 縦方向対応）、配置時に入れるのは増分4（<c>Kind</c> 経路の新設）という段取りゆえ。
+    /// <b>T-133増分4-B で <c>MainWindowViewModel.PlaceElementAtSelectedCell(ElementKind, string?)</c> が
+    /// 呼び手となり、結線を果たした</b>（<see cref="DefaultCellWidth"/> も同じくこの経路が初めての呼び手。
+    /// 既存の配置はすべて <c>PartId</c> 経由で <c>PartDefinition</c> から幅を取っておった）。
+    /// <c>docs/proposed.md</c> P-143「型はあるが結線が無い」を残さぬよう、結線先を先に書き留めておいたもの。
     /// </para></summary>
     public static int DefaultCellHeight(ElementKind kind) => kind switch
     {

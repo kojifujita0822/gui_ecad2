@@ -3090,16 +3090,29 @@ public sealed class MainWindowViewModel : ViewModelBase
         // (P-148)」と記していたが、枠は h セルちょうどへ改まり P-148 は覆った。枠の大きさは変わったが、
         // 「枠と図面の占有が食い違いうる」という本コメントの趣旨そのものは変わらぬ。
         int cellHeight = definition?.HeightCells ?? 1;
-        // T-136(A)増分1: シート種別の枷。definition は直上で解決済みゆえそこから引く。
-        // 【非対称の記録＝増分1の壊す実測で露見】移動の2経路は PartResolver.SheetAffinityOf を通るが、
-        // 本経路だけは通っておらぬ——配置時にはまだ ElementInstance が無いためである。
-        // 未解決の partId（definition が null）でも、ここで作る要素の Kind は既定値ゆえ
-        // ElementCatalog.SheetAffinityOf(既定)＝Any となり、結果は下の式と一致する（今は実害なし）。
-        // T-133増分4 で Kind 経路の配置導線が新設される際、そちらは Kind から引く要があるゆえ、
-        // その折に PartResolver 側へ (PartDefinition?, ElementKind) を受けるオーバーロードを設けて
-        // 本経路もろとも一元化するのが筋。今それを作れば呼び出し元1つの器が先に立つゆえ見送る。
-        var affinity = definition?.SheetAffinity ?? SheetAffinity.Any;
-        if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet, affinity)) return;
+        var newElement = new ElementInstance
+        {
+            Pos = pos,
+            PartId = partId,
+            CellWidth = cellWidth,
+            CellHeight = cellHeight,
+            DeviceName = deviceName.Length > 0 ? deviceName : null,
+        };
+
+        // T-136(A)増分1: シート種別の枷。
+        // 【T-133増分4-B で非対称を解消した】かつては「移動の2経路は PartResolver.SheetAffinityOf を
+        // 通るが、配置だけは通らぬ（配置時にはまだ ElementInstance が無いため）」という非対称があり、
+        // ここは definition?.SheetAffinity ?? Any と直に書いておった。
+        // 【解いた手】要素を先に組み立てておけば、移動の2経路（:1702/:1744）とまったく同じ
+        // PartResolver.SheetAffinityOf(要素, ライブラリ) がそのまま使える——3経路が同じ呼び方になる。
+        // 【振る舞いは変わらぬ】definition は PartLibrary.Get(partId) の結果ゆえ PartResolver 内の
+        // lib?.Get(e.PartId) と同一で、definition が null のときは要素の Kind が既定値である以上
+        // ElementCatalog.SheetAffinityOf(既定)＝Any へ落ち、旧い式と同じ値になる。
+        // 【要素を先に作ってよい理由】ValidatePlacement で拒まれれば Elements へ加えぬまま捨てる。
+        // UndoManager.RecordSnapshot は Document を写すが、この時点で要素はまだシートに載っておらぬ
+        // ゆえ、スナップショットの中身も従来と変わらぬ。
+        if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet,
+                               PartResolver.SheetAffinityOf(newElement, PartLibrary))) return;
 
         // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
         // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
@@ -3110,14 +3123,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         UndoManager.RecordSnapshot(Document);
         int undoDepthAfterPlacement = UndoManager.UndoDepth;
 
-        var newElement = new ElementInstance
-        {
-            Pos = pos,
-            PartId = partId,
-            CellWidth = cellWidth,
-            CellHeight = cellHeight,
-            DeviceName = deviceName.Length > 0 ? deviceName : null,
-        };
         sheet.Elements.Add(newElement);
         MarkDirty();
 
@@ -3149,6 +3154,73 @@ public sealed class MainWindowViewModel : ViewModelBase
             candidates, SelectedIndex: 0, UndoDepthAfterPlacement: undoDepthAfterPlacement);
         Tool = new ToolState(ToolMode.ConfirmOrJoinTarget);
         OnPropertyChanged(nameof(OrJoinTargetPreview));
+    }
+
+    /// <summary>
+    /// SelectedCell へ組込み種別（<see cref="ElementKind"/>）の要素を配置する（T-133増分4-B）。
+    /// <para>
+    /// <b>【なぜ PartId 経路と別に要るか】</b>既存の
+    /// <see cref="PlaceElementAtSelectedCell(string, string, bool)"/> は <c>PartId</c> 専用で、
+    /// 生成する要素の <c>Kind</c> を設定せず常に既定値 <c>ContactNO</c> のまま固定される
+    /// （T-046由来の既知の構造的制約）。<b>主回路3極記号は <see cref="PartDefinition"/> を持たぬゆえ、
+    /// 既存の配置フローにそのままでは乗らぬ</b>——殿裁定2026-07-28＝案B（<c>ElementKind</c> 経路の新設）。
+    /// </para>
+    /// <para>
+    /// <b>【デバイス名を取らぬ】</b>原本 GuiEcad は3極記号をメニューで選び、キャンバスを単クリックで
+    /// 即座に置く（配置ダイアログを挟まぬ）。殿裁定2026-07-28＝B-1「メニュー→キャンバス単クリック配置」も
+    /// 同じ形にて、名前は配置後にプロパティパネルで付ける。<b>ゆえに機器表への登録もここでは行わぬ</b>
+    /// ——名前が無い要素は機器表に載らぬという既存の作法（PartId 経路の <c>deviceName.Length > 0</c> 条件）と揃う。
+    /// </para>
+    /// <para>
+    /// <b>【<c>Params[Orient]</c> は入れ、<c>Params[Type]</c> は入れぬ】</b>この非対称は原本の設計そのものである。
+    /// <b>向きは配置時に確定し以後変えられぬ</b>（原本コメント「タグ "Kind#V/#H" で配置時に向きを確定（切替不可）」）
+    /// ゆえ、確定した値を記録せねば何を選んだかが失われる。<b>対して型（NFB/MCCB/ELB）は配置後に切り替えるもの</b>で、
+    /// <c>DiagramRenderer</c> が「未設定なら NFB」のフォールバックを既に持つ
+    /// （<c>DiagramRenderer.cs:1046</c>）。ここで既定値を書き込めば <c>"NFB"</c> が2箇所に散り、
+    /// いずれ片方が腐る。<b>書き漏らしではない。</b>型の切替UIは増分5（＝T-131 の P-100）で設ける。
+    /// </para>
+    /// <para>
+    /// <b>【共通部分を PartId 経路と括らぬ理由】</b>重なるのは
+    /// 「ValidatePlacement → RecordSnapshot → Add → MarkDirty」の順序だけで、呼び出し元は2つ
+    /// ——rule of three に達しておらぬ（<see cref="KindDisplayName"/> を2箇所へ個別に足したのと同じ判断）。
+    /// <b>ただしこの順序そのものは T-134殿裁定(U-1) の要であり、片方だけ変えてはならぬ</b>
+    /// ——拒否された経路で履歴を積めば「押しても何も変わらぬUndo」が1回挟まる。
+    /// <c>PlaceElementByKindTests</c> が両経路について順序を測っておる。
+    /// </para>
+    /// </summary>
+    /// <param name="kind">配置する組込み種別。幅・高さは <see cref="ElementCatalog"/> の既定値から取る。</param>
+    /// <param name="orient">主回路記号の向き（<c>"V"</c>／<c>"H"</c>）。<c>null</c> なら <c>Params</c> へ入れぬ。</param>
+    public void PlaceElementAtSelectedCell(ElementKind kind, string? orient)
+    {
+        if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
+
+        var newElement = new ElementInstance
+        {
+            Pos = pos,
+            Kind = kind,
+            // T-133増分4-B: ElementCatalog の既定値は、ここが初めての呼び手である
+            // ——既存の配置はすべて PartId 経由で PartDefinition から幅・高さを取っておった。
+            CellWidth = ElementCatalog.DefaultCellWidth(kind),
+            CellHeight = ElementCatalog.DefaultCellHeight(kind),
+        };
+        if (orient is not null) newElement.Params[ParamKeys.Orient] = orient;
+
+        // (f) 主回路限定の防御側。T-136(A) が ValidatePlacement へ SheetAffinity を既定値なしで
+        // 入れており、渡さぬという選択肢が構造上存在せぬ（渡し忘れればコンパイルが通らぬ）。
+        // 拒否はサイレント（殿裁定2026-07-31）——予防はメニュー側の無効化が担う（増分4-C）。
+        if (!ValidatePlacement(pos, newElement.CellWidth, newElement.CellHeight, sheet,
+                               PartResolver.SheetAffinityOf(newElement, PartLibrary))) return;
+
+        // 順序は PartId 経路と同じ（T-134殿裁定(U-1)）。拒否された経路では積まぬ。
+        UndoManager.RecordSnapshot(Document);
+
+        sheet.Elements.Add(newElement);
+        MarkDirty();
+
+        // T-079(P-058)と同じ理由: SelectedCell 自体は配置前後で値が変わらぬゆえ、setter 経由の
+        // SelectedElement 系プロパティ通知が発火せぬ。放置すればプロパティパネルの表示が
+        // 配置前の古い値のまま残る。
+        NotifySelectedElementChanged();
     }
 
     /// <summary>T-102(殿裁定=案A): OR配置の合流先候補を列挙する。新要素の配置行(pos.Row)より上に

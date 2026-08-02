@@ -133,12 +133,20 @@ public class SymbolTagParserTests
     /// ——<b>早く弾かれる入力だけでは、後段の緩みが現れぬ</b>。
     /// <c>samurai.md</c>「範囲の外側を測る」と同じ形の見落としにて、拒む段ごとに1件ずつ置く。
     /// </para>
+    /// <para>
+    /// <b>【4段すべてを揃えた・隠密の指摘 2026-08-02】</b>拒む段は4つ（空・区切り過多・未知種別・向き不正）
+    /// あるが、当初は後ろ3段しか測っておらなんだ。<b>1段目は初期化直後の最速 return ゆえ構造上自明に安全</b>
+    /// と隠密も判じておるが、<b>「3段は測ったが1段は測らぬ」という非対称を残せば、
+    /// 次に段を足す者が「どこまで測るのが作法か」を測りかねる。</b>1行で揃うゆえ足す。
+    /// </para>
     /// </summary>
     [Theory]
-    [InlineData("Foo#V")]          // 種別名の段で弾かれる
-    [InlineData("Breaker3P#X")]    // 向きの段で弾かれる（こちらが後段）
-    [InlineData("Breaker3P#V#H")]  // 区切りの段で弾かれる（こちらが最前段）
-    public void 拒んだときの出力は既定値のまま(string tag)
+    [InlineData(null)]             // 空・null の段（最前段）
+    [InlineData("")]               // 同上
+    [InlineData("Breaker3P#V#H")]  // 区切りの段
+    [InlineData("Foo#V")]          // 種別名の段
+    [InlineData("Breaker3P#X")]    // 向きの段（最後段）
+    public void 拒んだときの出力は既定値のまま(string? tag)
     {
         Assert.False(SymbolTagParser.TryParse(tag, out var kind, out var orient));
 

@@ -67,9 +67,10 @@ public sealed class ElementInstance
     /// <summary>占有セル高さ（既定は <see cref="ElementCatalog.DefaultCellHeight"/>）。Motor=2・3極記号=2、他は1。
     /// <para>
     /// T-133増分2で新設。それ以前は高さの器が無く、縦2セルを占める記号（三相モータ・主回路3極記号）でも
-    /// 占有・ヒットテストは1行分しか見ていなかった。<b>本増分では器を置くだけで、判定へ通すのは増分3、
-    /// 配置時に既定値を入れるのは増分4である</b>——器と結線を分ける段取りゆえ、しばらく
-    /// <see cref="ElementCatalog.DefaultCellHeight"/> の呼び出し元が無い状態が続く（意図的）。
+    /// 占有・ヒットテストは1行分しか見ていなかった。<b>器と結線を分ける段取りで進めた</b>——
+    /// 増分2で器を置き、増分3で判定へ通し、<b>増分4で配置時に入れるところまで結線済みである</b>
+    /// （自作パーツは <c>PartDefinition.HeightCells</c> から＝増分4、組込み種別は
+    /// <see cref="ElementCatalog.DefaultCellHeight"/> から＝増分4-B の <c>Kind</c> 経路）。
     /// </para>
     /// <para>
     /// 永続化＝JsonSerializer による自動反映（GcadSerializer は手書きのマッピングを持たぬ）。
