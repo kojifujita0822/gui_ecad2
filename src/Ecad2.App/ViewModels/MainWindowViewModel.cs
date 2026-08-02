@@ -2856,14 +2856,26 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>グリッド範囲内か判定する。列は左上アンカー基準、<b>行は中心基準</b>である。
     /// <para>
-    /// T-133増分3(殿裁定11=H-2「中心基準3行」): 高さ H の要素は <c>pos.Row</c> を中心として
-    /// 上下へ <c>H-1</c> 行ずつ、計 <c>2(H-1)+1</c> 行を占める。H=1 なら 1行(従来と同一)、
-    /// H=2 なら 3行。<b>接続点の <see cref="Ecad2.Model.PartShapeGeometry.ClampPort"/> が用いる
-    /// <c>rowLimit = heightCells - 1</c> と同じ式</b>であり、両者の基準が揃う。
+    /// T-133増分3(殿裁定11=H-2「中心基準」): 高さ H の要素は <c>pos.Row</c> を中心として
+    /// 上下へ <see cref="ElementInstance.RowSpanOf"/>(H) 行ずつ、計 <c>2×RowSpanOf(H)+1</c> 行を占める。
+    /// H=1 なら 1行(従来と同一)、H=2 なら 3行、<b>H=3 も 3行</b>（下記のとおり奇数は一つ下の偶数へ潰れる）。
+    /// </para>
+    /// <para>
+    /// <b>【2026-08-02 訂正・式が改まっておる】</b>T-139(C)裁定（殿裁定2026-07-31）により
+    /// <b>旧 <c>H-1</c> ／新 <c>RowSpanOf(H) = Math.Max(0, H/2)</c>（整数除算）</b>。
+    /// <b>H=1・H=2 では新旧が同値ゆえ、高さ2だけを見て確かめても違いは現れぬ。</b>
+    /// </para>
+    /// <para>
+    /// <b>【<c>ClampPort</c> の <c>rowLimit</c> とは別の式である】</b>接続点の
+    /// <see cref="Ecad2.Model.PartShapeGeometry.ClampPort"/> が用いる <c>rowLimit = heightCells - 1</c> は
+    /// T-139(C)裁定でも変わっておらぬ。<b>H=1・H=2 では偶然一致するが、H≧3 で食い違う</b>
+    /// （H=3 なら <c>rowLimit</c>=2 に対し <c>RowSpanOf</c>=1）。
+    /// <b>かつてここには「両者の基準が揃う」と書いてあったが、それは裁定前の記述であった</b>
+    /// ——<b>「揃う」と信じて設計すれば誤る。</b>
     /// </para>
     /// <para>
     /// <b>列と行で基準が違う点に注意せよ。</b> 列は <c>[c, c+W-1]</c>(左上アンカー)、
-    /// 行は <c>[r-(H-1), r+(H-1)]</c>(中心)。<b>幅と高さを同じ式で扱うと誤る。</b>
+    /// 行は <c>[r-RowSpanOf(H), r+RowSpanOf(H)]</c>(中心)。<b>幅と高さを同じ式で扱うと誤る。</b>
     /// 殿裁定の経緯＝計画書§4-1（描画が及ぶ全行を覆うことを占有判定の本義とした）。
     /// </para></summary>
     private static bool IsWithinGridBounds(GridPos pos, int cellWidth, int cellHeight, Sheet sheet)
@@ -2907,8 +2919,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// exclude省略(null)で従来どおりの判定になる。
     /// <para>
     /// T-133増分3: 行も区間交差で判定する。<b>置く側だけでなく既存要素の側も高さを持つ</b>ゆえ、
-    /// 両者の占有行範囲 <c>[r-(H-1), r+(H-1)]</c> が重なるかを見る(列と同じ区間交差の形)。
+    /// 両者の占有行範囲 <c>[r-RowSpanOf(H), r+RowSpanOf(H)]</c> が重なるかを見る(列と同じ区間交差の形)。
     /// 高さ1どうしなら <c>[r,r]</c> 同士の一致比較に潰れ、従来と数学的に等価である。
+    /// <b>【2026-08-02 訂正】</b>かつてここには <c>[r-(H-1), r+(H-1)]</c> と書いてあったが、
+    /// T-139(C)裁定（殿裁定2026-07-31）で <see cref="ElementInstance.RowSpanOf"/> へ改まっておる
+    /// （H=1・H=2 では同値ゆえ数値は変わらぬが、H≧3 で食い違う）。
     /// </para></summary>
     private static bool IsOccupied(GridPos pos, int cellWidth, int cellHeight, Sheet sheet, ElementInstance? exclude = null)
     {

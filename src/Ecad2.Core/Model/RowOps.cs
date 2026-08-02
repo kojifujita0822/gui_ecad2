@@ -48,7 +48,11 @@ public static class RowOps
     public static IReadOnlyList<ElementInstance> DeleteRow(Sheet sheet, int targetRow)
     {
         // T-133増分4(隠密の死角調査「漏れ2」、殿裁定2026-07-28=(D-1)): 高さ2以上の要素は
-        // 2H-1 行を占める(中心基準)。アンカー行の一致だけを見ると、真上・真下の行を削除したとき
+        // 複数行を占める(中心基準。占有行数＝2×ElementInstance.RowSpanOf(H)+1)。
+        // 【2026-08-02 訂正】かつてここには「2H-1 行」と書いてあったが、T-139(C)裁定
+        // (殿裁定2026-07-31)で RowSpanOf = Math.Max(0, H/2) へ改まっておる。H=2 では
+        // 新旧とも3行で一致するが、H=3 は旧5行・新3行と食い違う。
+        // アンカー行の一致だけを見ると、真上・真下の行を削除したとき
         // その要素が削除されず -1 シフトして残る——画面に描かれておるのに消えぬ食い違いが出る。
         // 殿裁定「対象行の要素は要素ごと削除」の趣旨に従い、占有範囲にかかれば削除する。
         var removedElements = sheet.Elements.Where(e => e.ContainsRow(targetRow)).ToList();
