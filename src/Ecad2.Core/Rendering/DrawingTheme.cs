@@ -37,10 +37,10 @@ public sealed class DrawingTheme
     // (背景とのコントラストのみ確認、色自体はテーマ非依存)。
     public static readonly Color Comment = new(255, 0, 128, 0);
     // T-136(B)増分4(殿裁定2026-08-02): パーツエディタの接続点の種類色。ライト/ダーク両テーマで固定。
-    // 【仮の値・論点7】赤(PortPower)は実装後に実機の絵を殿へお見せしてから裁可を仰ぐ暫定値
-    // (docs/ecad2-t136-increment4-plan-samurai.md 論点7、選択リング色=論点3の前例に倣う)。
-    // 青(PortDrcExempt)は増分3以前からの塗り色(DodgerBlue)をそのまま流用、据え置き確定値。
-    public static readonly Color PortPower = new(255, 220, 20, 20);       // 仮値: 電源に接続される点
+    // 赤(PortPower)は論点7(docs/ecad2-t136-increment4-plan-samurai.md)——実装後にLight/Dark
+    // 双方の実機の絵を殿へお見せし、殿裁可2026-08-02=実機の絵をご覧のうえ確定(選択リング色=論点3の
+    // 前例に倣う)。青(PortDrcExempt)は増分3以前からの塗り色(DodgerBlue)をそのまま流用、確定値。
+    public static readonly Color PortPower = new(255, 220, 20, 20);       // 確定: 電源に接続される点
     public static readonly Color PortDrcExempt = new(255, 30, 144, 255); // 確定: 制御配線でDRC無効な点
     // 【往復2周目・家老裁定】PortColorのフォールバック専用。throw化は「開発時の実装ミスを実行時の
     // 危険（描画中の例外＝画面が落ちパーツ喪失）で買う」ため撤回(隠密指摘)。既存配色に現れぬ

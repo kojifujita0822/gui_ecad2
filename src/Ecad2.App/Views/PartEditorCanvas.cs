@@ -715,7 +715,8 @@ public sealed class PartEditorCanvas : FrameworkElement
             // T-136(B)増分4（殿裁定2026-08-02）: 塗り色を接続点の種類（赤=電源に接続される点／
             // 青=制御配線でDRC無効な点）で描き分ける。色の決定はDrawingTheme.PortColorへ切り出し
             // （View層に色分岐を持たせずCore層でテスト可能にする、docs/ecad2-t136-increment4-plan-
-            // samurai.md §2.3）。赤の具体的な色調は仮値（同書論点7、実機の絵をお見せしてから裁可）。
+            // samurai.md §2.3）。赤の具体的な色調（論点7）は殿裁可2026-08-02＝Light/Dark双方の
+            // 実機の絵をご覧のうえ確定。
             var (portFillRadius, portRingRadius) = PartShapeGeometry.PortVisualRadiiMm(_geo.CellMm);
             var portRingStroke = new StrokeStyle(_theme.Foreground, PartShapeGeometry.PortRingStrokeMm);
             for (int i = 0; i < _ports.Count; i++)
