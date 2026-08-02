@@ -99,6 +99,27 @@ public sealed class PartFolderStore
                 try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
             }
 
+            // T-143: T-136(B)増分5(殿裁定7=モータの3端子は青)より前に展開された モータ.gcadpart は
+            // ports に kind を持たず、デシリアライズで PortDef.Kind の既定値 Power(赤)へ落ちる
+            // (Power は PortKind の先頭ゆえ default(T) と同値)。SeedBasics は既存ファイルを上書き
+            // せぬ設計(冪等)ゆえ、コード側の青化だけでは展開済みの実運用データへ届かない。固定Id
+            // (モータ)のときだけ DrcExempt へ補正し書き戻す(上記2件と同型パターン、T-037/T-061踏襲)。
+            //
+            // 【意図的な赤を巻き込まぬか】PortKind は2値ゆえ、上の Role 補正が使う「既定値以外なら
+            // 殿の意図的な変更」という判定が成り立たない(欠落と意図的な power が JSON 上区別できぬ)。
+            // されど基本図形(図形/直下)はパーツエディタの編集対象に含まれず(自作パーツ管理メニューは
+            // Category=="自作" のみを並べ、保存も SaveCustom=図形/自作/ へ書く)、アプリの操作では
+            // 意図的な赤を作れない。ゆえに「動機が考えにくい」ではなく「経路が無い」を根拠とする。
+            // 【射程】アプリ外でファイルを直接編集した場合、および将来 基本図形の編集を許す UI が
+            // 入った場合は、この前提が崩れる。そのときは本補正の条件を見直すこと。
+            if (def.Id == BasicPartTemplates.MotorId && def.Ports.Any(p => p.Kind != PortKind.DrcExempt))
+            {
+                for (int i = 0; i < def.Ports.Count; i++)
+                    if (def.Ports[i].Kind != PortKind.DrcExempt)
+                        def.Ports[i] = def.Ports[i] with { Kind = PortKind.DrcExempt };
+                try { PartLibrarySerializer.SaveOne(def, file); } catch { /* ベストエフォート */ }
+            }
+
             // 隠密レビュー指摘: Idがnull/空文字列(壊れた/旧形式ファイル)の場合、HashSet.Addは
             // 最初の1件を「非重複」として通してしまい無効なIdのまま放置される
             // (後続のDictionary登録でArgumentNullException等の恐れ)。無条件で再採番扱いにする。

@@ -430,4 +430,273 @@ public class PartFolderStoreTests
             Directory.Delete(tempDir, recursive: true);
         }
     }
+
+    // ===== T-143: 展開済みモータの kind 欠落を DrcExempt へ補正するマイグレーション回帰テスト =====
+    // (docs/ecad2-t143-portkind-fixup-test-design-onmitsu.md、上記 Role 補正テストと同じ固定Id・同じ手法)
+    //
+    // 【背景】T-136(B)増分5(殿裁定7=モータの3端子は青)より前に展開された モータ.gcadpart は
+    // ports に kind を持たず、デシリアライズで PortDef.Kind の既定値 Power(赤)へ落ちる。
+    // SeedBasics は既存ファイルを上書きせぬ設計(冪等)ゆえ、コード側の青化が実運用データへ届かない。
+    //
+    // 【測れておらぬ範囲・設計書§1】「kind 欠落」と「意図的に power と書かれた」は JSON 上区別が
+    // つかぬ(PortKind は2値ゆえ、前例 T-061 の Role 補正が使う「既定値以外なら意図的」の判定が
+    // 成り立たない)。ゆえに後者を保護するテストは原理的に書けない。実装は「基本図形はパーツエディタの
+    // 編集対象に含まれぬ」という構造を根拠に割り切っており、その構造が崩れれば本テスト群では検出できない。
+
+    /// <summary>kind 欠落の3端子を持つ旧版モータJSON(展開済み実データそのものの形)。
+    /// ports 以外のフィールドは非破壊性(観点B)の測定対象として意図的に持たせてある。</summary>
+    private static string LegacyMotorJson(string id) =>
+        $$"""
+        {"id":"{{id}}","name":"モータ","widthCells":3,"heightCells":1,"role":"nonSimulated","ports":[{"name":"U","rowOffset":0,"boundaryOffset":0},{"name":"V","rowOffset":0,"boundaryOffset":1},{"name":"W","rowOffset":0,"boundaryOffset":2}],"primitives":[{"type":"circle","cx":2.05,"cy":0,"r":0.92}]}
+        """;
+
+    [Fact]
+    public void Enumerate_LegacyMotorJsonWithoutKind_BackfillsToDrcExemptAndSaves()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, LegacyMotorJson(BasicPartTemplates.MotorId));
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var ports = result.Entries.Single().Definition.Ports;
+            // 観点D(対称性): 3端子を1つだけ見て済ませない。かつ件数だけでは「在るべき端子に
+            // 付いているか」を測れぬゆえ、端子名で引いて個別に確認する。
+            Assert.Equal(3, ports.Count);
+            Assert.All(ports, p => Assert.Equal(PortKind.DrcExempt, p.Kind));
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "U").Kind);
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "V").Kind);
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "W").Kind);
+
+            // 観点C1: ファイルへ書き戻されている(次回起動でも維持される)。
+            var reloaded = PartLibrarySerializer.LoadOne(path);
+            Assert.All(reloaded.Ports, p => Assert.Equal(PortKind.DrcExempt, p.Kind));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_MotorAlreadyDrcExempt_NoChangeIdempotent()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 既に補正済み(kind="drcExempt")のファイルを再実行しても変化しないこと(冪等性)。
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, $$"""
+                {"id":"{{BasicPartTemplates.MotorId}}","name":"モータ","ports":[{"name":"U","rowOffset":0,"boundaryOffset":0,"kind":"drcExempt"},{"name":"V","rowOffset":0,"boundaryOffset":1,"kind":"drcExempt"},{"name":"W","rowOffset":0,"boundaryOffset":2,"kind":"drcExempt"}]}
+                """);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.All(result.Entries.Single().Definition.Ports,
+                p => Assert.Equal(PortKind.DrcExempt, p.Kind));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_MotorBackfillTwice_FileUnchangedOnSecondRun()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点C2: 1回目で補正・書き戻しが起きた後、2回目の走査でファイルが変わらないこと。
+            // 起動のたびに Enumerate が走る設計(PartPaletteViewModel のコンストラクタ)ゆえ、
+            // 補正が収束せず毎回書き込み続ける形になっていないかを測る。
+            //
+            // 【内容比較だけでは足りぬ】書き戻す内容は補正後も同一ゆえ、内容の一致は「書き込みが
+            // 起きなかった」ことを意味しない(実測: 要否判定を外して毎回書き戻す改変を当てても
+            // 内容比較はGREENのまま通った)。ゆえに最終更新時刻でも測る。時刻は1回目の直後に
+            // 既知の過去値へ落としておく——2回の走査が同一時刻内に収まって偽陰性になるのを防ぐ
+            // (SetCreationOrder が作成時刻を明示設定するのと同じ発想)。
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, LegacyMotorJson(BasicPartTemplates.MotorId));
+
+            var store = new PartFolderStore(tempDir);
+            store.Enumerate();
+            string afterFirst = File.ReadAllText(path);
+
+            var marker = new DateTime(2020, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            File.SetLastWriteTimeUtc(path, marker);
+
+            store.Enumerate();
+            string afterSecond = File.ReadAllText(path);
+
+            Assert.Equal(afterFirst, afterSecond);
+            // 2回目では書き戻し自体が起きぬ(補正の要否判定が効いておる)。
+            Assert.Equal(marker, File.GetLastWriteTimeUtc(path));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_MotorPartiallyMigrated_BackfillsOnlyMissingPortsAndKeepsExisting()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点A4(境界): 3端子中 U のみ kind 欠落、V/W は既に drcExempt。
+            // 欠落分だけが補正され、既に青の2件も青のまま保たれること。
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, $$"""
+                {"id":"{{BasicPartTemplates.MotorId}}","name":"モータ","ports":[{"name":"U","rowOffset":0,"boundaryOffset":0},{"name":"V","rowOffset":0,"boundaryOffset":1,"kind":"drcExempt"},{"name":"W","rowOffset":0,"boundaryOffset":2,"kind":"drcExempt"}]}
+                """);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var ports = result.Entries.Single().Definition.Ports;
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "U").Kind);
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "V").Kind);
+            Assert.Equal(PortKind.DrcExempt, ports.Single(p => p.Name == "W").Kind);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_OtherBasicPartWithoutKind_NotAffected()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点A3(誤爆防止): 固定Id=ContactNOId(a接点)は対象外(Id不一致)で Kind=Power のまま。
+            // 殿裁定7は「モータのみ青・他は赤」ゆえ、赤の側が黙って青へ流れぬことを固定する。
+            string path = Path.Combine(tempDir, "a接点.gcadpart");
+            File.WriteAllText(path, $$"""
+                {"id":"{{BasicPartTemplates.ContactNOId}}","name":"a接点","ports":[{"name":"L","rowOffset":0,"boundaryOffset":0},{"name":"R","rowOffset":0,"boundaryOffset":1}]}
+                """);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            Assert.All(result.Entries.Single().Definition.Ports,
+                p => Assert.Equal(PortKind.Power, p.Kind));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_SelectSwitchWithoutKind_NotAffected()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点E1(誤爆防止・別の固定Id): Role 補正の対象である セレクトSW も、Kind は
+            // 触られず Power のまま。「固定Idごとの補正」同士が混線しておらぬことを測る。
+            string path = Path.Combine(tempDir, "セレクトSW.gcadpart");
+            File.WriteAllText(path, $$"""
+                {"id":"{{BasicPartTemplates.SelectSwitchId}}","name":"セレクトSW","role":"contactNO","ports":[{"name":"L","rowOffset":0,"boundaryOffset":0},{"name":"R","rowOffset":0,"boundaryOffset":1}]}
+                """);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var def = result.Entries.Single().Definition;
+            Assert.All(def.Ports, p => Assert.Equal(PortKind.Power, p.Kind));
+            // Role 補正の側は従来どおり効いていること(本タスクが既存の補正を壊しておらぬ確認)。
+            Assert.Equal(PartRole.SelectSwitch, def.Role);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_MotorBackfill_PreservesAllOtherFields()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点B(破壊性・DoD2の核心): Kind 以外は一字一句変わらぬこと。
+            // 標準と異なる name・セル数・primitives・端子座標を入れ、補正後もそれらが
+            // 保たれることをフィールド単位で測る。
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, $$"""
+                {"id":"{{BasicPartTemplates.MotorId}}","name":"三相モータ改","widthCells":5,"heightCells":3,"role":"nonSimulated","ports":[{"name":"U2","rowOffset":1,"boundaryOffset":2},{"name":"V2","rowOffset":-1,"boundaryOffset":3},{"name":"W2","rowOffset":0,"boundaryOffset":4}],"primitives":[{"type":"circle","cx":3.5,"cy":0.25,"r":1.75}]}
+                """);
+
+            var store = new PartFolderStore(tempDir);
+            var result = store.Enumerate();
+
+            var def = result.Entries.Single().Definition;
+            // B2: 名前・セル数・役割
+            Assert.Equal("三相モータ改", def.Name);
+            Assert.Equal(5, def.WidthCells);
+            Assert.Equal(3, def.HeightCells);
+            Assert.Equal(PartRole.NonSimulated, def.Role);
+            // B1: 図形プリミティブ
+            var circle = Assert.IsType<PartCircle>(Assert.Single(def.Primitives));
+            Assert.Equal(3.5, circle.Cx);
+            Assert.Equal(0.25, circle.Cy);
+            Assert.Equal(1.75, circle.R);
+            // B3: PortDef の Kind 以外(名前・行・境界)。Kind だけが変わっていること。
+            var u = def.Ports.Single(p => p.Name == "U2");
+            Assert.Equal(1, u.RowOffset);
+            Assert.Equal(2, u.BoundaryOffset);
+            Assert.Equal(PortKind.DrcExempt, u.Kind);
+            var v = def.Ports.Single(p => p.Name == "V2");
+            Assert.Equal(-1, v.RowOffset);
+            Assert.Equal(3, v.BoundaryOffset);
+            var w = def.Ports.Single(p => p.Name == "W2");
+            Assert.Equal(0, w.RowOffset);
+            Assert.Equal(4, w.BoundaryOffset);
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Enumerate_LegacyMotorJsonReadOnly_BackfillsInMemoryWithoutThrowing()
+    {
+        string tempDir = CreateTempDir();
+        try
+        {
+            // 観点E2: 書き戻し失敗(読み取り専用)でも例外は外へ伝播せず、メモリ上は補正済みで継続する
+            // (OneDrive同期中のロック等を想定。前例2件と同型のベストエフォート方針)。
+            string path = Path.Combine(tempDir, "モータ.gcadpart");
+            File.WriteAllText(path, LegacyMotorJson(BasicPartTemplates.MotorId));
+            File.SetAttributes(path, FileAttributes.ReadOnly);
+
+            var store = new PartFolderStore(tempDir);
+            PartEnumerationResult result;
+            try
+            {
+                result = store.Enumerate();
+            }
+            finally
+            {
+                File.SetAttributes(path, FileAttributes.Normal);
+            }
+
+            Assert.All(result.Entries.Single().Definition.Ports,
+                p => Assert.Equal(PortKind.DrcExempt, p.Kind));
+        }
+        finally
+        {
+            Directory.Delete(tempDir, recursive: true);
+        }
+    }
 }
