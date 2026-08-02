@@ -1620,8 +1620,13 @@
                                         <ListBox.ItemTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" Margin="2">
+                                                    <!-- T-140系統2(殿裁可2026-08-02、案W): 固定灰を消し継承へ委ねる。選択行では
+                                                         PanelContentSelectedForegroundBrush(白系)へ切り替わり選択時4.50:1(Light)/
+                                                         6.40:1(Dark)、非選択時はPanelContentForegroundBrushの継承で黒21:1/明色12.05:1、
+                                                         いずれもWCAG適合(色案=docs/ecad2-t140-keitou2-color-proposal-onmitsu.md §4.3)。
+                                                         Opacityは付けぬ(隣のDisplayNameと同じく継承のみ)。 -->
                                                     <Image Source="{Binding Thumbnail}" Width="24" Height="24" Margin="0,0,4,0"/>
-                                                    <TextBlock Text="{Binding Category}" Foreground="Gray" FontSize="10" Width="40" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{Binding Category}" FontSize="10" Width="40" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </DataTemplate>

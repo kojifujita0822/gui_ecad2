@@ -8,19 +8,19 @@ namespace Ecad2.App.Tests;
 /// 設計書=docs/ecad2-t140-keitou2-test-design-onmitsu.md §4.1。
 /// 【重要】素朴な"Gray"検索は偽陽性を7件生む(SystemColors.GrayTextBrushKey 6件・コメント中の
 /// ファイル名1件、設計書§2.1)。`Foreground="Gray"`という属性の形で照合する。
-/// 【範囲の但し書き】設計書は3件（プレースホルダ・画像パス・部品カテゴリ）を前提に書かれたが、
-/// 3件目（部品カテゴリ、MainWindow.xaml:1615）は選択行のコントラスト不適合が別途見つかり
-/// 保留（家老采配2026-08-02）。ゆえに観点7の期待値は0件ではなく1件（3件目のみ残る）。
+/// 【往復1周目訂正・家老裁定2026-08-02】3件目（部品カテゴリ、MainWindow.xaml:1624）は当初
+/// 選択行のコントラスト不適合により保留していたが、案W（Foregroundを消すのみ、Opacityは付けぬ）
+/// が採られ決着した。ゆえに観点7の期待値は0件（3件とも消える）へ読み替える。
 /// </summary>
 public class MainWindowGrayForegroundTests
 {
     [Fact]
-    public void MainWindow_xaml_Foreground等Grayは部品カテゴリの1件のみ残る()
+    public void MainWindow_xaml_Foreground等Grayは0件()
     {
         var content = File.ReadAllText(GetMainWindowXamlPath());
         var count = CountOccurrences(content, "Foreground=\"Gray\"");
 
-        Assert.Equal(1, count);
+        Assert.Equal(0, count);
     }
 
     /// <summary>
