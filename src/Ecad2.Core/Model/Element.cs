@@ -19,7 +19,7 @@ public static class ParamKeys
 public static class BreakerTypeOptions
 {
     public const string Default = "NFB";
-    public static readonly string[] All = { "NFB", "MCCB", "ELB" };
+    public static readonly string[] All = { Default, "MCCB", "ELB" };
 }
 
 public enum LineStyle { Solid, Dashed, Dotted }

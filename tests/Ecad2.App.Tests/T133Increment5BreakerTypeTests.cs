@@ -122,4 +122,44 @@ public class T133Increment5BreakerTypeTests : ViewModelTestBase
 
         Assert.Equal(BreakerTypeOptions.All, vm.BreakerTypeChoices);
     }
+
+    // ===== 隠密の静的レビュー指摘(docs/ecad2-t133-increment5-review-onmitsu.md)への対処 =====
+
+    /// <summary>要修正2: 値の直読みだけでなく、setterが実際にPropertyChangedを発火することを
+    /// 観測する(ViewModelBase.PropertyChangedForTest、SelectedSheetNotificationTestsと同型)。</summary>
+    [Fact]
+    public void SelectedElementBreakerType_値変更時にPropertyChangedを通知する()
+    {
+        var vm = ArrangeWithBreaker3P();
+        var notified = new List<(string? Name, object? Old)>();
+        vm.PropertyChangedForTest += (name, old) => notified.Add((name, old));
+
+        vm.SelectedElementBreakerType = "MCCB";
+
+        Assert.Contains(notified, n => n.Name == nameof(MainWindowViewModel.SelectedElementBreakerType)
+            && (string?)n.Old == BreakerTypeOptions.Default);
+    }
+
+    /// <summary>
+    /// 要修正1(隠密指摘・家老采配)のRED先行証明: <c>SelectedCell</c>のsetter(直接クリック等で
+    /// 選択セルが変わる経路。<see cref="PlaceElementAtSelectedCell(ElementKind, string?)"/>が使う
+    /// <c>NotifySelectedElementChanged</c>とは別のコード路)は、字下げが一段深い独自の通知ブロックを
+    /// 持つ——他の5プロパティ(<c>IsSelectedElementSelectSwitch</c>等)と同じ字面の一括置換では
+    /// 一致せず、新設2プロパティが漏れていた(隠密が既存5件=各4箇所・新設2件=3箇所と数え直して発見)。
+    /// 台帳DoD「Breaker3P選択時のみ出現」に直に触れる欠陥ゆえ、SelectedCellを動かして戻すだけの
+    /// 操作(要素の配置・削除を伴わない)で通知が漏れることを固定する。
+    /// </summary>
+    [Fact]
+    public void SelectedCellの移動で戻った時もIsSelectedElementBreaker3PとSelectedElementBreakerTypeが通知される()
+    {
+        var vm = ArrangeWithBreaker3P();
+        vm.SelectedCell = new GridPos(0, 0);   // Breaker3Pの占有範囲外の空セルへ一旦離れる
+        var notified = new List<string?>();
+        vm.PropertyChangedForTest += (name, _) => notified.Add(name);
+
+        vm.SelectedCell = PlacePos;   // Breaker3Pへ戻る——SelectedCellのsetter経由のみを通る
+
+        Assert.Contains(nameof(MainWindowViewModel.IsSelectedElementBreaker3P), notified);
+        Assert.Contains(nameof(MainWindowViewModel.SelectedElementBreakerType), notified);
+    }
 }

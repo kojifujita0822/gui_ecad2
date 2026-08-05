@@ -500,6 +500,8 @@ public sealed class MainWindowViewModel : ViewModelBase
                 OnPropertyChanged(nameof(SelectedElementDeviceName));
                 OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
                 OnPropertyChanged(nameof(SelectedElementNotchPosition));
+                OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
+                OnPropertyChanged(nameof(SelectedElementBreakerType));
                 OnPropertyChanged(nameof(IsSelectedElementLamp));
                 OnPropertyChanged(nameof(SelectedElementLampColor));
                 OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
