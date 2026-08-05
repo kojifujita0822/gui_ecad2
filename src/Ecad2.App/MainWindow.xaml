@@ -1589,7 +1589,7 @@
                                                          Foreground="{DynamicResource InputForegroundBrush}"
                                                          LostKeyboardFocus="NotchPositionBox_LostKeyboardFocus" PreviewKeyDown="NotchPositionBox_PreviewKeyDown"/>
                                             </StackPanel>
-                                            <!-- T-133增分5: Breaker3P限定の種別ComboBox(NFB/MCCB/ELB)。原本(GuiEcad
+                                            <!-- T-133増分5: Breaker3P限定の種別ComboBox(NFB/MCCB/ELB)。原本(GuiEcad
                                                  MainPage.Properties.cs)踏襲=SelectionChangedで即時反映、TextBoxのような
                                                  Explicit確定は不要(ComboBoxの選択自体が確定操作のため)。 -->
                                             <StackPanel Visibility="{Binding IsSelectedElementBreaker3P, Converter={StaticResource BoolToVisibility}}">

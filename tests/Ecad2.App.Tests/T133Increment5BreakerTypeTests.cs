@@ -5,7 +5,7 @@ using Ecad2.Persistence;
 namespace Ecad2.App.Tests;
 
 /// <summary>
-/// T-133增分5(T-131のP-100、プロパティパネルへBreaker3P種別ComboBox新設)の回帰テスト。
+/// T-133増分5(T-131のP-100、プロパティパネルへBreaker3P種別ComboBox新設)の回帰テスト。
 /// IsSelectedElementBreaker3P/SelectedElementBreakerTypeの新設プロパティを検証する。
 /// T086NotchPositionTestsと同型(GuiEcad CommitBreakerType踏襲、ComboBoxのSelectionChangedが
 /// 「確定した一回」と対応する)。配置はPlaceElementByKindTestsに倣いElementKind経路

@@ -2332,19 +2332,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    /// <summary>SelectedElementがBreaker3Pか(T-133增分5、プロパティパネルの種別ComboBox表示制御用)。
+    /// <summary>SelectedElementがBreaker3Pか(T-133増分5、プロパティパネルの種別ComboBox表示制御用)。
     /// DiagramRenderer.cs:1044のType参照ゲート(直接Kind判定)と同一条件——Breaker3Pは非シミュレート
     /// 固定シンボルでPartResolver.ComponentKind経由の分岐を持たぬため、原本のType参照箇所と揃える。
     /// IsSelectedElementSelectSwitchと同型。</summary>
     public bool IsSelectedElementBreaker3P
         => SelectedElement is ElementInstance selEl && selEl.Kind == ElementKind.Breaker3P;
 
-    /// <summary>Breaker3P種別ComboBoxの選択肢一覧(T-133增分5、XAML ItemsSourceバインディング用)。
+    /// <summary>Breaker3P種別ComboBoxの選択肢一覧(T-133増分5、XAML ItemsSourceバインディング用)。
     /// BreakerTypeOptions.All(静的配列、Core層)をそのまま公開する薄いラッパー——静的メンバーは
     /// XAMLのBindingから直接束縛できぬため、インスタンスプロパティ越しに渡す。</summary>
     public IReadOnlyList<string> BreakerTypeChoices => BreakerTypeOptions.All;
 
-    /// <summary>Breaker3Pの種別(NFB/MCCB/ELB、T-133增分5、ElementInstance.Params[ParamKeys.Type])。
+    /// <summary>Breaker3Pの種別(NFB/MCCB/ELB、T-133増分5、ElementInstance.Params[ParamKeys.Type])。
     /// Breaker3P限定(IsSelectedElementBreaker3PでXAML側表示制御)。未設定時はDiagramRenderer.cs:1046と
     /// 同じ既定値(BreakerTypeOptions.Default="NFB")を返す——参照するのみでParamsへは書かぬ(GuiEcad
     /// CommitBreakerTypeがSelectionChangedで実変更時のみ書く挙動に合わせ、未編集要素はParams空のまま
