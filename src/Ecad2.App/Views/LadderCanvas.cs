@@ -80,11 +80,23 @@ public sealed class LadderCanvas : FrameworkElement
 
     // 選択セルのハイライト枠線(T-017/T-027)。基本図形は全て1セル幅(BasicPartTemplates確認済み)
     // のため、常に1セル分の矩形で描く。
-    private static readonly Pen SelectedCellPen = new(Brushes.OrangeRed, 2.0);
+    // T-133増分5往復1周目(忍者実機再検証で発覚): 未Freezeの静的Freezableは、生成した
+    // STAスレッドに紐づき、別スレッド(xUnitの並列実行が生む別スレッドのMainWindow等)からの
+    // 描画で「異なるスレッドに属するDependencyObjectは使用できぬ」例外を招く。CreateDraftPen()等
+    // 既存の工場メソッド群は元々Freeze済みだったが、この5件は直書きでFreezeを欠いていた
+    // (副作用=プロパティの実行時書換えが無いことをsrc全体のgrepで確認済み、隠密の独立検分と一致)。
+    private static readonly Pen SelectedCellPen = CreateFrozenPen(Brushes.OrangeRed, 2.0);
 
     // 選択中の配線プリミティブのハイライト線(T-041増分1)。SelectedCellPenと同色・やや太めにして
     // 「配線が選択されている」ことを線そのものの強調で示す(セルの矩形ハイライトとは表現を変える)。
-    private static readonly Pen SelectedConnectorPen = new(Brushes.OrangeRed, 3.5);
+    private static readonly Pen SelectedConnectorPen = CreateFrozenPen(Brushes.OrangeRed, 3.5);
+
+    private static Pen CreateFrozenPen(Brush brush, double thickness)
+    {
+        var pen = new Pen(brush, thickness);
+        pen.Freeze();
+        return pen;
+    }
 
     // 記入中(未確定)の縦コネクタ/自由線のプレビュー線(T-041増分2/5)。確定済みの選択ハイライトと
     // 区別するため破線にする(DashStyle未共有=独立インスタンスにしないとFreeze例外になるため個別生成、
@@ -117,7 +129,7 @@ public sealed class LadderCanvas : FrameworkElement
     private const double ConnectionDotHitToleranceMm = 2.0;
 
     // 選択中の自由線のハイライト線(T-041増分5、SelectedConnectorPenと同型)。
-    private static readonly Pen SelectedFreeLinePen = new(Brushes.OrangeRed, 3.5);
+    private static readonly Pen SelectedFreeLinePen = CreateFrozenPen(Brushes.OrangeRed, 3.5);
 
     // 記入中(未確定)の自由線のプレビュー(T-041増分5、ConnectorDraftPenと同型)。
     private static readonly Pen FreeLineDraftPen = CreateDraftPen();
@@ -126,7 +138,7 @@ public sealed class LadderCanvas : FrameworkElement
     private static readonly Brush SelectedConnectionDotBrush = Brushes.OrangeRed;
 
     // 選択中の画像のハイライト枠+リサイズハンドル(T-064、SelectedConnectorPen等と同色)。
-    private static readonly Pen SelectedImagePen = new(Brushes.OrangeRed, 2.0);
+    private static readonly Pen SelectedImagePen = CreateFrozenPen(Brushes.OrangeRed, 2.0);
     private const double ImageResizeHandleSizeDip = 8.0;
 
     // 選択中のGroupFrame(グループ枠)のハイライト枠(T-067、SelectedImagePen等と同型)。
@@ -136,7 +148,7 @@ public sealed class LadderCanvas : FrameworkElement
     // 隠されて見えていた(削除→Undoで選択解除後は正しい線種が見えた、という忍者一次観測から
     // 因果関係が確定)。BorderStyleに応じたDashStyle付きPenを動的に選択する(DrawingTheme.
     // DashOn/DashOff等、WpfRenderer.Penと同じ倍数値で視覚言語を揃える)。
-    private static readonly Pen SelectedFrameSolidPen = new(Brushes.OrangeRed, 2.0);
+    private static readonly Pen SelectedFrameSolidPen = CreateFrozenPen(Brushes.OrangeRed, 2.0);
     private static readonly Pen SelectedFrameDashedPen = CreateSelectedFrameDashPen(DrawingTheme.DashOn, DrawingTheme.DashOff);
     private static readonly Pen SelectedFrameDottedPen = CreateSelectedFrameDashPen(DrawingTheme.DotOn, DrawingTheme.DotOff);
 

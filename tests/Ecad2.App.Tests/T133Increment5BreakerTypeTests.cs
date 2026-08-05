@@ -115,12 +115,17 @@ public class T133Increment5BreakerTypeTests : ViewModelTestBase
         Assert.False(vm.UndoCommand.CanExecute(null));
     }
 
+    /// <summary>隠密の静的レビュー指摘(軽微、追って上がった一件): 修正前は
+    /// <c>Assert.Equal(BreakerTypeOptions.All, vm.BreakerTypeChoices)</c>としており、
+    /// <c>BreakerTypeChoices => BreakerTypeOptions.All</c>という単純委譲ゆえ同じ参照どうしの
+    /// 比較=常に緑という退化したアサーションだった(PR-27「対称・退化した入力」の親戚、
+    /// 退化しておるのが入力でなくアサーションの方)。値を直に置くことで、中身が変わっても鳴るようにする。</summary>
     [Fact]
-    public void BreakerTypeChoices_選択肢一覧がBreakerTypeOptionsAllと一致する()
+    public void BreakerTypeChoices_選択肢一覧はNFB_MCCB_ELBの順()
     {
         var vm = CreateViewModel();
 
-        Assert.Equal(BreakerTypeOptions.All, vm.BreakerTypeChoices);
+        Assert.Equal(new[] { "NFB", "MCCB", "ELB" }, vm.BreakerTypeChoices);
     }
 
     // ===== 隠密の静的レビュー指摘(docs/ecad2-t133-increment5-review-onmitsu.md)への対処 =====

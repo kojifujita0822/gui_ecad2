@@ -838,7 +838,15 @@ public partial class MainWindow : Window
             // T-102: 合流先確認モードの候補プレビュー切替(Up/Down)・取消(Esc)を、他のDraftPreview系
             // プロパティと同じ自動再描画契機に含める。
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.OrJoinTargetPreview)
-            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode))
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode)
+            // T-133増分5往復1周目(忍者実機再検証・隠密指摘): ComboBoxで種別を変えても、選択を
+            // 外すまでラベル・ELBのテストボタンが更新されなかった欠陥。TextBox系6件は
+            // CommitDeviceNameEdit()(LostFocus/Enterで確定した後RedrawCanvas()を明示呼出)という
+            // 別経路で救われているが、ComboBoxはTextBoxでないためその経路に乗らず、かつ本リストにも
+            // 無かったため両経路から漏れていた(IsSelectedElementBreaker3Pは絵に出ぬVisibility制御
+            // 専用のため対象外――値がリストに載ったSelectedCell等から派生する、という理由づけでは
+            // ないと隠密の指摘、家老裁定2026-08-05)。
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedElementBreakerType))
             RedrawCanvas();
 
         // T-061第五歩: モード遷移に合わせて実時間タイマを開始/停止する(GuiEcad
