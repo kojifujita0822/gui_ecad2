@@ -91,6 +91,10 @@ public sealed class LadderCanvas : FrameworkElement
     // 「配線が選択されている」ことを線そのものの強調で示す(セルの矩形ハイライトとは表現を変える)。
     private static readonly Pen SelectedConnectorPen = CreateFrozenPen(Brushes.OrangeRed, 3.5);
 
+    // 新しい静的Pen/Brushは必ず本メソッド(またはCreateDraftPen()等の同型工場メソッド)経由で
+    // 生成すること。未凍結のまま置くと、生成した最初のSTAスレッドに紐づき、xUnitの並列実行が
+    // 生む別のSTAスレッド(別テストクラスのnew MainWindow()等)から描画で触れられた際に
+    // 「異なるスレッドに属するDependencyObjectは使用できぬ」例外を招く(T-133増分5往復1周目)。
     private static Pen CreateFrozenPen(Brush brush, double thickness)
     {
         var pen = new Pen(brush, thickness);
