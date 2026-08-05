@@ -808,7 +808,7 @@ public sealed class PartEditorCanvas : FrameworkElement
     /// 絵で示すこと。
     /// <para>
     /// <b>【P-168・2026-08-05訂正】</b>起票時点（T-137）は「高さ設定 h に対し枠が覆う行は 2h-1 であり、
-    /// 設定値と実体が食い違う」ことが狙いの根拠だったが、この前提は<see cref="ElementInstance.RowSpanOf"/>
+    /// 設定値と実体が食い違う」ことが狙いの根拠だったが、この前提は<see cref="PartShapeGeometry.FrameRect"/>
     /// を h セルちょうどへ改めた T-139(C) 裁定（2026-07-31、T-137実装の2時間27分後）で消えている
     /// （隠密が時系列を特定、<c>docs/proposed.md</c> の P-168 欄）。区切り線が今も要るかは殿のご判断だが、
     /// 「残す」と裁定（2026-08-05）されたため機能はそのまま、誤った根拠の記述のみをここで正す。
