@@ -2332,6 +2332,45 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>SelectedElementがBreaker3Pか(T-133增分5、プロパティパネルの種別ComboBox表示制御用)。
+    /// DiagramRenderer.cs:1044のType参照ゲート(直接Kind判定)と同一条件——Breaker3Pは非シミュレート
+    /// 固定シンボルでPartResolver.ComponentKind経由の分岐を持たぬため、原本のType参照箇所と揃える。
+    /// IsSelectedElementSelectSwitchと同型。</summary>
+    public bool IsSelectedElementBreaker3P
+        => SelectedElement is ElementInstance selEl && selEl.Kind == ElementKind.Breaker3P;
+
+    /// <summary>Breaker3P種別ComboBoxの選択肢一覧(T-133增分5、XAML ItemsSourceバインディング用)。
+    /// BreakerTypeOptions.All(静的配列、Core層)をそのまま公開する薄いラッパー——静的メンバーは
+    /// XAMLのBindingから直接束縛できぬため、インスタンスプロパティ越しに渡す。</summary>
+    public IReadOnlyList<string> BreakerTypeChoices => BreakerTypeOptions.All;
+
+    /// <summary>Breaker3Pの種別(NFB/MCCB/ELB、T-133增分5、ElementInstance.Params[ParamKeys.Type])。
+    /// Breaker3P限定(IsSelectedElementBreaker3PでXAML側表示制御)。未設定時はDiagramRenderer.cs:1046と
+    /// 同じ既定値(BreakerTypeOptions.Default="NFB")を返す——参照するのみでParamsへは書かぬ(GuiEcad
+    /// CommitBreakerTypeがSelectionChangedで実変更時のみ書く挙動に合わせ、未編集要素はParams空のまま
+    /// 保つ設計。フォールバックとの二重管理を避ける)。get/setとも都度SelectedElementから読み直すため
+    /// (キャッシュされた添字等を比較する形ではない)、選択切替に伴う偶然の値一致が判定を誤らせる余地は
+    /// 無い(ecad2_setproperty_early_return_trapの構造とは異なる、家老の指摘に対する確認)。
+    /// SelectedElementNotchPositionと同型、値未変化ならRecordSnapshotしない。</summary>
+    public string SelectedElementBreakerType
+    {
+        get => SelectedElement?.Params.TryGetValue(ParamKeys.Type, out var v) == true && !string.IsNullOrEmpty(v)
+            ? v : BreakerTypeOptions.Default;
+        set
+        {
+            if (SelectedElement is not ElementInstance el) return;
+            if (!BreakerTypeOptions.All.Contains(value)) return;
+            string oldValue = el.Params.TryGetValue(ParamKeys.Type, out var ov) && !string.IsNullOrEmpty(ov)
+                ? ov : BreakerTypeOptions.Default;
+            if (oldValue == value) return;
+
+            UndoManager.RecordSnapshot(Document);
+            el.Params[ParamKeys.Type] = value;
+            MarkDirty();
+            OnPropertyChanged(nameof(SelectedElementBreakerType), oldValue);
+        }
+    }
+
     /// <summary>SelectedElementがタイマ限時接点(NO/NC計2種)か(T-096、プロパティパネルの
     /// 設定時間入力欄表示制御用)。殿直接指摘(2026-07-15)＝**瞬時接点(TimerInstantContactNO/NC)に
     /// 設定時間は不要**(瞬時=遅延なしで切り替わる接点のため、プリセット時間の概念自体が無関係)。
@@ -2502,6 +2541,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
+        OnPropertyChanged(nameof(SelectedElementBreakerType));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
@@ -2637,6 +2678,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
+        OnPropertyChanged(nameof(SelectedElementBreakerType));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
@@ -3192,7 +3235,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// ゆえ、確定した値を記録せねば何を選んだかが失われる。<b>対して型（NFB/MCCB/ELB）は配置後に切り替えるもの</b>で、
     /// <c>DiagramRenderer</c> が「未設定なら NFB」のフォールバックを既に持つ
     /// （<c>DiagramRenderer.cs:1046</c>）。ここで既定値を書き込めば <c>"NFB"</c> が2箇所に散り、
-    /// いずれ片方が腐る。<b>書き漏らしではない。</b>型の切替UIは増分5（＝T-131 の P-100）で設ける。
+    /// いずれ片方が腐る。<b>書き漏らしではない。</b>型の切替UIは増分5（＝T-131 の P-100）で
+    /// <see cref="SelectedElementBreakerType"/> として設けた——そちらも実変更時のみ書く形で、
+    /// このフォールバックとの二重管理を避けている。
     /// </para>
     /// <para>
     /// <b>【共通部分を PartId 経路と括らぬ理由】</b>重なるのは
@@ -3587,6 +3632,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementDeviceName));
         OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
         OnPropertyChanged(nameof(SelectedElementNotchPosition));
+        OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
+        OnPropertyChanged(nameof(SelectedElementBreakerType));
         OnPropertyChanged(nameof(IsSelectedElementLamp));
         OnPropertyChanged(nameof(SelectedElementLampColor));
         OnPropertyChanged(nameof(IsSelectedElementTimerRelated));

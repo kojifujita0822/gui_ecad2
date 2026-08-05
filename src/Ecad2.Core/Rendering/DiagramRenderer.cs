@@ -1043,7 +1043,7 @@ public sealed class DiagramRenderer
         // 縦向きは記号右・中央、横向きは記号上に置く（横向きは縦に背が高いため）。
         if (e.Kind == ElementKind.Breaker3P)
         {
-            var typ = e.Params.TryGetValue(ParamKeys.Type, out var t) && !string.IsNullOrEmpty(t) ? t : "NFB";
+            var typ = e.Params.TryGetValue(ParamKeys.Type, out var t) && !string.IsNullOrEmpty(t) ? t : BreakerTypeOptions.Default;
             bool horiz = orient == "H";
             var ts = _theme.Text(TextRole.DeviceName) with
             {

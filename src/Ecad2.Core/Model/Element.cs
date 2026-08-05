@@ -12,6 +12,16 @@ public static class ParamKeys
     public const string Orient = "Orient";        // 主回路記号の向き（V/H）
 }
 
+/// <summary>Breaker3P の種別（<see cref="ParamKeys.Type"/>）の選択肢と既定値（T-133增分5、
+/// GuiEcad MainPage.Properties.cs:400 の BreakerTypes 配列踏襲）。既定値 "NFB" は
+/// DiagramRenderer（Params未設定時のフォールバック描画）と MainWindowViewModel（プロパティパネル
+/// ComboBoxの既定表示・書込み判定）の双方が参照する。ここで一元管理し、リテラルの二重管理を避ける。</summary>
+public static class BreakerTypeOptions
+{
+    public const string Default = "NFB";
+    public static readonly string[] All = { "NFB", "MCCB", "ELB" };
+}
+
 public enum LineStyle { Solid, Dashed, Dotted }
 
 public enum ElementKind
