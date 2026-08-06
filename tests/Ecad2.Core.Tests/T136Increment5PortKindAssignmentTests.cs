@@ -11,6 +11,14 @@ namespace Ecad2.Core.Tests;
 /// 自作テンプレート（<see cref="BasicPartTemplates"/>）15件のうちモータが青・14件が赤。計32件。
 /// </para>
 /// <para>
+/// <b>【T-133増分7で自作テンプレートが15→17件になった】</b>サーマルリレーa/bの移植による。
+/// <b>裁定の骨子「モータのみ青」は変わらず、新規2件は接点ゆえ赤</b>（<see cref="PortDef"/> の既定）
+/// ——モータの青（<see cref="PortKind.DrcExempt"/>）はDRC免除のための扱いにて、
+/// シミュレート対象の接点には当たらぬ。<b>赤の員数のみ30→32件、総数32→34件へ改まった。</b>
+/// <b>本テスト群が「堰き止め」として設計どおり働き、この判断を促した</b>
+/// ——員数を固定していなければ、新規2件は既定値のまま黙って流れ込んでおった。
+/// </para>
+/// <para>
 /// <b>「17件」の1件＝<see cref="ElementKind"/> の1メンバー</b>である（部品の実体数ではない）。
 /// 主回路3極記号3種は接続点を0個しか持たぬゆえ17件に含まれておらぬ。
 /// 組込み17件と自作テンプレート15件は別データにて、同名（例＝a接点）でも独立に設定する
@@ -52,11 +60,18 @@ public class T136Increment5PortKindAssignmentTests
         => Assert.Equal(17, KindsWithPorts().Count);
 
     /// <summary>
-    /// 自作テンプレートは15件。理由は上と同じ。
+    /// 自作テンプレートは17件（T-133増分7でサーマルリレーa/bを足し、15→17）。理由は上と同じ。
+    /// <para>
+    /// <b>【この17は<c>All()</c>自体の件数であり、部品リストの表示件数19とは別の単位】</b>
+    /// 表示件数は<c>All()</c>17件＋OR論理2件（<c>ContactNO</c>／<c>ContactNC</c>の
+    /// <c>IsOrEligible</c>分、<c>PartPaletteViewModel.cs:75-76</c>）＝19件。
+    /// <b>増分7の前は「<c>All()</c>15件・表示17件」であった</b>——
+    /// <b>同じ「17」が前後で別の意味を指すゆえ、単位を明記しておく</b>（隠密の検算、2026-08-06）。
+    /// </para>
     /// </summary>
     [Fact]
-    public void 自作テンプレートは15件()
-        => Assert.Equal(15, BasicPartTemplates.All().Count);
+    public void 自作テンプレートは17件()
+        => Assert.Equal(17, BasicPartTemplates.All().Count);
 
     /// <summary>
     /// 主回路3極記号3種は接続点を持たぬ（＝17件の外にある）ことの対照。
@@ -108,13 +123,14 @@ public class T136Increment5PortKindAssignmentTests
         Assert.All(motor.Ports, p => Assert.Equal(PortKind.DrcExempt, p.Kind));
     }
 
-    /// <summary>自作テンプレートのモータ以外14件は、すべての接続点が赤。</summary>
+    /// <summary>自作テンプレートのモータ以外16件は、すべての接続点が赤
+    /// （T-133増分7でサーマルリレーa/bが加わり14→16。両件とも接点ゆえ赤）。</summary>
     [Fact]
-    public void 自作テンプレート_モータ以外14件の接続点はすべて赤()
+    public void 自作テンプレート_モータ以外16件の接続点はすべて赤()
     {
         var others = BasicPartTemplates.All().Where(p => p.Id != BasicPartTemplates.MotorId).ToList();
 
-        Assert.Equal(14, others.Count);
+        Assert.Equal(16, others.Count);
         foreach (var part in others)
             Assert.All(part.Ports, p => Assert.Equal(PortKind.Power, p.Kind));
     }

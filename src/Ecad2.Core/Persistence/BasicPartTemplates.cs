@@ -36,6 +36,23 @@ public static class BasicPartTemplates
     public const string ThermalOverloadId = "basic-thermal-overload";
     public const string EmergencyStopId = "basic-emergency-stop";
 
+    // T-133増分7: 原本の組み込みパーツ2件（thermal-relay a/b）の移植。固定Idの用途は上記と同じ。
+    /// <summary>サーマルリレーa接点の固定Id。
+    /// <para>
+    /// <b>【名称が紛らわしい。<see cref="ThermalOverloadId"/> とは別物である】</b>
+    /// 原本に「サーマル」と名の付く実体が三つあり、本件はその三番目にござる（隠密の調査、2026-08-06）。
+    /// <list type="bullet">
+    /// <item>単独「サーマル(OL)」＝コの字形。<see cref="ThermalOverloadId"/>（T-133増分6でメニュー再掲）</item>
+    /// <item>「サーマル(OL) 2極」＝3極記号。<c>ElementKind.ThermalOverload3P</c>（T-133増分4）</item>
+    /// <item><b>本件＝thermal-relay a/b</b>。円2つ＋横線＋×印の接点記号（原本の <c>.gcadpart</c> 実体）</item>
+    /// </list>
+    /// <b>前二者は組込み描画（<c>SymbolGlyphs</c>）にて実装形態からして別系統</b>ゆえ、Id も表示名も
+    /// 取り違えぬよう区別できる語を採ってある。
+    /// </para></summary>
+    public const string ThermalRelayNOId = "basic-thermal-relay-no";
+    /// <summary>サーマルリレーb接点の固定Id。用途・注意は<see cref="ThermalRelayNOId"/>と同じ。</summary>
+    public const string ThermalRelayNCId = "basic-thermal-relay-nc";
+
     /// <summary>2端子（左=NetA / 右=NetB）の標準ポート。1セル幅の図形で共通。</summary>
     private static List<PortDef> TwoPorts() => new()
     {
@@ -75,6 +92,8 @@ public static class BasicPartTemplates
         TimerInstantContactNC(),
         ThermalOverload(),
         EmergencyStop(),
+        ThermalRelayNO(),
+        ThermalRelayNC(),
     };
 
     // a接点(NO): 2ブレード＋左右リード
@@ -398,6 +417,70 @@ public static class BasicPartTemplates
                 0.127, -0.239, 0.189, -0.289, 0.261, -0.329, 0.340, -0.358, 0.424, -0.375,
                 0.510, -0.380, 0.596, -0.372, 0.679, -0.352, 0.756, -0.321, 0.826, -0.278, 0.873, -0.239,
             }),
+        },
+    };
+
+    // T-133増分7: 原本の組み込みパーツ2件（thermal-relay a/b）。
+    //
+    // 【座標は変換せず原本のまま移した】上記T-071の10種は SymbolGlyphs（中心基準）由来ゆえ x+0.5 の
+    // 変換を要したが、本件は原本の .gcadpart（JSON実体）由来にて、その座標規約は PartDefinition と
+    // 同一である——ecad2 は原本の .gcadpart をそのまま逆シリアライズできる設計になっており
+    // （PartDefinition.cs:85「旧 .gcadpart に本フィールドが無ければ既定値のまま読まれる」）、
+    // JSONのフィールド名も PartCircle/PartLine のプロパティと一致する。ゆえに変換は要らぬ。
+    //
+    // 【a と b は y の符号だけが違う同型である】どちらも「円2つ＋横線1本＋斜線2本（×印）」の計5件で、
+    // a は横線が上側(y=-0.1875)・b は下側(y=+0.1875)。×印は横線の上下に在るのではなく、
+    // 横線を中心にまたぐ（a なら y=-0.3125〜-0.0625、その中心が横線の -0.1875）。
+    // ※下ごしらえの調査書には「a=斜線1本 / b=斜線2本」「×印は横線の上／下」とあるが、
+    //   原本を直読した結果は上記のとおり（侍、2026-08-06）。両調査書の結論（別実体・移植可）は正しい。
+    //
+    // 【primitives の並びは原本のまま保つ】a は横線が3番目・b は5番目と原本自体が不揃いだが、
+    // 線と円のみで塗りが無いゆえ描画順は見た目に響かぬ。移植の忠実さを優先し、揃えずに写した。
+
+    // サーマルリレーa: 端子円2つ＋上側の横線＋×印（thermal-relay-a.gcadpart 由来。role=contactNO）
+    private static PartDefinition ThermalRelayNO() => new()
+    {
+        Id = ThermalRelayNOId,
+        Name = "サーマルリレーa",
+        WidthCells = 1,
+        HeightCells = 1,
+        // 原本の role フィールドどおり。図面上の記号だけがサーマル用に異なり、電気的な振る舞いは
+        // 通常のa接点と同一である（隠密の原本調査）。PartRole.ThermalOverload は上記の
+        // 「サーマル(OL)」（コの字形）専用ゆえ、こちらへは用いぬ。
+        //
+        // 【IsOrEligible を付けぬのは意図である。付け忘れではない】Role=ContactNO を持ちながら
+        // OR対象でないのは本テンプレート群で初の組み合わせにて、読み手が疑いやすい箇所ゆえ書き残す。
+        // IsOrEligible は Role とは独立の明示フラグであり（PartDefinition.cs:78-81、T-037往復2周目）、
+        // 原本にも該当フィールドは無い。付ければ部品リストへ ORa/ORb の論理エントリが増えて
+        // 表示件数が19ではなく21になる（PartPaletteViewModel.cs:75-76）。
+        Role = PartRole.ContactNO,
+        Ports = TwoPorts(),
+        Primitives =
+        {
+            new PartCircle(0.875, 0, 0.125),                  // 右端子円
+            new PartCircle(0.125, 0, 0.125),                  // 左端子円
+            new PartLine(0.125, -0.1875, 0.875, -0.1875),     // 横線（上側）
+            new PartLine(0.625, -0.3125, 0.375, -0.0625),     // ×印（右上→左下）
+            new PartLine(0.375, -0.3125, 0.625, -0.0625),     // ×印（左上→右下）
+        },
+    };
+
+    // サーマルリレーb: 端子円2つ＋下側の横線＋×印（thermal-relay-b.gcadpart 由来。role=contactNC）
+    private static PartDefinition ThermalRelayNC() => new()
+    {
+        Id = ThermalRelayNCId,
+        Name = "サーマルリレーb",
+        WidthCells = 1,
+        HeightCells = 1,
+        Role = PartRole.ContactNC,     // 原本の role フィールドどおり。理由は ThermalRelayNO と同じ
+        Ports = TwoPorts(),
+        Primitives =
+        {
+            new PartCircle(0.875, 0, 0.125),                  // 右端子円
+            new PartCircle(0.125, 0, 0.125),                  // 左端子円
+            new PartLine(0.625, 0.0625, 0.375, 0.3125),       // ×印（右上→左下）
+            new PartLine(0.375, 0.0625, 0.625, 0.3125),       // ×印（左上→右下）
+            new PartLine(0.125, 0.1875, 0.875, 0.1875),       // 横線（下側）
         },
     };
 }
