@@ -2,11 +2,13 @@ using System.Windows;
 using System.Windows.Controls;
 using Ecad2.App.ViewModels;
 using Ecad2.Model;
+using Ecad2.Persistence;
 
 namespace Ecad2.App.Tests;
 
 /// <summary>
 /// T-133増分4-C: 「その他図形」メニューから主回路3極記号を配置する導線。
+/// <b>増分6（殿裁定8）で既存4件の再掲を加えた</b>——同じサブメニューに <c>PartId</c> 経路が同居する。
 /// <para>
 /// <b>【ここで初めて 4-A・4-B が呼ばれる】</b>タグ解析（4-A）も <c>Kind</c> 経路の配置（4-B）も
 /// 器としては測り済みだが、<b>器の単体テストだけでは「作ったのに一度も呼ばれておらぬ」を素通しする</b>
@@ -24,35 +26,68 @@ namespace Ecad2.App.Tests;
 /// <c>TryPlaceActiveTool</c> へ至る経路（マウス座標→セル選択）は測っておらぬ。
 /// <c>TryPlaceKindElement</c> のプレチェック（範囲外・占有済みの案内文言）も <c>private</c> ゆえ測れぬ
 /// ——いずれも実機確認に委ねる。
+/// <b>増分6で加わった分についても同様に、押した後に実際の要素が生まれるところは測っておらぬ</b>
+/// ——ここで測るのは<b>「ツール状態へ正しい <c>PartId</c> が載るところまで」</b>である。
+/// その先（<c>TryPlaceElement</c> が配置バーを開き、部品リスト経由と同一の要素を作ること）は
+/// 既存経路そのものゆえ、<b>素通しされうるのは「載る値が違う」場合に限られる</b>。
 /// </para>
 /// </summary>
 public class MenuPlacementToolTests
 {
     /// <summary>原本 GuiEcad の <c>OtherBuiltins</c> 配列（<c>MainPage.Tools.cs:238-252</c>）の並びどおり。
-    /// <b>文言・並びは暫定であり殿の裁可を要する</b>——変わればここも直す。</summary>
+    /// <b>文言・並びは暫定であり殿の裁可を要する</b>——変わればここも直す。
+    /// <para>
+    /// <b>【増分6で添字が 0〜5 から 4〜9 へずれた】</b>既存4件が手前に入ったゆえ。
+    /// <b>添字を持たせたまま直したのは、並び順そのものを測る網でもあるため</b>
+    /// ——タグで引く形に改めれば、この網は消える。
+    /// </para></summary>
     public static IEnumerable<object[]> ExpectedEntries() => new[]
     {
-        new object[] { 0, "Breaker3P#V", ElementKind.Breaker3P, "V" },
-        new object[] { 1, "Breaker3P#H", ElementKind.Breaker3P, "H" },
-        new object[] { 2, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
-        new object[] { 3, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
-        new object[] { 4, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
-        new object[] { 5, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
+        new object[] { 4, "Breaker3P#V", ElementKind.Breaker3P, "V" },
+        new object[] { 5, "Breaker3P#H", ElementKind.Breaker3P, "H" },
+        new object[] { 6, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
+        new object[] { 7, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
+        new object[] { 8, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
+        new object[] { 9, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
     };
+
+    /// <summary>T-133増分6（殿裁定8）で再掲した既存4件。原本 <c>OtherBuiltins</c> の 1〜4 番と同じ並び。
+    /// <b>Id は <see cref="BasicPartTemplates"/> の定数から取る</b>——XAML に書いた綴りが
+    /// テンプレート側の Id と食い違えば、ここで鳴る。</summary>
+    public static IEnumerable<object[]> ExpectedPartEntries() => new[]
+    {
+        new object[] { 0, "part:" + BasicPartTemplates.SelectSwitchId, BasicPartTemplates.SelectSwitchId },
+        new object[] { 1, "part:" + BasicPartTemplates.ThermalOverloadId, BasicPartTemplates.ThermalOverloadId },
+        new object[] { 2, "part:" + BasicPartTemplates.EmergencyStopId, BasicPartTemplates.EmergencyStopId },
+        new object[] { 3, "part:" + BasicPartTemplates.MotorId, BasicPartTemplates.MotorId },
+    };
+
+    /// <summary>添字だけを要するテスト向け。<b>上の2つから派生させ、並びの定義を二重に持たぬ。</b></summary>
+    public static IEnumerable<object[]> SymbolIndices() => ExpectedEntries().Select(e => new[] { e[0] });
+
+    /// <summary><see cref="SymbolIndices"/> と同じ理由で <see cref="ExpectedPartEntries"/> から派生させる。</summary>
+    public static IEnumerable<object[]> PartIndices() => ExpectedPartEntries().Select(e => new[] { e[0] });
 
     private static MenuItem ItemAt(MainWindow window, int index)
         => (MenuItem)window.OtherSymbolsMenu.Items[index];
 
+    /// <summary>3極記号6項目（増分4-C分）だけを取り出す。既存4件は <c>part:</c> タグゆえ解析の対象が違う。</summary>
+    private static IEnumerable<MenuItem> SymbolItems(MainWindow window)
+        => window.OtherSymbolsMenu.Items.Cast<MenuItem>().Skip(4);
+
     // ===== 観点A: メニューの中身 =====
 
-    /// <summary>3種 × 縦横で6項目。<b>増減があれば鳴る</b>——原本の6エントリと員数を合わせる。</summary>
+    /// <summary>
+    /// 既存4件（増分6）＋3種×縦横6件（増分4-C）で10項目。<b>増減があれば鳴る</b>
+    /// ——原本 <c>OtherBuiltins</c> の10エントリと員数を合わせる。
+    /// </summary>
     [Fact]
-    public void その他図形は六項目を持つ()
+    public void その他図形は十項目を持つ()
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
 
-            Assert.Equal(6, window.OtherSymbolsMenu.Items.Count);
+            Assert.Equal(10, window.OtherSymbolsMenu.Items.Count);
         });
 
     /// <summary>
@@ -83,7 +118,7 @@ public class MenuPlacementToolTests
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
-            var parsed = window.OtherSymbolsMenu.Items.Cast<MenuItem>()
+            var parsed = SymbolItems(window)
                 .Select(i => { SymbolTagParser.TryParse((string)i.Tag, out var k, out var o); return (Kind: k, Orient: o); })
                 .ToList();
 
@@ -93,6 +128,38 @@ public class MenuPlacementToolTests
                 Assert.Single(parsed.Where(p => p.Kind == kind && p.Orient == "H"));
             }
         });
+
+    /// <summary>
+    /// T-133増分6: 再掲した4件のタグが <c>"part:&lt;PartId&gt;"</c> 形式で、
+    /// <see cref="BasicPartTemplates"/> の Id を指すこと。
+    /// <b>綴り誤りは実機でも「押しても何も起きぬ」形で現れるゆえ気づきにくい</b>——ここで捕らえる。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ExpectedPartEntries))]
+    public void 再掲した四件のタグが既存パーツのIdを指す(int index, string expectedTag, string expectedPartId)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+            var item = ItemAt(window, index);
+
+            Assert.Equal(expectedTag, item.Tag);
+            Assert.StartsWith("part:", (string)item.Tag);
+            Assert.Equal(expectedPartId, ((string)item.Tag)["part:".Length..]);
+        });
+
+    /// <summary>
+    /// T-133増分6: 再掲した4件が <see cref="BasicPartTemplates.All"/> に実在すること。
+    /// <b>「メニューには在るがテンプレートには無い」を捕らえる</b>——Id を打ち間違えても
+    /// 上のテストは <see cref="ExpectedPartEntries"/> 側も同じ定数を使うゆえ鳴らぬが、
+    /// テンプレートから当該パーツが消えればこちらが鳴る。
+    /// </summary>
+    [Theory]
+    [InlineData(BasicPartTemplates.SelectSwitchId)]
+    [InlineData(BasicPartTemplates.ThermalOverloadId)]
+    [InlineData(BasicPartTemplates.EmergencyStopId)]
+    [InlineData(BasicPartTemplates.MotorId)]
+    public void 再掲した四件はテンプレートに実在する(string expectedPartId)
+        => Assert.Single(BasicPartTemplates.All().Where(p => p.Id == expectedPartId));
 
     // ===== 観点B: Click の配線（本テスト群の主題） =====
 
@@ -128,7 +195,7 @@ public class MenuPlacementToolTests
             var window = new MainWindow();
             var vm = (MainWindowViewModel)window.DataContext;
 
-            ItemAt(window, 0).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ItemAt(window, 4).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Null(vm.Tool.PartId);
             Assert.False(vm.Tool.IsOr);
@@ -142,24 +209,105 @@ public class MenuPlacementToolTests
             var window = new MainWindow();
             var vm = (MainWindowViewModel)window.DataContext;
 
-            ItemAt(window, 0).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ItemAt(window, 4).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Contains("配置ツール", vm.StatusMessage);
             Assert.Contains("ブレーカ", vm.StatusMessage);
         });
 
+    /// <summary>
+    /// T-133増分6: 再掲した4件を押せば <c>PartId</c> 経路の配置ツールへ切り替わること。
+    /// <b>本増分の主題</b>——タグから Id を解き、部品ライブラリで引き当てるところまでが繋がる。
+    /// <c>Kind</c> が載らぬことも併せて押さえる（3極記号側と混ざれば
+    /// <c>TryPlaceActiveTool</c> の分岐が Kind 側へ流れてしまう）。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ExpectedPartEntries))]
+    public void 再掲した四件を押せばパーツ配置ツールへ切り替わる(int index, string _, string expectedPartId)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+            var vm = (MainWindowViewModel)window.DataContext;
+
+            ItemAt(window, index).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal(ToolMode.PlaceElement, vm.Tool.Mode);
+            Assert.Equal(expectedPartId, vm.Tool.PartId);
+            Assert.Null(vm.Tool.Kind);
+            Assert.Null(vm.Tool.Orient);
+            Assert.False(vm.Tool.IsOr);
+        });
+
+    /// <summary>T-133増分6: 再掲した4件も押せば案内が出ること。<b>表示名がそのまま出る</b>
+    /// ——原本準拠の表示名（「三相モータ」）であり、テンプレートの <c>Name</c>（「モータ」）ではない。</summary>
+    [Fact]
+    public void 再掲した四件を押せば表示名のまま案内が出る()
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+            var vm = (MainWindowViewModel)window.DataContext;
+
+            ItemAt(window, 3).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Contains("配置ツール", vm.StatusMessage);
+            Assert.Contains("三相モータ", vm.StatusMessage);
+        });
+
     // ===== 観点C: (f) 主回路限定の予防側 =====
 
     /// <summary>
-    /// サブメニューの <c>IsEnabled</c> が <c>CanPlaceOnMainCircuit</c> へ束ねられていること。
+    /// 3極記号6項目の <c>IsEnabled</c> が <c>CanPlaceOnMainCircuit</c> へ束ねられていること。
     /// <b>殿裁定2026-07-28＝「制御回路シートではメニュー項目を無効化（グレーアウト）」の予防側。</b>
+    /// <para>
+    /// <b>【増分6で束ねる場所がサブメニューから項目へ移った】</b>殿裁可2026-08-06。
+    /// 射程外の既存4件が配下へ入るゆえ、枷を殿裁定4の射程（3極記号のみ）へ合わせ直した。
+    /// </para>
     /// <para>
     /// バインドの有無そのものを見るのは、<b>値だけを見ると「たまたま両方 false」で通ってしまう</b>ため
     /// ——文書が無い起動直後は <c>CanPlaceOnMainCircuit</c> も <c>IsEnabled</c> も偽になる。
     /// </para>
     /// </summary>
+    [Theory]
+    [MemberData(nameof(SymbolIndices))]
+    public void 三極記号は主回路シートでのみ有効になるよう束ねられている(int index)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+
+            var binding = System.Windows.Data.BindingOperations.GetBinding(
+                ItemAt(window, index), UIElement.IsEnabledProperty);
+
+            Assert.NotNull(binding);
+            Assert.Equal(nameof(MainWindowViewModel.CanPlaceOnMainCircuit), binding!.Path.Path);
+        });
+
+    /// <summary>
+    /// T-133増分6: 再掲した4件は <c>CanEditDiagram</c> へ束ねられていること。
+    /// <b>主回路限定の枷を負わぬ</b>——これらは <c>SheetAffinity.Any</c>（<c>PartDefinition.cs:87</c> の既定）
+    /// にて制御回路シートにも置けるゆえ、部品リスト経由と可否を揃える。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(PartIndices))]
+    public void 再掲した四件は編集可否のみで束ねられている(int index)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+
+            var binding = System.Windows.Data.BindingOperations.GetBinding(
+                ItemAt(window, index), UIElement.IsEnabledProperty);
+
+            Assert.NotNull(binding);
+            Assert.Equal(nameof(MainWindowViewModel.CanEditDiagram), binding!.Path.Path);
+        });
+
+    /// <summary>
+    /// T-133増分6: サブメニュー自体には <c>IsEnabled</c> のバインドが残っておらぬこと。
+    /// <b>枷を「移した」ことの証である</b>——項目側へ足しただけでサブメニュー側を外し忘れれば、
+    /// 制御回路シートで既存4件ごとグレーアウトしたままになる（<b>それこそが本増分で解いた齟齬</b>）。
+    /// <b>項目側のバインドを見るテストだけでは、この取り零しを素通しする。</b>
+    /// </summary>
     [Fact]
-    public void サブメニューは主回路シートでのみ有効になるよう束ねられている()
+    public void サブメニュー自体には主回路限定の枷が残っておらぬ()
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
@@ -167,7 +315,6 @@ public class MenuPlacementToolTests
             var binding = System.Windows.Data.BindingOperations.GetBinding(
                 window.OtherSymbolsMenu, UIElement.IsEnabledProperty);
 
-            Assert.NotNull(binding);
-            Assert.Equal(nameof(MainWindowViewModel.CanPlaceOnMainCircuit), binding!.Path.Path);
+            Assert.Null(binding);
         });
 }

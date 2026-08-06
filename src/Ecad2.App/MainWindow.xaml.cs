@@ -3402,6 +3402,57 @@ public partial class MainWindow : Window
         _viewModel.StatusMessage = $"配置ツール: {header} - キャンバスをクリックして配置位置を指定してください";
     }
 
+    /// <summary>「その他図形」メニューのパーツ経路タグの接頭辞（原本 GuiEcad のタグ形式3 と同じ綴り）。</summary>
+    private const string PartTagPrefix = "part:";
+
+    /// <summary>
+    /// 「その他図形」メニューから既存パーツの配置ツールを選ぶ（T-133増分6・殿裁定8）。
+    /// <para>
+    /// <b>直上の <see cref="OtherSymbolMenuItem_Click"/> と対を成す</b>が、<c>Tool</c> に載せるのが
+    /// <c>Kind</c> ではなく <c>PartId</c> である点が異なる——ここで扱う4件は
+    /// <see cref="Ecad2.Persistence.BasicPartTemplates"/> に <c>PartDefinition</c> として実在するゆえ、
+    /// <b>新しい配置経路は要らぬ</b>（計画書§2-5）。<c>PartId</c> を載せれば以後は
+    /// <see cref="TryPlaceActiveTool"/> が既存の <see cref="TryPlaceElement"/> へ流すゆえ、
+    /// <b>配置バーを通す作法も、生まれる要素も、部品リストから置いた場合と同一になる</b>
+    /// ——3極記号がバーを通さぬのとはここが違う。
+    /// </para>
+    /// <para>
+    /// <b>【タグの形＝<c>"part:&lt;PartId&gt;"</c>】</b>原本 GuiEcad のタグ形式3（<c>MainPage.Tools.cs:105-107</c>）に倣う。
+    /// <see cref="ViewModels.SymbolTagParser"/> が扱う <c>Kind#Orient</c> 形式と同じサブメニューに同居するゆえ、
+    /// <b>接頭辞で経路を弁別する</b>。
+    /// </para>
+    /// <para>
+    /// <b>【<see cref="ActivateBuiltinTool"/> を使い回さぬ理由】</b>あちらは <c>Definition.Name</c> で引くが、
+    /// 本メニューの表示名は原本準拠ゆえ <c>Name</c> と食い違う（「三相モータ」対 <c>"モータ"</c>、
+    /// 「サーマル(OL)」対 <c>"サーマル"</c>）。<b>Id で引くのが確実である。</b>
+    /// </para>
+    /// </summary>
+    private void OtherPartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: string tag, Header: string header }) return;
+        if (!TryParsePartTag(tag, out var partId)) return;
+        var entry = _viewModel.PartPalette.Entries.FirstOrDefault(pe => pe.Definition.Id == partId);
+        if (entry is null) return;
+
+        // OtherSymbolMenuItem_Click と同じ理由(T-069往復4周目修正1、隠密テスト設計書・殿裁可済み):
+        // 記入中ドラフトを保持したまま Tool.Mode を上書きすると HasAnyDraft が意図せず真のまま残る。
+        _viewModel.CancelResidualDraftForToolSwitch();
+        _viewModel.Tool = new ViewModels.ToolState(ViewModels.ToolMode.PlaceElement, PartId: entry.Definition.Id);
+        _viewModel.StatusMessage = $"配置ツール: {header} - キャンバスをクリックして配置位置を指定してください";
+    }
+
+    /// <summary>
+    /// <c>"part:&lt;PartId&gt;"</c> 形式のタグから <c>PartId</c> を取り出す。
+    /// 接頭辞が無い・接頭辞のみで中身が空、のいずれも <c>false</c> を返す。
+    /// </summary>
+    private static bool TryParsePartTag(string? tag, out string partId)
+    {
+        partId = "";
+        if (tag is null || !tag.StartsWith(PartTagPrefix) || tag.Length == PartTagPrefix.Length) return false;
+        partId = tag[PartTagPrefix.Length..];
+        return true;
+    }
+
     private void BuiltinPlaceButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button { Tag: string tag }) return;

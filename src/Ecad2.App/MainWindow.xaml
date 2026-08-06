@@ -1003,21 +1003,36 @@
                      「サーマル(OL) 2極」が型名 ThermalOverload3P と食い違うのは原本がそう記すゆえで、
                      書き誤りではない（KindDisplayName のコメントに同旨）。
 
-                     【IsEnabled＝(f) 主回路限定の予防側】殿裁定2026-07-28＝「制御回路シートでは
-                     メニュー項目を無効化（グレーアウト）」。配置時の拒否（ValidatePlacement）は
-                     到達せぬ前提の最終防御として別に在る（家老裁定＝両建て）。
-                     CanPlaceOnMainCircuit は T-136(A)増分2 で既に3箇所（1255/1265/1285行）に
-                     使用実績があり、通知経路も結線済み。
+                     【IsEnabled＝(f) 主回路限定の予防側。増分6で項目単位へ移した】
+                     殿裁定2026-07-28＝「制御回路シートではメニュー項目を無効化（グレーアウト）」。
+                     増分4-C ではサブメニュー自体へ掛けて配下への到達ごと防いでいたが（家老裁定2026-07-28）、
+                     増分6で射程外の既存4件が配下へ入るため、枷を3極記号6項目へ個別に移した（殿裁可2026-08-06）。
+                     殿裁定4の射程は「3極記号は主回路シートのみ」であり、既存4件（SheetAffinity.Any＝
+                     PartDefinition.cs:87 の既定）を制限する裁定は元より無い——枷の位置を射程へ合わせ直した形。
+                     このまま据え置けば「部品リストからは置けるがメニューからは置けぬ」という経路間の不一致が生じた。
+                     配置時の拒否（ValidatePlacement）は到達せぬ前提の最終防御として別に在る（家老裁定＝両建て）。
+                     CanPlaceOnMainCircuit は T-136(A)増分2 で既にツールバー3箇所に使用実績があり、
+                     通知経路も結線済み。
 
-                     【子要素を静的に6件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
+                     【T-133増分6: 既存4件の再掲（殿裁定8）】原本 OtherBuiltins 配列（同上）の並びどおり、
+                     セレクトSW・サーマル(OL)・非常停止・三相モータを3極記号の手前へ置く。
+                     こちらは PartId 経路ゆえ Click ハンドラが別（OtherPartMenuItem_Click）であり、
+                     配置バーを通す既存の作法をそのまま踏む——部品リストから置いたものと同一の要素になる。
+                     タグの "part:" 接頭辞は原本のタグ形式3（part:<PartId>）に倣い、Kind タグとの弁別を明示する。
+
+                     【子要素を静的に10件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
                      要ったもの。本サブメニューは静的ゆえ HasItems=true が最初から保たれ、同じ手当ては要らぬ。 -->
-                <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)" IsEnabled="{Binding CanPlaceOnMainCircuit}">
-                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click"/>
-                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click"/>
-                    <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click"/>
-                    <MenuItem Header="電磁接触器 主接点 横" Tag="ContactorMain3P#H" Click="OtherSymbolMenuItem_Click"/>
-                    <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click"/>
-                    <MenuItem Header="サーマル(OL) 2極 横" Tag="ThermalOverload3P#H" Click="OtherSymbolMenuItem_Click"/>
+                <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)">
+                    <MenuItem Header="セレクトSW" Tag="part:basic-select-switch" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="サーマル(OL)" Tag="part:basic-thermal-overload" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="非常停止" Tag="part:basic-emergency-stop" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="三相モータ" Tag="part:basic-motor" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="電磁接触器 主接点 横" Tag="ContactorMain3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="サーマル(OL) 2極 横" Tag="ThermalOverload3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
