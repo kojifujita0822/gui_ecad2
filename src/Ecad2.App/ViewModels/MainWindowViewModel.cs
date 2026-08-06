@@ -493,22 +493,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             ClearOrJoinTargetDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
+                // PR-17段1(殿裁可2026-08-06): 中央の15件は基準そのものゆえ呼び出しへ寄せる。
+                // 前後の2件は基準に含まれぬためこの場に残す——SelectedCellDisplayは本setter固有、
+                // HasNoPropertySelectionは段2で基準の末尾へ移す予定(並びを保つため末尾に置く)。
+                // この if の内側から出してはならぬ。同値の再代入で17件が飛ぶ形へ崩れる。
                 OnPropertyChanged(nameof(SelectedCellDisplay));
-                OnPropertyChanged(nameof(SelectedElement));
-                OnPropertyChanged(nameof(HasSelectedElement));
-                OnPropertyChanged(nameof(SelectedElementKindDisplay));
-                OnPropertyChanged(nameof(SelectedElementDeviceName));
-                OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
-                OnPropertyChanged(nameof(SelectedElementNotchPosition));
-                OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
-                OnPropertyChanged(nameof(SelectedElementBreakerType));
-                OnPropertyChanged(nameof(IsSelectedElementLamp));
-                OnPropertyChanged(nameof(SelectedElementLampColor));
-                OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
-                OnPropertyChanged(nameof(SelectedElementSetpoint));
-                OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
-                OnPropertyChanged(nameof(SelectedElementLabelDy));
-                OnPropertyChanged(nameof(SelectedElementComment));
+                NotifySelectedElementChanged();
                 OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
@@ -2537,21 +2527,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (deviceName is not null) RemoveDeviceIfUnreferenced(deviceName);
 
-        OnPropertyChanged(nameof(SelectedElement));
-        OnPropertyChanged(nameof(HasSelectedElement));
-        OnPropertyChanged(nameof(SelectedElementKindDisplay));
-        OnPropertyChanged(nameof(SelectedElementDeviceName));
-        OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
-        OnPropertyChanged(nameof(SelectedElementNotchPosition));
-        OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
-        OnPropertyChanged(nameof(SelectedElementBreakerType));
-        OnPropertyChanged(nameof(IsSelectedElementLamp));
-        OnPropertyChanged(nameof(SelectedElementLampColor));
-        OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
-        OnPropertyChanged(nameof(SelectedElementSetpoint));
-        OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
-        OnPropertyChanged(nameof(SelectedElementLabelDy));
-        OnPropertyChanged(nameof(SelectedElementComment));
+        // PR-17段1(殿裁可2026-08-06): ここは基準15件と完全に同一の並びを書き写しておった。
+        // 4箇所に分けて書けば、新しい派生プロパティを足す折に一つでも書き漏らせば穴が空く
+        // (T-107・本件で二度起きた)。書く場所を一つにすれば、分けて書くこと自体ができぬ。
+        NotifySelectedElementChanged();
         DeviceTable.Refresh();
         return true;
     }
@@ -3627,22 +3606,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasProject));
         OnPropertyChanged(nameof(CanEditDiagram));
         OnPropertyChanged(nameof(SelectedCell), oldSelectedCell);
+        // PR-17段1(殿裁可2026-08-06): SelectedCellDisplayは基準に含まれぬゆえ手前に残す。
+        // 続く15件は基準そのものであった。
         OnPropertyChanged(nameof(SelectedCellDisplay));
-        OnPropertyChanged(nameof(SelectedElement));
-        OnPropertyChanged(nameof(HasSelectedElement));
-        OnPropertyChanged(nameof(SelectedElementKindDisplay));
-        OnPropertyChanged(nameof(SelectedElementDeviceName));
-        OnPropertyChanged(nameof(IsSelectedElementSelectSwitch));
-        OnPropertyChanged(nameof(SelectedElementNotchPosition));
-        OnPropertyChanged(nameof(IsSelectedElementBreaker3P));
-        OnPropertyChanged(nameof(SelectedElementBreakerType));
-        OnPropertyChanged(nameof(IsSelectedElementLamp));
-        OnPropertyChanged(nameof(SelectedElementLampColor));
-        OnPropertyChanged(nameof(IsSelectedElementTimerRelated));
-        OnPropertyChanged(nameof(SelectedElementSetpoint));
-        OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
-        OnPropertyChanged(nameof(SelectedElementLabelDy));
-        OnPropertyChanged(nameof(SelectedElementComment));
+        NotifySelectedElementChanged();
         SheetNavigation.ResetSheets();
         // T-050往復2周目(隠密CONFIRMEDバグ2): ResetSheets自体はSelectedSheet通知を撃たない。ミラー
         // 再同期(Sheets.Clear+再追加)を終えた後、Document差し替え前に捕捉した正しい旧値でここから
