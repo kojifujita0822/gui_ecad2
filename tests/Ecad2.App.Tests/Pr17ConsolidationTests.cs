@@ -21,9 +21,14 @@ namespace Ecad2.App.Tests;
 public class Pr17ConsolidationTests : ViewModelTestBase
 {
     /// <summary>
-    /// 基準 <c>NotifySelectedElementChanged()</c> が通知する15件。
+    /// 基準 <c>NotifySelectedElementChanged()</c> が通知する16件。
     /// <b>並びの定義をここ1箇所に持ち、他の期待集合はここからの合成で組み立てる</b>
     /// （<c>MenuPlacementToolTests</c> が <c>SymbolIndices()</c> を派生させたのと同じ作法）。
+    /// <para>
+    /// <b>【段2で15件から16件になった】</b><c>HasNoPropertySelection</c> を末尾へ足したため
+    /// （<c>P-169</c> の手当て）。<b>期待値の更新であって、検出力の緩和ではない</b>
+    /// ——集合比較という測り方も、対象の経路も変えておらぬ。
+    /// </para>
     /// </summary>
     private static readonly string[] BasisProperties =
     {
@@ -42,14 +47,15 @@ public class Pr17ConsolidationTests : ViewModelTestBase
         nameof(MainWindowViewModel.SelectedElementSetpointSliderValue),
         nameof(MainWindowViewModel.SelectedElementLabelDy),
         nameof(MainWindowViewModel.SelectedElementComment),
+        nameof(MainWindowViewModel.HasNoPropertySelection),
     };
 
-    /// <summary>基準に含まれぬが本統合の対象に隣接する2件。<c>SelectedCellDisplay</c> は
-    /// <c>SelectedCell</c> setter 固有、<c>HasNoPropertySelection</c> は段2で基準へ移す予定のもの。</summary>
+    /// <summary>基準に含まれぬが本統合の対象に隣接するもの。
+    /// <c>SelectedCellDisplay</c> は <c>SelectedCell</c> setter 固有ゆえ基準へは入らぬ。
+    /// <b>段2までは <c>HasNoPropertySelection</c> もここに在った</b>——基準の末尾へ移した。</summary>
     private static readonly string[] AdjacentProperties =
     {
         nameof(MainWindowViewModel.SelectedCellDisplay),
-        nameof(MainWindowViewModel.HasNoPropertySelection),
     };
 
     /// <summary>

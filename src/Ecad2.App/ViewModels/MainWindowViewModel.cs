@@ -493,13 +493,15 @@ public sealed class MainWindowViewModel : ViewModelBase
             ClearOrJoinTargetDraftIfAny();
             if (SetProperty(ref _selectedCell, value))
             {
-                // PR-17段1(殿裁可2026-08-06): 中央の15件は基準そのものゆえ呼び出しへ寄せる。
-                // 前後の2件は基準に含まれぬためこの場に残す——SelectedCellDisplayは本setter固有、
-                // HasNoPropertySelectionは段2で基準の末尾へ移す予定(並びを保つため末尾に置く)。
-                // この if の内側から出してはならぬ。同値の再代入で17件が飛ぶ形へ崩れる。
+                // PR-17段1(殿裁可2026-08-06): 中央の15件は基準そのものゆえ呼び出しへ寄せた。
+                // SelectedCellDisplayは基準に含まれぬ本setter固有ゆえこの場に残す。
+                // この if の内側から出してはならぬ。同値の再代入でも飛ぶ形へ崩れる。
+                //
+                // PR-17段2: HasNoPropertySelectionはここに在ったが、基準の末尾へ移した。
+                // 並びは「SelectedCellDisplay → 基準(末尾がHasNoPropertySelection)」となり、
+                // 通知の順序は移す前と完全に同一に保たれる。
                 OnPropertyChanged(nameof(SelectedCellDisplay));
                 NotifySelectedElementChanged();
-                OnPropertyChanged(nameof(HasNoPropertySelection));
             }
         }
     }
@@ -2668,6 +2670,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedElementSetpointSliderValue));
         OnPropertyChanged(nameof(SelectedElementLabelDy));
         OnPropertyChanged(nameof(SelectedElementComment));
+        // PR-17段2(P-169の手当て、殿裁可2026-08-06): 末尾へ足す。SelectedCell setter は
+        // 「SelectedCellDisplay → 基準 → HasNoPropertySelection」の並びであったゆえ、
+        // 末尾に置けば setter 側の1行を削っても通知の順序が前後で完全に同一に保たれる。
+        // 欠落しておったのは4経路(削除・行削除・配置2種)。基準へ足せば一挙に埋まる。
+        OnPropertyChanged(nameof(HasNoPropertySelection));
     }
 
     private string _statusMessage = "";
