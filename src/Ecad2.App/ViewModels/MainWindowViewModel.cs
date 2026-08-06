@@ -460,6 +460,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedFreeLine = null;
             SelectedConnectionDot = null;
             // T-064: 画像も同様に扱う。
+            // PR-17段3: この代入と直下のSelectedFrame=nullは、HasNoPropertySelectionを
+            // 無条件に通知する(各setterがSetPropertyの戻り値を見ておらぬ)。
+            // 本setterの発火回数を数えるときは勘定に入れよ——同値の再代入でも飛ぶ。
             SelectedImage = null;
             // T-067: 枠(GroupFrame)も同様に扱う。
             SelectedFrame = null;
@@ -1277,6 +1280,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// 現在選択中の画像(T-064: グリッド非依存の自由配置要素、SelectedFreeLine等と同型の排他制御——
     /// SelectedCellのsetterが常時クリアする)。単一選択のみ。
+    /// <para>
+    /// <b>【PR-17段3の注記・下2行はSetPropertyの戻り値を見ておらぬ】</b>
+    /// ゆえに<b>同値の再代入(null→null等)でも必ず通知が飛ぶ</b>。
+    /// SelectedFrameのsetterも同型である。
+    /// <b>これはPR-17で四人が足を取られた箇所にござる</b>——本setterへ代入する側
+    /// (SelectedCell setter冒頭・ReplaceDocument)を読んでいて、ここまで辿らずに
+    /// 発火回数を数え違えた。<b>数を数えるときは、この2行を勘定に入れること。</b>
+    /// なお本項は「直せ」という意味ではない。ガード化の是非は別途の調査題目にござる
+    /// (この無条件通知に依存する経路が他に無いか未確認のため)。
+    /// </para>
     /// </summary>
     public ImageInsert? SelectedImage
     {
@@ -1469,6 +1482,11 @@ public sealed class MainWindowViewModel : ViewModelBase
     // P-050は構造的に非該当)。
     private GroupFrame? _selectedFrame;
 
+    /// <summary>
+    /// <b>【PR-17段3の注記・下2行はSetPropertyの戻り値を見ておらぬ】</b>
+    /// SelectedImageのsetterと同型にて、<b>同値の再代入でも必ず通知が飛ぶ</b>。
+    /// 詳細と経緯はそちらのdocコメントを見よ。<b>数を数えるときは勘定に入れること。</b>
+    /// </summary>
     public GroupFrame? SelectedFrame
     {
         get => _selectedFrame;
@@ -2647,12 +2665,23 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeviceTable.Refresh();
     }
 
-    /// <summary>SelectedElement系4プロパティ(SelectedElement/HasSelectedElement/
-    /// SelectedElementKindDisplay/SelectedElementDeviceName)のPropertyChangedを無条件で発火する
+    /// <summary>SelectedElement系プロパティ(下記16件)のPropertyChangedを無条件で発火する
     /// (T-055増分3往復1周目、隠密レビュー指摘a・bの恒久対応)。DeleteRowAtCommandは行削除で
     /// SelectedCellの座標が指す実データ(要素の有無・内容)が変わりうるが、SelectedCell自体の
     /// setterは「値が変化した場合のみ」通知する(削除対象行そのものを選択中=座標は不変というケースで
-    /// 通知が抜け落ちる、指摘a)ため、削除完了後に明示的に呼ぶ。</summary>
+    /// 通知が抜け落ちる、指摘a)ため、削除完了後に明示的に呼ぶ。
+    /// <para>
+    /// PR-17段3(殿裁可2026-08-06): 数を実数へ訂正した。旧記述は「4プロパティ」と述べ4つを名指ししていたが、
+    /// 実際には段2以前で15件、段2でHasNoPropertySelectionを足して16件。二重に古びていた。
+    /// <b>この数を報告や設計へ引くときは、必ず本文を数え直すこと</b>——数はここで増え続ける。
+    /// </para>
+    /// <para>
+    /// <b>【集計時の注意・PR-17で四人が足を取られた】</b>本メソッドの外にも
+    /// HasNoPropertySelectionを飛ばす経路がある。SelectedImage/SelectedFrameの各setterが
+    /// <b>SetPropertyの戻り値を見ず無条件に</b>通知するため、それらへ代入する箇所
+    /// (SelectedCell setter冒頭・ReplaceDocument)では本メソッドとは別に発火する。
+    /// 発火回数を数える際は勘定に入れること(詳細は各setterの定義および呼び出し箇所のコメント)。
+    /// </para></summary>
     private void NotifySelectedElementChanged()
     {
         OnPropertyChanged(nameof(SelectedElement));
@@ -3571,6 +3600,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 同様に旧文書の実体を持ち越さない。SelectedImage=nullはSelectedCellのsetter内にしか
         // 無く、上の_selectedCellは直接代入(setterバイパス)のため自動クリアが効かない
         // (SelectedConnector等と同じ理由、ここだけ横展開漏れしていた)。
+        //
+        // PR-17段3: この代入と下のSelectedFrame=nullは、HasNoPropertySelectionを無条件に通知する
+        // (各setterがSetPropertyの戻り値を見ておらぬ)。段2以前、本メソッドはHasNoPropertySelectionを
+        // 自分では通知しておらず、この2つの副作用に暗黙で救われていた。段2で基準へ足したことにより
+        // 明示になり、現在は暗黙2回＋明示1回の計3回飛ぶ。発火回数を数えるときは勘定に入れよ。
         SelectedImage = null;
         // T-067: 枠(GroupFrame)も同様に旧文書の実体を持ち越さない(PR-01再発、隠密静的レビュー
         // 指摘。上の_selectedCellは直接代入[setterバイパス]のためSelectedFrame=nullの自動クリアが
