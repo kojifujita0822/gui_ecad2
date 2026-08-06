@@ -22,6 +22,17 @@
 
 **併せて確認**——`SelectedImage`（`:1289-1300`）・`SelectedFrame`（`:1480-`付近）の両setterは`SetProperty`の戻り値を見ず`HasNoPropertySelection`を無条件通知。`ReplaceDocument`は`SelectedImage=null`（`:3588`）・`SelectedFrame=null`（`:3592`）を必ず通る。**侍の§5-2の記述と一致**。
 
+> **【2026-08-06追記・訂正】侍の実測報告を受け`grep`で`SelectedImage = null`／`SelectedFrame = null`の
+> 全呼出（計6箇所）を洗い出したところ、**`ReplaceDocument`だけでなく`SelectedCell`setter自身の
+> 先頭（`:463`・`:465`、`if (SetProperty(...))`ガードより前）にも同じ無条件クリアがあり、
+> ここも`HasNoPropertySelection`を無条件通知していた**——**当初の§0で確認漏れがあった箇所**
+> （SelectedCell setterは中盤〜末尾しか読んでおらず、冒頭の排他制御部分を見落としていた）。
+> **残る2箇所（`:1325`＝`DeleteSelectedImage`内の自己クリア、`:1494`＝`DeleteSelectedFrame`内の
+> 自己クリア）は自分自身をnullにするだけで、他方の選択種別を巻き込まぬため無関係と確認済み。**
+> **`DeleteSelectedElement`・`DeleteRowAtCommand`・配置2種（`PlaceElementAtSelectedCell`両経路）は
+> いずれも`grep`結果に現れず、この無条件クリアと無縁と確認した**（§3の4経路テストは訂正不要）。
+> **影響は§2-4-c・§2-4-dの期待値のみ。下記表を訂正済みの値へ差し替える。**
+
 **`SelectedElement`は`SelectedCell`と`CurrentSheet.Elements`からの算出プロパティ**（`:2137-2138`、専用フィールドを持たぬ）——テスト設定では「要素を`Elements`へ追加し`SelectedCell`をその位置へ合わせる」ことで`HasSelectedElement`を真にする。
 
 ---
@@ -90,18 +101,24 @@ private static readonly string[] BasisProperties = {
 
 ### 2-4. 具体的なテスト（Fact 3件＋境界値1件）
 
+> **【2026-08-06訂正】2-4-c・2-4-dの期待値を、侍の実測報告（`SelectedCell`setter冒頭の無条件
+> `SelectedImage=null`／`SelectedFrame=null`）を反映して直した。取り消し線が訂正前、太字が現行値。**
+
 | # | 対象 | 操作（入力） | 期待 |
 |---|---|---|---|
 | 2-4-a | `DeleteSelectedElement` | 要素を1つ配置し選択、`DeleteSelectedElement()`を呼ぶ | 捕捉集合＝`BasisProperties`と完全一致（15件） |
 | 2-4-b | `SelectedCell` setter（変化あり） | 要素の在るセルを選択後、**別のセル**（行・列とも異なる）を選択 | 捕捉集合＝`BasisProperties ∪ {SelectedCellDisplay, HasNoPropertySelection}`と完全一致（17件） |
-| 2-4-c | `SelectedCell` setter（**退化入力・境界値**） | **同一セルを再選択**（`vm.SelectedCell = vm.SelectedCell`と同値の代入） | **捕捉集合は空**（0件）——`if (SetProperty(...))`の条件分岐そのものが統合後も保たれているかを見る |
-| 2-4-d | `ReplaceDocument` | 要素を選択した状態で`vm.NewDocument()`を呼ぶ（`ReplaceDocument`はprivateゆえ`NewDocument()`/`OpenFile`経由で駆動） | 捕捉集合＝`BasisProperties ∪ {SelectedCellDisplay}`と完全一致（16件、`HasNoPropertySelection`はまだ含まぬ） |
+| 2-4-c | `SelectedCell` setter（**退化入力・境界値**） | **同一セルを再選択**（`vm.SelectedCell = vm.SelectedCell`と同値の代入） | ~~捕捉集合は空（0件）~~ **捕捉集合＝`{HasNoPropertySelection}`（1件）**——setter冒頭の無条件`SelectedImage=null`／`SelectedFrame=null`クリアが`if`ガードの外で先に走り、`HasNoPropertySelection`だけは常に飛ぶ（`HashSet`ゆえ2回分が1件に潰れて現れる） |
+| 2-4-d | `ReplaceDocument` | 要素を選択した状態で`vm.NewDocument()`を呼ぶ（`ReplaceDocument`はprivateゆえ`NewDocument()`/`OpenFile`経由で駆動） | ~~捕捉集合＝`BasisProperties ∪ {SelectedCellDisplay}`（16件）~~ **捕捉集合＝`BasisProperties ∪ {SelectedCellDisplay, HasNoPropertySelection}`（17件）**——`ReplaceDocument`自身が`SelectedImage=null`／`SelectedFrame=null`（`:3567`/`:3571`）を直に呼ぶため、段2（基準への追加）を待たずとも`HasNoPropertySelection`は既に飛ぶ（§3-4「暗黙の依存」と同じ事実。段1の期待値組み立てにこの事実を反映し損ねていたのが誤りの正体） |
 
-**2-4-cが要**——**PR-27の退化入力チェックそのもの**にござる。「同一値の再代入では17件が一切発火しない」
-という**現状の条件分岐（ガード）**は、複製をまとめる際に`if`ごと消してしまう改変（＝常に発火する形へ
-崩れる改変）に対して**無防備になりがち**（3箇所を1関数へ寄せる作業で、うっかりガードの外へ出しやすい）。
-**この境界値ケースが無ければ、「17件は正しいが常に発火するようになった」という壊れ方を段1のテストは
-一切検出できぬ**。
+**2-4-cが要**——**PR-27の退化入力チェックそのもの**にござる。**ただし訂正後の主張は「何も飛ばぬ」
+ではなく「`if`ガード配下の16件は飛ばず、ガード外の`HasNoPropertySelection`だけが飛ぶ」**——
+「同一値の再代入では16件ブロックが一切発火しない」という**現状の条件分岐（ガード）**は、複製を
+まとめる際に`if`ごと消してしまう改変（＝常に発火する形へ崩れる改変）に対して**無防備になりがち**
+（3箇所を1関数へ寄せる作業で、うっかりガードの外へ出しやすい）。**この境界値ケースが無ければ、
+「16件ブロックが正しいが常に発火するようになった」という壊れ方を段1のテストは一切検出できぬ**
+——**捕捉集合が`{HasNoPropertySelection}`から17件へ膨らんでおれば検出できる、という形に変わっただけで、
+検出力そのものは訂正前後で変わらぬ**。
 
 ---
 
@@ -180,6 +197,13 @@ setter自身の17件ブロック（`HasNoPropertySelection`を含む）が別途
 にござる。**空セル選択→同セル配置という操作そのものが、忍者の対照実験（別セルを経由せず`{ESC}`のみ）
 の単体版**。
 
+**【4経路とも§0の無条件クリアと無縁であることを`grep`で確認済み】**——`DeleteSelectedElement`・
+`PlaceElementAtSelectedCell`両経路は`SelectedImage`／`SelectedFrame`に一切触れぬ。`DeleteRowAtCommand`が
+呼ぶ`FinishRowCountChange`（`:2792-2799`）には`SelectedCell`の**条件付き**再代入
+（`selectedCell.Row >= sheet.Grid.Rows`の場合のみ）があるが、**3-3-bの設定値**（`Grid.Rows=10`→
+削除後9、選択行3）**では3<9ゆえこの分岐に入らず、setter自体が呼ばれぬ**——3-3-bの期待値（0→1）は
+この条件を満たす設定である限り成立する。**行数・選択行を変える場合はこの条件を再確認すること。**
+
 ### 3-4. 【`ReplaceDocument`固有】家老の問いへの回答——**件数ではなく「回数」で見る**
 
 **家老の問い**＝「`ReplaceDocument`経路の暗黙の依存（`SelectedImage`/`SelectedFrame`setterの無条件通知）が
@@ -205,21 +229,50 @@ setter自身の17件ブロック（`HasNoPropertySelection`を含む）が別途
 見逃す）とは別物**——**ここで数えるのは同一プロパティ名の発火"回数"であり、集合比較ではないため
 `PR-27`の穴には当たらぬ**（回数を数えて中身が入れ替わる余地はない、対象が単一のプロパティ名ゆえ）。
 
-同じ技法は**`SelectedCell`setterの回帰確認にも使える**——setter自身が持つ既存の
-明示`HasNoPropertySelection`呼び出し（現行1回）を、段2で基準へ「移す」際に**消し忘れれば2回に
-なる**（二重発火という新種の不具合）。**「増えていないこと」を確かめる意味でも回数が要る。**
+同じ技法は**`SelectedCell`setterの回帰確認にも使える**——ただし**この回帰確認自体が§0の
+無条件クリア（`SelectedImage=null`／`SelectedFrame=null`）を勘定に入れ損ねていた**
+（後述§3-5-aの訂正参照）。正しくは、値が実際に変わる選択変更で**現行3回**
+（暗黙2回＋setter自身の明示呼び出し1回）。段2で基準へ「移す」際に**setter自身の明示行を
+消し忘れれば、暗黙2回＋基準経由1回＋消し忘れた明示1回＝4回に膨らむ**（二重発火という
+新種の不具合）。**「3回のまま増えていないこと」を確かめる意味でも回数が要る。**
 
 ### 3-5. `ReplaceDocument`・`SelectedCell`setter回帰の具体的なテスト
 
 | # | 対象 | 操作 | ①現行（段2前） | ③段2後 |
 |---|---|---|---|---|
-| 3-5-a | `SelectedCell` setter（回帰確認） | 要素の在るセル→別セルへ選択変更 | 1回発火（現行の明示呼び出し） | **依然1回**発火（基準へ移るのみ、増減なし。§3-4末尾の技法） |
+| 3-5-a | `SelectedCell` setter（回帰確認） | 要素の在るセル→別セルへ選択変更 | ~~1回発火（現行の明示呼び出し）~~ **3回発火**（setter冒頭の無条件`SelectedImage=null`／`SelectedFrame=null`由来の暗黙2回＋setter自身の明示呼び出し1回。§0参照） | ~~依然1回~~ **依然3回発火**（暗黙2回＋基準経由1回。setter自身の明示行は段2で削れるが総数は変わらぬ。§3-4末尾の技法） |
 | 3-5-b | `ReplaceDocument`（忍者発見・射程拡大分） | 要素を選択した状態で`NewDocument()` | **2回**発火（暗黙のみ） | **3回**発火（暗黙2＋明示1、§3-4の技法） |
 | 3-5-c | 既存呼出のうち「値が変わらぬ3経路」の代表1件＝`ReplaceAllDeviceName`（`:2637`） | 要素を選択し`ReplaceAllDeviceName`を呼ぶ（デバイス名一括置換、選択自体は変えぬ操作） | 0回発火 | **1回**発火——**基準関数を経由するだけで恩恵を受けることの代表証明**（§3-3冒頭の判断根拠） |
 
+> **【2026-08-06訂正】3-5-aの期待値を「1回」としていたのは誤りであった**（侍の実測で発覚）。
+> **§2-4-c・§2-4-dと同根の見落とし**——`SelectedCell`setter自身を動かすテストである以上、
+> setter冒頭の無条件クリア（§0）を必ず勘定に入れねばならなんだのに、当初は「setter自身が
+> 持つ既存の明示`HasNoPropertySelection`呼び出し」だけを数え、冒頭の暗黙2回を見落としていた。
+> **正しくは①③とも3回（変化なし）**——「増えていないこと」を確かめるという3-5-aの狙い自体は
+> 変わらぬが、基準となる回数が1→3に訂正される。
+
 **3-5-aが要**——段2実装で`SelectedCell`setter自身の既存`HasNoPropertySelection`呼び出しを
-消し忘れると2回発火に膨らむ（二重発火という新種の不具合）。**「増えていないこと」を確かめる
-意味でも回数が要る。**
+消し忘れると、暗黙2回＋基準経由1回＋消し忘れた明示1回で**4回**に膨らむ（二重発火という
+新種の不具合）。**「3回のまま増えていないこと」を確かめる意味でも回数が要る。**
+
+### 3-5-d. 【四例目の有無・系統的な再点検】§3の他の項目は無縁と確認
+
+**家老の求め「四例目が無いと言い切れる根拠」に応え、§3全項目を「その操作は`SelectedCell`
+プロパティ**setter**を（直接・間接を問わず）呼ぶか」という一点で再点検した**
+（呼べば§0の暗黙2回が必ず乗る、呼ばねば無縁）。
+
+| # | 対象 | `SelectedCell`setterを呼ぶか | 根拠 |
+|---|---|---|---|
+| 3-3-a | `DeleteSelectedElement` | **呼ばぬ** | `:2521-2557`全文に`SelectedCell`への代入なし（既確認） |
+| 3-3-b | `DeleteRowAtCommand`（`sc.Row==row`分岐） | **呼ばぬ** | `if(sc.Row>row)`が偽ゆえ再代入行に到達せず。`FinishRowCountChange`の条件付き再代入も3-3-bの設定値（Rows10→9、選択行3）では不成立（既確認、§3-3内の注記） |
+| 3-3-c/d | `PlaceElementAtSelectedCell`両経路 | **呼ばぬ** | `SelectedCell`は読み取りのみ（`is {} pos`）、代入なし |
+| 3-5-a | `SelectedCell`setter（回帰確認） | **呼ぶ**（テスト対象そのもの） | ここが訂正対象 |
+| 3-5-b | `ReplaceDocument` | **呼ばぬ**——`_selectedCell = null`は**setterをバイパスする直接代入**（`:3557`付近のコメントで確認済み） | `SelectedImage=null`／`SelectedFrame=null`はReplaceDocument自身が直に呼ぶ2回のみで、setter冒頭の暗黙2回とは別物（重複しない）——§3-4の「2回」はこの2回のみを指し訂正不要 |
+| 3-5-c | `ReplaceAllDeviceName` | **呼ばぬ** | `SelectedCell`・`SelectedImage`・`SelectedFrame`のいずれにも触れぬ（`:2633-2639`全文確認） |
+
+**結論＝影響は3-5-aのみ。他5項目（3-3-a/b/c/d・3-5-b・3-5-c）は上表の個別根拠により無縁と
+確定した——「洗ったが見当たらなんだ」ではなく、各項目ごとに「setterを呼ぶか」を名指しで
+判定した上での無縁確認である。**
 
 **3-5-cを1件のみに絞った理由**——**`ReplaceOneDeviceName`（`:2575`）・`EndOrJoinTargetDraft`
 （`:3503`）を含め、この3箇所はいずれも`NotifySelectedElementChanged()`を単に呼ぶだけで、
