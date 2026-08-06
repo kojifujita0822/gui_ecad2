@@ -17,6 +17,17 @@ public sealed class PartPaletteViewModel : ViewModelBase
 {
     private readonly PartFolderStore _store;
 
+    /// <summary>ピン留めの永続化（T-133増分9、殿裁定9）。<see cref="PinnedPartStore"/> は T-007 の移植で
+    /// Core層へ入りながら参照0件のまま据え置かれており、本増分が初めての呼び手である。</summary>
+    private readonly PinnedPartStore _pinnedStore;
+
+    /// <summary>ピン留めされた部品Idの集合。<see cref="Load"/> のたびにディスクから読み直す。
+    /// <para>
+    /// <b>順序は持たぬ</b>——原本 GuiEcad も <c>HashSet</c> で保持し、メニューへ出す順は掲出側が
+    /// <c>_folderEntries</c>（Category昇順→名前昇順）を回して決めておる。<b>ピン留めした順ではない。</b>
+    /// </para></summary>
+    private HashSet<string> _pinnedIds = new();
+
     private IReadOnlyList<PartFolderEntry> _entries = Array.Empty<PartFolderEntry>();
     public IReadOnlyList<PartFolderEntry> Entries { get => _entries; private set => SetProperty(ref _entries, value); }
 
@@ -39,10 +50,21 @@ public sealed class PartPaletteViewModel : ViewModelBase
     public PartPaletteViewModel() : this(PartFolderStore.CreateDefault()) { }
 
     /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
-    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。</summary>
-    public PartPaletteViewModel(PartFolderStore store)
+    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。
+    /// <para>
+    /// <b>【T-133増分9・ピン留めの保存先は実MyDocuments のままである】</b>本オーバーロードは
+    /// <see cref="PinnedPartStore.CreateDefault"/> を用いる。<b><see cref="TogglePin"/> を呼ぶテストは
+    /// 必ず下の2引数版を使い、一時フォルダの <see cref="PinnedPartStore"/> を注入すること</b>
+    /// ——さもなくば P-019 と同じ副作用（テストが実MyDocumentsへ書く）が、ピン留めの側から蘇る。
+    /// <b>読むだけなら副作用は無い</b>（<see cref="PinnedPartStore.Load"/> はファイルが無ければ空を返す）。
+    /// </para></summary>
+    public PartPaletteViewModel(PartFolderStore store) : this(store, PinnedPartStore.CreateDefault()) { }
+
+    /// <summary>T-133増分9: ピン留めの保存先も注入できる形。テストはこちらを使う。</summary>
+    public PartPaletteViewModel(PartFolderStore store, PinnedPartStore pinnedStore)
     {
         _store = store;
+        _pinnedStore = pinnedStore;
         store.EnsureFolders();
         store.SeedBasics();
         Load();
@@ -52,6 +74,10 @@ public sealed class PartPaletteViewModel : ViewModelBase
     /// Refresh双方から呼ばれる共通ロジック)。</summary>
     private void Load()
     {
+        // T-133増分9: ピン留めもここで読み直す。Load は保存・削除でも呼ばれるゆえ、
+        // 別プロセスがファイルを書き換えても次の Load で追従する（原本は起動時1回のみ）。
+        _pinnedIds = _pinnedStore.Load();
+
         var enumeration = _store.Enumerate();
         Entries = enumeration.Entries;
         // T-035: ファイルコピー等によるPartDefinition.Id重複検出・再採番の詳細(対象ファイル・
@@ -121,6 +147,33 @@ public sealed class PartPaletteViewModel : ViewModelBase
     {
         _store.Delete(filePath);
         Load();
+    }
+
+    /// <summary>その部品がピン留めされているか（T-133増分9、殿裁定9）。</summary>
+    public bool IsPinned(string partId) => _pinnedIds.Contains(partId);
+
+    /// <summary>
+    /// ピン留めを登録／解除する（原本 GuiEcad <c>OnTogglePinPart</c> 踏襲、<c>MainPage.Parts.cs:196-208</c>）。
+    /// <para>
+    /// <b>【本増分の射程はここまで】</b>状態を書き換えてディスクへ保存するのみで、<b>通知も再構築も行わぬ</b>
+    /// ——原本は直後に <c>RebuildShapeMenu(); RebuildOtherPartMenu();</c> を呼んで掲出先を即座に更新するが、
+    /// <b>ecad2 のメニューは <c>SubmenuOpened</c> で開くたびに動的構築される</b>ゆえ、次に開いた時点で
+    /// 最新の状態が反映される（ラベルの「ピン留め」⇔「解除」も同様）。<b>原本の即時再構築は要らぬ。</b>
+    /// </para>
+    /// <para>
+    /// <b>掲出（ピン留め済みをメニューへ出す形）は殿の裁可待ちにて、本増分に含めておらぬ</b>
+    /// ——掲出先が定まれば、その更新をここへ足すか、掲出側が都度読むかを決める（家老裁定2026-08-06）。
+    /// </para>
+    /// <para>
+    /// <b>保存の失敗は握りつぶされる</b>——<see cref="PinnedPartStore.Save"/> が <c>catch { }</c> ゆえ
+    /// （原本も同じ）。<b>使い手には「ピン留めした」と見えて実際は保存されておらぬ場合がありうる。</b>
+    /// 手当ては <c>proposed.md</c> へ起票済み（家老、2026-08-06）——本増分では触れず、ここに書き残す。
+    /// </para></summary>
+    public void TogglePin(string partId)
+    {
+        if (_pinnedIds.Contains(partId)) _pinnedIds.Remove(partId);
+        else _pinnedIds.Add(partId);
+        _pinnedStore.Save(_pinnedIds);
     }
 
     /// <summary>PartId+IsOrから一致するSelectionEntryを解決する(T-033増分5のComboBox初期選択・

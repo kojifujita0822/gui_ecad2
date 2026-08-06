@@ -511,8 +511,29 @@ public partial class MainWindow : Window
             var deleteItem = new MenuItem { Header = "削除(_D)", Tag = entry };
             deleteItem.Click += DeletePartMenuItem_Click;
             sub.Items.Add(deleteItem);
+            // T-133増分9(殿裁定9): ピン留めの登録/解除。原本 GuiEcad の BuildShapeSubMenu
+            // (MainPage.Parts.cs:168-171)と同型で、同一項目のラベルを状態で切り替えるトグルにする。
+            // 文言も原本のまま。ここは開くたびに作り直されるゆえ、押した後の再構築は要らぬ
+            // (原本は RebuildShapeMenu を呼ぶが、あちらは静的構築ゆえ)。
+            var pinItem = new MenuItem
+            {
+                Header = _viewModel.PartPalette.IsPinned(entry.Definition.Id)
+                    ? "その他図形のピン留めを解除" : "その他図形にピン留め",
+                Tag = entry,
+            };
+            pinItem.Click += TogglePinPartMenuItem_Click;
+            sub.Items.Add(pinItem);
             CustomPartsMenu.Items.Add(sub);
         }
+    }
+
+    /// <summary>T-133増分9: ピン留めの登録/解除（原本 <c>OnTogglePinPart</c> 踏襲）。
+    /// <b>掲出（ピン留め済みをメニューへ出す形）は殿の裁可待ちにて本増分に含めておらぬ</b>ゆえ、
+    /// ここでは状態を切り替えるのみ。<c>CustomPartsMenu</c> のラベルは次に開いた折に追従する。</summary>
+    private void TogglePinPartMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;
+        _viewModel.PartPalette.TogglePin(entry.Definition.Id);
     }
 
     private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
