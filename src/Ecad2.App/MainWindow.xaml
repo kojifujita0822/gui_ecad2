@@ -1020,13 +1020,28 @@
                      配置バーを通す既存の作法をそのまま踏む——部品リストから置いたものと同一の要素になる。
                      タグの "part:" 接頭辞は原本のタグ形式3（part:<PartId>）に倣い、Kind タグとの弁別を明示する。
 
-                     【子要素を静的に10件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
+                     【T-133増分8 段2: 縦向きモータの掲出（殿裁定15＝案A）】既存「三相モータ」（PartId 経路）は
+                     据え置き、その直後へ Kind 経路の「三相モータ 縦」を1件足す。
+                     原本 OtherBuiltins に縦向きモータは無い（侍が原本を実測。台帳裁定14の「原本ソースが不在」は
+                     誤りで、原本は C:\Users\kojif\Desktop\生産物\gui_ecad に実在し、突合した結果として無かった）
+                     ゆえ並びの手本が無く、「モータの変種はモータの隣」という原本の並びの精神に倣って置いた。
+                     【文言は暫定であり殿の裁可を要する】家老裁量2026-08-06＝3極記号の「〜 縦」「〜 横」へ
+                     揃えた形。文言だけで殿を煩わせるより実機で見ていただく方が早いとの判断（増分4-Cと同型）。
+                     変えるのは本項目の Header と MenuPlacementToolTests の期待値のみで済む。
+                     なお既存側は「三相モータ」のまま＝名から横向きとは読めぬが、改名は家老の指示の範囲外ゆえ
+                     手を触れておらぬ（侍の見立てとして家老へ申し送り済み）。
+                     【IsEnabled が 3極記号と違う】CanPlaceOnMainCircuit ではなく CanEditDiagram を束ねる——
+                     ElementCatalog.SheetAffinityOf(Motor) は既定の Any（ElementCatalog.cs:47-52）にて
+                     主回路限定の枷を負わぬゆえ、既存4件および部品リスト経由と可否を揃える。
+
+                     【子要素を静的に11件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
                      要ったもの。本サブメニューは静的ゆえ HasItems=true が最初から保たれ、同じ手当ては要らぬ。 -->
                 <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)">
                     <MenuItem Header="セレクトSW" Tag="part:basic-select-switch" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="サーマル(OL)" Tag="part:basic-thermal-overload" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="非常停止" Tag="part:basic-emergency-stop" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="三相モータ" Tag="part:basic-motor" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="三相モータ 縦" Tag="Motor#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>

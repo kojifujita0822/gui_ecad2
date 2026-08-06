@@ -37,19 +37,36 @@ public class MenuPlacementToolTests
     /// <summary>原本 GuiEcad の <c>OtherBuiltins</c> 配列（<c>MainPage.Tools.cs:238-252</c>）の並びどおり。
     /// <b>文言・並びは暫定であり殿の裁可を要する</b>——変わればここも直す。
     /// <para>
-    /// <b>【増分6で添字が 0〜5 から 4〜9 へずれた】</b>既存4件が手前に入ったゆえ。
+    /// <b>【増分6で添字が 0〜5 から 4〜9 へ、増分8段2で 5〜10 へずれた】</b>既存4件が手前に入り、
+    /// さらに「三相モータ 縦」が手前へ加わったゆえ。
     /// <b>添字を持たせたまま直したのは、並び順そのものを測る網でもあるため</b>
     /// ——タグで引く形に改めれば、この網は消える。
     /// </para></summary>
     public static IEnumerable<object[]> ExpectedEntries() => new[]
     {
-        new object[] { 4, "Breaker3P#V", ElementKind.Breaker3P, "V" },
-        new object[] { 5, "Breaker3P#H", ElementKind.Breaker3P, "H" },
-        new object[] { 6, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
-        new object[] { 7, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
-        new object[] { 8, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
-        new object[] { 9, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
+        new object[] { 5, "Breaker3P#V", ElementKind.Breaker3P, "V" },
+        new object[] { 6, "Breaker3P#H", ElementKind.Breaker3P, "H" },
+        new object[] { 7, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
+        new object[] { 8, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
+        new object[] { 9, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
+        new object[] { 10, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
     };
+
+    /// <summary>T-133増分8 段2（殿裁定15＝案A）で足した「三相モータ 縦」。
+    /// <b>3極記号と同じ <c>Kind#Orient</c> タグの形だが、別の <c>MemberData</c> へ分けてある</b>
+    /// ——<c>IsEnabled</c> の束ね先が違う（3極記号＝<c>CanPlaceOnMainCircuit</c>／本件＝<c>CanEditDiagram</c>）ゆえ、
+    /// <see cref="ExpectedEntries"/> へ混ぜれば主回路限定を測るテストが誤って本件にも当たる。
+    /// <para>
+    /// <b>【文言は暫定であり殿の裁可を要する】</b>家老裁量2026-08-06＝3極記号の「〜 縦」へ揃えた形。
+    /// 実機で殿にご覧いただいてから定める——変われば XAML の Header とここが直る。
+    /// </para></summary>
+    public static IEnumerable<object[]> ExpectedMotorEntries() => new[]
+    {
+        new object[] { 4, "Motor#V", ElementKind.Motor, "V" },
+    };
+
+    /// <summary><see cref="ExpectedMotorEntries"/> の添字だけを要するテスト向け。</summary>
+    public static IEnumerable<object[]> MotorIndices() => ExpectedMotorEntries().Select(e => new[] { e[0] });
 
     /// <summary>T-133増分6（殿裁定8）で再掲した既存4件。原本 <c>OtherBuiltins</c> の 1〜4 番と同じ並び。
     /// <b>Id は <see cref="BasicPartTemplates"/> の定数から取る</b>——XAML に書いた綴りが
@@ -71,23 +88,37 @@ public class MenuPlacementToolTests
     private static MenuItem ItemAt(MainWindow window, int index)
         => (MenuItem)window.OtherSymbolsMenu.Items[index];
 
-    /// <summary>3極記号6項目（増分4-C分）だけを取り出す。既存4件は <c>part:</c> タグゆえ解析の対象が違う。</summary>
+    /// <summary>3極記号の先頭（＝ブレーカ縦）の添字。
+    /// <b>添字を直に書いたテストが増分8段2で対象を取り違えた</b>——手前へ「三相モータ 縦」が
+    /// 入って添字が1つずれ、<c>ItemAt(window, 4)</c> が3極記号でなくモータを指すようになった。
+    /// <b>一方は案内文言で鳴ったが、もう一方（<c>PartId</c> を持たぬことの確認）は
+    /// モータも <c>PartId</c> を持たぬゆえ鳴らずに素通りした</b>——<b>測る対象がずれても通ってしまう形</b>ゆえ、
+    /// 名前を与えて一箇所へ寄せる。</summary>
+    private const int FirstSymbolIndex = 5;
+
+    /// <summary>3極記号6項目（増分4-C分）だけを取り出す。既存4件は <c>part:</c> タグゆえ解析の対象が違い、
+    /// 添字4の「三相モータ 縦」（増分8段2）は <c>Kind</c> タグだが主回路限定の枷を負わぬゆえ、いずれも外す。</summary>
     private static IEnumerable<MenuItem> SymbolItems(MainWindow window)
-        => window.OtherSymbolsMenu.Items.Cast<MenuItem>().Skip(4);
+        => window.OtherSymbolsMenu.Items.Cast<MenuItem>().Skip(5);
 
     // ===== 観点A: メニューの中身 =====
 
     /// <summary>
-    /// 既存4件（増分6）＋3種×縦横6件（増分4-C）で10項目。<b>増減があれば鳴る</b>
-    /// ——原本 <c>OtherBuiltins</c> の10エントリと員数を合わせる。
+    /// 既存4件（増分6）＋三相モータ縦1件（増分8段2）＋3種×縦横6件（増分4-C）で11項目。
+    /// <b>増減があれば鳴る。</b>
+    /// <para>
+    /// <b>【原本の10エントリとは員数が揃わなくなった】</b>増分6までは原本 <c>OtherBuiltins</c> の
+    /// 10エントリと一致しておったが、<b>原本に縦向きモータは無い</b>（侍が原本を実測）。
+    /// <b>殿裁定5により ecad2 が新たに設けた1件ゆえ、原本より1件多いのが正である。</b>
+    /// </para>
     /// </summary>
     [Fact]
-    public void その他図形は十項目を持つ()
+    public void その他図形は十一項目を持つ()
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
 
-            Assert.Equal(10, window.OtherSymbolsMenu.Items.Count);
+            Assert.Equal(11, window.OtherSymbolsMenu.Items.Count);
         });
 
     /// <summary>
@@ -195,7 +226,7 @@ public class MenuPlacementToolTests
             var window = new MainWindow();
             var vm = (MainWindowViewModel)window.DataContext;
 
-            ItemAt(window, 4).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ItemAt(window, FirstSymbolIndex).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Null(vm.Tool.PartId);
             Assert.False(vm.Tool.IsOr);
@@ -209,7 +240,7 @@ public class MenuPlacementToolTests
             var window = new MainWindow();
             var vm = (MainWindowViewModel)window.DataContext;
 
-            ItemAt(window, 4).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ItemAt(window, FirstSymbolIndex).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Contains("配置ツール", vm.StatusMessage);
             Assert.Contains("ブレーカ", vm.StatusMessage);
@@ -289,6 +320,74 @@ public class MenuPlacementToolTests
     [Theory]
     [MemberData(nameof(PartIndices))]
     public void 再掲した四件は編集可否のみで束ねられている(int index)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+
+            var binding = System.Windows.Data.BindingOperations.GetBinding(
+                ItemAt(window, index), UIElement.IsEnabledProperty);
+
+            Assert.NotNull(binding);
+            Assert.Equal(nameof(MainWindowViewModel.CanEditDiagram), binding!.Path.Path);
+        });
+
+    // ===== 観点D: T-133増分8 段2 —— 縦向きモータの掲出（殿裁定15＝案A） =====
+
+    /// <summary>
+    /// 「三相モータ 縦」のタグが <see cref="SymbolTagParser"/> で <see cref="ElementKind.Motor"/> と
+    /// 向き <c>"V"</c> へ解けること。
+    /// <b><see cref="SymbolTagParser"/> は種別を制限せぬ設計ゆえ、解析側は無改修で通る</b>
+    /// （同クラスのコメント＝「その種別に向きを付けてよいかまでは検査せぬ。組み合わせの正しさは
+    /// タグを書くメニュー定義の側が負う」）——<b>ならばその責を負うのは本テストである。</b>
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ExpectedMotorEntries))]
+    public void モータ縦のタグが種別と向きへ解ける(int index, string expectedTag, ElementKind expectedKind, string expectedOrient)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+            var item = ItemAt(window, index);
+
+            Assert.Equal(expectedTag, item.Tag);
+            Assert.True(SymbolTagParser.TryParse((string)item.Tag, out var kind, out var orient));
+            Assert.Equal(expectedKind, kind);
+            Assert.Equal(expectedOrient, orient);
+        });
+
+    /// <summary>
+    /// 「三相モータ 縦」を押せば <c>Kind</c> 経路の配置ツールへ切り替わること。
+    /// <b><c>PartId</c> が載らぬことを併せて押さえる</b>——直前の項目「三相モータ」は <c>PartId</c> 経路にて、
+    /// 両者は隣り合いながら別の経路へ流れる。<b>取り違えれば、置かれる要素そのものが変わる</b>
+    /// （<c>PartId</c> 経路なら接続点なし・高さ2、<c>Kind</c> 経路なら青の3点・縦向き描画）。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(ExpectedMotorEntries))]
+    public void モータ縦を押せばKind経路の配置ツールへ切り替わる(int index, string _, ElementKind expectedKind, string expectedOrient)
+        => StaTestRunner.Run(() =>
+        {
+            var window = new MainWindow();
+            var vm = (MainWindowViewModel)window.DataContext;
+
+            ItemAt(window, index).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+
+            Assert.Equal(ToolMode.PlaceElement, vm.Tool.Mode);
+            Assert.Equal(expectedKind, vm.Tool.Kind);
+            Assert.Equal(expectedOrient, vm.Tool.Orient);
+            Assert.Null(vm.Tool.PartId);
+            Assert.False(vm.Tool.IsOr);
+        });
+
+    /// <summary>
+    /// 「三相モータ 縦」は <c>CanEditDiagram</c> へ束ねられていること。
+    /// <b>3極記号と同じ <c>Kind</c> 経路でありながら、枷の束ね先が違う</b>——
+    /// <c>ElementCatalog.SheetAffinityOf(Motor)</c> は既定の <c>Any</c> にて主回路限定ではないゆえ、
+    /// 部品リスト経由・既存4件と可否を揃える。
+    /// <b>「Kind 経路だから主回路限定」と早合点して <c>CanPlaceOnMainCircuit</c> を束ねれば、
+    /// 制御回路シートで置けなくなる</b>——増分6で解いた齟齬と同型の穴が、こちらへ移るだけになる。
+    /// </summary>
+    [Theory]
+    [MemberData(nameof(MotorIndices))]
+    public void モータ縦は編集可否のみで束ねられている(int index)
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
