@@ -228,13 +228,53 @@ feedback_detection_relocates_not_eliminates_discipline_burden`）。
 
 ---
 
+## 5-4. 【追記 2026-08-06】統合形の具体——**段2は基準の「末尾」へ足す要がある**
+
+**§6-2「段1が振る舞い不変であること」のうち、静的に示せる範囲を詰めた。**
+**通知の集合だけでなく、順序まで保たれることを示す。**
+
+### 段1（3箇所を呼び出しへ）
+
+| 箇所 | 現況の並び | 統合後 |
+|---|---|---|
+| `DeleteSelectedElement` | 基準15と**完全同一** | `NotifySelectedElementChanged();` へ置換するのみ |
+| `ReplaceDocument` | `SelectedCellDisplay` → 基準15 | `OnPropertyChanged(nameof(SelectedCellDisplay));` ＋ 呼び出し |
+| `SelectedCell` setter | `SelectedCellDisplay` → 基準15 → `HasNoPropertySelection` | 同上 ＋ 末尾に `HasNoPropertySelection` を残す |
+
+**三者とも、前後に残す分を除けば並びは基準そのものにござる。**
+**ゆえに段1では通知の集合・順序・回数のいずれも変わらぬ。**
+
+### 段2（基準へ `HasNoPropertySelection` を足す）——**足す位置が要にござる**
+
+**基準の末尾（`SelectedElementComment` の後）へ足せば、`SelectedCell` setter の並びは**
+
+```
+段1後: SelectedCellDisplay → [基準15] → HasNoPropertySelection
+段2後: SelectedCellDisplay → [基準15 + HasNoPropertySelection]
+```
+
+**——前後で完全に同一になる。** **setter 側の末尾1行は段2で削れる。**
+
+**逆に基準の先頭や中間へ足せば、setter の通知順序が変わる。**
+**§4で洗ったとおり、通知の順序に依存するテストが4件ある**
+（`RowInsertDeleteCommandsTests` の `captured[^1]`）。
+**それらが見ておるのは `SelectedElementDeviceName` にて本項と直に噛み合わぬが、
+順序を保てるのに崩す理由が無い。**
+
+> **【この節は実装ではない】** 並びを一次ソースから写して突き合わせただけにござる。
+> **`src` には一切触れておらぬ**（家老の申し付け＝隠密のテスト設計を待つ）。
+
+---
+
 ## 6. 侍が測っておらぬこと
 
 1. ~~**`ReplaceDocument` 経路で `HasNoPropertySelection` が実際に必要になる場面**は測っておらぬ~~
    **【2026-08-06 解消。§5-2 を見よ】静的読解で「実害は生じぬ。ただし救いは暗黙」と確定した。**
    **実機での見え方のみ忍者へ残る。**
 2. **段1が「振る舞い不変」であることは、まだ測っておらぬ**——本書は数を突き合わせた設計であり、
-   実測は実装時に行う
+   実測は実装時に行う。
+   **【2026-08-06 一部前進。§5-4 を見よ】並びを一次ソースから写して突き合わせ、
+   集合・順序・回数のいずれも保てる形を示した。ただしこれは机上にて、実測は依然として実装時にござる。**
 3. ~~**通知が9経路すべてで ＋1 されることの害の有無**~~
    **【2026-08-06 解消。§5-3 を見よ】経路を1つずつ開いて判じた。害は無く、
    むしろ4経路では必要な通知が欠けておった。**
