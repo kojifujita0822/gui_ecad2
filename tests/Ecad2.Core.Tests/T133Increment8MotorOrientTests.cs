@@ -21,7 +21,8 @@ namespace Ecad2.Core.Tests;
 /// 崩れたときに気づく手立てが要る」2026-08-06）。
 /// </para>
 /// <para>
-/// <b>【意匠は未確定である】</b>本増分の絵は「原本の横向きを反時計回りに90度回した形」＝第一案にすぎぬ。
+/// <b>【意匠は未確定である】</b>本増分の絵は「原本の横向きを時計回りに90度回した形」＝第一案にすぎぬ
+/// （回す向きのみ殿裁定2026-08-06で確定＝大円が下。寸法・形は絵をご覧いただいてから）。
 /// 殿が実機の絵をご覧になって確定なされる段取りゆえ、<b>座標を固定する下2件（端子・大円の位置）は
 /// 意匠が改まれば期待値も改まる</b>。そのとき直すべきは期待値の側にて、これは堰ではない。
 /// </para>
@@ -49,13 +50,15 @@ public class T133Increment8MotorOrientTests
     }
 
     [Fact]
-    public void OrientV_BodyCircleSitsAboveTerminals()
+    public void OrientV_BodyCircleSitsBelowTerminals()
     {
         var body = BodyCircle(RenderMotor("V"));
 
-        // 大円は端子列の中央（x=1セル）の上（y=-1.75セル）。y は下向き正ゆえ負が上にあたる。
+        // 大円は端子列の中央（x=1セル）の下（y=+1.75セル。y は下向き正）。
+        // 上下は殿裁定2026-08-06＝「回転方向が逆。大円が下」——主回路の流れが上から下ゆえ、
+        // モータは外部配線を上から受けて本体が下に来る。
         Assert.True(Near(body.X, Cell), $"大円の x が食い違う: {body.X}");
-        Assert.True(Near(body.Y, -1.75 * Cell), $"大円の y が食い違う: {body.Y}");
+        Assert.True(Near(body.Y, 1.75 * Cell), $"大円の y が食い違う: {body.Y}");
     }
 
     [Fact]
