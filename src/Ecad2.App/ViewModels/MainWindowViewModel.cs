@@ -3211,7 +3211,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         DeviceTable.Refresh();
 
         // T-079(P-058)バグ修正: SelectedCell自体は配置前後で値が変わらないため、SelectedCellの
-        // setter経由のSelectedElement系4プロパティ通知が発火されない。放置するとプロパティパネル
+        // setter経由のSelectedElement系プロパティ(現在16件)の通知が発火されない。放置するとプロパティパネル
         // (DeviceNameBox)の表示が配置前の古い値のまま残り、配置直後にCtrl+S等でCommitDeviceNameEdit
         // (T-049)が走ると、古い表示値が誤って新要素のデバイス名としてコミットされ、機器表エントリが
         // 消失する(侍実測で確定、隠密の当初仮説=CommitEdit内部メカニズム説は棄却)。要素追加が
