@@ -57,8 +57,11 @@ public class MenuPlacementToolTests
     /// ——<c>IsEnabled</c> の束ね先が違う（3極記号＝<c>CanPlaceOnMainCircuit</c>／本件＝<c>CanEditDiagram</c>）ゆえ、
     /// <see cref="ExpectedEntries"/> へ混ぜれば主回路限定を測るテストが誤って本件にも当たる。
     /// <para>
-    /// <b>【文言は暫定であり殿の裁可を要する】</b>家老裁量2026-08-06＝3極記号の「〜 縦」へ揃えた形。
-    /// 実機で殿にご覧いただいてから定める——変われば XAML の Header とここが直る。
+    /// <b>【文言は殿裁定2026-08-06で確定】</b>「三相モータ 縦」——既存側も「三相モータ 横」へ改め、
+    /// 対にした。侍が段2で「既存側は無印ゆえ名から横向きと読めぬ」と申し送った見立てが、
+    /// 家老の検分（忍者の撮ったメニュー画）を経て殿の裁定となった形。
+    /// <b>3極記号6項目（<see cref="ExpectedEntries"/>）の文言は依然として暫定である</b>
+    /// ——増分4-C の裁定のままにて、確定したのはモータ2項目のみ。
     /// </para></summary>
     public static IEnumerable<object[]> ExpectedMotorEntries() => new[]
     {
@@ -95,6 +98,18 @@ public class MenuPlacementToolTests
     /// モータも <c>PartId</c> を持たぬゆえ鳴らずに素通りした</b>——<b>測る対象がずれても通ってしまう形</b>ゆえ、
     /// 名前を与えて一箇所へ寄せる。</summary>
     private const int FirstSymbolIndex = 5;
+
+    /// <summary>既存4件の末尾（＝「三相モータ 横」、<c>PartId</c> 経路）の添字。
+    /// <b>隠密の検分（2026-08-06）を受けて名前を与えた</b>——挿入位置（添字4）より手前ゆえ増分8段2では
+    /// ずれなんだが、<b><see cref="FirstSymbolIndex"/> と同じ弱さを抱えておる</b>（将来また前方へ項目が
+    /// 挿入されれば黙って対象がずれる）。
+    /// <b>「次のついでに」を選ばなんだのは、ついでの宛先が無ければ宛先ごと消えるゆえ</b>
+    /// ——増分9がメニューへ手を入れる保証は無い。
+    /// <para>
+    /// なお他の期待値テストは <c>MemberData</c> 経由の派生ゆえ直書きを持たず、この型の穴は構造的に無い
+    /// （隠密の検分）。<b>直書きが残っておったのは本件と <see cref="FirstSymbolIndex"/> の2箇所のみ。</b>
+    /// </para></summary>
+    private const int MotorPartIndex = 3;
 
     /// <summary>3極記号6項目（増分4-C分）だけを取り出す。既存4件は <c>part:</c> タグゆえ解析の対象が違い、
     /// 添字4の「三相モータ 縦」（増分8段2）は <c>Kind</c> タグだが主回路限定の枷を負わぬゆえ、いずれも外す。</summary>
@@ -270,7 +285,13 @@ public class MenuPlacementToolTests
         });
 
     /// <summary>T-133増分6: 再掲した4件も押せば案内が出ること。<b>表示名がそのまま出る</b>
-    /// ——原本準拠の表示名（「三相モータ」）であり、テンプレートの <c>Name</c>（「モータ」）ではない。</summary>
+    /// ——メニューの表示名（「三相モータ 横」）であり、テンプレートの <c>Name</c>（「モータ」）ではない。
+    /// <para>
+    /// <b>【期待値に「横」まで含めるのは、部分一致で素通りするのを防ぐため】</b>殿裁定2026-08-06で
+    /// 「三相モータ」→「三相モータ 横」へ改まったが、<b>旧文言は新文言の部分文字列ゆえ、
+    /// <c>Contains("三相モータ")</c> のままでは改名を差し戻しても鳴らぬ</b>——測る対象が変わったのに
+    /// 期待値がそれを追わぬ形になる。
+    /// </para></summary>
     [Fact]
     public void 再掲した四件を押せば表示名のまま案内が出る()
         => StaTestRunner.Run(() =>
@@ -278,10 +299,10 @@ public class MenuPlacementToolTests
             var window = new MainWindow();
             var vm = (MainWindowViewModel)window.DataContext;
 
-            ItemAt(window, 3).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
+            ItemAt(window, MotorPartIndex).RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
 
             Assert.Contains("配置ツール", vm.StatusMessage);
-            Assert.Contains("三相モータ", vm.StatusMessage);
+            Assert.Contains("三相モータ 横", vm.StatusMessage);
         });
 
     // ===== 観点C: (f) 主回路限定の予防側 =====

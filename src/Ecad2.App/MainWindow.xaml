@@ -1025,11 +1025,12 @@
                      原本 OtherBuiltins に縦向きモータは無い（侍が原本を実測。台帳裁定14の「原本ソースが不在」は
                      誤りで、原本は C:\Users\kojif\Desktop\生産物\gui_ecad に実在し、突合した結果として無かった）
                      ゆえ並びの手本が無く、「モータの変種はモータの隣」という原本の並びの精神に倣って置いた。
-                     【文言は暫定であり殿の裁可を要する】家老裁量2026-08-06＝3極記号の「〜 縦」「〜 横」へ
-                     揃えた形。文言だけで殿を煩わせるより実機で見ていただく方が早いとの判断（増分4-Cと同型）。
-                     変えるのは本項目の Header と MenuPlacementToolTests の期待値のみで済む。
-                     なお既存側は「三相モータ」のまま＝名から横向きとは読めぬが、改名は家老の指示の範囲外ゆえ
-                     手を触れておらぬ（侍の見立てとして家老へ申し送り済み）。
+                     【モータ2項目の文言は殿裁定2026-08-06で確定】「三相モータ 横」「三相モータ 縦」の対とする。
+                     侍が段2で「既存側は無印ゆえ名から横向きと読めぬ」と申し送った見立てを、家老が忍者の
+                     撮ったメニュー画で非対称と確かめて殿へ諮り、殿の御言葉「三相モータ 横に揃えてくれ」により
+                     既存側へも「横」を付けた。これにて全項目が「〜 縦」「〜 横」の対で並ぶ。
+                     【3極記号6項目の文言は依然として暫定】上の増分4-C の断りのとおり原本準拠の暫定にて、
+                     確定したのはモータ2項目のみ——ここを混ぜて読まぬこと。
                      【IsEnabled が 3極記号と違う】CanPlaceOnMainCircuit ではなく CanEditDiagram を束ねる——
                      ElementCatalog.SheetAffinityOf(Motor) は既定の Any（ElementCatalog.cs:47-52）にて
                      主回路限定の枷を負わぬゆえ、既存4件および部品リスト経由と可否を揃える。
@@ -1040,7 +1041,7 @@
                     <MenuItem Header="セレクトSW" Tag="part:basic-select-switch" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="サーマル(OL)" Tag="part:basic-thermal-overload" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="非常停止" Tag="part:basic-emergency-stop" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
-                    <MenuItem Header="三相モータ" Tag="part:basic-motor" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="三相モータ 横" Tag="part:basic-motor" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="三相モータ 縦" Tag="Motor#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
