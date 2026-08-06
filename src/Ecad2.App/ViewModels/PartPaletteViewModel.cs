@@ -57,6 +57,16 @@ public sealed class PartPaletteViewModel : ViewModelBase
     /// 必ず下の2引数版を使い、一時フォルダの <see cref="PinnedPartStore"/> を注入すること</b>
     /// ——さもなくば P-019 と同じ副作用（テストが実MyDocumentsへ書く）が、ピン留めの側から蘇る。
     /// <b>読むだけなら副作用は無い</b>（<see cref="PinnedPartStore.Load"/> はファイルが無ければ空を返す）。
+    /// </para>
+    /// <para>
+    /// <b>【この定めはコンパイラに強制されておらぬ】</b>docコメントによる申し合わせにすぎぬ。
+    /// <c>MainWindowViewModel</c> が本オーバーロードで <c>PartPalette</c> を構築しておるゆえ、
+    /// <b><c>MainWindowViewModelTests</c> 側へ <c>.PartPalette.TogglePin(...)</c> が書き足されれば、
+    /// 誰も気づかぬまま実MyDocumentsへ書く経路が開く</b>（隠密の検分、2026-08-06。
+    /// 現時点で <see cref="TogglePin"/> を呼ぶ9箇所はすべて2引数版を使うており申し合わせは守られておる）。
+    /// <b>型で塞ぐ道は在る</b>——本オーバーロードを廃して2引数版のみにすれば、コンパイラが強制する。
+    /// <b>波及は実測で src 1箇所＋テスト5ファイル程度</b>にて手が届く規模だが、
+    /// <b>増分9の主題（未配線のものを繋ぐ）とは別軸ゆえ <c>proposed.md</c> へ切り離した。</b>
     /// </para></summary>
     public PartPaletteViewModel(PartFolderStore store) : this(store, PinnedPartStore.CreateDefault()) { }
 
