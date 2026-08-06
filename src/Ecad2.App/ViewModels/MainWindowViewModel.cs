@@ -352,6 +352,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         // ("SetCurrentSheetIndexCore")がPropertyChangedへ渡ってしまう。本来のプロパティ名を明示する。
         SetProperty(ref _currentSheetIndex, value, nameof(CurrentSheetIndex));
         NotifyCurrentSheetDependentPropertiesChanged();
+
+        // P-173(殿裁可2026-08-06): 【この無条件クリアをガード化してはならぬ】
+        // ガード化すると、Undo/Redo時の SelectedElement 系通知が丸ごと消える。
+        //
+        // 【機序】Undo は ApplyUndoRedoSnapshot からこのメソッドを経由して選択状態を戻す。
+        // このとき復元後の SelectedCell が復元前と同じ値であっても、ここで一度 null を挟むことで
+        // 「X → null → X」と2回の変化が生じ、SelectedCell setter の if (SetProperty(...)) を
+        // 2回通る。ゆえに NotifySelectedElementChanged() が確かに走る。
+        // この行を「値が変わるときだけ」の形にすると、同じ値へ戻す Undo では SetProperty が
+        // 同値ガードで弾き、通知が一度も飛ばなくなる——画面が古い表示のまま取り残される。
+        //
+        // 【別経路の救いは無い】直前の NotifyCurrentSheetDependentPropertiesChanged() は
+        // CurrentSheet 系5件とパレットの配置可否のみで、SelectedElement 系を一件も含まぬ
+        // (P-172の検算で侍が独立に確認)。すなわち通知はこの一本の綱に懸かっており、しかも細い。
+        //
+        // 【本日三例目である】PR-17段3で ReplaceDocument の暗黙の通知・SelectedImage/SelectedFrame
+        // setter の無条件通知を書き残したが、ここはその範囲外であった。
+        // 「今は正しく動いておるが、どこにも書かれておらぬ依存に支えられておる」形の三例目にて、
+        // 三つ並べば偶然ではなく本コードベースの性質と見るべきものにござる。
         SelectedCell = null;
     }
 
