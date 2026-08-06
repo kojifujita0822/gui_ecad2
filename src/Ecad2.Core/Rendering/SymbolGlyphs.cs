@@ -14,6 +14,10 @@ internal static class SymbolGlyphs
                             Color? manualFill = null, string? variant = null, string? orient = null)
     {
         bool horiz = orient == "H";   // 主回路3極記号の向き（既定=縦流れ V）。
+        // 三相モータの向き（T-133増分8、殿裁定5）。同じ Params[Orient] を見ながら、3極記号とは
+        // 既定が逆である——3極記号は V が既定で H が別、モータは横向き（端子が縦に3つ）が既定で
+        // V が別。既存データは Orient を持たぬゆえ、V 以外はすべて従来の描画へ倒れる。
+        bool motorVert = orient == "V";
         double cx = width / 2;
 
         switch (kind)
@@ -40,7 +44,7 @@ internal static class SymbolGlyphs
             case ElementKind.Timer: TimerCoil(r, s, cx, width, cell); break;
             case ElementKind.Lamp: Lamp(r, s, cx, width, cell); break;
             case ElementKind.Terminal: Terminal(r, s, cx, width, cell); break;
-            case ElementKind.Motor: Motor(r, s, width, cell); break;
+            case ElementKind.Motor: Motor(r, s, width, cell, motorVert); break;
 
             case ElementKind.Breaker3P: Breaker3P(r, s, width, variant, horiz); break;
             case ElementKind.ContactorMain3P: ContactorMain3P(r, s, width, horiz); break;
@@ -216,8 +220,9 @@ internal static class SymbolGlyphs
 
     // 三相モータ: 大円＋左に縦3端子(⊘)＋リード。U/V/W 端子は 1セル間隔（y=-1/0/1・グリッド線上）に
     // 揃え、上流の主回路記号（接触器・サーマル等）の極とまっすぐつながるようにする。k = width/3 = 1セル。
-    private static void Motor(IRenderer r, StrokeStyle s, double width, double cell)
+    private static void Motor(IRenderer r, StrokeStyle s, double width, double cell, bool vert)
     {
+        if (vert) { MotorV(r, s, width); return; }
         double k = width / 3.0;
         void M(double x1, double y1, double x2, double y2) => r.DrawLine(new(x1 * k, y1 * k), new(x2 * k, y2 * k), s);
         void O(double x, double y, double rad) => r.DrawCircle(new(x * k, y * k), rad * k, s);
@@ -235,6 +240,38 @@ internal static class SymbolGlyphs
         M(xT + rT, 0, xC - rB, 0);           // リード V→本体（水平直結）
         M(xT + rT, -1, 1.25, -0.46);         // リード U（斜め）→本体上左
         M(xT + rT, 1, 1.25, 0.46);           // リード W（斜め）→本体下左
+    }
+
+    // 三相モータ（縦向き・T-133増分8、殿裁定5）: 端子が横に3つ・上に本体大円。
+    // 上の横向きを反時計回りに90度回し、端子を行中心へ揃えた形＝写像 (x, y) → (y + 1, -x + 0.30)。
+    // 寸法は横向きから一切変えておらぬ（原本の意匠をそのまま回したもの）。
+    //
+    // 【この向きで初めて描画とポート定義が噛み合う】端子が列境界 0/1/2・行中心 y=0 に載るゆえ、
+    // ElementCatalog.Ports(Motor) の U/V/W（RowOffset 0・BoundaryOffset 0/1/2）とちょうど重なる。
+    // 横向きは端子を縦に描きながらポートは横並びで、両者が直交しておった（既知の食い違い）。
+    //
+    // 【縦の広がりが器を超える】y は -2.67（大円上端）から +0.30（入線下端）＝約2.97セル分に及び、
+    // ElementCatalog.DefaultCellHeight(Motor) = 2 に収まらぬ。縮めれば収まるが、それは
+    // 「原本を90度回した形」ではなくなる——寸法の是非は絵をご覧いただいてから定める。
+    private static void MotorV(IRenderer r, StrokeStyle s, double width)
+    {
+        double k = width / 3.0;
+        void M(double x1, double y1, double x2, double y2) => r.DrawLine(new(x1 * k, y1 * k), new(x2 * k, y2 * k), s);
+        void O(double x, double y, double rad) => r.DrawCircle(new(x * k, y * k), rad * k, s);
+
+        const double rT = 0.18;                         // 端子 ⊘ の半径（端子の中心は行中心 y=0）
+        const double xC = 1.0, yC = -1.75, rB = 0.92;   // 本体大円の中心・半径
+
+        O(xC, yC, rB);                       // 本体大円
+        foreach (var x in new[] { 0.0, 1.0, 2.0 })
+        {
+            M(x, 0.30, x, rT);               // 入線（下＝外部配線側→端子）
+            O(x, 0, rT);                     // 端子 ○
+            M(x + rT, rT, x - rT, -rT);      // ⊘ 斜線
+        }
+        M(xC, -rT, xC, yC + rB);             // リード V→本体（垂直直結）
+        M(0.0, -rT, 0.54, -0.95);            // リード U（斜め）→本体左下
+        M(2.0, -rT, 1.46, -0.95);            // リード W（斜め）→本体右下
     }
 
     // ===== 主回路（三相動力）用 3極記号（sample.png 準拠・2×2セル）=====

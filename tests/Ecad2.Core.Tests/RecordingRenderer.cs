@@ -14,6 +14,14 @@ internal sealed class RecordingRenderer : IRenderer
     public List<(double Tx, double Ty, double Scale)> Transforms { get; } = new();
     public List<string> Ops { get; } = new();
     public List<Rect2D> Rectangles { get; } = new();
+    /// <summary>DrawLine/DrawCircle の引数（T-133増分8で追加）。記号グリフの座標を測るために要る。
+    /// <para>
+    /// <b>Ops へは足しておらぬ</b>——Ops は Push/Pop/Rect の呼び出し順序を測る既存テストが
+    /// 見ておる列であり、そこへ線・円を混ぜれば既存の期待値がすべて狂う。本追加は
+    /// <b>新しい列を2本足すだけ</b>にて、既存テストの観測対象は一切変わらぬ。
+    /// </para></summary>
+    public List<(Point2D A, Point2D B)> Lines { get; } = new();
+    public List<(Point2D Center, double Radius)> Circles { get; } = new();
 
     public void PushTransform(double translateX, double translateY, double scale = 1.0)
     {
@@ -23,7 +31,7 @@ internal sealed class RecordingRenderer : IRenderer
     public void PopTransform() => Ops.Add("Pop");
     public void PushClip(Rect2D rect) { }
     public void PopClip() { }
-    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) { }
+    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) => Lines.Add((a, b));
     public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke) { }
     public void DrawRectangle(Rect2D rect, StrokeStyle stroke)
     {
@@ -31,7 +39,7 @@ internal sealed class RecordingRenderer : IRenderer
         Ops.Add($"Rect:{Rectangles.Count - 1}");
     }
     public void FillRectangle(Rect2D rect, Color color) { }
-    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) { }
+    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) => Circles.Add((center, radius));
     public void FillCircle(Point2D center, double radius, Color color) { }
     public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) { }
     public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) { }
