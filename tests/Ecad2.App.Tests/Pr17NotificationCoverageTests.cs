@@ -27,6 +27,14 @@ namespace Ecad2.App.Tests;
 /// <b>すなわち本試作は、我らが二度踏んだ穴のうち片方しか塞がぬ。</b>
 /// 段1（複製そのものを断つ）が本命であり、本試作はその補助にすぎぬ。
 /// </para>
+///
+/// <para>
+/// <b>【もう一つの脆さ・タイポによる規約逸脱】</b>（隠密の指摘、2026-08-06）
+/// 上の限界は<b>意図して規約の外へ出る</b>場合の話にござる。
+/// これとは別に<b>規約に従うつもりでタイポにより外れる</b>形がある——例＝<c>SelectdElementXxx</c>。
+/// <b>こちらの方が危うい</b>：意図的な規約外なら <see cref="KnownOutsideConvention"/> へ足す動機が働くが、
+/// <b>タイポは書き手自身が逸脱に気づかぬ</b>ゆえ、基準へ足しても本試作は沈黙する。
+/// </para>
 /// </summary>
 public class Pr17NotificationCoverageTests : ViewModelTestBase
 {
@@ -51,7 +59,22 @@ public class Pr17NotificationCoverageTests : ViewModelTestBase
             .Where(n => ConventionPrefixes.Any(prefix => n.StartsWith(prefix, StringComparison.Ordinal)))
             .ToHashSet();
 
-    /// <summary>基準が実際に飛ばす通知を、削除経路で捕らえる（基準を単独で呼べる最短の経路）。</summary>
+    /// <summary>基準が実際に飛ばす通知を、削除経路で捕らえる（基準を単独で呼べる最短の経路）。
+    /// <para>
+    /// <b>【書かれておらぬ依存に支えられておる。ここに書き残す】</b>（隠密の指摘、2026-08-06）
+    /// <c>DeleteSelectedElement()</c> は <c>MarkDirty()</c> を呼ぶが、<c>IsDirty</c> の通知は
+    /// <b>ここへ混入せぬ</b>——<see cref="ArrangeWithSelectedElement"/> の要素配置で既に
+    /// <c>IsDirty = true</c> になっており、<c>IsDirty</c> の setter が <c>SetProperty</c> ゆえ
+    /// <b>二度目は同値ガードで弾かれる</b>から（<c>MainWindowViewModel.cs:263,267</c> で確認）。
+    /// <b>Arrange が「文書を変更せぬ」形へ変われば、<c>IsDirty</c> が混入して
+    /// 「規約の外は既知2件のみ」のテストが崩れる。</b>
+    /// </para>
+    /// <para>
+    /// <b>本日、我らが繰り返し見た形にござる</b>——どこにも書かれておらぬ依存に正しさが支えられておる
+    /// （<c>ReplaceDocument</c> の暗黙の通知・Undo時の無条件クリア・そしてこれ）。
+    /// <b>ゆえに、せめて書き残す。</b>
+    /// </para>
+    /// </summary>
     private static HashSet<string> CaptureBasisNotifications(MainWindowViewModel vm)
     {
         var raised = new HashSet<string>();
