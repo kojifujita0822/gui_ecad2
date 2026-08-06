@@ -29,9 +29,11 @@ namespace Ecad2.Core.Tests;
 /// </summary>
 public class T133Increment8MotorOrientTests
 {
-    private const double Cell = 9.0;               // RenderOptions.CellMm の既定
-    private const double TerminalR = 0.18 * Cell;  // 端子 ⊘ の半径（横向き・縦向きで共通）
-    private const double BodyR = 0.92 * Cell;      // 本体大円の半径（同上）
+    private const double Cell = 9.0;                // RenderOptions.CellMm の既定
+    // 端子 ⊘ と本体大円の半径（横向き・縦向きで共通）。値は殿がお描きになった意匠
+    // sample/モーター(横).gcadparts に依る（殿裁定2026-08-06。旧意匠は 0.18 / 0.92 であった）。
+    private const double TerminalR = 0.125 * Cell;
+    private const double BodyR = 0.75 * Cell;
     private const string MotorPartId = "basic-motor";
 
     /// <summary>対称・退化した値を避けた配置（行0・列0や行と列が等しい位置を使わぬ）。</summary>
@@ -92,7 +94,14 @@ public class T133Increment8MotorOrientTests
     }
 
     /// <summary>上と同じ経路分離を、<c>Kind</c> が <see cref="ElementKind.Motor"/> の側からも測る
-    /// ——<c>PartId</c> が在れば <c>Kind</c> によらず <c>PartDrawing</c> が勝つ。</summary>
+    /// ——<c>PartId</c> が在れば <c>Kind</c> によらず <c>PartDrawing</c> が勝つ。
+    /// <para>
+    /// <b>【射程＝本件は同一性しか測っておらぬ】</b>意匠そのものが壊れても、比べる両者が揃って
+    /// 壊れるゆえ鳴らぬ（<c>BasicPartTemplates</c> の座標を旧値へ戻す改変Eで、本件だけGREENのまま残ると実測）。
+    /// <b>意匠の検出は上の <see cref="PartIdMotor_OrientV_DrawsIdenticallyToOrientUnset"/> が担う</b>
+    /// ——あちらは <see cref="AssertLegacyHorizontalMotor"/> を併せて呼んでおる。<b>役割を分けてあり、
+    /// 本件に同じ判定を足すのは冗長</b>ゆえ足しておらぬ。
+    /// </para></summary>
     [Fact]
     public void PartIdMotor_WithKindMotor_OrientV_DrawsIdenticallyToOrientUnset()
     {
@@ -125,17 +134,21 @@ public class T133Increment8MotorOrientTests
         return recorder;
     }
 
-    /// <summary>従来の横向き＝端子が x=0.30セルの縦一列（y=-1/0/+1セル）、大円は右（x=2.05セル）。</summary>
+    /// <summary>横向き（既定）＝端子が x=0.25セルの縦一列（y=-1/0/+1セル）、大円は右（x=2.0セル）。
+    /// <para>
+    /// <b>円のみを見て線を見ておらぬのは意図である</b>——PartId 経路と Kind 経路では入線3本の有無が
+    /// 食い違う（殿裁定2026-08-06＝案C）。<b>円の位置は両経路で同一</b>ゆえ、本判定は両方に使える。
+    /// </para></summary>
     private static void AssertLegacyHorizontalMotor(RecordingRenderer recorder)
     {
         var terminals = TerminalCircles(recorder);
         Assert.Equal(3, terminals.Count);
-        Assert.Contains(terminals, c => Near(c.X, 0.30 * Cell) && Near(c.Y, -Cell));
-        Assert.Contains(terminals, c => Near(c.X, 0.30 * Cell) && Near(c.Y, 0));
-        Assert.Contains(terminals, c => Near(c.X, 0.30 * Cell) && Near(c.Y, Cell));
+        Assert.Contains(terminals, c => Near(c.X, 0.25 * Cell) && Near(c.Y, -Cell));
+        Assert.Contains(terminals, c => Near(c.X, 0.25 * Cell) && Near(c.Y, 0));
+        Assert.Contains(terminals, c => Near(c.X, 0.25 * Cell) && Near(c.Y, Cell));
 
         var body = BodyCircle(recorder);
-        Assert.True(Near(body.X, 2.05 * Cell) && Near(body.Y, 0), $"大円が食い違う: {body}");
+        Assert.True(Near(body.X, 2.0 * Cell) && Near(body.Y, 0), $"大円が食い違う: {body}");
     }
 
     private static List<Point2D> TerminalCircles(RecordingRenderer recorder) =>

@@ -181,19 +181,26 @@ public class MainWindowViewModelTests : ViewModelTestBase
     public void PlaceElementAtSelectedCell_MultiCellWidthBoundaryAndOverlap_PlacesOnlyWhenValid(
         string partId, int column, int occupiedColumn, bool expectPlaced)
     {
+        // 【行0でなく行1へ置く——殿裁定2026-08-06でモータが高さ2になったゆえ】
+        // 高さの占有は中心基準（殿裁定11＝H-2）にて、高さ2の要素は pos.Row の上下1行ずつ計3行を占める。
+        // 行0では上端がグリッド外（-1）となり、幅の検証に入る前に高さで弾かれてしまう。
+        // 本テストが測るのは docコメントのとおり「WidthCells>1 の境界外・重複検出」＝幅であり、
+        // 行0であることに意味は無い——ゆえに幅の検証が成り立つ行へ移した（期待値は一切変えておらぬ）。
+        const int row = 1;
+
         var vm = CreateViewModel();
         vm.NewDocument();
 
         if (occupiedColumn >= 0)
         {
-            vm.SelectedCell = new GridPos(0, occupiedColumn);
+            vm.SelectedCell = new GridPos(row, occupiedColumn);
             vm.PlaceElementAtSelectedCell(BasicPartTemplates.ContactNOId, "", isOr: false);
         }
 
-        vm.SelectedCell = new GridPos(0, column);
+        vm.SelectedCell = new GridPos(row, column);
         vm.PlaceElementAtSelectedCell(partId, "X001", isOr: false);
 
-        Assert.Equal(expectPlaced, vm.CurrentSheet!.Elements.Any(el => el.PartId == partId && el.Pos == new GridPos(0, column)));
+        Assert.Equal(expectPlaced, vm.CurrentSheet!.Elements.Any(el => el.PartId == partId && el.Pos == new GridPos(row, column)));
     }
 
     /// <summary>

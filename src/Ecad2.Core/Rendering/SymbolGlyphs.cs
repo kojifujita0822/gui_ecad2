@@ -220,6 +220,18 @@ internal static class SymbolGlyphs
 
     // 三相モータ: 大円＋左に縦3端子(⊘)＋リード。U/V/W 端子は 1セル間隔（y=-1/0/1・グリッド線上）に
     // 揃え、上流の主回路記号（接触器・サーマル等）の極とまっすぐつながるようにする。k = width/3 = 1セル。
+    //
+    // 【意匠は殿がお描きになったもの】sample/モーター(横).gcadparts（殿裁定2026-08-06＝一括で採る）。
+    // 旧意匠（端子 r=0.18・大円 r=0.92・U/W が一直線の斜め）から、一回り小さく・リードは折れ線へ改めた。
+    //
+    // 【入線はこちらにのみ在る】殿の図柄は接続点を持たぬ形（ports:[]）ゆえ入線も無いが、Kind 経路は
+    // ElementCatalog.Ports(Motor) の U/V/W を持つ（殿裁定5「ポート定義は不変」）。接続点から端子まで
+    // 線が届かねば隙間が空くゆえ、こちらだけ入線3本を残す。PartId 経路（BasicPartTemplates.Motor）は
+    // 殿の図柄どおり入線なし——両経路の絵は、この3本の分だけ食い違う（殿裁定＝案C、承知のうえの選択）。
+    //
+    // 【U/W のリードが左右非対称なのは殿の図柄のまま】終点は U(1.5,-0.5625)／W(1.4375,0.5) にて、
+    // 厳密な対称なら W は (1.5,0.5625) になる。いずれも大円の周（中心からの距離 0.7526）に載っており
+    // 実害は無いが、揃えれば殿の意匠を改めることになるゆえ、そのまま写した。
     private static void Motor(IRenderer r, StrokeStyle s, double width, double cell, bool vert)
     {
         if (vert) { MotorV(r, s, width); return; }
@@ -227,24 +239,26 @@ internal static class SymbolGlyphs
         void M(double x1, double y1, double x2, double y2) => r.DrawLine(new(x1 * k, y1 * k), new(x2 * k, y2 * k), s);
         void O(double x, double y, double rad) => r.DrawCircle(new(x * k, y * k), rad * k, s);
 
-        const double xT = 0.30, rT = 0.18;   // 端子 ⊘ の x 位置・半径
-        const double xC = 2.05, rB = 0.92;   // 本体大円の中心 x・半径
+        const double xT = 0.25, rT = 0.125;   // 端子 ⊘ の x 位置・半径
+        const double xC = 2.0, rB = 0.75;     // 本体大円の中心 x・半径
 
         O(xC, 0, rB);                        // 本体大円
         foreach (var y in new[] { -1.0, 0.0, 1.0 })
         {
-            M(0, y, xT - rT, y);                       // 入線（左境界→端子）
+            M(0, y, xT - rT, y);                       // 入線（左境界→端子。Kind 経路のみ）
             O(xT, y, rT);                              // 端子 ○
-            M(xT - rT, y + rT, xT + rT, y - rT);       // ⊘ 斜線
+            M(xT + rT, y - rT, xT - rT, y + rT);       // ⊘ 斜線
         }
         M(xT + rT, 0, xC - rB, 0);           // リード V→本体（水平直結）
-        M(xT + rT, -1, 1.25, -0.46);         // リード U（斜め）→本体上左
-        M(xT + rT, 1, 1.25, 0.46);           // リード W（斜め）→本体下左
+        M(xT + rT, -1, 1.0, -1);             // リード U（水平）
+        M(1.0, -1, 1.5, -0.5625);            // リード U（斜め）→本体左上
+        M(xT + rT, 1, 1.0, 1);               // リード W（水平）
+        M(1.0, 1, 1.4375, 0.5);              // リード W（斜め）→本体左下
     }
 
     // 三相モータ（縦向き・T-133増分8、殿裁定5）: 端子が横に3つ・下に本体大円。
-    // 上の横向きを時計回りに90度回し、端子を行中心へ揃えた形＝写像 (x, y) → (-y + 1, x - 0.30)。
-    // 寸法は横向きから一切変えておらぬ（原本の意匠をそのまま回したもの）。
+    // 上の横向き（＝殿の新しい意匠）を時計回りに90度回し、端子を行中心へ揃えた形
+    // ＝写像 (x, y) → (-y + 1, x - 0.25)。寸法は横向きから一切変えておらぬ。
     //
     // 【回す向きは殿裁定2026-08-06】主回路の流れは上から下（電源→ブレーカ→接触器→サーマル→モータ）
     // であり、モータは終端ゆえ外部配線を上から受けて本体が下に来る。3極記号の縦流れ（y∈[-1,+1] の
@@ -256,28 +270,30 @@ internal static class SymbolGlyphs
     // なお時計回りゆえ、横向きで上にあった U が右端（x=2）へ来る。端子の絵は3つとも同一で
     // 名前を描き分けておらぬゆえ見た目に差は出ぬが、U/W の並びが横向きとは逆順になる。
     //
-    // 【縦の広がりが器を超える】y は -0.30（入線上端）から +2.67（大円下端）＝約2.97セル分に及び、
-    // ElementCatalog.DefaultCellHeight(Motor) = 2 に収まらぬ。縮めれば収まるが、それは
-    // 「原本を90度回した形」ではなくなる——寸法の是非は絵をご覧いただいてから定める。
+    // 【縦の広がりが器を超える】y は -0.25（入線上端）から +2.5（大円下端）＝約2.75セル分に及び、
+    // ElementCatalog.DefaultCellHeight(Motor) = 2 に収まらぬ（旧意匠では2.97セル分であった）。
+    // 縮めれば収まるが、それは「殿の意匠を90度回した形」ではなくなる。
     private static void MotorV(IRenderer r, StrokeStyle s, double width)
     {
         double k = width / 3.0;
         void M(double x1, double y1, double x2, double y2) => r.DrawLine(new(x1 * k, y1 * k), new(x2 * k, y2 * k), s);
         void O(double x, double y, double rad) => r.DrawCircle(new(x * k, y * k), rad * k, s);
 
-        const double rT = 0.18;                        // 端子 ⊘ の半径（端子の中心は行中心 y=0）
-        const double xC = 1.0, yC = 1.75, rB = 0.92;   // 本体大円の中心・半径
+        const double rT = 0.125;                       // 端子 ⊘ の半径（端子の中心は行中心 y=0）
+        const double xC = 1.0, yC = 1.75, rB = 0.75;   // 本体大円の中心・半径
 
         O(xC, yC, rB);                       // 本体大円
         foreach (var x in new[] { 0.0, 1.0, 2.0 })
         {
-            M(x, -0.30, x, -rT);             // 入線（上＝外部配線側→端子）
+            M(x, -0.25, x, -rT);             // 入線（上＝外部配線側→端子）
             O(x, 0, rT);                     // 端子 ○
-            M(x - rT, -rT, x + rT, rT);      // ⊘ 斜線
+            M(x + rT, rT, x - rT, -rT);      // ⊘ 斜線
         }
         M(xC, rT, xC, yC - rB);              // リード V→本体（垂直直結）
-        M(2.0, rT, 1.46, 0.95);              // リード U（斜め）→本体右上
-        M(0.0, rT, 0.54, 0.95);              // リード W（斜め）→本体左上
+        M(2.0, rT, 2.0, 0.75);               // リード U（垂直）
+        M(2.0, 0.75, 1.5625, 1.25);          // リード U（斜め）→本体右上
+        M(0.0, rT, 0.0, 0.75);               // リード W（垂直）
+        M(0.0, 0.75, 0.5, 1.1875);           // リード W（斜め）→本体左上
     }
 
     // ===== 主回路（三相動力）用 3極記号（sample.png 準拠・2×2セル）=====

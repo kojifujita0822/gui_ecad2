@@ -66,6 +66,14 @@ public static class BasicPartTemplates
     /// 組込み側（<c>ElementCatalog</c>）のモータと同じ扱いに揃えてある。
     /// 他の14件は赤＝<see cref="PortDef"/> の既定値のまま（明示引数は置かず、
     /// <c>T136Increment5PortKindAssignmentTests</c> で固定する）。
+    /// </para>
+    /// <para>
+    /// <b>【現在未使用である。削除せず残す——家老裁定2026-08-06】</b>
+    /// 殿裁定2026-08-06により <see cref="Motor"/> は接続点を持たぬ形（殿がお描きになった
+    /// <c>sample/モーター(横).gcadparts</c> の <c>ports:[]</c>）へ改まり、本関数は唯一の呼び手を失った。
+    /// <b>「不要になった」は削除の理由にならぬ</b>（<c>karo.md</c> の物差し）——<b>裁定が覆ればまた要る</b>ゆえ、
+    /// 裁定の記録として残してある。<b>組込み側（<c>ElementCatalog.Ports</c>）の青は裁定5
+    /// 「ポート定義は不変」により今も生きており、本関数と同型の定義がそちらに在る。</b>
     /// </para></summary>
     private static List<PortDef> MotorPorts() => new()
     {
@@ -262,35 +270,50 @@ public static class BasicPartTemplates
         },
     };
 
-    // 三相モータ: 大円＋左に縦3端子(⊘)＋リード（SymbolGlyphs.Motor由来。3セル幅・非シミュレート、
-    // 3端子(U/V/W)のためTwoPorts()は使えずMotorPorts()を使う。座標系はSymbolGlyphs.Motorが
-    // 中心オフセットを使わない左端原点方式のためx+0.5変換は不要、そのまま移植）。
+    // 三相モータ: 大円＋左に縦3端子(⊘)＋リード。
+    //
+    // 【意匠・寸法・接続点のすべてが殿のお描きになったもの】sample/モーター(横).gcadparts を
+    // 殿裁定2026-08-06により一括で採った（図柄／heightCells 1→2／ports 3件→空）。
+    // 座標はパーツエディタの出力（セル単位・原点=最左ポート点・行中心線=y0）をそのまま写している
+    // ——SymbolGlyphs と同一の座標系ゆえ変換は要らぬ。
+    //
+    // 【接続点を持たぬ＝意図であって付け忘れではない】殿裁定＝案C。PartId 経路（本定義）は接続点なし、
+    // Kind 経路（ElementCatalog.Ports(Motor)）は裁定5「ポート定義は不変」により U/V/W の青3点を持つ。
+    // ゆえに同じ三相モータでも、置き方によって接続点の有無が違う——殿は承知のうえで裁定なされた。
+    // 接続点が無いことは電気的には無害である（Role=NonSimulated ゆえ T-136(C) で既に結線から外れており、
+    // PartResolver.ParticipatesInWiring は接続点の有無を見ておらぬ）。占有幅も PartResolver.BoundarySpan が
+    // 接続点0件のとき WidthCells へ倒れるゆえ保たれる。
+    //
+    // 【入線が無いのも意図である】接続点が無い以上、左境界から端子まで線を引く相手がおらぬ。
+    // Kind 経路の SymbolGlyphs.Motor だけが入線3本を持つ——両経路の絵は、その3本の分だけ食い違う。
+    //
+    // 【MotorPorts() は本定義が唯一の呼び手であった】本裁定により未使用となったが、削除は殿の判断を
+    // 仰ぐ定めゆえ残してある（CLAUDE.md の rm 禁止と同じ筋。家老へ要否を上申済み）。
     private static PartDefinition Motor() => new()
     {
         Id = MotorId,
         Name = "モータ",
         WidthCells = 3,
-        HeightCells = 1,
+        HeightCells = 2,
         Role = PartRole.NonSimulated,
-        Ports = MotorPorts(),
+        Ports = new(),
         Primitives =
         {
-            new PartLine(0, -1, 0.12, -1),
-            new PartCircle(0.30, -1, 0.18),
-            new PartLine(0.12, -0.82, 0.48, -1.18),
+            new PartCircle(0.25, -1, 0.125),
+            new PartCircle(0.25, 0, 0.125),
+            new PartCircle(0.25, 1, 0.125),
 
-            new PartLine(0, 0, 0.12, 0),
-            new PartCircle(0.30, 0, 0.18),
-            new PartLine(0.12, 0.18, 0.48, -0.18),
+            new PartCircle(2.0, 0, 0.75),
 
-            new PartLine(0, 1, 0.12, 1),
-            new PartCircle(0.30, 1, 0.18),
-            new PartLine(0.12, 1.18, 0.48, 0.82),
+            new PartLine(0.375, -1, 1, -1),
+            new PartLine(1, -1, 1.5, -0.5625),
+            new PartLine(0.375, 0, 1.25, 0),
+            new PartLine(0.375, 1, 1, 1),
+            new PartLine(1, 1, 1.4375, 0.5),
 
-            new PartCircle(2.05, 0, 0.92),
-            new PartLine(0.48, 0, 1.13, 0),
-            new PartLine(0.48, -1, 1.25, -0.46),
-            new PartLine(0.48, 1, 1.25, 0.46),
+            new PartLine(0.375, -1.125, 0.125, -0.875),
+            new PartLine(0.375, -0.125, 0.125, 0.125),
+            new PartLine(0.375, 0.875, 0.125, 1.125),
         },
     };
 
