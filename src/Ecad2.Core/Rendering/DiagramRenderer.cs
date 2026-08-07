@@ -1152,6 +1152,47 @@ public sealed class DiagramRenderer
     // T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): コメントはDeviceName経由でDevice.Commentを
     // 引いて記号の下・中央に描く(GX3の上下2分割セル構造に対応、機器名=上段/コメント=下段で
     // 同一セル内に収め行を専有しない)。同一デバイス名の全要素で同じコメントが表示される。
+    /// <summary>
+    /// 機器名ラベルの文字スタイル（T-145、殿裁定＝原因を究明してから直す）。
+    /// モータのみ <see cref="VAlign.Middle"/> で描き、他は <see cref="VAlign.Bottom"/> のまま据え置く。
+    /// <para>
+    /// 【なぜモータだけ揃え方を変えるか】<c>TextRole.DeviceName</c> は <c>VAlign.Bottom</c> にて
+    /// （<c>DrawingTheme.cs:135</c>）、渡した座標に来るのは文字の下端であって中心ではない
+    /// （<c>WpfRenderer.cs:101</c> ＝ <c>position.Y * K - ft.Height</c>）。
+    /// ゆえに座標を本体大円の中心に合わせても、文字は約1.2mm上へ出る——忍者の実機で
+    /// 1.13〜1.16mm、殿の目視で1.2mmと実測された。
+    /// </para>
+    /// <para>
+    /// 【他の種別が同じ穴を免れておるのは、値の側に織り込まれておるゆえ】コイルの
+    /// <c>DefaultLabelDy</c> は -5.72 にて、幾何だけで合わせるなら -4.5 で足りる。
+    /// その差1.22mmがまさにこのアンカー分にあたる。すなわち他の種別は「実測で合わせ込んだ値」を
+    /// 持っており、モータだけが幾何値のままであった。
+    /// </para>
+    /// <para>
+    /// 【残差が約0.1mm残ることを承知の上で採っておる】<c>VAlign.Middle</c> が合わせるのは
+    /// レイアウト箱の中心（<c>ft.Height / 2</c>）であって、墨の中心ではない。
+    /// 実測＝<c>ft.Height</c> は 2.6599mm（Yu Gothic UI・2.0mm）、その半分1.3300mmに対し
+    /// 下端から墨中心までは1.205〜1.263mm（文字列に依る）。差の0.067〜0.128mmが墨の下側へ残る。
+    /// 侍・隠密が別の手法で独立に測り、一致を見た値である。
+    /// <b>ゼロではない</b>——次に測る者がこの0.1mmを新たな不具合と読まぬよう、ここに明記しておく。
+    /// </para>
+    /// <para>
+    /// 【実測値を書き足す道を採らなんだ理由】種別ごとに <c>DefaultLabelDy</c> へ実測分を織り込む形
+    /// （コイルの流儀）なら残差はより小さくなるが、書体を変えれば崩れる——それは本タスクが
+    /// 踏んだ失敗そのものである。アンカー分は書体と文字寸法で決まる数にて、円の大小にも種別にも依らぬ。
+    /// 揃え方の側を直せば、その数を持ち回る必要がなくなる。
+    /// </para>
+    /// <para>
+    /// 【前例】ランプ色ラベルが既に <c>VAlign.Middle</c> を明示しておる（本ファイル、記号の中央に色記号を置く箇所）。
+    /// 記号の中に文字を収める意匠では中央揃えが筋にござる。コイルも同じ意匠でありながら
+    /// <c>Bottom</c> ＋実測値のままにて、二つの流儀が並ぶ。揃えるのは別タスクの筋と侍は判じた。
+    /// </para></summary>
+    private TextStyle DeviceNameStyle(ElementKind labelKind)
+    {
+        var style = _theme.Text(TextRole.DeviceName);
+        return labelKind == ElementKind.Motor ? style with { VAlign = VAlign.Middle } : style;
+    }
+
     /// <summary>機器名ラベルとコメントを描く。
     /// <para>
     /// <b>【T-145で横オフセットと向きが入った】</b>それまで x は要素幅の中央に固定で、
@@ -1186,7 +1227,7 @@ public sealed class DiagramRenderer
 
             double xn = cx + dx;                              // dx>0 で右へ
             double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
-            r.DrawText(e.DeviceName!, new(xn, yn), _theme.Text(TextRole.DeviceName));
+            r.DrawText(e.DeviceName!, new(xn, yn), DeviceNameStyle(labelKind));
 
             // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
             // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。

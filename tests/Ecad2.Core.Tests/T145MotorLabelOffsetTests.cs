@@ -265,6 +265,58 @@ public class T145MotorLabelOffsetTests
         Assert.True(moved > atCenter, $"既定の名が中央より右に出ておらぬ: 既定={moved} 中央={atCenter}");
     }
 
+    // ===== 揃え方——アンカーが文字の下端でなく箱の中央に来ること =====
+
+    /// <summary>
+    /// モータの機器名が <see cref="VAlign.Middle"/> で描かれること（T-145の縦ずれ手当て、殿裁定＝案B）。
+    /// <para>
+    /// 座標を大円の中心へ合わせても、<see cref="VAlign.Bottom"/> のままでは渡した座標に来るのは
+    /// 文字の下端にて、文字は約1.2mm上へ出る（忍者の実機で1.13〜1.16mm、殿の目視で1.2mm）。
+    /// 揃え方の側を直すことで、<c>DefaultLabelDy</c> は幾何的な意味を保ったままでよくなる。
+    /// </para>
+    /// <para>
+    /// 横（<c>PartId</c> 経路）と縦（<c>Kind</c> 経路）の両方を測る。経路が違えば
+    /// <c>labelKind</c> の解け方も違うゆえ、片方だけでは足りぬ。
+    /// </para></summary>
+    [Theory]
+    [InlineData(BasicPartTemplates.MotorId, null)]
+    [InlineData(null, "V")]
+    public void モータの名は中央揃えで描かれる(string? partId, string? orient)
+        => Assert.Equal(VAlign.Middle, LabelStyle(MotorElement(partId, orient)).VAlign);
+
+    /// <summary>
+    /// モータ以外は従来どおり下端揃えのままであること（回帰）。
+    /// <para>
+    /// 他の種別は <c>DefaultLabelDy</c> の側にアンカー分を織り込んだ実測値を持っておる
+    /// （コイルの -5.72 が幾何値 -4.5 より1.22mm深いのがそれにあたる）。
+    /// ここで揃え方を変えれば、その織り込みが二重に効いて逆へ1.2mm動く。
+    /// </para></summary>
+    [Theory]
+    [InlineData(ElementKind.Coil)]
+    [InlineData(ElementKind.ContactNO)]
+    [InlineData(ElementKind.Lamp)]
+    [InlineData(ElementKind.Terminal)]
+    public void モータ以外の名は下端揃えのまま(ElementKind kind)
+    {
+        var e = new ElementInstance { Kind = kind, Pos = Where, CellWidth = 1, DeviceName = "Y001" };
+
+        Assert.Equal(VAlign.Bottom, LabelStyle(e).VAlign);
+    }
+
+    /// <summary>
+    /// 揃え方を変えても、渡す座標そのものは大円の中心を指したままであること。
+    /// <para>
+    /// 本タスクの手当ては座標ではなく揃え方の側を直すものにて、
+    /// <c>DefaultLabelDy</c>／<c>DefaultLabelDx</c> は幾何値のまま据え置く。
+    /// ここが崩れれば、揃え方の修正が座標の修正へすり替わったことになる。
+    /// </para></summary>
+    [Fact]
+    public void 揃え方を変えても座標は大円の中心を指す()
+    {
+        AssertLabelSitsOnBodyCircle(MotorElement(partId: BasicPartTemplates.MotorId, orient: null));
+        AssertLabelSitsOnBodyCircle(MotorElement(partId: null, orient: "V"));
+    }
+
     // ===== ヘルパ =====
 
     private static PartLibrary Library()
@@ -301,6 +353,12 @@ public class T145MotorLabelOffsetTests
 
     private static Point2D LabelPosition(ElementInstance element)
         => Render(element).DrawnTextEntries.Single(t => t.Text == element.DeviceName).Position;
+
+    /// <summary>機器名ラベルに用いられた文字スタイル。
+    /// <see cref="RecordingRenderer"/> は座標だけでなく <see cref="TextStyle"/> も記録しておるゆえ、
+    /// 揃え方（<see cref="VAlign"/>）はテストで測れる——実機を待たずに済む。</summary>
+    private static TextStyle LabelStyle(ElementInstance element)
+        => Render(element).DrawnTextEntries.Single(t => t.Text == element.DeviceName).Style;
 
     /// <summary>
     /// 機器名が、実際に描かれた本体大円の中心へ載っていることを確かめる。
