@@ -34,22 +34,33 @@ namespace Ecad2.App.Tests;
 /// </summary>
 public class MenuPlacementToolTests
 {
-    /// <summary>原本 GuiEcad の <c>OtherBuiltins</c> 配列（<c>MainPage.Tools.cs:238-252</c>）の並びどおり。
-    /// <b>文言・並びは暫定であり殿の裁可を要する</b>——変わればここも直す。
+    /// <summary>3極記号6項目。<b>並び順は殿裁定2026-08-07で「横→縦」に確定した</b>
+    /// ——増分8段2の申し送り「モータのみ横→縦、3極記号は縦→横にて順が逆」を諮った結果、
+    /// 不揃いな側（3極記号）を並べ替えて揃えた。<b>文言は依然として暫定であり殿の裁可を要する。</b>
+    /// <para>
+    /// <b>【原本の並びとは異なることになった】</b>増分4-C以来ここは原本 GuiEcad の
+    /// <c>OtherBuiltins</c> 配列（<c>MainPage.Tools.cs:238-252</c>）を写しており、
+    /// <b>原本は縦→横である</b>。<b>原本準拠より ecad2 内での揃いを優先する殿の御意</b>ゆえ、
+    /// ここは意図して原本から外れておる——<b>「原本と違う＝写し違い」と読まぬこと。</b>
+    /// </para>
     /// <para>
     /// <b>【増分6で添字が 0〜5 から 4〜9 へ、増分8段2で 5〜10 へずれた】</b>既存4件が手前に入り、
-    /// さらに「三相モータ 縦」が手前へ加わったゆえ。
+    /// さらに「三相モータ 縦」が手前へ加わったゆえ。<b>2026-08-07の並べ替えでは添字は動かぬ</b>
+    /// ——6項目の中で入れ替えただけで、手前に項目が挿れられたわけではない。
     /// <b>添字を持たせたまま直したのは、並び順そのものを測る網でもあるため</b>
     /// ——タグで引く形に改めれば、この網は消える。
+    /// <b>実際、本表を直す前に XAML だけを並べ替えて測ったところ 12ケースが RED になった</b>
+    /// （<c>各項目のタグが種別と向きへ解ける</c> 6件＋<c>項目を押せば配置ツールが切り替わる</c> 6件）
+    /// ——<b>この網が並び順の変更を確かに捕らえることの実測である。</b>
     /// </para></summary>
     public static IEnumerable<object[]> ExpectedEntries() => new[]
     {
-        new object[] { 5, "Breaker3P#V", ElementKind.Breaker3P, "V" },
-        new object[] { 6, "Breaker3P#H", ElementKind.Breaker3P, "H" },
-        new object[] { 7, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
-        new object[] { 8, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
-        new object[] { 9, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
-        new object[] { 10, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
+        new object[] { 5, "Breaker3P#H", ElementKind.Breaker3P, "H" },
+        new object[] { 6, "Breaker3P#V", ElementKind.Breaker3P, "V" },
+        new object[] { 7, "ContactorMain3P#H", ElementKind.ContactorMain3P, "H" },
+        new object[] { 8, "ContactorMain3P#V", ElementKind.ContactorMain3P, "V" },
+        new object[] { 9, "ThermalOverload3P#H", ElementKind.ThermalOverload3P, "H" },
+        new object[] { 10, "ThermalOverload3P#V", ElementKind.ThermalOverload3P, "V" },
     };
 
     /// <summary>T-133増分8 段2（殿裁定15＝案A）で足した「三相モータ 縦」。
@@ -61,7 +72,8 @@ public class MenuPlacementToolTests
     /// 対にした。侍が段2で「既存側は無印ゆえ名から横向きと読めぬ」と申し送った見立てが、
     /// 家老の検分（忍者の撮ったメニュー画）を経て殿の裁定となった形。
     /// <b>3極記号6項目（<see cref="ExpectedEntries"/>）の文言は依然として暫定である</b>
-    /// ——増分4-C の裁定のままにて、確定したのはモータ2項目のみ。
+    /// ——増分4-C の裁定のままにて、文言について確定したのはモータ2項目のみ。
+    /// <b>並び順は別件にて、2026-08-07に「横→縦」で全項目が確定しておる</b>（混ぜて読まぬこと）。
     /// </para></summary>
     public static IEnumerable<object[]> ExpectedMotorEntries() => new[]
     {

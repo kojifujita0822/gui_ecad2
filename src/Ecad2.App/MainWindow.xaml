@@ -994,7 +994,17 @@
                      キャンバス単クリック配置」）。配置バーは通さぬ——3極記号はデバイス名を取らず、
                      名前は配置後にプロパティパネルで付ける（原本 GuiEcad と同じ作法）。
 
-                     【文言と並びは暫定であり、殿の裁可を要する】
+                     【並び順は殿裁定2026-08-07で確定＝「横→縦」。文言は依然として暫定】
+                     増分8段2の申し送り「モータのみ横→縦、3極記号は縦→横にて順が逆」を殿へ諮り、
+                     「横→縦」へ揃える裁定を賜った。不揃いなのは3極記号の側ゆえ、6項目をこちらで並べ替えた
+                     （モータ2項目は既に横→縦にて動かさぬ）。
+                     これにより原本 GuiEcad の OtherBuiltins（縦→横）とは並びが異なることになる——
+                     原本準拠より、ecad2 内での揃いを優先する殿の御意である。
+                     並べ替えは Header と Tag の対を保ったまま行を入れ替えるのみで、Click ハンドラも
+                     IsEnabled の束ね先も変わらぬ。3極記号6項目は連続しており、その前後（モータ2項目・
+                     ピン留めの動的部）とは境を接するのみゆえ、添字は 5〜10 のまま保たれる。
+
+                     【文言は暫定であり、殿の裁可を要する】
                      台帳 T-131節が「メニューの並び・文言はUI/UX分岐ゆえ殿へ諮る」と定めており、
                      殿ご不在のため原本 GuiEcad の OtherBuiltins 配列（MainPage.Tools.cs:238-252）
                      から文言・並びをそのまま写して暫定とした（家老裁定2026-08-02＝暫定実装のうえ
@@ -1053,12 +1063,12 @@
                     <MenuItem Header="非常停止" Tag="part:basic-emergency-stop" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="三相モータ 横" Tag="part:basic-motor" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="三相モータ 縦" Tag="Motor#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
-                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 横" Tag="Breaker3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
-                    <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="ブレーカ(NFB/MCCB/ELB) 縦" Tag="Breaker3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="電磁接触器 主接点 横" Tag="ContactorMain3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
-                    <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="サーマル(OL) 2極 横" Tag="ThermalOverload3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
