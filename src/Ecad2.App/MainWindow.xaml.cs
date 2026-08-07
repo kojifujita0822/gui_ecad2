@@ -536,6 +536,99 @@ public partial class MainWindow : Window
         _viewModel.PartPalette.TogglePin(entry.Definition.Id);
     }
 
+    /// <summary>「その他図形」メニューへ掲出したピン留め分（セパレータ＋各項目）を覚えておく器。
+    /// <para>
+    /// <b>【静的項目の員数を数える形にせぬ理由】</b>「11件より後ろを消す」と書けば、静的項目が増減する
+    /// たびにこの数を直す要が生じる。<b>直し忘れれば静的項目を巻き込んで消すか、古い掲出分を残すかの
+    /// どちらかで黙って壊れる</b>——増分8で添字の直書きに二度踏んだのと同じ型である。
+    /// <b>足したものを直に覚えておけば、静的項目が何件であろうと関わりが無い。</b>
+    /// </para></summary>
+    private readonly List<object> _pinnedMenuItems = new();
+
+    /// <summary>
+    /// T-133増分9: ピン留め済み自作図形を「その他図形」メニューの末尾へ掲出する（殿裁定2026-08-07＝案A）。
+    /// <para>
+    /// <b>【Bubble 再発火への備え】</b><c>SubmenuOpened</c> は <c>RoutingStrategy.Bubble</c> ゆえ、
+    /// 子孫の発火がここへ上ってくる（T-068増分1で実機まで露見した罠。<see cref="CustomPartsMenu_SubmenuOpened"/>
+    /// のコメントに経緯あり）。<b>今の配下は葉の <c>MenuItem</c> のみゆえ実際には上ってこぬが</b>、
+    /// 将来サブメニューを持つ項目が入れば当たる——<b>当たってから気づく類の壊れ方ゆえ、先に塞いでおく。</b>
+    /// </para>
+    /// <para>
+    /// <b>【ダミー子項目は要らぬ】</b>同じ T-068増分1 の罠のもう一つ（<c>HasItems=false</c> だと
+    /// <c>SubmenuHeader</c> にならずサブメニューが開かぬ）は、<b>本サブメニューが静的に11項目を持つゆえ当たらぬ。</b>
+    /// </para>
+    /// <para>
+    /// <b>【開くたびに作り直す】</b>ピン留めの登録・解除（<see cref="TogglePinPartMenuItem_Click"/>）は
+    /// 状態を書き換えるだけで再構築を呼ばぬ——<b>次に開いた時点でここが最新を読む</b>ゆえ、
+    /// 原本 GuiEcad の <c>RebuildShapeMenu()</c> 即時呼び出しに当たるものは要らぬ
+    /// （<see cref="ViewModels.PartPaletteViewModel.TogglePin"/> のコメントに同旨）。
+    /// </para>
+    /// </summary>
+    private void OtherSymbolsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        if (!ReferenceEquals(e.OriginalSource, OtherSymbolsMenu)) return;
+        e.Handled = true;
+
+        RebuildPinnedSection(OtherSymbolsMenu, _pinnedMenuItems,
+            _viewModel.PartPalette.PinnedEntries, OtherPartMenuItem_Click);
+    }
+
+    /// <summary>
+    /// ピン留め掲出分を作り直す（T-133増分9）。<b>依存をすべて引数で受ける形にしてある</b>——
+    /// <see cref="MainWindow"/> を立てずとも測れるようにするため。
+    /// <para>
+    /// <b>【なぜ切り出したか】</b><c>TogglePin</c> は実 MyDocuments へ書くゆえ
+    /// （<see cref="ViewModels.PartPaletteViewModel"/> の申し合わせ）、<b><see cref="MainWindow"/> を
+    /// 立てるテストではピン留め済みの状態を作れぬ。</b> 引数で受ければ、任意の一覧を渡して
+    /// 生成の結果を測れる。
+    /// </para>
+    /// <para>
+    /// <b>【原本と同じ形】</b>0件ならセパレータも出さぬ（原本 <c>MainPage.Parts.cs:79</c> の
+    /// <c>if (pinnedEntries.Count > 0)</c>）。件数の上限は設けぬ。並べ替えもここでは行わぬ
+    /// ——順は <see cref="ViewModels.PartPaletteViewModel.PinnedEntries"/> が既に決めておる。
+    /// </para>
+    /// <para>
+    /// <b>【タグの形が原本と違う】</b>原本は <c>Tag = e.Definition.Id</c>（接頭辞なし・専用ハンドラ
+    /// <c>OnPlacePinnedPart</c>）だが、<b>ecad2 は同じサブメニューに <c>Kind#Orient</c> 形式が同居する</b>ゆえ
+    /// <c>"part:"</c> を冠して経路を弁別する（増分6で定めた作法）。<b>これにより配置の導線は
+    /// <see cref="OtherPartMenuItem_Click"/> をそのまま使い回せる</b>——原本が専用ハンドラを要したのは
+    /// タグの形が同居しておらなんだゆえで、ecad2 では新しい配置経路を足す要が無い。
+    /// </para>
+    /// <para>
+    /// <b><c>IsEnabled</c> は既存4件と同じく <c>CanEditDiagram</c> へ束ねる</b>——自作図形は
+    /// 主回路限定の枷を負わぬゆえ、部品リスト経由・既存4件と可否を揃える（増分6で解いた齟齬と同じ筋）。
+    /// </para>
+    /// </summary>
+    internal static void RebuildPinnedSection(
+        ItemsControl menu, List<object> tracked,
+        IReadOnlyList<PartFolderEntry> pinned, RoutedEventHandler onClick)
+    {
+        foreach (var item in tracked) menu.Items.Remove(item);
+        tracked.Clear();
+
+        if (pinned.Count == 0) return;
+
+        AddTracked(new Separator());
+        foreach (var entry in pinned)
+        {
+            var item = new MenuItem
+            {
+                Header = entry.Definition.Name,
+                Tag = PartTagPrefix + entry.Definition.Id,
+            };
+            item.Click += onClick;
+            item.SetBinding(UIElement.IsEnabledProperty,
+                new Binding(nameof(ViewModels.MainWindowViewModel.CanEditDiagram)));
+            AddTracked(item);
+        }
+
+        void AddTracked(object item)
+        {
+            menu.Items.Add(item);
+            tracked.Add(item);
+        }
+    }
+
     private void EditPartMenuItem_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not MenuItem { Tag: PartFolderEntry entry }) return;

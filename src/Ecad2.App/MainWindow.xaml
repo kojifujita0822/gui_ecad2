@@ -1036,8 +1036,18 @@
                      主回路限定の枷を負わぬゆえ、既存4件および部品リスト経由と可否を揃える。
 
                      【子要素を静的に11件持つ】CustomPartsMenu のダミー子項目（上）は動的構築ゆえに
-                     要ったもの。本サブメニューは静的ゆえ HasItems=true が最初から保たれ、同じ手当ては要らぬ。 -->
-                <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)">
+                     要ったもの。本サブメニューは静的ゆえ HasItems=true が最初から保たれ、同じ手当ては要らぬ。
+                     増分9で末尾へ動的部が付くが、静的11件が残るゆえこの前提は変わらぬ。
+
+                     【T-133増分9: ピン留め済み自作図形の掲出（殿裁定2026-08-07＝案A）】
+                     下の静的11項目の後ろへ、セパレータ＋ピン留め済みの各図形を SubmenuOpened で足す。
+                     原本 GuiEcad は「組込み記号→組み込みパーツ→セパレータ→ピン留め→セパレータ→自作図形」
+                     の並び（MainPage.Parts.cs:64-91）だが、ecad2 の自作図形サブメニューは別の場所
+                     （CustomPartsMenu、上）に在るゆえ、ピン留めは末尾に来る。
+                     末尾へ足すのは殿裁定であると同時に、既存11項目の添字が保たれる形でもある——
+                     手前へ挿れれば増分8で測った添字ベースのテスト群がまとめてずれる。
+                     動的部の生成・除去は MainWindow.xaml.cs の OtherSymbolsMenu_SubmenuOpened が担う。 -->
+                <MenuItem x:Name="OtherSymbolsMenu" Header="その他図形(_O)" SubmenuOpened="OtherSymbolsMenu_SubmenuOpened">
                     <MenuItem Header="セレクトSW" Tag="part:basic-select-switch" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="サーマル(OL)" Tag="part:basic-thermal-overload" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                     <MenuItem Header="非常停止" Tag="part:basic-emergency-stop" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>

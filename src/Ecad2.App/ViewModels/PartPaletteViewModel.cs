@@ -163,6 +163,31 @@ public sealed class PartPaletteViewModel : ViewModelBase
     public bool IsPinned(string partId) => _pinnedIds.Contains(partId);
 
     /// <summary>
+    /// 「その他図形」メニューへ掲出するピン留め済みの一覧（T-133増分9の掲出、殿裁定2026-08-07＝案A）。
+    /// <para>
+    /// <b>原本 GuiEcad の掲出側と同型である</b>（<c>MainPage.Parts.cs:76-78</c>／<c>MainPage.Tools.cs:186-188</c>
+    /// ——原本は上メニューと左パレットの2箇所で同じ式を書いておる）。<see cref="Entries"/> を
+    /// <see cref="_pinnedIds"/> で濾すだけで、<b>並べ替えも Category での絞り込みも行わぬ</b>。
+    /// </para>
+    /// <para>
+    /// <b>【並べ替えを足さぬ理由】</b><see cref="Entries"/> が既に Category昇順→名前昇順で並んでおり
+    /// （<c>PartFolderStore.cs:151-152</c>）、濾してもその順は保たれる。ここで <c>OrderBy</c> を重ねれば
+    /// <b>原本と並びが変わりうる</b>——原本は <c>_folderEntries</c> の順をそのまま使うゆえ。
+    /// <b><see cref="_pinnedIds"/> の順（＝ピン留めした順）は使わぬ</b>のが原本の作法である。
+    /// </para>
+    /// <para>
+    /// <b>【Category で絞らぬのも原本どおり】</b>登録の導線は自作パーツのサブメニューにしか無いゆえ、
+    /// 実際に基本図形の Id が入ることはない。<b>絞りを足せば原本に無い振る舞いを増やすだけになる</b>ため、
+    /// 濾す条件は原本と同じくピン留め状態のみとした。
+    /// </para>
+    /// <para>
+    /// <b>【消えた図形の Id は自然に落ちる】</b><see cref="Entries"/> の側を回すゆえ、図形を削除した後に
+    /// JSON へ残る孤児 Id は掲出されぬ。<b>ただし掃除はされぬ</b>——原本も同じで、これは申し送り済み。
+    /// </para></summary>
+    public IReadOnlyList<PartFolderEntry> PinnedEntries =>
+        Entries.Where(entry => _pinnedIds.Contains(entry.Definition.Id)).ToList();
+
+    /// <summary>
     /// ピン留めを登録／解除する（原本 GuiEcad <c>OnTogglePinPart</c> 踏襲、<c>MainPage.Parts.cs:196-208</c>）。
     /// <para>
     /// <b>【本増分の射程はここまで】</b>状態を書き換えてディスクへ保存するのみで、<b>通知も再構築も行わぬ</b>
