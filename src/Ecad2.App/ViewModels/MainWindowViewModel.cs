@@ -2471,15 +2471,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SelectedElementSetpoint = Math.Round(value).ToString(CultureInfo.InvariantCulture);
     }
 
-    /// <summary>要素のラベル位置計算に用いる実効種別を解決する(T-097)。T-071バグ修正の教訓
-    /// (DiagramRenderer.cs:953、e.Kindは自作パーツ・組込みパーツ問わずPartId配置時は常に既定値
-    /// ContactNOのまま)により、DefaultLabelDyへ渡す種別はPartResolver.ComponentKind経由で解決する
-    /// 必要がある(IsSelectedElementTimerRelatedと同型パターン)。CreatesComponent=falseの場合は
-    /// DiagramRenderer.csのresolvedKind計算と同様e.Kindへフォールバックする。</summary>
-    private ElementKind ResolveLabelKind(ElementInstance element)
-        => PartResolver.CreatesComponent(element, PartLibrary)
-           ? PartResolver.ComponentKind(element, PartLibrary)
-           : element.Kind;
+    /// <summary>要素のラベル既定オフセット(mm)を、描画側とまったく同じ解き方で求める(T-097、T-145)。
+    /// <para>
+    /// <b>【T-145で <c>PartResolver.LabelKind</c> へ寄せた】</b>従来はここに <c>ResolveLabelKind</c> を
+    /// 私に持ち、<c>DiagramRenderer</c> の <c>resolvedKind</c> と同じ二分岐を書き写しておった。
+    /// <b>T-145でモータの迂回が加わり、同じ迂回を二箇所へ書く形になる</b>ゆえ一元化した
+    /// ——<b>片方だけ直せば、プロパティパネルの相対値と実際の描画位置が食い違う</b>
+    /// （入力欄に0と出ておるのに絵は別の場所、という形で現れる）。
+    /// </para>
+    /// <para>
+    /// 向き(<see cref="ParamKeys.Orient"/>)も渡す——モータは向きによって本体大円の位置が変わり、
+    /// 既定オフセットもそれに従うゆえ。
+    /// </para></summary>
+    private double DefaultLabelDyOf(ElementInstance element)
+        => ElementCatalog.DefaultLabelDy(
+            PartResolver.LabelKind(element, PartLibrary),
+            PartResolver.LabelOrient(element, PartLibrary));
 
     /// <summary>ラベル高さオフセットの相対値(mm、T-097、殿裁定=種別既定の表示位置(
     /// <see cref="ElementCatalog.DefaultLabelDy"/>)を0として+-で上下させる相対オフセット方式)。
@@ -2494,7 +2501,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         get
         {
             if (SelectedElement is not ElementInstance el) return "";
-            double defaultDy = ElementCatalog.DefaultLabelDy(ResolveLabelKind(el));
+            double defaultDy = DefaultLabelDyOf(el);
             double absolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var s)
                 && double.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out double v)
                 ? v : defaultDy;
@@ -2506,7 +2513,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         set
         {
             if (SelectedElement is not ElementInstance el) return;
-            double defaultDy = ElementCatalog.DefaultLabelDy(ResolveLabelKind(el));
+            double defaultDy = DefaultLabelDyOf(el);
             double oldAbsolute = el.Params.TryGetValue(ParamKeys.LabelDy, out var os)
                 && double.TryParse(os, NumberStyles.Any, CultureInfo.InvariantCulture, out double ov)
                 ? ov : defaultDy;

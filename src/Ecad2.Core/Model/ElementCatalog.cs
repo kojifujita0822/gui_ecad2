@@ -79,11 +79,75 @@ public static class ElementCatalog
         },
     };
 
+    /// <summary>組込みモータ（<c>BasicPartTemplates</c> の「モータ」）の PartId（T-145）。
+    /// <para>
+    /// <b>【なぜラベルの解決に Id が要るか】</b>組込みモータは <c>PartId</c> 経路で配置されるが、
+    /// その要素の <see cref="ElementInstance.Kind"/> は既定値 <see cref="ElementKind.ContactNO"/> のまま
+    /// である（T-046由来の構造的制約）。<b>ゆえにラベル位置の解決が接点用の値を拾ってしまう</b>
+    /// ——「モータの既定値を入れれば直る」は誤りにて、経路ごと迂回せねば届かぬ。
+    /// <b>殿裁定2026-08-06＝モータに限って迂回する（根であるT-046の構造は断たぬ）。</b>
+    /// </para>
+    /// <para>
+    /// <b>【綴りを二重に持つことになる】</b><c>BasicPartTemplates.MotorId</c> が本体だが、
+    /// あちらは <c>Persistence</c> 層にて、<c>Model</c> 層から参照すれば層の向きが逆になる。
+    /// <b>二つが食い違えば迂回が黙って効かなくなる</b>——絵は正しいのにラベルだけ元の位置へ戻り、
+    /// テストも実機も「何も起きておらぬ」ように見える。<b>ゆえに両者の一致をテストで固定してある。</b>
+    /// </para></summary>
+    public const string MotorPartId = "basic-motor";
+
+    /// <summary>ラベル位置の解決で「縦向き」と見なす <see cref="ParamKeys.Orient"/> の値か（T-145）。
+    /// <b><c>SymbolGlyphs</c> のモータ描画と同じ規則でなければ、絵とラベルがずれる</b>
+    /// ——あちらは <c>Rendering</c> 層の private ゆえ共有できず、同じ規則をここへ写した
+    /// （<b>既定は横向きにて、"V" のときだけ縦</b>）。</summary>
+    private static bool IsMotorVertical(string? orient) => orient == "V";
+
+    // T-145（殿ご下命2026-08-06「モーターのデバイス名が大円の中央に表示されない」）。
+    // 殿裁定＝x・y両方を本体大円の中心へ寄せる。
+    //
+    // 【座標の出どころ】SymbolGlyphs の Motor / MotorV は「原点＝左境界・行中心、+x右・+y下」、
+    // 単位 k = width/3 ＝ 1セル（モータは CellWidth=3）。本体大円の中心は
+    //   横向き … (x, y) = (2.0, 0)    セル
+    //   縦向き … (x, y) = (1.0, 1.75) セル
+    // 一方ラベルの既定位置は、x が要素幅の中央（1.5セル）、y が行中心の Cell*0.50 上。
+    //
+    // 【ゆえに】
+    //   dx（正で右） 横 = 2.0 - 1.5 = +0.5セル ／ 縦 = 1.0 - 1.5 = -0.5セル
+    //   dy（正で上） DrawElementLabel は yn = YRow - Cell*0.50 - dy ゆえ、
+    //     行中心へ置くには dy = -0.50セル、行中心の1.75セル下へ置くには dy = -(0.50 + 1.75)セル
+    //
+    // 【mm の生値である】既存の LabelDy（Coil の -5.72 等）と同じくセル 9mm を前提とする。
+    // CellMm を変えれば合わなくなるが、ここだけセル比にすれば Params[LabelDy]（mm 絶対値）と
+    // 意味論が食い違うゆえ、既存へ揃えた。
+    //
+    // 【コイルに要った実測補正は入れておらぬ】Coil は理論値 -5.5 から -5.72 へ、テキスト中心が
+    // 円中心より約0.22mm上にずれる分を忍者の実測で補正してある（下記コメント）。同じ描画系ゆえ
+    // モータにも同型のずれが出る見込みだが、値まで同じとは限らぬ——理論値を入れ、実機の画素採取で
+    // 確かめる（外れておれば、その差がコイルの補正値と揃うかどうかも併せて見られる）。
+    private const double MotorLabelDxHorizontal = 4.5;      // +0.5セル
+    private const double MotorLabelDxVertical = -4.5;       // -0.5セル
+    private const double MotorLabelDyHorizontal = -4.5;     // -0.50セル（行中心）
+    private const double MotorLabelDyVertical = -20.25;     // -2.25セル（行中心の1.75セル下）
+
+    /// <summary>
+    /// 機器名ラベルの既定横オフセット(mm、正で右)。要素に <c>Params["LabelDx"]</c> が無い場合に使う。
+    /// <b>T-145 で新設した</b>——それまで x は要素幅の中央に固定で、寄せる器が無かった。
+    /// <b>モータ以外はすべて 0</b>（従来どおり幅の中央）にて、既存の見た目は変わらぬ。
+    /// </summary>
+    public static double DefaultLabelDx(ElementKind k, string? orient) => k switch
+    {
+        ElementKind.Motor => IsMotorVertical(orient) ? MotorLabelDxVertical : MotorLabelDxHorizontal,
+        _ => 0.0,
+    };
+
     /// <summary>
     /// 機器名ラベルの既定高さオフセット(mm、正で上)。要素に Params["LabelDy"] が無い場合に使う。
     /// 密集時の重なり回避の標準位置（実図面の規定図に基づく調整値が由来）。
-    /// </summary>
-    public static double DefaultLabelDy(ElementKind k) => k switch
+    /// <para>
+    /// <b>【T-145で向きを受けるようになった】</b>モータは向きによって本体大円の位置が変わるゆえ、
+    /// <b>種別ごとの1値では足りぬ</b>。<b>引数を省略可能にしておらぬのは</b>、省略できる形にすると
+    /// 呼び手が向きを渡し忘れても黙って旧挙動になり、<b>誤りが実機まで露見せぬ</b>ゆえである。
+    /// </para></summary>
+    public static double DefaultLabelDy(ElementKind k, string? orient) => k switch
     {
         ElementKind.ContactNO or ElementKind.ContactNC => -1.5,
         ElementKind.PushButtonNC => -1.5,
@@ -96,6 +160,7 @@ public static class ElementCatalog
         ElementKind.Coil => -5.72,   // コイルの丸の中心に表示(実測補正済み、重なり回避)
         ElementKind.Lamp => -1.5,
         ElementKind.Terminal => -2.0,
+        ElementKind.Motor => IsMotorVertical(orient) ? MotorLabelDyVertical : MotorLabelDyHorizontal,
         _ => 0.0,
     };
 

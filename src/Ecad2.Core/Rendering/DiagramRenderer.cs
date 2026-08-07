@@ -1068,7 +1068,16 @@ public sealed class DiagramRenderer
             r.DrawText(lampColor, new(X(lb) + width / 2, YRow(e.Pos.Row)), cs);
         }
 
-        DrawElementLabel(r, e, lb, rb, width, resolvedKind);
+        // T-145: ラベルの種別は resolvedKind と別に解く。あちらは CreatesComponent=false のとき
+        // e.Kind へ落ちるゆえ、PartId 経路のモータが既定値 ContactNO のまま接点用の位置を拾う。
+        //
+        // 【向きは PartId 経路へ渡さぬ】上の分岐のとおり PartId 経路の絵は PartDrawing.Draw が描き、
+        // あちらは orient を引数に持たぬ——すなわち定義どおりの向きで固定される。ここでラベルだけが
+        // 向きを見れば、絵は横向きのまま名が縦向きの位置へ寄り、両者が食い違う。
+        // メニューは「三相モータ 横」を PartId 経路、「三相モータ 縦」を Kind 経路と分けてあるゆえ
+        // 通常は Orient=V を持つ PartId 要素は生まれぬが、ファイルを直に書けば起こりうる。
+        DrawElementLabel(r, e, lb, rb, width,
+            PartResolver.LabelKind(e, _lib), PartResolver.LabelOrient(e, _lib));
     }
 
     /// <summary>テストモード中、計時中の限時タイマ接点(TimerContactNO/NC)の上に残り時間
@@ -1143,7 +1152,19 @@ public sealed class DiagramRenderer
     // T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): コメントはDeviceName経由でDevice.Commentを
     // 引いて記号の下・中央に描く(GX3の上下2分割セル構造に対応、機器名=上段/コメント=下段で
     // 同一セル内に収め行を専有しない)。同一デバイス名の全要素で同じコメントが表示される。
-    private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width, ElementKind resolvedKind)
+    /// <summary>機器名ラベルとコメントを描く。
+    /// <para>
+    /// <b>【T-145で横オフセットと向きが入った】</b>それまで x は要素幅の中央に固定で、
+    /// 寄せる器が無かった（殿ご下命2026-08-06＝モータの名を本体大円の中心へ）。
+    /// <b><paramref name="labelKind"/> は描画本体の <c>resolvedKind</c> とは別物である</b>
+    /// ——<see cref="PartResolver.LabelKind"/> がモータの経路だけを迂回して解く。
+    /// </para>
+    /// <para>
+    /// <b>コメント（記号の下）には横オフセットを掛けておらぬ</b>——殿裁定の射程は機器名にて、
+    /// コメントは従来どおり幅の中央から動かさぬ。<b>モータでは機器名だけが横へ寄る</b>ことになる。
+    /// </para></summary>
+    private void DrawElementLabel(IRenderer r, ElementInstance e, int lb, int rb, double width,
+        ElementKind labelKind, string? orient)
     {
         if (!_opt.ShowDeviceNames) return;
 
@@ -1155,14 +1176,21 @@ public sealed class DiagramRenderer
             double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
                 double.TryParse(s, System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture, out double v)
-                ? v : ElementCatalog.DefaultLabelDy(resolvedKind);
+                ? v : ElementCatalog.DefaultLabelDy(labelKind, orient);
 
+            // T-145: 横も同じ作法（個別値 Params["LabelDx"] 優先・無ければ種別の既定）。
+            double dx = e.Params.TryGetValue(ParamKeys.LabelDx, out var sx) &&
+                double.TryParse(sx, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out double vx)
+                ? vx : ElementCatalog.DefaultLabelDx(labelKind, orient);
+
+            double xn = cx + dx;                              // dx>0 で右へ
             double yn = YRow(e.Pos.Row) - Cell * 0.50 - dy;   // dy>0 で上へ（機器名は記号の上）
-            r.DrawText(e.DeviceName!, new(cx, yn), _theme.Text(TextRole.DeviceName));
+            r.DrawText(e.DeviceName!, new(xn, yn), _theme.Text(TextRole.DeviceName));
 
             // タイマ接点は機器名の右肩に種別ミニラベル（限時=「限」/ 瞬時=「瞬」）を出して区別する。
             // 瞬時接点は素の接点と同形のため、記号だけでは判別しにくいのを補う。
-            if (TimerContactMark(resolvedKind) is string mark)
+            if (TimerContactMark(labelKind) is string mark)
                 r.DrawText(mark, new(X(rb) + 0.3, yn),
                     _theme.Text(TextRole.DeviceName) with { FontSizeMm = 1.7, HAlign = HAlign.Left });
         }

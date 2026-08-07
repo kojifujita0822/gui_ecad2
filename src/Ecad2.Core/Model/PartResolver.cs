@@ -125,4 +125,45 @@ public static class PartResolver
                 $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };
     }
+
+    /// <summary>
+    /// 機器名ラベルの位置を決めるのに用いる種別（T-145、殿ご下命2026-08-06）。
+    /// <para>
+    /// <b>【<see cref="ComponentKind"/> と別に要る理由】</b>あちらは「ネットリストの電気要素として
+    /// 何か」を答えるゆえ、<see cref="PartRole.NonSimulated"/> には答が無く例外を投げる。
+    /// <b>されどラベルは非シミュレートの記号にも付く</b>——組込みモータがまさにそれである。
+    /// </para>
+    /// <para>
+    /// <b>【モータだけを迂回する】</b><c>PartId</c> 経路で置かれた要素の
+    /// <see cref="ElementInstance.Kind"/> は既定値 <see cref="ElementKind.ContactNO"/> のままにて
+    /// （T-046由来の構造的制約）、そのままでは<b>モータのラベルが接点用の位置へ寄る</b>。
+    /// <b>殿裁定は「根であるT-046の構造は断たず、モータに限って迂回する」</b>——
+    /// <b>承知の短所として、同じ構造から出る別の不具合は残る</b>（ラベル以外に及ぶかは未調査）。
+    /// </para>
+    /// <para>
+    /// <b>【未解決の PartId は迂回せぬ】</b>ライブラリで実体を引けぬときは絵の側も
+    /// <see cref="ElementInstance.Kind"/> で描かれるゆえ、ラベルだけモータの位置へ寄れば
+    /// <b>絵と名が食い違う</b>。実体を引けることを条件にしてある。
+    /// </para></summary>
+    public static ElementKind LabelKind(ElementInstance e, PartLibrary? lib)
+    {
+        if (CreatesComponent(e, lib)) return ComponentKind(e, lib);
+        if (lib?.Get(e.PartId) is not null && e.PartId == ElementCatalog.MotorPartId) return ElementKind.Motor;
+        return e.Kind;
+    }
+
+    /// <summary>
+    /// 機器名ラベルの位置を決めるのに用いる向き（T-145）。<see cref="LabelKind"/> と対を成す。
+    /// <para>
+    /// <b>【PartId 経路では向きを見ぬ】</b>PartId 経路の絵は <c>PartDrawing.Draw</c> が描き、
+    /// <b>あちらは向きを引数に持たぬ</b>——定義どおりの形で固定される。
+    /// <b>ここでラベルだけが向きを見れば、絵は元の向きのまま名だけが動く。</b>
+    /// </para>
+    /// <para>
+    /// <b>【この規則を一箇所に置く理由】</b>描画（<c>DiagramRenderer</c>）とプロパティパネルの
+    /// 相対値（<c>MainWindowViewModel</c>）が同じ規則で解かねば、<b>入力欄に0と出ておるのに
+    /// 絵は別の場所という食い違いが生じる</b>。<see cref="LabelKind"/> と揃えてここへ置いた。
+    /// </para></summary>
+    public static string? LabelOrient(ElementInstance e, PartLibrary? lib)
+        => lib?.Get(e.PartId) is not null ? null : e.Params.GetValueOrDefault(ParamKeys.Orient);
 }

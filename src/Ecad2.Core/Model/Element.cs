@@ -9,6 +9,7 @@ public static class ParamKeys
     public const string LampColor = "LampColor";  // ランプ色
     public const string Type = "Type";            // Breaker3P の種別（NFB/MCCB/ELB）
     public const string LabelDy = "LabelDy";      // ラベル高さオフセット（mm・double）
+    public const string LabelDx = "LabelDx";      // ラベル横オフセット（mm・double、T-145）
     public const string Orient = "Orient";        // 主回路記号の向き（V/H）
 }
 
