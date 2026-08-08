@@ -107,7 +107,11 @@ public sealed class SvgRenderer : IRenderer
 
     // ツールバーアイコン用 SVG 文字列を生成する。
     // cell=8mm, vpad=cell*0.62 でタイマ△(高さ cell*0.58)まで収まる。
-    public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35, Color? color = null)
+    // orient は SymbolGlyphs.Draw へそのまま渡す(T-147)。主回路3極記号("H"で横向き)と三相モータ
+    // ("V"で縦向き)が向きを持つため、渡さないと常に既定の向きのアイコンになる——DiagramRenderer 側の
+    // 2つの呼び出しは既に orient を渡しており、ここだけが渡していなかった非対称を解消する。
+    public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35, Color? color = null,
+                                           string? orient = null)
     {
         const double cell = 8.0;
         const double hpad = 0.5;
@@ -120,7 +124,7 @@ public sealed class SvgRenderer : IRenderer
 
         var stroke = new StrokeStyle(color ?? DrawingTheme.Black, strokeWidthMm);
         var renderer = new SvgRenderer(sb);
-        SymbolGlyphs.Draw(renderer, stroke, kind, cell, cell);
+        SymbolGlyphs.Draw(renderer, stroke, kind, cell, cell, orient: orient);
 
         sb.Append("</svg>");
         return sb.ToString();
