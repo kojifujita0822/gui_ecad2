@@ -20,17 +20,24 @@ namespace Ecad2.Core.Tests;
 /// </summary>
 public class DiagramRendererTestModeColorTests
 {
-    // T-061修正(隠密指摘、家老経由確認2026-07-13): MainCircuit=falseだとDrawRungWiresが自動配線
-    // (母線間の配線)を描画し、その配線色はPoweredNets(floodL∪floodR、両母線から到達可能な全ネット)
-    // 判定で常にPowered色になる(単独要素配置は必ず母線に直結するため)。Assert.Contains(Powered, ...)
-    // は配線由来のPoweredと要素記号由来のPoweredを区別できず、要素自体が実際にはグレーのまま
-    // (=旧実装のB群バグ)でも配線色混入によって偽陽性でPASSしてしまっていた(隠密の静的読解で発覚、
-    // 実測でも6件中4件が旧実装で偶然PASSすると確認)。MainCircuit=trueにしてDrawRails/DrawBusLabels/
-    // DrawRungWiresを全てスキップさせ、DrawElement(要素記号)由来の色のみが記録されるようにする
-    // (NetlistBuilder/EvaluatorはMainCircuitを一切参照しないため評価結果への影響はない)。
+    // 測定系の変遷(この経緯を消すと、次の者が MainCircuit=true へ戻して測定を壊す):
+    //
+    // T-061修正(隠密指摘、家老経由確認2026-07-13)で、当初は MainCircuit=true を使っていた。
+    // 理由は DrawRungWires が描く自動横配線の色が測定を汚すこと——配線色は PoweredNets
+    // (floodL∪floodR、両母線から到達可能な全ネット)判定で常にPowered色になり(単独要素配置は必ず
+    // 母線に直結するため)、Assert.Contains(Powered, ...) が配線由来と要素記号由来を区別できず、
+    // 要素自体がグレーのまま(=旧実装のB群バグ)でも偽陽性でPASSしていた(実測で6件中4件が旧実装で
+    // 偶然PASS)。MainCircuit=true にすれば DrawRails/DrawBusLabels/DrawRungWires が全てスキップ
+    // され、要素記号由来の色のみが記録される、という理屈だった。
+    //
+    // T-146(殿裁定2026-08-08)でこの道具は使えなくなった。主回路シートではテストモード評価自体を
+    // 走らせないため、MainCircuit=true では要素にも色が付かない(旧のまま残せば全件が自明に通り、
+    // 測る力を失う)。そこで測定系を ColorRecordingRenderer.SymbolColors へ移した——DrawElement が
+    // 要素記号を PushTransform〜PopTransform で囲むことを使い、シート種別ではなく描画の入れ子で
+    // 配線と要素記号を切り分ける。制御回路シート(MainCircuit=false)のまま要素記号の色だけを測れる。
     private static Sheet MakeSingleElementSheet(ElementKind kind, string deviceName)
     {
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         sheet.Elements.Add(new ElementInstance { Kind = kind, Pos = new GridPos(0, 5), DeviceName = deviceName });
         return sheet;
     }
@@ -43,6 +50,8 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet);   // sim=null(作画モード)
 
+        // ここだけ LineColors を見る(他は SymbolColors)。作画モードではテストモード色が図面の
+        // どこにも——要素記号だけでなく配線にも——現れないことを主張したいため、範囲の広い方が強い。
         Assert.DoesNotContain(DrawingTheme.Powered, renderer.LineColors);
         Assert.DoesNotContain(DrawingTheme.NonEnergizedGray, renderer.LineColors);
     }
@@ -56,8 +65,8 @@ public class DiagramRendererTestModeColorTests
         // 単独要素は自動的に左右母線間へ直結される(DrawRungWires前提と同型)ため、コイルは常時励磁。
         new DiagramRenderer().Render(renderer, sheet, sim: new SimState());
 
-        Assert.Contains(DrawingTheme.Powered, renderer.LineColors);
-        Assert.DoesNotContain(DrawingTheme.NonEnergizedGray, renderer.LineColors);
+        Assert.Contains(DrawingTheme.Powered, renderer.SymbolColors);
+        Assert.DoesNotContain(DrawingTheme.NonEnergizedGray, renderer.SymbolColors);
     }
 
     [Fact]
@@ -71,7 +80,7 @@ public class DiagramRendererTestModeColorTests
         // 検証対象は接点記号自体がグレー(非通電)で描かれることのみ。
         new DiagramRenderer().Render(renderer, sheet, sim: new SimState());
 
-        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.LineColors);
+        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.SymbolColors);
     }
 
     [Fact]
@@ -88,7 +97,7 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: sim);
 
-        Assert.Contains(DrawingTheme.Powered, renderer.LineColors);
+        Assert.Contains(DrawingTheme.Powered, renderer.SymbolColors);
     }
 
     [Fact]
@@ -101,7 +110,7 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: new SimState());
 
-        Assert.Contains(DrawingTheme.Powered, renderer.LineColors);
+        Assert.Contains(DrawingTheme.Powered, renderer.SymbolColors);
     }
 
     [Fact]
@@ -120,7 +129,7 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: sim);
 
-        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.LineColors);
+        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.SymbolColors);
     }
 
     [Fact]
@@ -135,7 +144,7 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: sim);
 
-        Assert.Contains(DrawingTheme.Powered, renderer.LineColors);
+        Assert.Contains(DrawingTheme.Powered, renderer.SymbolColors);
     }
 
     [Fact]
@@ -143,7 +152,7 @@ public class DiagramRendererTestModeColorTests
     {
         // B-2再発防止: 限時タイマ接点はコイル励磁「かつ」経過時間>=設定時間で初めて導通する。
         // コイル励磁直後(経過時間未達)は非導通(グレー)のままであるべき。
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         var timerCoil = new ElementInstance { Kind = ElementKind.Timer, Pos = new GridPos(0, 0), DeviceName = "T001" };
         timerCoil.Params[ParamKeys.Setpoint] = "5";
         var timerContact = new ElementInstance { Kind = ElementKind.TimerContactNO, Pos = new GridPos(1, 0), DeviceName = "T001" };
@@ -155,7 +164,7 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: sim);
 
-        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.LineColors);
+        Assert.Contains(DrawingTheme.NonEnergizedGray, renderer.SymbolColors);
     }
 
     [Fact]
@@ -167,7 +176,7 @@ public class DiagramRendererTestModeColorTests
         // DeviceNameを共有する」ため偶然Poweredに一致してしまい、旧実装のB-2バグを検出できない
         // (RED先行証明で実測確認済み、旧実装でもPASS)。検出力はBeforeTimeout(経過時間未達→旧実装は
         // 誤って赤、正しくはグレー)側が担う。このテストは限時判定の対称性(達成/未達両方)の確認として残す。
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         var timerCoil = new ElementInstance { Kind = ElementKind.Timer, Pos = new GridPos(0, 0), DeviceName = "T001" };
         timerCoil.Params[ParamKeys.Setpoint] = "5";
         var timerContact = new ElementInstance { Kind = ElementKind.TimerContactNO, Pos = new GridPos(1, 0), DeviceName = "T001" };
@@ -179,28 +188,48 @@ public class DiagramRendererTestModeColorTests
 
         new DiagramRenderer().Render(renderer, sheet, sim: sim);
 
-        Assert.Contains(DrawingTheme.Powered, renderer.LineColors);
+        Assert.Contains(DrawingTheme.Powered, renderer.SymbolColors);
     }
 }
 
 /// <summary>DrawLine/DrawCircle等に渡されるStrokeStyle.Colorのみを記録するIRendererのテストダブル
-/// (DiagramRendererLabelTests.RecordingRendererのDrawText専用版と対になる色専用版)。</summary>
+/// (DiagramRendererLabelTests.RecordingRendererのDrawText専用版と対になる色専用版)。
+/// <para>
+/// T-146(2026-08-08): 要素記号由来の色を <see cref="SymbolColors"/> へ分けて記録する。
+/// DiagramRenderer.DrawElement は要素記号を PushTransform〜PopTransform で囲む
+/// (r.PushTransform(X(lb), YRow(e.Pos.Row)) → SymbolGlyphs.Draw/PartDrawing.Draw → r.PopTransform())
+/// ため、この入れ子の内側で記録された色だけが要素記号由来であり、外側は母線・自動横配線・枠・
+/// 縦コネクタ等の色である。要素記号の色を測るテストはこちらを見ること。
+/// </para></summary>
 internal sealed class ColorRecordingRenderer : IRenderer
 {
+    /// <summary>PushTransform の入れ子の深さ。0 より大きい間は要素記号を描画中。</summary>
+    private int _transformDepth;
+
+    /// <summary>描画された全ての線色(母線・自動横配線・枠・要素記号を含む)。</summary>
     public List<Color> LineColors { get; } = new();
 
-    public void PushTransform(double translateX, double translateY, double scale = 1.0) { }
-    public void PopTransform() { }
+    /// <summary>要素記号のみの線色(DrawElement の PushTransform 内で記録されたもの)。</summary>
+    public List<Color> SymbolColors { get; } = new();
+
+    private void Record(Color color)
+    {
+        LineColors.Add(color);
+        if (_transformDepth > 0) SymbolColors.Add(color);
+    }
+
+    public void PushTransform(double translateX, double translateY, double scale = 1.0) => _transformDepth++;
+    public void PopTransform() => _transformDepth--;
     public void PushClip(Rect2D rect) { }
     public void PopClip() { }
-    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) => LineColors.Add(stroke.Color);
-    public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke) => LineColors.Add(stroke.Color);
-    public void DrawRectangle(Rect2D rect, StrokeStyle stroke) => LineColors.Add(stroke.Color);
+    public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) => Record(stroke.Color);
+    public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke) => Record(stroke.Color);
+    public void DrawRectangle(Rect2D rect, StrokeStyle stroke) => Record(stroke.Color);
     public void FillRectangle(Rect2D rect, Color color) { }
-    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) => LineColors.Add(stroke.Color);
+    public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) => Record(stroke.Color);
     public void FillCircle(Point2D center, double radius, Color color) { }
-    public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) => LineColors.Add(stroke.Color);
-    public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) => LineColors.Add(stroke.Color);
+    public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) => Record(stroke.Color);
+    public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) => Record(stroke.Color);
     public void DrawText(string text, Point2D position, TextStyle style) { }
     public Size2D MeasureText(string text, TextStyle style) => new(0, 0);
     public void DrawImage(string filePath, Rect2D bounds) { }

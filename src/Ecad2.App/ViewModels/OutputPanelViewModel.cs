@@ -70,6 +70,8 @@ public sealed class OutputPanelViewModel : ViewModelBase
         results.AddRange(DesignRuleCheck.CheckDeviceTypeConsistency(_owner.Document, _owner.PartLibrary));
         results.AddRange(DesignRuleCheck.CheckUnresolvedPartId(_owner.Document, _owner.PartLibrary));
 
+        // 主回路シートの除外はここではなく DesignRuleCheck 側の各メソッド冒頭で行う(T-146、殿裁定
+        // 2026-08-08)。呼び出し元が増えても漏れないよう、診断の側に単一ゲートを置く方針。
         foreach (var sheet in _owner.Document.Sheets)
         {
             var net = NetlistBuilder.Build(sheet, _owner.PartLibrary);

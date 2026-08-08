@@ -15,9 +15,15 @@ public class DiagramRendererTimerCountdownTests
 {
     // コイル(DeviceName=deviceName、Params[Setpoint]設定、母線間直結で常時励磁)+
     // タイマ接点(kind、同DeviceName、宙に浮いた別行配置)の2要素シート。
+    //
+    // T-146(殿裁定2026-08-08)で MainCircuit=true を外した。主回路シートではテストモード評価自体を
+    // 走らせないため、残したままでは残り時間が一切描かれない——Contains 系2件は落ち、DoesNotContain 系
+    // 4件は自明に通って測る力を失う。本テスト群は DrawnTexts(文字)のみを見ており、自動横配線は
+    // DrawText を呼ばないため、制御回路シートでも測定は汚れない(色を測る
+    // DiagramRendererTestModeColorTests とは事情が異なり、こちらは種別を外すだけで足りる)。
     private static Sheet MakeSheet(ElementKind contactKind, string deviceName, string setpoint, bool includeCoil = true)
     {
-        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
+        var sheet = new Sheet { Grid = new GridSpec { Rows = 10, Columns = 20 } };
         if (includeCoil)
         {
             var coil = new ElementInstance { Kind = ElementKind.Coil, Pos = new GridPos(0, 5), DeviceName = deviceName };

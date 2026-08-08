@@ -171,9 +171,11 @@ public static class DesignRuleCheck
     /// <summary>
     /// 縦コネクタ中間行スルー交差チェック（P7）。
     /// Netlist.VerticalCrossings（NetlistBuilder が検出済み）から診断を生成する。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）は対象外（T-146、殿裁定2026-08-08）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckVerticalCrossings(Sheet sheet, Netlist net)
     {
+        if (sheet.MainCircuit) return Array.Empty<Diagnostic>();
         if (net.VerticalCrossings.Count == 0) return Array.Empty<Diagnostic>();
         var diags = new List<Diagnostic>();
         foreach (var (row, col) in net.VerticalCrossings)
@@ -188,9 +190,12 @@ public static class DesignRuleCheck
     /// <summary>
     /// 負荷の母線到達可能性チェック（P8）。
     /// 全接点を強制導通（静的トポロジー）で BFS し、負荷の左右端子が各母線に到達できるか確認する。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）は対象外（T-146、殿裁定2026-08-08）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckLoadReachability(Sheet sheet, Netlist net)
     {
+        if (sheet.MainCircuit) return Array.Empty<Diagnostic>();
+
         var fromLeft  = FloodContacts(net, net.LeftRailNet);
         var fromRight = FloodContacts(net, net.RightRailNet);
 
@@ -222,9 +227,12 @@ public static class DesignRuleCheck
     /// 二重コイル（コイル直列接続）チェック。
     /// 2つ以上の負荷が共有する節点が、いずれの母線からも接点経由で到達できない場合、
     /// その節点は負荷どうしの直列接続点＝二重コイルである（並列接続の共有節点は母線到達可能なので除外される）。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）は対象外（T-146、殿裁定2026-08-08）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckSeriesCoils(Sheet sheet, Netlist net)
     {
+        if (sheet.MainCircuit) return Array.Empty<Diagnostic>();
+
         var fromLeft = FloodContacts(net, net.LeftRailNet);
         var fromRight = FloodContacts(net, net.RightRailNet);
         var elemRow = sheet.Elements.ToDictionary(e => e.Id, e => e.Pos.Row + 1);

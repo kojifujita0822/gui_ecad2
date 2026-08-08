@@ -21,9 +21,17 @@ public sealed class TestSession
         _lib = lib;
     }
 
-    /// <summary>現在の入力＋持ち越した励磁状態で評価する。</summary>
+    /// <summary>
+    /// 現在の入力＋持ち越した励磁状態で評価する。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）では評価を走らせず、空の結果を返す
+    /// （T-146、殿裁定2026-08-08「主回路でテストモード評価を止める」）。
+    /// 画面の通電ハイライトは <see cref="Ecad2.Rendering.DiagramRenderer.Render"/> が
+    /// 独立に評価しており、本メソッドを止めるだけでは消えない（あちらにも同じガードがある）。
+    /// </summary>
     public EvalResult Evaluate()
     {
+        if (_sheet.MainCircuit) return Result = new EvalResult();
+
         var net = NetlistBuilder.Build(_sheet, _lib);
         var res = new Evaluator(net).Evaluate(State);
         State.Energized.Clear();
@@ -42,9 +50,12 @@ public sealed class TestSession
     /// <summary>
     /// 経過時間を <paramref name="dt"/> 秒進める。励磁中のタイマコイルの経過時間を加算し、
     /// 消磁されたタイマコイルの経過時間をリセットする。その後評価を実行する。
+    /// 主回路シートでは時間も進めない（<see cref="Evaluate"/> のガードと対、T-146）。
     /// </summary>
     public EvalResult Tick(double dt)
     {
+        if (_sheet.MainCircuit) return Evaluate();
+
         var net = NetlistBuilder.Build(_sheet, _lib);
         foreach (var (device, _) in net.TimerSetpoints)
         {
