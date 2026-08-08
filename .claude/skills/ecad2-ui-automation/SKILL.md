@@ -173,6 +173,23 @@ Start-Ecad2App                # コンソール出力を $env:TEMP\ecad2-ui-auto
 Invoke-Ecad2Button -Name "a接点配置 (F5)"
 Invoke-Ecad2Button -Name "選択ツール (Esc)"
 
+# 組込み記号(a接点等)をツールバーから配置する完全手順(2026-08-08、T-146検証、忍者)。
+# セル選択→ツールボタン押下だけでは配置バーが開くのみで要素は生まれぬ。「配置位置」を
+# 改めてキャンバスクリックで指定する2段階が要る。ステータス文言
+# 「配置ツール: a接点 - キャンバスをクリックして配置位置を指定してください」を複数回読み直したが
+# 同じ文言のまま変化せず、「まだ開いていない」と誤読して数手を空費した(危うくUIAツリー探索の
+# 手法自体を疑うところであった)。★ただし配置バーが開く前後でこの文言が実際に変わらぬことは
+# 確かめておらぬ(開いたタイミングを正確に特定できなんだため)。疑わしければ文言だけで判断せず
+# スクリーンショットで実見すること。
+Invoke-Ecad2CanvasClick -RelativeX 372 -RelativeY 323   # (1)セル選択
+Invoke-Ecad2Button -Name "a接点配置 (F5)"                 # (2)ツール起動
+Invoke-Ecad2CanvasClick -RelativeX 372 -RelativeY 323   # (3)配置位置指定(同じセルでよい)→名前入力バーが開く
+Send-Ecad2Keys "{ENTER}"                                 # (4)名前を空のまま確定(既定名で配置)。
+# 名前欄には`AutomationId="PlacementDeviceNameBox"`が既に付いている(6.2節参照)ため、
+# 通常のFindAllでUIA探索するより先にこのIdで直接検索する方が確実。
+# ★確定後は必ずデバイス名を設定すること——テストモード中の要素クリックは
+# DeviceName未設定だと無反応になる(6.2節「テストモード中のクリックが無反応」参照)。
+
 # 左パーツパレットのリスト項目（Name は完全一致が必要。表示ラベルだけでなく
 # "PartFolderEntry { Category = ..., FilePath = ..., Definition = ... }" という完全な文字列になっている点に注意。
 # 部分一致で探したい場合は Find-Ecad2Element -All の結果を Where-Object で絞り込む）
@@ -384,6 +401,7 @@ dirtyフラグに触れぬ別系統の永続化）終了したところ、**や�
 | `CanvasArea` | 中央キャンバス（Pane、単一ビジュアルとしてUI Automationツリーに現れる。内部の図形要素は個別に走査できない可能性が高い＝GuiEcadのWin2D Canvasと同様の制約） |
 | `DeviceTableGrid` | 右パネル機器表（DataGrid、`DataItem`単位で行、列は機器名/種別/型式） |
 | ツールバーボタン | `"新規作成 (Ctrl+N)"` `"開く (Ctrl+O)"` `"上書き保存 (Ctrl+S)"` `"元に戻す (Ctrl+Z)"` `"やり直し (Ctrl+Y)"` `"PDF出力 (Ctrl+P)"`（1段目）、`"選択ツール (Esc)"` `"a接点配置 (F5)"` `"b接点配置 (F6)"` `"コイル配置 (F7)"` `"端子台配置 (F8)"`（2段目） |
+| シート追加ダイアログ（`AddSheetButton`押下で開く、2026-08-08 T-146検証、忍者実測） | `NameBox`（Edit、シート名）／`ControlCircuitRadio`・`MainCircuitRadio`（RadioButton、種別選択。`SelectionItemPattern.Select()`で選択可）／`OK`・`キャンセル`（Name一致のButton） |
 
 要素一覧を再取得したい場合:
 ```powershell
@@ -878,6 +896,19 @@ T-134では`Ctrl+Y`が2度不発となり実装の瑕疵を疑ったが、**一�
 （**関連＝6.8節「Undoが生きておる対照は線を1本引いて取れ」**。
 **あちらは「機構が生きておるか」、こちらは「履歴が伸びておらぬか」で目的は違えど、
 `IsEnabled`を疑うという手法は同根**——忍者の見立て）
+
+#### テストモード中、要素をクリックしても無反応 → DeviceName未設定を疑え（2026-08-08、T-146検証、忍者）
+
+**組込み記号(a接点等)を配置直後、名前を空のままテストモードで通電クリックを試みても無反応**
+のことがある。`TestModePress`メソッド内（`MainWindowViewModel.cs:3048`付近、検索文字列＝
+`element.DeviceName is not string device`）のガード条件で、**名前未設定だとnullを返し
+何も起きぬ**。
+
+**対処**＝配置後、必ずプロパティパネルの`DeviceNameBox`へ名前を設定してから検証に入る
+（`ValuePattern.SetValue`はモデルへ反映されぬことがあるため、物理クリックで実際に
+フォーカスしてから`Send-Ecad2Keys`で入力し`{TAB}`等でLostFocusさせること。上記既載の
+「プロパティパネルのテキストボックス」罠と同根）。名前設定後は`DeviceTableGrid`の行数で
+モデルへ反映されたことを確認できる。
 
 ### 6.3 スクリーンショット・見た目確認が実態と食い違う（PrintWindow・画素採取系）
 
