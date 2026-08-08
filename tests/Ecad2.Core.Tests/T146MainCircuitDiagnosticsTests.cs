@@ -259,6 +259,85 @@ public class T146MainCircuitDiagnosticsTests
         Assert.Equal("CR1", d.DeviceName);
     }
 
+    // ---- (5) 手動強制の塗り（往復1周目・忍者の実機確認で発覚） ----
+    //
+    // 増分1では色を「線」でしか測っておらず、手動強制の表示を素通ししていた。手動強制は塗りで
+    // 描かれる（DiagramRenderer の 1×1 セル背景塗りと SymbolGlyphs の ContactNO/NC ブレード間塗り、
+    // いずれも FillRectangle）。実機では主回路シートでテストモード中に要素をクリックすると水色
+    // ハイライトが残っており、忍者の画素採取で R255G255B255 → R145G180B240 と確認された。
+    //
+    // 機序＝DrawElement の manuallyForced は inputs（Render が渡す sim?.Inputs）のみを見ており、
+    // energized を見ていない。ゆえに評価をスキップしても inputs が渡る限り塗りは出る。
+
+    /// <summary>手動強制の塗りが出るのは組込み ContactNO/NC（SymbolGlyphs が manualFill を見る種別）。</summary>
+    private static Sheet MakeForcedContactSheet(bool mainCircuit)
+    {
+        var sheet = new Sheet { PageNumber = 1, Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = mainCircuit };
+        sheet.Elements.Add(new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = "X1", Pos = new GridPos(0, 0) });
+        return sheet;
+    }
+
+    [Fact]
+    public void Render_制御回路シートでは手動強制の塗りが出る()
+    {
+        var sheet = MakeForcedContactSheet(mainCircuit: false);
+        var renderer = new ColorRecordingRenderer();
+        var sim = new SimState();
+        sim.Inputs["X1"] = true;
+
+        new DiagramRenderer().Render(renderer, sheet, sim: sim);
+
+        Assert.Contains(DrawingTheme.ManualForced, renderer.FillColors);
+    }
+
+    [Fact]
+    public void Render_主回路シートでは手動強制の塗りも出ない()
+    {
+        var sheet = MakeForcedContactSheet(mainCircuit: true);
+        var renderer = new ColorRecordingRenderer();
+        var sim = new SimState();
+        sim.Inputs["X1"] = true;
+
+        new DiagramRenderer().Render(renderer, sheet, sim: sim);
+
+        Assert.DoesNotContain(DrawingTheme.ManualForced, renderer.FillColors);
+    }
+
+    /// <summary>塗りが出る経路は手動強制だけではない——通電中の負荷にも 1×1 セルの背景塗りが乗る
+    /// （<c>DiagramRenderer</c> の bgFill、<c>on &amp;&amp; isLoad</c> の枝）。手動強制の枝（inputs 由来）
+    /// だけを測ると、こちらの枝が塞がっているかを弁別できぬ。
+    /// <para>
+    /// なお bgFill にはもう一つ「自作パーツが手動強制中」の枝がある（<c>part is not null &amp;&amp;
+    /// manuallyForced</c>、隠密の指摘2026-08-08）。これは手動強制の枝と同じ <c>manuallyForced</c> を
+    /// 通るため、入口で sim を落とせば併せて塞がる——<b>ただしそれは論理であって、自作パーツを
+    /// 立てての実測はしておらぬ</b>（侍が自ら区切る）。
+    /// </para></summary>
+    [Fact]
+    public void Render_制御回路シートでは通電中の負荷に背景塗りが出る()
+    {
+        var sheet = MakePushButtonCoilSheet(mainCircuit: false);
+        var renderer = new ColorRecordingRenderer();
+        var sim = new SimState();
+        sim.Inputs["PB1"] = true;
+
+        new DiagramRenderer().Render(renderer, sheet, sim: sim);
+
+        Assert.Contains(DrawingTheme.ManualForced, renderer.FillColors);
+    }
+
+    [Fact]
+    public void Render_主回路シートでは通電中の負荷の背景塗りも出ない()
+    {
+        var sheet = MakePushButtonCoilSheet(mainCircuit: true);
+        var renderer = new ColorRecordingRenderer();
+        var sim = new SimState();
+        sim.Inputs["PB1"] = true;
+
+        new DiagramRenderer().Render(renderer, sheet, sim: sim);
+
+        Assert.DoesNotContain(DrawingTheme.ManualForced, renderer.FillColors);
+    }
+
     [Fact]
     public void Render_主回路シートではタイマ残り時間を描かない()
     {

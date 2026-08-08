@@ -267,6 +267,24 @@ public sealed class DiagramRenderer
     {
         _lib = library;
         _devices = devices;
+
+        // 主回路シートではテストモード評価を一切行わない(T-146、殿裁定2026-08-08)。入口で sim を
+        // 落とすことで、以降の全経路——通電評価・要素の手動強制表示・タイマ残り時間——が一括で
+        // 作画モードと同じになる。
+        //
+        // 【なぜ箇所ごとのガードではなく入口で落とすのか】往復1周目(2026-08-08)で、箇所ごとに
+        // ガードを置く形では漏れることが実機で判明した。Render が sim を使うのは3系統
+        // (通電評価 / DrawElement へ渡す sim?.Inputs / DrawTimerCountdowns)だが、増分1では前後2つ
+        // だけを塞ぎ、真ん中を漏らした——手動強制の表示は energized ではなく inputs のみを見るため
+        // (DrawElement の manuallyForced)、主回路シートでも水色ハイライトが残っていた。将来 sim を
+        // 使う箇所が増えても同じことが起きるため、単一の関門へ集約する。
+        //
+        // 【netlist を空にする案とは事情が異なる】起票時、共通の関門 NetlistBuilder.Build を主回路で
+        // 空にする案を検討して取り下げた——netlist は診断以外に配線描画(要素→ネット対応表)にも
+        // 使われており、空にすると主回路シートの配線が描かれなくなるため。sim にその類の用途は無い
+        // (上記3系統がすべてで、いずれもテストモード専用の表示)。sim=null は「作画モードとして
+        // 描く」ことと同義であり、既存の作画モード経路そのものである。
+        if (sheet.MainCircuit) sim = null;
         var netlist = NetlistBuilder.Build(sheet, library);
         // T-146(主回路シートで診断を走らせぬ)でここへ主回路ガードを足す要は無い、と家老裁定
         // 2026-08-08で確認済み。理由は二つ: (1)report の渡り先は DrawRungWires 一箇所のみで、その
@@ -282,11 +300,10 @@ public sealed class DiagramRenderer
         // タイマ限時判定・セレクトSWノッチ判定を正しく持つIsConductingの結果)。Render内部で
         // 評価が完結するため、外部への経路新設(SimState拡張等)は不要でここで直接DrawElementへ渡す。
         Dictionary<Guid, bool>? elementConducting = null;
-        // 主回路シートではテストモード評価を走らせない(T-146、殿裁定2026-08-08)。評価をしなければ
-        // powered/energized/elementConducting は null のままとなり、DrawElement は作画モードと同じ
-        // 通常色で描く=要素の色変化が出なくなる。TestSession 側にも同じガードがあるが、Render は
-        // SimState を受け取って独立に評価するため、あちらを止めるだけでは色は消えない。
-        if (sim is not null && !sheet.MainCircuit)
+        // 主回路シートの判定は入口の sim=null で済んでいる(上記)。ここは作画モードと同じ経路を通る。
+        // なお TestSession 側にも同じ趣旨のガードがあるが、Render は SimState を受け取って独立に
+        // 評価するため、あちらを止めるだけでは画面の色は消えない。
+        if (sim is not null)
         {
             var eval = new Evaluator(netlist).Evaluate(sim);
             powered = eval.PoweredNets;
@@ -339,8 +356,9 @@ public sealed class DiagramRenderer
         DrawFrames(r, sheet, rowStart, rowEnd, totalRows);
         foreach (var e in sheet.Elements)
             if (InWindow(e.Pos.Row)) DrawElement(r, e, energized, sim?.Inputs, elementConducting);
-        // タイマ残り時間の表示もテストモード評価の一部ゆえ、主回路シートでは出さない(T-146)。
-        if (sim is not null && !sheet.MainCircuit)
+        // タイマ残り時間の表示もテストモード評価の一部。主回路シートの判定は入口の sim=null で
+        // 済んでいる(T-146往復1周目で個別ガードを単一の関門へ集約した)。
+        if (sim is not null)
             DrawTimerCountdowns(r, sheet, netlist, sim, energized, rowStart, rowEnd);
         DrawRungComments(r, sheet, columns, rowStart, rowEnd);
 

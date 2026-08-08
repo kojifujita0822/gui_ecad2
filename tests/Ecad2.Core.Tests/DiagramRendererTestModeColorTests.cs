@@ -212,6 +212,21 @@ internal sealed class ColorRecordingRenderer : IRenderer
     /// <summary>要素記号のみの線色(DrawElement の PushTransform 内で記録されたもの)。</summary>
     public List<Color> SymbolColors { get; } = new();
 
+    /// <summary>
+    /// 塗りつぶしの色(FillRectangle/FillCircle)。T-146往復1周目で新設。
+    /// <para>
+    /// 従前このテストダブルは塗りを一切記録しておらず、<b>手動強制の表示を丸ごと素通ししていた</b>
+    /// ——手動強制は線ではなく塗りで描かれる（DiagramRenderer の 1×1 セル背景塗りと、
+    /// SymbolGlyphs の ContactNO/NC のブレード間塗り、いずれも FillRectangle）。
+    /// 「テストモード色が一切出ない」を線色だけで測っていたため、忍者の実機確認で
+    /// 主回路シートに水色ハイライトが残っているのが見つかるまで気づけなかった。
+    /// </para>
+    /// <para>
+    /// 既存の <see cref="LineColors"/>・<see cref="SymbolColors"/> へ混ぜず別立てにしたのは、
+    /// それらを見ている既存テストの判定を動かさないため。
+    /// </para></summary>
+    public List<Color> FillColors { get; } = new();
+
     private void Record(Color color)
     {
         LineColors.Add(color);
@@ -225,9 +240,9 @@ internal sealed class ColorRecordingRenderer : IRenderer
     public void DrawLine(Point2D a, Point2D b, StrokeStyle stroke) => Record(stroke.Color);
     public void DrawPolyline(ReadOnlySpan<Point2D> points, StrokeStyle stroke) => Record(stroke.Color);
     public void DrawRectangle(Rect2D rect, StrokeStyle stroke) => Record(stroke.Color);
-    public void FillRectangle(Rect2D rect, Color color) { }
+    public void FillRectangle(Rect2D rect, Color color) => FillColors.Add(color);
     public void DrawCircle(Point2D center, double radius, StrokeStyle stroke) => Record(stroke.Color);
-    public void FillCircle(Point2D center, double radius, Color color) { }
+    public void FillCircle(Point2D center, double radius, Color color) => FillColors.Add(color);
     public void DrawEllipse(Point2D center, double radiusX, double radiusY, StrokeStyle stroke) => Record(stroke.Color);
     public void DrawArc(Point2D center, double radius, double startDeg, double sweepDeg, StrokeStyle stroke) => Record(stroke.Color);
     public void DrawText(string text, Point2D position, TextStyle style) { }
