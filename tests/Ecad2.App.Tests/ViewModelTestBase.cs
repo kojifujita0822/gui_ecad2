@@ -27,10 +27,15 @@ public abstract class ViewModelTestBase : IDisposable
         Directory.CreateDirectory(_tempDir);
     }
 
+    /// <summary>T-149: ピン留めの保存先も一時フォルダへ向ける。従前は
+    /// <c>PartPaletteViewModel</c> が内部で <see cref="PinnedPartStore.CreateDefault"/> を掴んでおり、
+    /// 本基底を継承する全テストが実MyDocuments の pinned-parts.json を読んでいた（書き込みは
+    /// <c>TogglePin</c> を呼んだ場合のみゆえ実害は出ていなかったが、型では防げていなかった）。</summary>
     protected MainWindowViewModel CreateViewModel()
     {
         Dispatcher = new ImmediateDispatcherService();
-        return new(new PartFolderStore(_tempDir), Dispatcher);
+        return new(new PartFolderStore(_tempDir), Dispatcher,
+                   new PinnedPartStore(Path.Combine(_tempDir, "pinned-parts.json")));
     }
 
     public void Dispose() => Directory.Delete(_tempDir, recursive: true);

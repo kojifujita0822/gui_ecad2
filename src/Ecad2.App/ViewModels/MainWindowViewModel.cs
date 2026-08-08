@@ -3713,11 +3713,22 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     /// <summary>T-045(P-016対応): テスト等からIDispatcherServiceも注入できるようにするための
     /// コンストラクタ(SheetNavigationViewModelのDispatcher直接依存分離)。PartFolderStoreの
-    /// 2本立てパターン(T-042)と同型。</summary>
+    /// 2本立てパターン(T-042)と同型。ピン留めの保存先は本番既定(実MyDocuments)を使う。</summary>
     public MainWindowViewModel(PartFolderStore partFolderStore, IDispatcherService dispatcherService)
+        : this(partFolderStore, dispatcherService, PinnedPartStore.CreateDefault()) { }
+
+    /// <summary>T-149: ピン留めの保存先も注入できるようにするためのコンストラクタ。
+    /// PartFolderStore(T-042)・IDispatcherService(T-045)と同型の3本目にござる。
+    /// <para>
+    /// これが本体。<see cref="PartPaletteViewModel"/> が1引数版を廃したため、実MyDocuments を
+    /// 掴むか一時フォルダを使うかの選択がここへ集まった——App 層で実MyDocuments を掴む箇所は
+    /// 上のオーバーロード1つのみになる。
+    /// </para></summary>
+    public MainWindowViewModel(PartFolderStore partFolderStore, IDispatcherService dispatcherService,
+                               PinnedPartStore pinnedPartStore)
     {
         SheetNavigation = new SheetNavigationViewModel(this, dispatcherService);
-        PartPalette = new PartPaletteViewModel(partFolderStore);
+        PartPalette = new PartPaletteViewModel(partFolderStore, pinnedPartStore);
         // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
         // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。
         PartLibrary = PartPalette.Library;

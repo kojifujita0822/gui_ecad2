@@ -46,31 +46,20 @@ public sealed class PartPaletteViewModel : ViewModelBase
     private IReadOnlyList<PartSelectionEntryViewModel> _selectionEntries = Array.Empty<PartSelectionEntryViewModel>();
     public IReadOnlyList<PartSelectionEntryViewModel> SelectionEntries { get => _selectionEntries; private set => SetProperty(ref _selectionEntries, value); }
 
-    /// <summary>本番用。実MyDocuments配下(PartFolderStore.CreateDefault())を使う。</summary>
-    public PartPaletteViewModel() : this(PartFolderStore.CreateDefault()) { }
-
-    /// <summary>T-042: テスト等から一時フォルダのPartFolderStoreを注入できるようにするための
-    /// コンストラクタ(P-019=App層テストが実MyDocumentsを叩く副作用の解消)。
+    /// <summary>
+    /// 唯一のコンストラクタ。保存先を2つとも呼び手に選ばせる（T-149、殿ご裁可2026-08-08）。
     /// <para>
-    /// <b>【T-133増分9・ピン留めの保存先は実MyDocuments のままである】</b>本オーバーロードは
-    /// <see cref="PinnedPartStore.CreateDefault"/> を用いる。<b><see cref="TogglePin"/> を呼ぶテストは
-    /// 必ず下の2引数版を使い、一時フォルダの <see cref="PinnedPartStore"/> を注入すること</b>
-    /// ——さもなくば P-019 と同じ副作用（テストが実MyDocumentsへ書く）が、ピン留めの側から蘇る。
-    /// <b>読むだけなら副作用は無い</b>（<see cref="PinnedPartStore.Load"/> はファイルが無ければ空を返す）。
+    /// 従前は引数なし版と <see cref="PartFolderStore"/> 1つだけの版も在り、いずれも
+    /// <see cref="PinnedPartStore.CreateDefault"/>（実MyDocuments）を内部で掴んでいた。
+    /// 「<see cref="TogglePin"/> を呼ぶテストは必ず一時フォルダの <see cref="PinnedPartStore"/> を
+    /// 注入すること」という定めが docコメントによる申し合わせにすぎず、コンパイラに強制されて
+    /// いなかったため——<c>MainWindowViewModelTests</c> 側へ <c>.PartPalette.TogglePin(...)</c> が
+    /// 書き足されれば、誰も気づかぬまま実MyDocuments へ書く経路が開く（隠密の検分2026-08-06、P-177）。
     /// </para>
     /// <para>
-    /// <b>【この定めはコンパイラに強制されておらぬ】</b>docコメントによる申し合わせにすぎぬ。
-    /// <c>MainWindowViewModel</c> が本オーバーロードで <c>PartPalette</c> を構築しておるゆえ、
-    /// <b><c>MainWindowViewModelTests</c> 側へ <c>.PartPalette.TogglePin(...)</c> が書き足されれば、
-    /// 誰も気づかぬまま実MyDocumentsへ書く経路が開く</b>（隠密の検分、2026-08-06。
-    /// 現時点で <see cref="TogglePin"/> を呼ぶ9箇所はすべて2引数版を使うており申し合わせは守られておる）。
-    /// <b>型で塞ぐ道は在る</b>——本オーバーロードを廃して2引数版のみにすれば、コンパイラが強制する。
-    /// <b>波及は実測で src 1箇所＋テスト5ファイル程度</b>にて手が届く規模だが、
-    /// <b>増分9の主題（未配線のものを繋ぐ）とは別軸ゆえ <c>proposed.md</c> へ切り離した。</b>
+    /// 廃したことで本番の保存先を選ぶ責は <c>MainWindowViewModel</c> 側へ移った。
+    /// 実MyDocuments を掴むのはそこ1箇所のみになる。
     /// </para></summary>
-    public PartPaletteViewModel(PartFolderStore store) : this(store, PinnedPartStore.CreateDefault()) { }
-
-    /// <summary>T-133増分9: ピン留めの保存先も注入できる形。テストはこちらを使う。</summary>
     public PartPaletteViewModel(PartFolderStore store, PinnedPartStore pinnedStore)
     {
         _store = store;
