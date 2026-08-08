@@ -152,10 +152,29 @@ public sealed class PartPaletteViewModel : ViewModelBase
         Load();
     }
 
-    /// <summary>T-068増分1: 自作パーツを削除し一覧を最新化する。</summary>
+    /// <summary>T-068増分1: 自作パーツを削除し一覧を最新化する。
+    /// <para>
+    /// T-148: 削除した部品のピン留めを JSON からも落とす。原本 GuiEcad は掃除せず孤児 Id が残るが、
+    /// ecad2 は掃除する（殿ご裁可2026-08-08）。掲出は <see cref="PinnedEntries"/> が
+    /// <see cref="Entries"/> の側を回すため孤児が出ることは無いが、JSON が際限なく太る。
+    /// </para>
+    /// <para>
+    /// Id を引くのは <see cref="_store"/> の削除より前でなければならぬ——後では
+    /// <see cref="Entries"/> から消えており引けぬ。<see cref="Load"/> が
+    /// <c>_pinnedIds</c> を JSON から読み直すため、保存も <see cref="Load"/> より前に行う。
+    /// </para></summary>
     public void DeletePart(string filePath)
     {
+        string? deletedId = Entries
+            .FirstOrDefault(e => string.Equals(Path.GetFullPath(e.FilePath), Path.GetFullPath(filePath),
+                                               StringComparison.OrdinalIgnoreCase))
+            ?.Definition.Id;
+
         _store.Delete(filePath);
+
+        if (deletedId is not null && _pinnedIds.Remove(deletedId))
+            _pinnedStore.Save(_pinnedIds);
+
         Load();
     }
 
