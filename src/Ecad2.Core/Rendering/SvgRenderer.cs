@@ -110,8 +110,14 @@ public sealed class SvgRenderer : IRenderer
     // orient は SymbolGlyphs.Draw へそのまま渡す(T-147)。主回路3極記号("H"で横向き)と三相モータ
     // ("V"で縦向き)が向きを持つため、渡さないと常に既定の向きのアイコンになる——DiagramRenderer 側の
     // 2つの呼び出しは既に orient を渡しており、ここだけが渡していなかった非対称を解消する。
+    //
+    // variant も同じ非対称であったため併せて渡す(T-150)。ただし効く範囲は orient より狭い——
+    // SymbolGlyphs 側で variant を見るのは ElementKind.Breaker3P の一箇所のみ(`variant == "ELB"` で
+    // テストボタンの小四角を描き足す)であり、"NFB"・"MCCB"・null は三つとも同じ絵になる。
+    // 図面上で NFB と MCCB を見分けているのは記号の形ではなく DiagramRenderer が記号脇へ記す文字で、
+    // そちらは GenerateSymbolSvg の描画対象外。つまり本引数で変わるのは ELB のアイコンだけである。
     public static string GenerateSymbolSvg(ElementKind kind, double strokeWidthMm = 0.35, Color? color = null,
-                                           string? orient = null)
+                                           string? orient = null, string? variant = null)
     {
         const double cell = 8.0;
         const double hpad = 0.5;
@@ -124,7 +130,7 @@ public sealed class SvgRenderer : IRenderer
 
         var stroke = new StrokeStyle(color ?? DrawingTheme.Black, strokeWidthMm);
         var renderer = new SvgRenderer(sb);
-        SymbolGlyphs.Draw(renderer, stroke, kind, cell, cell, orient: orient);
+        SymbolGlyphs.Draw(renderer, stroke, kind, cell, cell, variant: variant, orient: orient);
 
         sb.Append("</svg>");
         return sb.ToString();

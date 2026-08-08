@@ -59,4 +59,52 @@ public class T147SvgRendererOrientTests
             SvgRenderer.GenerateSymbolSvg(ElementKind.Motor),
             SvgRenderer.GenerateSymbolSvg(ElementKind.Motor, orient: null));
     }
+
+    // ---- T-150: variant も同じ非対称であったため併せて渡す ----
+
+    /// <summary>variant が効くのは <see cref="ElementKind.Breaker3P"/> の一箇所のみで、
+    /// 効き方は <c>variant == "ELB"</c> のときテストボタンの小四角を描き足すか否か
+    /// （<c>SymbolGlyphs.cs</c> の Breaker3P、侍の一次ソース直読2026-08-08）。</summary>
+    [Fact]
+    public void GenerateSymbolSvg_主回路3極記号はELBで絵が変わる()
+    {
+        string defaultSvg = SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P);
+        string elbSvg = SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P, variant: "ELB");
+
+        Assert.NotEqual(defaultSvg, elbSvg);
+    }
+
+    /// <summary><b>射程の証拠であり、これを測らねば次に読む者が「ブレーカ三種を描き分ける」と
+    /// 誤読する。</b>NFB・MCCB は既定と同じ絵になる——<c>SymbolGlyphs</c> が見るのは "ELB" か否かのみ。
+    /// 図面上で NFB と MCCB を見分けているのは記号の形ではなく <c>DiagramRenderer</c> が記号脇へ記す
+    /// 文字であり、そちらは <see cref="SvgRenderer.GenerateSymbolSvg"/> の描画対象外にござる。</summary>
+    [Theory]
+    [InlineData("NFB")]
+    [InlineData("MCCB")]
+    public void GenerateSymbolSvg_主回路3極記号はNFBとMCCBでは絵が変わらない(string variant)
+    {
+        Assert.Equal(
+            SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P),
+            SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P, variant: variant));
+    }
+
+    /// <summary>素朴なベースライン。variant を見ぬ種別では渡しても絵が変わらぬ。</summary>
+    [Fact]
+    public void GenerateSymbolSvg_variantを見ぬ種別は渡しても変わらない()
+    {
+        string defaultSvg = SvgRenderer.GenerateSymbolSvg(ElementKind.Motor);
+
+        Assert.Equal(defaultSvg, SvgRenderer.GenerateSymbolSvg(ElementKind.Motor, variant: "ELB"));
+    }
+
+    /// <summary>orient と variant を同時に渡しても双方が効くこと。片方だけを渡す形でしか測らねば、
+    /// 引数の取り違え（variant を orient の位置へ渡す等）を素通しする。</summary>
+    [Fact]
+    public void GenerateSymbolSvg_orientとvariantは同時に効く()
+    {
+        string both = SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P, orient: "H", variant: "ELB");
+
+        Assert.NotEqual(SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P, orient: "H"), both);
+        Assert.NotEqual(SvgRenderer.GenerateSymbolSvg(ElementKind.Breaker3P, variant: "ELB"), both);
+    }
 }
