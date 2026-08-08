@@ -50,6 +50,7 @@ public static class DesignRuleCheck
     /// リレーコイル（<see cref="ElementKind.Coil"/>。表示負荷の <see cref="ElementKind.Lamp"/> を除く）の
     /// 対応関係を機器名ごとに照合し、片側のみの機器を警告する。
     /// <see cref="CircuitNumberer"/> でシートが採番済みであることが前提（未採番行は回路番号0）。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）は走査から除く（T-146、殿裁定2026-08-08）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckCrossReference(LadderDocument doc, PartLibrary? lib = null)
     {
@@ -57,6 +58,7 @@ public static class DesignRuleCheck
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
+            if (sheet.MainCircuit) continue;   // 主回路シートは診断の対象外（T-146、殿裁定2026-08-08）
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
@@ -110,6 +112,7 @@ public static class DesignRuleCheck
     /// 接点種別と機器実体の整合チェック（P2/P6）。
     /// 同一機器名に励磁系接点（ContactNO/NC）と入力系接点（押釦・タイマ等）が混在する場合、
     /// またはコイルで駆動される機器の接点種別が入力系になっている場合を診断する。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）は走査から除く（T-146、殿裁定2026-08-08）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckDeviceTypeConsistency(LadderDocument doc, PartLibrary? lib = null)
     {
@@ -118,6 +121,7 @@ public static class DesignRuleCheck
 
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
+            if (sheet.MainCircuit) continue;   // 主回路シートは診断の対象外（T-146、殿裁定2026-08-08）
             foreach (var elem in sheet.Elements)
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
@@ -272,12 +276,16 @@ public static class DesignRuleCheck
     /// 見つからない参照のまま配置）・読込時（<see cref="Persistence.PartFolderStore.Enumerate"/>
     /// のID重複再採番で既存図面の参照が孤立）いずれの経路も「PartId設定済みなのに解決不可」という
     /// 同一条件で検出できる。PartId が null（組込み種別を直接指定）の要素は対象外。
+    /// 主回路シート（<see cref="Sheet.MainCircuit"/>）も走査から除く（T-146、殿裁定2026-08-08）。
+    /// ライブラリを失った要素を拾う網から主回路だけが外れることになるが、殿裁定により
+    /// 「主回路シートでは診断を行わない」を仕様として採る（分岐2）。
     /// </summary>
     public static IReadOnlyList<Diagnostic> CheckUnresolvedPartId(LadderDocument doc, PartLibrary? lib = null)
     {
         var diagnostics = new List<Diagnostic>();
         foreach (var sheet in doc.Sheets.OrderBy(s => s.PageNumber))
         {
+            if (sheet.MainCircuit) continue;   // 主回路シートは診断の対象外（T-146、殿裁定2026-08-08）
             foreach (var elem in sheet.Elements)
             {
                 if (!PartResolver.IsUnresolvedPartId(elem, lib)) continue;

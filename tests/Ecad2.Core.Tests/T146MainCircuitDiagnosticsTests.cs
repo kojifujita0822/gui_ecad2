@@ -198,6 +198,67 @@ public class T146MainCircuitDiagnosticsTests
         Assert.DoesNotContain(DrawingTheme.NonEnergizedGray, renderer.LineColors);
     }
 
+    // ---- (4) 文書単位DRC 3件（増分2） ----
+    //
+    // 増分1のシート単位と違い、これらは LadderDocument を受けて全シートを走査する。
+    // ゆえに対の形をシート2枚の混在で作る——同じ文書に制御回路シート(ページ1)と主回路シート
+    // (ページ2)を置き、同型の不備を両方に仕込む。制御回路の分だけが診断に出れば、
+    // 「走査から主回路だけが抜ける」ことを1件のテストで弁別できる。
+
+    /// <summary>ページ1＝制御回路・ページ2＝主回路の2枚組み文書。両シートへ同型の要素を置く。</summary>
+    private static LadderDocument MakeMixedDoc(Func<string, ElementInstance[]> makeElements)
+    {
+        var control = new Sheet { PageNumber = 1, Grid = new GridSpec { Rows = 10, Columns = 20 } };
+        control.Elements.AddRange(makeElements("CR1"));
+        var main = new Sheet { PageNumber = 2, Grid = new GridSpec { Rows = 10, Columns = 20 }, MainCircuit = true };
+        main.Elements.AddRange(makeElements("CR2"));
+        return new LadderDocument { Sheets = { control, main } };
+    }
+
+    [Fact]
+    public void CheckCrossReference_主回路シートの要素は駆動元不明として挙がらない()
+    {
+        // 接点だけあってコイルが無い＝DRC-XREF-001（駆動元不明）。
+        var doc = MakeMixedDoc(name =>
+            [new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = name, Pos = new GridPos(0, 0) }]);
+
+        var diagnostics = DesignRuleCheck.CheckCrossReference(doc);
+
+        var d = Assert.Single(diagnostics);
+        Assert.Equal(DesignRuleCheck.ContactWithoutCoil, d.Code);
+        Assert.Equal("CR1", d.DeviceName);   // 主回路側の CR2 は挙がらない
+    }
+
+    [Fact]
+    public void CheckDeviceTypeConsistency_主回路シートの要素は種別不整合として挙がらない()
+    {
+        // 同一機器名に励磁系接点(ContactNO)と入力系接点(押釦)が混在＝DRC-TYPE-001。
+        var doc = MakeMixedDoc(name =>
+        [
+            new ElementInstance { Kind = ElementKind.ContactNO, DeviceName = name, Pos = new GridPos(0, 0) },
+            new ElementInstance { Kind = ElementKind.PushButtonNO, DeviceName = name, Pos = new GridPos(1, 0) },
+        ]);
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc);
+
+        var d = Assert.Single(diagnostics);
+        Assert.Equal(DesignRuleCheck.TypeConflictEnergizedVsInput, d.Code);
+        Assert.Equal("CR1", d.DeviceName);
+    }
+
+    [Fact]
+    public void CheckUnresolvedPartId_主回路シートの要素は未解決参照として挙がらない()
+    {
+        var doc = MakeMixedDoc(name =>
+            [new ElementInstance { PartId = "missing-id", DeviceName = name, Pos = new GridPos(0, 0) }]);
+
+        var diagnostics = DesignRuleCheck.CheckUnresolvedPartId(doc, new PartLibrary());
+
+        var d = Assert.Single(diagnostics);
+        Assert.Equal(DesignRuleCheck.UnresolvedPartId, d.Code);
+        Assert.Equal("CR1", d.DeviceName);
+    }
+
     [Fact]
     public void Render_主回路シートではタイマ残り時間を描かない()
     {
