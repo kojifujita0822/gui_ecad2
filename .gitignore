@@ -5,3 +5,5 @@ version/
 poc/wpf-focus-poc/WpfFocusPoc/poc-output.pdf
 SCREEN SHOT/
 sample/
+# T-123: Inno Setup が生成するインストーラー本体（45MB規模）。スクリプト(.iss)は追跡下に置く
+installer/*.exe
