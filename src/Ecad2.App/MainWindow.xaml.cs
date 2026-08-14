@@ -228,6 +228,17 @@ public partial class MainWindow : Window
         // T-110増分1(隠密プラン§3.5、望ましい方向): 単一Manager化によりAutoHideサイド領域は
         // ウィンドウ全域に及ぶため、本対処が全ペイン共通で有効になる。
         MainDockingManager.Loaded += PlacementToolBarDockingManager_Loaded;
+        // T-123: ファイル関連付け(.gcad)経由の起動で文書を開く。コンストラクタではなくLoadedで
+        // 行うのは、読み込み失敗時のMessageBoxがOwner(このウィンドウ)の表示を前提とするため。
+        Loaded += MainWindow_Loaded;
+    }
+
+    // T-123: 起動引数で指定された文書を開く。起動直後の一度きりで、以降のLoaded(再表示等)では
+    // 読み直さない——ユーザーがその後に別の文書を開いていた場合に上書きしてしまうため。
+    private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= MainWindow_Loaded;
+        if (App.StartupDocumentPath is string path) LoadDocumentOrShowError(path);
     }
 
     private void PlacementToolBarDockingManager_Loaded(object sender, RoutedEventArgs e)
@@ -1532,9 +1543,17 @@ public partial class MainWindow : Window
         var dialog = new Microsoft.Win32.OpenFileDialog { Filter = GcadFileFilter, DefaultExt = ".gcad" };
         if (dialog.ShowDialog(this) != true) return;
 
+        LoadDocumentOrShowError(dialog.FileName);
+    }
+
+    // 読み込みと失敗時の案内(T-019、T-123で共通化)。ダイアログ経由(OpenButton_Click)と
+    // ファイル関連付け経由(MainWindow_Loaded)で失敗時の見え方を揃えるため、読み込みは
+    // 必ずここを通す。
+    private void LoadDocumentOrShowError(string path)
+    {
         try
         {
-            _viewModel.LoadFromFile(dialog.FileName);
+            _viewModel.LoadFromFile(path);
         }
         catch (Exception)
         {
@@ -1542,7 +1561,7 @@ public partial class MainWindow : Window
             // 生の技術的例外文面(英語)がex.Message経由でそのまま表示されていた欠陥を修正。
             // 一般向け日本語文面＋対象パスのみを表示する(プラン段階2の意図どおり)。
             MessageBox.Show(this,
-                $"ファイルを読み込めませんでした。ファイルが壊れているか、対応していない形式の可能性があります。\n{dialog.FileName}",
+                $"ファイルを読み込めませんでした。ファイルが壊れているか、対応していない形式の可能性があります。\n{path}",
                 "読み込みエラー", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }

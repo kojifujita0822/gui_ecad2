@@ -13,6 +13,13 @@ namespace Ecad2.App;
 /// </summary>
 public partial class App : Application
 {
+    /// <summary>
+    /// 起動引数で指定された文書のパス(T-123)。無指定ならnull。
+    /// App.xamlがStartupUriでMainWindowを構築するためコンストラクタ引数として渡せず、
+    /// MainWindow側のLoadedから一度だけ読み取らせる。
+    /// </summary>
+    internal static string? StartupDocumentPath { get; private set; }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         // 隠密レビューfinding2: DispatcherUnhandledExceptionの購読をTraceLog初期化より前に
@@ -24,6 +31,10 @@ public partial class App : Application
         // MainWindow構築）より前に行い、起動直後のフォーカス遷移も取りこぼさないようにする。
         TraceLog.Initialize(e.Args);
         if (TraceLog.IsEnabled) RegisterTraceClassHandlers();
+
+        // T-123: ファイル関連付け(.gcad)経由の起動で開く文書を決める。MainWindowを構築する
+        // base.OnStartupより前に確定させておく。
+        StartupDocumentPath = StartupArguments.ResolveDocumentPath(e.Args);
 
         base.OnStartup(e);
     }
