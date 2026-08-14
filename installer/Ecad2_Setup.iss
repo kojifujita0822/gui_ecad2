@@ -10,7 +10,7 @@
 ; （SDKが error NETSDK1168 で明確に拒否する。実測確認済み）。
 
 #define AppName      "ecad2"
-#define AppVersion   "0.5.1"
+#define AppVersion   "0.6.0"
 #define AppPublisher "FK TEQUNO"
 #define AppExeName   "Ecad2.App.exe"
 ; ecad2 の文書ファイル。GuiEcad と同じ拡張子を用いる（殿裁定2026-08-14、競合は承知のうえ）。
