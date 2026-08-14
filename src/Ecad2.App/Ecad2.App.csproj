@@ -57,6 +57,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Version>0.5.1</Version>
+    <!-- T-123: アプリアイコン。GuiEcadのAppIcon.icoへ「2」を重ねた意匠（殿裁定2026-08-14＝案C）。
+         16px〜256pxの7サイズを内蔵し、32px以下は「2」が潰れぬよう別寸法で描いてある。 -->
+    <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
 
 </Project>
