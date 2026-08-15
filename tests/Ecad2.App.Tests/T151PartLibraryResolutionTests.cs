@@ -36,7 +36,7 @@ public class T151PartLibraryResolutionTests : ViewModelTestBase
     private const string EmbeddedPartName = "埋込専用テスト部品";
 
     /// <summary>設計書4-1の識別用定義。組込みの既定値と意図的にずらしてある——
-    /// 幅7（組込み15種のいずれとも異なる）・Role=TimerContactNO（既定のContactNOと異なる）・
+    /// 幅7（組込み17種のいずれとも異なる）・Role=TimerContactNO（既定のContactNOと異なる）・
     /// ポート3点（組込み既定の2点と異なる）・Primitives2種（多態シリアライズの実地確認を兼ねる）。</summary>
     private static PartDefinition EmbeddedTimerPart() => new()
     {

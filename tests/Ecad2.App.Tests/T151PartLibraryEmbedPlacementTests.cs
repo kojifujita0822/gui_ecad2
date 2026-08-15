@@ -60,7 +60,7 @@ public class T151PartLibraryEmbedPlacementTests : ViewModelTestBase
         var embedded = vm.Document.Library!.Get(CustomXId);
         Assert.NotNull(embedded);
         Assert.Equal("T151自作X", embedded!.Name);
-        // 幅5は組込み15種のいずれとも異なる。既定値1へ退化していないことを直接示す。
+        // 幅5は組込み17種のいずれとも異なる。既定値1へ退化していないことを直接示す。
         Assert.Equal(5, embedded.WidthCells);
     }
 

@@ -168,6 +168,73 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
         });
     }
 
+    /// <summary>
+    /// 案B（殿ご裁可2026-08-15）＝<b>組込みパーツだけの図面は、開いても埋め込みが起きず汚れぬ</b>。
+    /// <para>
+    /// 当初の実装（案A）は組込みも埋めており、<b>ほぼ全ての既存図面が開いただけで保存を促される</b>
+    /// 状態にあった（侍が実装後に気づき申し出た）。組込みは <c>SeedBasics</c> がどの環境でも展開するゆえ
+    /// 埋める要がなく、むしろ陳腐化した定義を図面へ永久固定する害がある。
+    /// </para>
+    /// <para>
+    /// <b>それでも組込みは解決できる</b>——<c>vm.PartLibrary</c> が「組込みはローカルから／自作は
+    /// 図面の埋め込みから」の合成であるため。ここを取り違えると、コイルもタイマも既定値の
+    /// a接点として振る舞う（実測で既存テスト16件が落ちた）。本テストはその両立を固定する。
+    /// </para></summary>
+    [Fact]
+    public void LoadFromFile_LegacyDocWithBuiltinPartsOnly_DoesNotEmbedAndStaysClean()
+    {
+        var doc = MakeLegacyDocument(BasicPartTemplates.ContactNOId, BasicPartTemplates.CoilId);
+
+        WithLocalPartsAndDocument([], doc, (vm, _) =>
+        {
+            // 埋め込みは起きず、開いただけでは汚れぬ。
+            Assert.Null(vm.Document.Library);
+            Assert.False(vm.IsDirty);
+
+            // それでも組込みは解決できる（ローカルから引くゆえ）。
+            Assert.NotNull(vm.PartLibrary.Get(BasicPartTemplates.ContactNOId));
+            Assert.Equal(PartRole.Coil, vm.PartLibrary.Get(BasicPartTemplates.CoilId)!.Role);
+            Assert.Empty(DesignRuleCheck.CheckUnresolvedPartId(vm.Document, vm.PartLibrary));
+        });
+    }
+
+    /// <summary>案B＝配置の側も対称に。組込みパーツを置いても図面へは埋め込まれぬ。
+    /// <para>既存の <c>PlaceElementAtSelectedCell_BuiltinSymbolOnly_DoesNotTouchDocumentLibrary</c> は
+    /// <c>ElementKind</c> 経路（<c>PartId</c> を持たぬ3極記号等）を測るもので、こちらは
+    /// <b><c>PartId</c> 経路の組込み</b>を測る——組込み17種はこちらを通る。</para></summary>
+    [Fact]
+    public void PlaceElementAtSelectedCell_BuiltinPartById_DoesNotEmbedIntoDocumentLibrary()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 0);
+
+        vm.PlaceElementAtSelectedCell(BasicPartTemplates.CoilId, "CR1", isOr: false);
+
+        Assert.Single(vm.Document.Sheets[0].Elements);
+        Assert.Null(vm.Document.Library);
+        // 組込みは解決できるゆえ、機器分類も正しく付く（a接点へ化けておらぬことの裏づけ）。
+        Assert.Equal(DeviceClass.Relay, vm.Document.Devices.ByName["CR1"].Class);
+    }
+
+    /// <summary>案B＝自作と組込みが混在する図面では、自作だけが埋め込まれる。</summary>
+    [Fact]
+    public void LoadFromFile_MixedCustomAndBuiltin_EmbedsOnlyCustomParts()
+    {
+        var doc = MakeLegacyDocument(PartAId, BasicPartTemplates.ContactNOId);
+
+        WithLocalPartsAndDocument([PartA()], doc, (vm, _) =>
+        {
+            Assert.NotNull(vm.Document.Library);
+            var embedded = Assert.Single(vm.Document.Library!.ById);
+            Assert.Equal(PartAId, embedded.Key);
+            // 自作が1件でも埋まれば文書は汚れる（保存を促す）。
+            Assert.True(vm.IsDirty);
+            // 組込みは埋め込まれておらぬが解決はできる。
+            Assert.NotNull(vm.PartLibrary.Get(BasicPartTemplates.ContactNOId));
+        });
+    }
+
     /// <summary>9-6節5行目＝新規文書（要素0件）はバックフィルの対象が無く <c>Library</c> は null のまま。
     /// 遅延初期化を不必要に起こさぬことの境界確認。</summary>
     [Fact]

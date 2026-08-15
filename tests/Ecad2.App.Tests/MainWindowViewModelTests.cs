@@ -421,13 +421,15 @@ public class MainWindowViewModelTests : ViewModelTestBase
     public void PlaceElementAtSelectedCell_WithNonSimulatedCustomPart_SetsDeviceClassOther()
     {
         var vm = CreateViewModel();
-        vm.NewDocument();
-        vm.PartLibrary.ById["custom-nonsim"] = new PartDefinition
+        // T-151: 自作パーツは「図形/自作」フォルダに在ることで自作と認識される（Category判定）。
+        // 従前の vm.PartLibrary.ById への直接代入では自作と見なされず、図面への埋め込みも起きぬ。
+        vm.PartPalette.SaveNewPart(new PartDefinition
         {
             Id = "custom-nonsim",
             Name = "テスト非シミュレート",
             Role = PartRole.NonSimulated,
-        };
+        });
+        vm.NewDocument();
         vm.SelectedCell = new GridPos(0, 0);
 
         vm.PlaceElementAtSelectedCell("custom-nonsim", "M1", isOr: false);

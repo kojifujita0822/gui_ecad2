@@ -30,23 +30,24 @@ public class T136SheetAffinityTests : ViewModelTestBase
         return vm;
     }
 
-    /// <summary>配置に使う自作パーツをローカルのカタログへ登録する。
+    /// <summary>配置に使う自作パーツを「図形/自作」フォルダへ登録する。
     /// <para>
-    /// <b>【T-151で登録先を改めた】</b>従前は <c>vm.PartLibrary.ById</c> へ入れていた。当時は
-    /// <c>vm.PartLibrary</c> が <c>PartPalette.Library</c> と同一インスタンスだったため、
-    /// これで「カタログへ登録する」意味になっていた。T-151以降 <c>vm.PartLibrary</c> は
-    /// 図面の埋め込み（<c>Document.Library</c>）を指すため、<b>配置の解決には届かぬ</b>
-    /// ——配置時に引かれるのはカタログ側ゆえ、そちらへ直に入れる。
+    /// <b>【T-151で登録の仕方を改めた】</b>従前は <c>vm.PartLibrary.ById</c> へ直に入れていた。
+    /// 当時は <c>vm.PartLibrary</c> が <c>PartPalette.Library</c> と同一インスタンスだったため、
+    /// これで「カタログへ登録する」意味になっていた。T-151以降は
+    /// <b>自作か組込みかを <c>Category</c>（フォルダの物理配置）で見分ける</b>ため、
+    /// 辞書へ直に入れるだけでは自作と認識されず、図面への埋め込みも起きぬ。
+    /// <c>SaveNewPart</c> で実際に自作フォルダへ書けば、<c>Entries</c> に <c>Category="自作"</c> で載る。
     /// <b>テストの意図（枷に合うシートにのみ置けること）は変えていない。</b>
     /// </para></summary>
     private static void RegisterPart(MainWindowViewModel vm, string id, SheetAffinity affinity)
-        => vm.PartPalette.Library.ById[id] = new PartDefinition
+        => vm.PartPalette.SaveNewPart(new PartDefinition
         {
             Id = id,
             Name = $"検体({affinity})",
             Role = PartRole.NonSimulated,
             SheetAffinity = affinity,
-        };
+        });
 
     // ==================================================================
     // 配置（PartId 経路）
@@ -120,7 +121,9 @@ public class T136SheetAffinityTests : ViewModelTestBase
         vm.SelectedCell = PlacePos;
 
         // 置いた後で部品定義の側を「主回路専用」へ変える（殿が後から枷を設定なさる運用）。
-        vm.PartLibrary.ById["p1"].SheetAffinity = SheetAffinity.MainCircuitOnly;
+        // T-151: 自作パーツの解決基準は図面の埋め込み側ゆえ、そちらを書き換える
+        // （ローカルを書き換えても図面側は配置時点の値のまま——それが本タスクの仕様にござる）。
+        vm.Document.Library!.ById["p1"].SheetAffinity = SheetAffinity.MainCircuitOnly;
 
         Assert.False(vm.MoveSelectedElement(deltaRow: 1, deltaColumn: 0));
         Assert.Equal(PlacePos, vm.CurrentSheet!.Elements[0].Pos);   // その場に留まる

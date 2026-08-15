@@ -2911,17 +2911,6 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// (設計出典: docs/ecad2-t051-implementation-plan-samurai.md)。</summary>
     public UndoManager UndoManager { get; } = new();
 
-    /// <summary>文書が <see cref="LadderDocument.Library"/> を持たぬ間だけ返す空のライブラリ（T-151）。
-    /// <para>
-    /// 空の文書（要素0件の新規作成）では埋め込みを起こさぬのが仕様ゆえ（設計書9-6節
-    /// <c>NewDocument_NoElements_LibraryStaysNull</c>）、<see cref="PartLibrary"/> を読んだだけで
-    /// <c>Document.Library</c> を作ってはならぬ。かといって null を返せば下流すべてが nullable になる。
-    /// ゆえに「読み取り専用に使われる空の器」をインスタンスごとに1つ持つ。
-    /// <b>static にしておらぬのは</b>、万一誰かが書き込んだ場合に他の ViewModel・他のテストまで
-    /// 汚染されるのを構造で防ぐため。
-    /// </para></summary>
-    private readonly PartLibrary _emptyLibrary = new();
-
     /// <summary>
     /// 現在使用可能な自作パーツライブラリ。
     /// DiagramRenderer.Render / LadderCanvas.Draw に渡し、PartResolver の解決にも使う。
@@ -2933,11 +2922,56 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 「<c>.gcad</c> は自己完結（portable）」という設計へ戻した（殿ご裁可2026-08-14＝案(a)原本回帰）。
     /// </para>
     /// <para>
-    /// <b>【ローカル側（<c>PartPalette.Library</c>）の役目】</b>新規配置時の選択肢を出すカタログ役に
-    /// 限られる。既存要素の解決には用いぬ——用いれば「ローカルにある環境でだけ正しく見える」という
-    /// 元の症状へ戻る。配置の瞬間にカタログから図面へ定義を写し、以後はその写しだけを見る。
+    /// <b>【組込みと自作で出所が違う】</b>（殿ご裁可2026-08-15＝案B）
+    /// <list type="bullet">
+    /// <item><b>自作パーツ</b>＝図面の埋め込み（<c>Document.Library</c>）が唯一の基準。ローカルへは
+    /// 一切戻らぬ——戻れば「手元にある環境でだけ正しく見える」という元の症状へ帰る。</item>
+    /// <item><b>組込み17種</b>＝ローカルのカタログから引く。<c>PartFolderStore.SeedBasics</c> が起動のたび
+    /// 無条件・冪等に展開するゆえ<b>どの環境にも必ず在る</b>。図面へ焼き付けると、陳腐化した時点の
+    /// 定義を永久に固定してしまう（後追い補正が3度入っておる＝<c>PartFolderStore.cs:77-121</c>）。</item>
+    /// </list>
+    /// これは二段解決（ローカル優先・埋め込みはフォールバック）ではない。<b>フォールバックの向きが
+    /// 逆であり、自作については図面側しか見ぬ</b>——組込みは「どの環境にも在る既知の集合」ゆえ
+    /// 別系統として引くだけである。
+    /// </para>
+    /// <para>
+    /// <b>【組込みも図面から引かせると何が壊れるか】</b>組込みパーツも <c>PartId</c> 経路で配置され、
+    /// その要素の <see cref="ElementInstance.Kind"/> は既定値 <see cref="ElementKind.ContactNO"/> のまま
+    /// である（T-046由来の構造的制約、<c>ElementCatalog.cs:84-88</c>）。定義を引けねば
+    /// <c>PartResolver</c> は <c>Kind</c> へ静かに落ち、<b>コイルもランプもタイマも端子台も
+    /// a接点として振る舞う</b>——実測で既存テスト16件が落ちた（侍2026-08-15）。
+    /// </para>
+    /// <para>
+    /// <b>【ローカル側（<c>PartPalette.Library</c>）の役目】</b>組込みの供給元と、新規配置時の
+    /// 選択肢を出すカタログ役。<b>自作パーツの解決には用いぬ。</b>
     /// </para></summary>
-    public PartLibrary PartLibrary => Document.Library ?? _emptyLibrary;
+    public PartLibrary PartLibrary
+    {
+        get
+        {
+            // 組込みはローカルから。自作は図面の埋め込みで上書きする
+            // ——同じ Id が両方に在る場合、図面側が勝つのが案(a)原本回帰の要。
+            var resolved = new PartLibrary();
+            foreach (string builtinId in BuiltinPartIds)
+                if (PartPalette.Library.Get(builtinId) is { } builtin) resolved.ById[builtinId] = builtin;
+            if (Document.Library is { } embedded)
+                foreach (var pair in embedded.ById) resolved.ById[pair.Key] = pair.Value;
+            return resolved;
+        }
+    }
+
+    /// <summary>組込みパーツ（<see cref="BasicPartTemplates"/> が同梱する固定Id）の集合（T-151＝案B'）。
+    /// <para>
+    /// 組込みか自作かの弁別に用いる。<b>フォルダの物理配置（<c>Category</c>）に依らぬ</b>のが要で、
+    /// 手動で「図形/」直下へ置かれた自作パーツも正しく自作として扱える（家老裁定2026-08-15）。
+    /// </para>
+    /// <para>
+    /// <c>PartFolderStore.Enumerate</c> がこの固定Idとの突合で正規化・書き戻しを行う（<c>:85,96,115</c>）ため、
+    /// 展開済みファイルの側でもIdは保たれる。組込みをコピーして作った自作パーツはId重複検出で
+    /// 再採番される（T-035）ゆえ、本集合に含まれず自作として扱われる。
+    /// </para></summary>
+    private static readonly HashSet<string> BuiltinPartIds =
+        BasicPartTemplates.All().Select(p => p.Id).ToHashSet(StringComparer.Ordinal);
 
     /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。
     /// cellWidth>1(Motor等)の場合、占有列範囲[pos.Column, pos.Column+cellWidth-1]と既存要素の占有列範囲
@@ -3220,6 +3254,29 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// その Id が<b>自作パーツ</b>（「図形/自作」配下）であればその定義を返す。組込み17種なら null（T-151＝
+    /// 殿ご裁可2026-08-15＝案B。埋め込みの対象を自作のみに絞る）。
+    /// <para>
+    /// <b>【なぜ組込みを埋めぬか】</b>(1) 組込みは <c>PartFolderStore.SeedBasics</c> が起動のたび
+    /// 無条件・冪等に走るゆえ、どの環境でも必ず解決できる。(2) <b>組込み定義はローカルファイルとして
+    /// 陳腐化しうる</b>——<c>SeedBasics</c> は既存ファイルを上書きせぬため、コード側の修正が展開済み
+    /// ファイルへ届かず、後追いの補正が3度入っておる（<c>PartFolderStore.cs:77-121</c>＝T-037
+    /// <c>IsOrEligible</c>／T-061 <c>SelectSwitch</c> Role／T-143 モータ <c>PortKind</c>）。
+    /// 組込みまで埋めれば、<b>陳腐化した時点の定義を図面へ永久に固定してしまう</b>。
+    /// (3) 全ての図面が開いただけで <c>IsDirty</c> になるのを避ける。
+    /// </para>
+    /// <para>
+    /// <b>【<c>Category</c> でなく固定Id集合で見分ける理由】</b>（家老裁定2026-08-15、隠密の提案）
+    /// <c>Category</c> はフォルダの物理配置に依るゆえ、Explorer 等で <c>.gcadpart</c> を「図形/」直下へ
+    /// 手で置いた「実質自作だが <c>Category=""</c>」を組込みと誤って分類する。
+    /// <see cref="BuiltinPartIds"/> は版に依らず閉じた集合ゆえ、フォルダ配置に左右されず、
+    /// その稀な経路も正しく自作側（図面へ埋め込む）へ回る。
+    /// </para></summary>
+    private PartDefinition? ResolveCustomPartDefinition(string? partId)
+        => partId is null or "" || BuiltinPartIds.Contains(partId) ? null
+         : PartPalette.Library.Get(partId);
+
+    /// <summary>
     /// 文書を開いた折、まだ埋め込まれておらぬ要素の定義をローカルから一括で写す（T-151＝案Y'、
     /// 殿ご裁可2026-08-15）。<b>埋め込んだ件数を返す</b>（呼び手が <c>IsDirty</c> の扱いを決めるため）。
     /// <para>
@@ -3242,7 +3299,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             {
                 if (element.PartId is not string partId || partId.Length == 0) continue;
                 if (Document.Library?.ById.ContainsKey(partId) == true) continue;
-                if (PartPalette.Library.Get(partId) is not PartDefinition local) continue;
+                // 案B＝自作パーツのみ。配置時（上の PlaceElementAtSelectedCell）と同じ判定を用いる
+                // ——片方だけ絞れば横展開漏れになり、開いた時と置いた時で埋まる範囲が食い違う。
+                if (ResolveCustomPartDefinition(partId) is not PartDefinition local) continue;
 
                 EmbedPartDefinition(local);
                 embedded++;
@@ -3319,7 +3378,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 図面に孤児として残る(隠密の申し送り＝設計書7-1節、`P-186`)。後に置けばスナップショットは
         // 埋め込み前の状態を写すゆえ、Undoで定義もろとも巻き戻る。スコープ外の対処ではなく、
         // 挿入位置の選択でそもそも孤児を生まぬ形にしたもの。
-        if (definition is not null) EmbedPartDefinition(definition);
+        // 【T-151案B（殿ご裁可2026-08-15）】埋めるのは自作パーツのみ。組込み17種は SeedBasics が
+        // どの環境でも展開するゆえ埋める要がなく、むしろ陳腐化した定義を固定する害がある。
+        if (ResolveCustomPartDefinition(partId) is PartDefinition custom) EmbedPartDefinition(custom);
 
         sheet.Elements.Add(newElement);
         MarkDirty();
