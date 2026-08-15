@@ -355,9 +355,17 @@ public class T133CellHeightPlacementTests : ViewModelTestBase
     // 「パーツエディタでは枠が 2h-1 行に広がるのに、図面では1行しか占有せぬ」食い違いが出る。
     // ==================================================================
 
-    /// <summary>指定の高さを持つ自作パーツを PartLibrary へ登録する。</summary>
+    /// <summary>指定の高さを持つ自作パーツをローカルのカタログへ登録する。
+    /// <para>
+    /// <b>【T-151で登録先を改めた】</b>従前は <c>vm.PartLibrary.ById</c> へ入れていた。当時は
+    /// <c>vm.PartLibrary</c> が <c>PartPalette.Library</c> と同一インスタンスだったため、
+    /// これで「カタログへ登録する」意味になっていた。T-151以降 <c>vm.PartLibrary</c> は
+    /// 図面の埋め込み（<c>Document.Library</c>）を指すため、<b>配置時の高さ・幅の解決には届かぬ</b>
+    /// ——配置時に引かれるのはカタログ側ゆえ、そちらへ直に入れる。
+    /// <b>テストの意図（自作パーツの高さが配置した要素へ入ること）は変えていない。</b>
+    /// </para></summary>
     private static void RegisterCustomPart(MainWindowViewModel vm, string id, int heightCells, int widthCells = 1)
-        => vm.PartLibrary.ById[id] = new PartDefinition
+        => vm.PartPalette.Library.ById[id] = new PartDefinition
         {
             Id = id,
             Name = $"高さ{heightCells}の検体",

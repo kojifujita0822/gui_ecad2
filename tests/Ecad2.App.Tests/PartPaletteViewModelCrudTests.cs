@@ -84,8 +84,21 @@ public class PartPaletteViewModelCrudTests : ViewModelTestBase
     }
 
     /// <summary>T-068増分1核心: Refresh(内部Load再実行)後もLibraryインスタンス自体は差し替わらない
-    /// ことを保証する(MainWindowViewModel.PartLibraryが同一インスタンス参照のまま最新化される
-    /// 設計の根拠、実装中にUndoスタック同様の見落としを避けるため明示的に固定した回帰テスト)。</summary>
+    /// ことを保証する(実装中にUndoスタック同様の見落としを避けるため明示的に固定した回帰テスト)。
+    /// <para>
+    /// <b>【T-151で主張を一つ落とした】</b>従前はここに
+    /// <c>Assert.Same(libraryBefore, vm.PartLibrary)</c> の一行があり、
+    /// 「<c>MainWindowViewModel.PartLibrary</c> が同一インスタンス参照のまま最新化される」ことを
+    /// 併せて固定していた。T-151（殿ご裁可2026-08-14＝案(a)原本回帰）で
+    /// <c>vm.PartLibrary</c> の指す先が図面の埋め込み（<c>Document.Library</c>）へ移ったため、
+    /// <b>この主張自体が成り立たなくなった</b>——文書を開き直せば別のインスタンスになるのが
+    /// 新しい設計の要であり、同一性を固定すれば逆に誤りを守る網になる。
+    /// </para>
+    /// <para>
+    /// <b>残した側（<c>palette.Library</c> の同一性）は今も生きている</b>——
+    /// <c>PartPaletteViewModel.Load</c> が <c>ById</c> の中身だけを入れ替えてインスタンスを保つ設計は
+    /// カタログ側にそのまま残っており、本テストはそちらの回帰を引き続き守る。
+    /// </para></summary>
     [Fact]
     public void SaveNewPart_KeepsSameLibraryInstance()
     {
@@ -96,6 +109,5 @@ public class PartPaletteViewModelCrudTests : ViewModelTestBase
         palette.SaveNewPart(new PartDefinition { Name = "参照確認用", WidthCells = 1, HeightCells = 1, Role = PartRole.ContactNO });
 
         Assert.Same(libraryBefore, palette.Library);
-        Assert.Same(libraryBefore, vm.PartLibrary);
     }
 }

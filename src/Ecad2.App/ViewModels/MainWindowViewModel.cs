@@ -2911,12 +2911,33 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// (設計出典: docs/ecad2-t051-implementation-plan-samurai.md)。</summary>
     public UndoManager UndoManager { get; } = new();
 
+    /// <summary>文書が <see cref="LadderDocument.Library"/> を持たぬ間だけ返す空のライブラリ（T-151）。
+    /// <para>
+    /// 空の文書（要素0件の新規作成）では埋め込みを起こさぬのが仕様ゆえ（設計書9-6節
+    /// <c>NewDocument_NoElements_LibraryStaysNull</c>）、<see cref="PartLibrary"/> を読んだだけで
+    /// <c>Document.Library</c> を作ってはならぬ。かといって null を返せば下流すべてが nullable になる。
+    /// ゆえに「読み取り専用に使われる空の器」をインスタンスごとに1つ持つ。
+    /// <b>static にしておらぬのは</b>、万一誰かが書き込んだ場合に他の ViewModel・他のテストまで
+    /// 汚染されるのを構造で防ぐため。
+    /// </para></summary>
+    private readonly PartLibrary _emptyLibrary = new();
+
     /// <summary>
-    /// 現在使用可能な自作パーツライブラリ。PartPalette.Library(T-015隠密レビュー指摘#2で
-    /// PartPaletteViewModel側に構築を一本化)をそのまま参照する。DiagramRenderer.Render /
-    /// LadderCanvas.Draw に渡し、要素配置時（T-016）の PartResolver 解決にも使う。
-    /// </summary>
-    public PartLibrary PartLibrary { get; }
+    /// 現在使用可能な自作パーツライブラリ。
+    /// DiagramRenderer.Render / LadderCanvas.Draw に渡し、PartResolver の解決にも使う。
+    /// <para>
+    /// <b>【T-151で基準が変わった】</b>従来は <c>PartPalette.Library</c>（起動時にローカルフォルダから
+    /// 構築するカタログ）をそのまま参照しており、図面を他所の環境へ持っていくと定義が解決できず
+    /// a接点へ黙って化けていた（<c>P-183</c>）。<b>本タスク以降は図面に埋め込まれた定義
+    /// （<see cref="LadderDocument.Library"/>）が唯一の解決基準である</b>——原本GuiEcadと同じ
+    /// 「<c>.gcad</c> は自己完結（portable）」という設計へ戻した（殿ご裁可2026-08-14＝案(a)原本回帰）。
+    /// </para>
+    /// <para>
+    /// <b>【ローカル側（<c>PartPalette.Library</c>）の役目】</b>新規配置時の選択肢を出すカタログ役に
+    /// 限られる。既存要素の解決には用いぬ——用いれば「ローカルにある環境でだけ正しく見える」という
+    /// 元の症状へ戻る。配置の瞬間にカタログから図面へ定義を写し、以後はその写しだけを見る。
+    /// </para></summary>
+    public PartLibrary PartLibrary => Document.Library ?? _emptyLibrary;
 
     /// <summary>SelectedCellの行に既に要素が置かれているか判定する(T-026段階4: 配置行は空き行限定、行挿入はしない)。
     /// cellWidth>1(Motor等)の場合、占有列範囲[pos.Column, pos.Column+cellWidth-1]と既存要素の占有列範囲
@@ -3158,16 +3179,76 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 制約)ため本分岐で個別に判定していたが、専用Role(PartRole.SelectSwitch)追加によりRole条件
     /// をそちらへ書き換える(docs/ecad2-t061-a1-select-switch-design-onmitsu.md 2-2節、横展開必須)。
     /// 本来はComponentKind経由(MapToDeviceClass)でも正しく解決されるようになるが、分岐自体の削除は
-    /// 範囲拡大回避のため見送り、条件値の書き換えのみに留める(同節、家老裁定=最小修正)。</summary>
+    /// 範囲拡大回避のため見送り、条件値の書き換えのみに留める(同節、家老裁定=最小修正)。
+    /// <para>
+    /// <b>【T-151＝殿ご裁可2026-08-15（案2）でその分岐を削った】</b>上の「見送り」を引き直したもの。
+    /// 当時の裁定は「<c>Category</c> が引ける」ことを前提にしていたが、解決の基準が
+    /// <see cref="LadderDocument.Library"/> へ移ると前提自体が崩れる——<c>Category</c> は
+    /// フォルダの物理配置に属す属性であり <see cref="PartDefinition"/> は持たぬゆえ、
+    /// 図面へ埋め込んだ定義からは引きようがない。<b>範囲拡大を許したのではなく、前提が変わった</b>。
+    /// </para>
+    /// <para>
+    /// <b>【削っても結果が変わらぬ根拠】</b><c>PartResolver.ComponentKind</c> の
+    /// <c>PartRole.SelectSwitch =&gt; ElementKind.SelectSwitch</c> と、下の <see cref="MapToDeviceClass"/> の
+    /// <c>ElementKind.SelectSwitch =&gt; DeviceClass.SelectSwitch</c> が既に在り、同じ結果へ届く。
+    /// <b>両者とも <c>IsOrEligible</c> を一切参照せぬ</b>ゆえ、旧分岐の <c>IsOrEligible:false</c> 条件は
+    /// その組が実在するか否かに関わらず結果へ影響し得ない（侍が写像を、隠密が全文精読で不参照を確認）。
+    /// 回帰の網は <c>MainWindowViewModelTests.SelectSwitchClassificationCases</c> のケースA〜E。
+    /// </para></summary>
     private DeviceClass ResolveDeviceClass(ElementInstance element)
-    {
-        var entry = PartPalette.Entries.FirstOrDefault(e => e.Definition.Id == element.PartId);
-        if (entry is { Category: "", Definition.Role: PartRole.SelectSwitch, Definition.IsOrEligible: false })
-            return DeviceClass.SelectSwitch;
-
-        return PartResolver.CreatesComponent(element, PartLibrary)
+        => PartResolver.CreatesComponent(element, PartLibrary)
             ? MapToDeviceClass(PartResolver.ComponentKind(element, PartLibrary))
             : DeviceClass.Other;
+
+    /// <summary>
+    /// パーツ定義を図面へ埋め込む（T-151）。既に同じ Id が埋め込まれていれば<b>何もせぬ</b>。
+    /// <para>
+    /// <b>【上書きせぬ理由】</b>図面に入っている定義こそが真実源である（殿ご裁可＝案(a)原本回帰）。
+    /// ローカルの現在値で上書きすれば、他所から受け取った図面を開いただけで手元の同名パーツへ
+    /// すり替わり、<b>移植性という本タスクの眼目がそのまま壊れる</b>。
+    /// </para>
+    /// <para>
+    /// <b>【値で写す】</b><c>PartLibrarySerializer.CloneOne</c> で複製してから入れる。参照を共有すると
+    /// ローカル側を編集した瞬間に図面側まで一緒に変わり、「保存時点の定義が図面に固定される」という
+    /// 仕様が成り立たなくなる。
+    /// </para></summary>
+    private void EmbedPartDefinition(PartDefinition definition)
+    {
+        Document.Library ??= new PartLibrary();
+        if (Document.Library.ById.ContainsKey(definition.Id)) return;
+        Document.Library.ById[definition.Id] = PartLibrarySerializer.CloneOne(definition);
+    }
+
+    /// <summary>
+    /// 文書を開いた折、まだ埋め込まれておらぬ要素の定義をローカルから一括で写す（T-151＝案Y'、
+    /// 殿ご裁可2026-08-15）。<b>埋め込んだ件数を返す</b>（呼び手が <c>IsDirty</c> の扱いを決めるため）。
+    /// <para>
+    /// <b>【なぜ開いた瞬間に行うか】</b>これが無いと、T-151以前に作られた図面（<c>Library</c> なし）へ
+    /// 部品を一つ置いた瞬間、<see cref="PartLibrary"/> の基準が図面側へ移り、<b>元から在った要素が
+    /// 揃って解決不能になる</b>——本タスクが直そうとしている症状を、修正自体が新たに生む形になる。
+    /// 配置の瞬間に一括で写す案も検討されたが（侍の当初案）、無関係な1個の配置が既存要素の
+    /// ローカル現在値まで問答無用で凍結する不意打ちがあるため、殿は開封時を選ばれた。
+    /// </para>
+    /// <para>
+    /// <b>【ローカルにも無い Id は対象外】</b>定義が失われている以上どこからも復元できぬ。
+    /// 従来どおり <c>DRC-PART-001</c> が拾う（設計書9-5(a)）。
+    /// </para></summary>
+    private int BackfillDocumentLibraryFromLocalCatalog()
+    {
+        int embedded = 0;
+        foreach (var sheet in Document.Sheets)
+        {
+            foreach (var element in sheet.Elements)
+            {
+                if (element.PartId is not string partId || partId.Length == 0) continue;
+                if (Document.Library?.ById.ContainsKey(partId) == true) continue;
+                if (PartPalette.Library.Get(partId) is not PartDefinition local) continue;
+
+                EmbedPartDefinition(local);
+                embedded++;
+            }
+        }
+        return embedded;
     }
 
     /// <summary>
@@ -3179,7 +3260,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
         // T-071バグ修正: Motor(WidthCells=3)等の複数セル幅パーツに対応するため、配置するパーツの
         // WidthCellsをPartLibraryから取得する(既定1、基本図形の大半は1セル幅のまま)。
-        var definition = PartLibrary.Get(partId);
+        //
+        // 【T-151で引き先が変わった】ここは PartLibrary(=図面の埋め込み)ではなく
+        // PartPalette.Library(ローカルのカタログ)から引く——これから置く部品は、まだ図面へ
+        // 写されておらぬゆえ図面側からは引けぬ。配置の導線は6本ともパレットの Entries を経る
+        // (侍の実測2026-08-15)ゆえ、カタログから引けば必ず当たる。
+        // 写しは下の RecordSnapshot の後で図面へ入れ、以後の解決はそちらが受け持つ。
+        var definition = PartPalette.Library.Get(partId);
         int cellWidth = definition?.WidthCells ?? 1;
         // T-133増分4(殿裁定2026-07-28、隠密の静的レビュー所見1): 自作パーツの高さも結線する。
         // 増分3までは幅のみ供給源(PartDefinition)から取り、高さは1固定という非対称が残っていた。
@@ -3212,8 +3299,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 【要素を先に作ってよい理由】ValidatePlacement で拒まれれば Elements へ加えぬまま捨てる。
         // UndoManager.RecordSnapshot は Document を写すが、この時点で要素はまだシートに載っておらぬ
         // ゆえ、スナップショットの中身も従来と変わらぬ。
+        // T-151: ここも上の definition と同じくカタログ側から引く。図面へ写す前ゆえ PartLibrary では
+        // 解決できず、渡せば ElementCatalog の既定(Any)へ静かに落ちてシート種別の枷が効かなくなる。
         if (!ValidatePlacement(pos, cellWidth, cellHeight, sheet,
-                               PartResolver.SheetAffinityOf(newElement, PartLibrary))) return;
+                               PartResolver.SheetAffinityOf(newElement, PartPalette.Library))) return;
 
         // T-134(明記なき漏れ#1、殿裁定2026-07-28=(U-1)): 要素の配置をUndo対象へ加える。
         // ValidatePlacement(直上)を通過した後に置くことで、占有済み・グリッド範囲外で配置が拒否
@@ -3223,6 +3312,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 宙ぶらりんな配置済み状態」が復活してしまうため。
         UndoManager.RecordSnapshot(Document);
         int undoDepthAfterPlacement = UndoManager.UndoDepth;
+
+        // T-151: 配置と同時に定義を図面へ埋め込む(原本GuiEcad MainPage.Parts.cs の
+        // `_document.Library ??= new(); _document.Library.ById[id] = def;` に対応)。
+        // 【RecordSnapshotより後に置く理由】前に置けば、配置をUndoで取り消しても埋め込みだけが
+        // 図面に孤児として残る(隠密の申し送り＝設計書7-1節、`P-186`)。後に置けばスナップショットは
+        // 埋め込み前の状態を写すゆえ、Undoで定義もろとも巻き戻る。スコープ外の対処ではなく、
+        // 挿入位置の選択でそもそも孤児を生まぬ形にしたもの。
+        if (definition is not null) EmbedPartDefinition(definition);
 
         sheet.Elements.Add(newElement);
         MarkDirty();
@@ -3701,6 +3798,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         UndoManager.Clear();
         // 新規/開く直後は未保存の変更が無い状態(IsDirty=false)から始まる。
         IsDirty = false;
+        // T-151(案Y'、殿ご裁可2026-08-15): 開いた瞬間に、まだ埋め込まれておらぬ定義をローカルから写す。
+        // 【この位置＝IsDirty=false より後でなければならぬ】前に置けば直上の代入に黙って上書きされ、
+        // 移行が済んだのに保存を促さぬまま閉じられる——次に他所で開けば同じ症状が再発する
+        // (隠密が設計書9-5(b)で予告した罠。7-1節のUndo孤児と同型の「リセット処理との前後関係」)。
+        // 【新規作成では発火せぬ】要素0件ゆえ写す対象が無く、Library は null のまま・IsDirty も false のまま。
+        if (BackfillDocumentLibraryFromLocalCatalog() > 0) IsDirty = true;
     }
 
     /// <summary>本番用。実MyDocuments配下(PartFolderStore.CreateDefault())を使う。</summary>
@@ -3729,9 +3832,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         SheetNavigation = new SheetNavigationViewModel(this, dispatcherService);
         PartPalette = new PartPaletteViewModel(partFolderStore, pinnedPartStore);
-        // T-015隠密レビュー指摘#2: PartPaletteViewModel.Libraryと同一ロジックの重複構築だったため、
-        // 構築元(PartPaletteViewModel)へ一本化し、ここでは公開済みのLibraryをそのまま使う。
-        PartLibrary = PartPalette.Library;
+        // T-151: ここに在った `PartLibrary = PartPalette.Library;` を落とした。解決の基準は
+        // 図面側(Document.Library)へ移り、PartLibrary は都度そちらを返す算出プロパティになった
+        // ——生成時に固定してしまうと、文書を開き直しても古い文書の定義を見続けることになる。
         DeviceTable = new DeviceTableViewModel(Document.Devices);
         OutputPanel = new OutputPanelViewModel(this);
         Find = new FindViewModel(this);

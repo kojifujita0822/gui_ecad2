@@ -30,8 +30,17 @@ public class T136SheetAffinityTests : ViewModelTestBase
         return vm;
     }
 
+    /// <summary>配置に使う自作パーツをローカルのカタログへ登録する。
+    /// <para>
+    /// <b>【T-151で登録先を改めた】</b>従前は <c>vm.PartLibrary.ById</c> へ入れていた。当時は
+    /// <c>vm.PartLibrary</c> が <c>PartPalette.Library</c> と同一インスタンスだったため、
+    /// これで「カタログへ登録する」意味になっていた。T-151以降 <c>vm.PartLibrary</c> は
+    /// 図面の埋め込み（<c>Document.Library</c>）を指すため、<b>配置の解決には届かぬ</b>
+    /// ——配置時に引かれるのはカタログ側ゆえ、そちらへ直に入れる。
+    /// <b>テストの意図（枷に合うシートにのみ置けること）は変えていない。</b>
+    /// </para></summary>
     private static void RegisterPart(MainWindowViewModel vm, string id, SheetAffinity affinity)
-        => vm.PartLibrary.ById[id] = new PartDefinition
+        => vm.PartPalette.Library.ById[id] = new PartDefinition
         {
             Id = id,
             Name = $"検体({affinity})",

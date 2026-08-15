@@ -316,6 +316,29 @@ public class MainWindowViewModelTests : ViewModelTestBase
             true, // 自作フォルダ(Category=="自作")
             DeviceClass.Relay,
         };
+
+        // E: 自作セレクトSW(自作フォルダ、Role=SelectSwitch・IsOrEligible=true)。
+        // T-151(隠密テスト設計 docs/ecad2-t151-test-design-onmitsu.md 6-4節、殿ご裁可2026-08-15=案2)で追加。
+        // 案2＝ResolveDeviceClassのCategoryゲート分岐を削りComponentKind経由へ一本化する。その安全性の
+        // 論拠そのものを固定する仮想ケースである——PartResolver.ComponentKind(:106-126)の
+        // PartRole.SelectSwitch=>ElementKind.SelectSwitch と MapToDeviceClass の
+        // ElementKind.SelectSwitch=>DeviceClass.SelectSwitch は、いずれもIsOrEligibleを一切参照せぬ。
+        // ゆえにIsOrEligibleの値によらず結果は変わらぬ。
+        // 【現存せぬ組み合わせを敢えて測る理由】BasicPartTemplatesにこの組は無い(隠密がgrepで確認済み、
+        // IsOrEligible=trueは2箇所ともContactNO/ContactNC)。将来この組が生まれた時の網として置く。
+        // 【Category=="自作"を選んだ意味】案2適用の前後で経路が変わらぬことを示す——自作フォルダゆえ
+        // Categoryゲート(Category=="")は元より通らず、削除前も削除後もComponentKind経由で解決される。
+        yield return new object[]
+        {
+            "custom-select-switch-or-eligible-guid",
+            new PartDefinition
+            {
+                Id = "custom-select-switch-or-eligible-guid", Name = "自作セレクトSW", Role = PartRole.SelectSwitch,
+                IsOrEligible = true, Ports = new() { new PortDef("L", 0, 0), new PortDef("R", 0, 1) },
+            },
+            true, // 自作フォルダ(Category=="自作")
+            DeviceClass.SelectSwitch,
+        };
     }
 
     /// <summary>customDefinitionが指定されたケース(B/D)は、PartFolderStoreの一時フォルダへ実際に

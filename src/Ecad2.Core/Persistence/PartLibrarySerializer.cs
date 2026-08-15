@@ -71,4 +71,22 @@ public static class PartLibrarySerializer
         part.Primitives = PartOptimizer.MergeCollinearLines(part.Primitives);
         return part;
     }
+
+    /// <summary>
+    /// パーツ定義を値として複製する（T-151）。図面へ定義を埋め込む際、ローカル側の実体と
+    /// 参照を共有せぬようにするために使う。
+    /// <para>
+    /// <b>【なぜ JSON 往復で写すか】</b>手書きのコピーは <see cref="PartDefinition"/> へ
+    /// フィールドが増えたときに黙って漏れる。JSON 往復なら新しいフィールドも自動で追従し、
+    /// <c>[JsonPolymorphic]</c> の <see cref="PartPrimitive"/> 6種も型ごと正しく複製される
+    /// （<see cref="PartPolyline"/> が持つ <c>double[]</c> のような可変の器も、往復すれば別の実体になる）。
+    /// </para>
+    /// <para>
+    /// <b>【<see cref="DeserializeOne"/> を使わぬ理由】</b>あちらは読み込み時に
+    /// <c>PartOptimizer.MergeCollinearLines</c> を掛けるため、<b>複製の過程で図形が変わりうる</b>。
+    /// 「配置した時点の定義をそのまま固定する」という本用途では、写した先が元と違ってはならぬ。
+    /// </para></summary>
+    public static PartDefinition CloneOne(PartDefinition part)
+        => JsonSerializer.Deserialize<PartDefinition>(SerializeOne(part), JsonOptions.Default)
+           ?? throw new InvalidDataException("Failed to clone part definition.");
 }
