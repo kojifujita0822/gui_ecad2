@@ -3761,6 +3761,23 @@ public sealed class MainWindowViewModel : ViewModelBase
         var oldSelectedSheet = SheetNavigation.SelectedSheet;
 
         Document = newDocument;
+        // T-151(案Y'、殿ご裁可2026-08-15／案イ、家老裁定2026-08-15): 開いた瞬間に、まだ埋め込まれて
+        // おらぬ定義をローカルから写す。
+        //
+        // 【この位置＝下の通知群より前でなければならぬ】(:3827以降) の OnPropertyChanged 群を承けて
+        // View が絵を描く。そこで Library が空なら、自作パーツは既定の ContactNO として描かれ、
+        // 結線・回路番号もその前提で決まる——【モデルには入っておるのに絵だけが古い】という形になる。
+        // 忍者の実機再現(2026-08-15)がまさにそれであった：DRC は解決済み(モデルを読むゆえ)、
+        // されど絵はa接点のまま・回路番号 15/16 のまま。しかもズームで再描画を促しても直らなんだ。
+        //
+        // 【当初は末尾に置いており申した】隠密が設計書9-5(b)で「IsDirty=false より前に置けば黙って
+        // 打ち消される」と予告し、それを避けようとして末尾へ置いた。避けたこと自体は正しかったが、
+        // 【その手当てが通知の順序を動かすことまでは問うておらなんだ】——予告された一点だけを見て、
+        // 隣の穴へ落ちた形にござる(侍の自省)。
+        //
+        // 【IsDirty はどう保つか】件数をここで受け、末尾の IsDirty=false の後で立て直す。
+        // こうすれば「打ち消されぬ」と「通知より前」の両方が同時に成り立つ。
+        int backfilledCount = BackfillDocumentLibraryFromLocalCatalog();
         // T-087往復修正(PR-13、隠密静的レビュー指摘の二次被害懸念への対処): テストモード中に
         // 新規作成/開く操作が実行された場合(Ctrl+T等のガード漏れで万一Mode=Testのままここに
         // 到達しても)、新Documentが作画モードで編集可能な状態から始まるようにする。Mode setter
@@ -3859,12 +3876,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         UndoManager.Clear();
         // 新規/開く直後は未保存の変更が無い状態(IsDirty=false)から始まる。
         IsDirty = false;
-        // T-151(案Y'、殿ご裁可2026-08-15): 開いた瞬間に、まだ埋め込まれておらぬ定義をローカルから写す。
-        // 【この位置＝IsDirty=false より後でなければならぬ】前に置けば直上の代入に黙って上書きされ、
+        // T-151: バックフィル(本メソッド冒頭、Document 差し替えの直後)が1件でも埋めたなら、
+        // 図面の中身は開く前と変わっておるゆえ保存を促す。
+        // 【この位置＝IsDirty=false より後でなければならぬ】前に置けば直上の代入に黙って打ち消され、
         // 移行が済んだのに保存を促さぬまま閉じられる——次に他所で開けば同じ症状が再発する
         // (隠密が設計書9-5(b)で予告した罠。7-1節のUndo孤児と同型の「リセット処理との前後関係」)。
+        // 【埋める処理そのものは冒頭へ移した】通知より後で埋めると、絵だけが未解決のまま残るゆえ
+        // (忍者の実機再現2026-08-15)。すなわち本件は【埋めるのは通知より前・汚すのはリセットより後】
+        // という二つの制約を同時に満たす形にござる——一箇所では両立せぬゆえ、件数を持ち越して分けた。
         // 【新規作成では発火せぬ】要素0件ゆえ写す対象が無く、Library は null のまま・IsDirty も false のまま。
-        if (BackfillDocumentLibraryFromLocalCatalog() > 0) IsDirty = true;
+        if (backfilledCount > 0) IsDirty = true;
     }
 
     /// <summary>本番用。実MyDocuments配下(PartFolderStore.CreateDefault())を使う。</summary>

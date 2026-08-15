@@ -248,6 +248,60 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
         });
     }
 
+    /// <summary>
+    /// <b>バックフィルは、文書差し替えの通知が飛ぶ<u>前</u>に済んでおらねばならぬ</b>（忍者の再現実測2026-08-15）。
+    /// <para>
+    /// <b>【この網が無かったゆえ素通しした穴】</b>他のバックフィルテストはいずれも
+    /// <c>LoadFromFile</c> が<b>戻った後</b>に <c>Document.Library</c> を見ており、モデルの側しか測っておらぬ。
+    /// ところが実機では、<c>ReplaceDocument</c> の通知（<c>OnPropertyChanged(nameof(Document))</c> 等）を承けて
+    /// View が絵を描く——<b>その時点で <c>Library</c> が空なら、自作パーツはa接点のまま描かれる</b>。
+    /// バックフィルはその後に走るゆえ、<b>モデルには入っておるのに絵だけが古い</b>という形になる。
+    /// </para>
+    /// <para>
+    /// 忍者の実測がまさにその形であった——<b>絵はa接点のまま（回路番号 15/16・17/18）、
+    /// されど保存すれば <c>library.byId</c> に定義が入っておる</b>。単体テストが通りながら実機で出た理由にござる。
+    /// </para>
+    /// <para>
+    /// <b>【測り方】</b>最初に飛んだ通知の時点で <c>vm.PartLibrary</c> が定義を引けるかを見る。
+    /// <c>Document</c> への代入自体は通知を伴わぬ（<c>ReplaceDocument</c> が後段で明示的に
+    /// <c>OnPropertyChanged</c> を呼ぶ形）ゆえ、<b>最初の通知＝View が動き始める最初の契機</b>にあたる。
+    /// </para></summary>
+    [Fact]
+    public void LoadFromFile_BackfillsBeforeFirstNotification_SoInitialRenderSeesEmbeddedDefinition()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"ecad2-t151-order-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var vm = CreateViewModel();
+            vm.PartPalette.SaveNewPart(PartA());
+
+            string path = Path.Combine(dir, "legacy.gcad");
+            GcadSerializer.Save(MakeLegacyDocument(PartAId), path);
+
+            PartDefinition? seenAtFirstNotification = null;
+            bool anyNotification = false;
+            vm.PropertyChanged += (_, _) =>
+            {
+                if (anyNotification) return;   // 最初の一度だけを捕らえる
+                anyNotification = true;
+                seenAtFirstNotification = vm.PartLibrary.Get(PartAId);
+            };
+
+            vm.LoadFromFile(path);
+
+            // 前提＝通知そのものは飛んでおること（飛ばねば測定が成立せず、下の Assert が
+            // 「埋まっておらぬ」と「そもそも測れておらぬ」を区別できなくなる）。
+            Assert.True(anyNotification, "文書差し替えの通知が一度も飛んでおらぬ＝測定が成立しておらぬ");
+            Assert.NotNull(seenAtFirstNotification);
+            Assert.Equal(5, seenAtFirstNotification!.WidthCells);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     /// <summary>9-6節5行目＝新規文書（要素0件）はバックフィルの対象が無く <c>Library</c> は null のまま。
     /// 遅延初期化を不必要に起こさぬことの境界確認。</summary>
     [Fact]
