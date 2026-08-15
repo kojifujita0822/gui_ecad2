@@ -265,6 +265,15 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
     /// <b>【測り方】</b>最初に飛んだ通知の時点で <c>vm.PartLibrary</c> が定義を引けるかを見る。
     /// <c>Document</c> への代入自体は通知を伴わぬ（<c>ReplaceDocument</c> が後段で明示的に
     /// <c>OnPropertyChanged</c> を呼ぶ形）ゆえ、<b>最初の通知＝View が動き始める最初の契機</b>にあたる。
+    /// </para>
+    /// <para>
+    /// <b>【射程・隠密の検分2026-08-15】</b>実際に再描画を起こすのは <c>Document</c> の通知ではなく
+    /// <c>CurrentSheet</c> のそれである（<c>MainWindow.xaml.cs</c> の <c>ViewModel_PropertyChanged</c> が
+    /// <c>RedrawCanvas</c> を撃つ条件に <c>Document</c> は含まれておらぬ）。本テストが捕らえるのは
+    /// <c>Document</c> 通知（<c>:3827</c>）の時点にて、描画の契機（<c>:3830</c>）より<b>手前</b>——
+    /// すなわち<b>より厳しい条件を課しており、検出力に穴は無い</b>。
+    /// <b>ただし将来この二つの通知の間に何かが挟まれば、網と実際の描画の間に隙が生じ得る</b>——
+    /// その折は本テストの捕捉点を <c>CurrentSheet</c> 側へ寄せるか、両方を測る形へ改められたい。
     /// </para></summary>
     [Fact]
     public void LoadFromFile_BackfillsBeforeFirstNotification_SoInitialRenderSeesEmbeddedDefinition()
@@ -295,6 +304,14 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
             Assert.True(anyNotification, "文書差し替えの通知が一度も飛んでおらぬ＝測定が成立しておらぬ");
             Assert.NotNull(seenAtFirstNotification);
             Assert.Equal(5, seenAtFirstNotification!.WidthCells);
+
+            // 【もう一方の制約を同じ1本で固定する】（隠密の検分2026-08-15）
+            // バックフィルは「通知より前に埋める」と「IsDirty を立てる」の二つを同時に満たさねばならぬ。
+            // 前者は ReplaceDocument の冒頭で、後者は末尾（IsDirty=false の後）で果たしており、
+            // 【一箇所では両立せぬゆえ件数を持ち越して分けてある】。
+            // 二つを別々のテストへ置けば、次に触る者が片方だけ動かした時に片方しか鳴らぬ——
+            // 「一方を直せば他方が壊れる」往復を防ぐため、ここで併せて押さえる。
+            Assert.True(vm.IsDirty, "バックフィルが効いたなら IsDirty が立つ筈（設計書9-5(b)の制約）");
         }
         finally
         {
