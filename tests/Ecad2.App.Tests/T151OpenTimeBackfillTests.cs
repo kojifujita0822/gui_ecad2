@@ -201,7 +201,15 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
     /// <summary>案B＝配置の側も対称に。組込みパーツを置いても図面へは埋め込まれぬ。
     /// <para>既存の <c>PlaceElementAtSelectedCell_BuiltinSymbolOnly_DoesNotTouchDocumentLibrary</c> は
     /// <c>ElementKind</c> 経路（<c>PartId</c> を持たぬ3極記号等）を測るもので、こちらは
-    /// <b><c>PartId</c> 経路の組込み</b>を測る——組込み17種はこちらを通る。</para></summary>
+    /// <b><c>PartId</c> 経路の組込み</b>を測る——組込み17種はこちらを通る。</para>
+    /// <para>
+    /// <b>【弁別に <c>DeviceClass</c> を使わぬ理由】</b>当初 <c>DeviceClass.Relay</c> で解決を確かめて
+    /// いたが、<c>MapToDeviceClass</c>（<c>MainWindowViewModel.cs:3130-3143</c>）は
+    /// <c>Coil</c> も <c>ContactNO</c> も同じ <c>Relay</c> へ写す。<c>ContactNO</c> は解決に失敗した折の
+    /// 既定フォールバック先ゆえ、<b>「正しく解決された」と「a接点へ黙って落ちた」を区別できておらなんだ</b>
+    /// ——本タスクが直そうとしている症状を、テスト自身が見逃す形であった（隠密の再レビューで露見、
+    /// 侍2026-08-15）。<c>ComponentKind</c> を直に見れば <c>Coil</c> と <c>ContactNO</c> が分かれる。
+    /// </para></summary>
     [Fact]
     public void PlaceElementAtSelectedCell_BuiltinPartById_DoesNotEmbedIntoDocumentLibrary()
     {
@@ -213,7 +221,12 @@ public class T151OpenTimeBackfillTests : ViewModelTestBase
 
         Assert.Single(vm.Document.Sheets[0].Elements);
         Assert.Null(vm.Document.Library);
-        // 組込みは解決できるゆえ、機器分類も正しく付く（a接点へ化けておらぬことの裏づけ）。
+
+        // 組込みは埋め込まれずとも解決できる。ComponentKind で見る——ここが弁別の要にござる。
+        var element = vm.Document.Sheets[0].Elements[0];
+        Assert.Equal(ElementKind.Coil, PartResolver.ComponentKind(element, vm.PartLibrary));
+        // 中間層（DeviceClass）も従来どおり付くことを併せて押さえる。ただし上のとおり
+        // Coil と ContactNO を分けぬゆえ、これ単独では検出力を持たぬ。
         Assert.Equal(DeviceClass.Relay, vm.Document.Devices.ByName["CR1"].Class);
     }
 
