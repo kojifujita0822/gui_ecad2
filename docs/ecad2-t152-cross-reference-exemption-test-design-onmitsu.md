@@ -175,3 +175,106 @@ GREENになる見込み**（DRC側の対応を待たず先に緑になる）た�
 
 以上、着手前調査（P-187）と本設計をもって、明日8/17の実装・検証がそのまま始められる形に
 してあると存ずる。
+
+---
+
+## 6. 追補（2026-08-16・射程拡大）——`DRC-TYPE-001`誤発火（`CheckDeviceTypeConsistency`）
+
+隠密のT-152静的レビューで発見。殿裁可により射程へ含める。
+
+### 6-0. 実害の機序（一次ソース確認）
+
+`DesignRuleCheck.CheckDeviceTypeConsistency`（`:153-209`）は`ElementCatalog.IsInputControlled`で
+機器名ごとに接点を`EnergizedControlledRefs`／`InputControlledRefs`へ振り分ける。
+
+- `サーマル.gcadpart`（Role=ThermalOverload）＝`IsInputControlled`が真→`InputControlledRefs`
+- `サーマルリレーa/b`（Role=ContactNO/NC）＝`IsInputControlled`が偽→`EnergizedControlledRefs`
+
+**現場の通例＝OL本体と補助接点は同一機器名**（殿ご確認済み）。両者が同一`DeviceName`を持てば
+`hasEnergized && hasInput`が成立し、**`DRC-TYPE-001`（`Error`severity）「励磁系接点と入力系接点が
+混在しています。シミュレーションが正しく動作しません」が誤って発火する**。孤立利用（OL単体、
+サーマルリレー単体）では発火せぬが、通例の組み方でこそ発火する——XREF側と対を成す型の誤りにて、
+T-133増分7でサーマルリレーa/bが新設されて初めて組める形になった（新設パーツと既存パーツの
+掛け合わせで生じた、いずれか単体の欠陥ではない）。
+
+### 6-1. 手当ての形——【推奨】門を置く（除外）。振り分け改めは退ける
+
+**振り分け改め（`ElementCatalog.IsInputControlled`自体を書き換え、サーマルリレーの`ElementKind`を
+input系に寄せる）は退ける。** 理由＝`IsInputControlled`は`DesignRuleCheck`だけでなく
+**`Evaluator.cs:172-177`（`IsConducting`）のテストモード導通判定そのもの**が参照しておる
+——`InputControlled`なら`s.Inputs[DeviceName]`（手動トグル）のみで導通、そうでなければ
+`s.Energized[DeviceName]`（コイル励磁）が主導・手動強制はOR経由の副次的な迂回路にすぎぬ。
+`Evaluator.IsConducting`は`Component`（`NetlistBuilder`解決後のランタイム構造）を相手にし、
+`PartId`/`PartLibrary`へは手が届かぬ——**振り分けを変えるにはNetlistBuilder→Componentの経路まで
+PartId弁別を通す必要があり、DesignRuleCheckだけの局所改修では済まぬ**。2日の期限では負いきれぬ
+規模と判ずる。
+
+**【現行のシミュレーション挙動は変えずとも実害は乏しい】** サーマルリレーは元よりコイルを
+持たぬ設計ゆえ、テストモードで`s.Energized[DeviceName]`が真になることは自然には起こらぬ。
+現行どおり「Energized判定＋手動強制のOR」のままでも、**手動強制（`s.Inputs`）は元から効く**
+——実質、現行のままテストモードでの手動操作に支障はない見込み（実測ではなく机上の見立て。
+実機での手動強制操作の確認は忍者の領分）。
+
+**ゆえに`CheckDeviceTypeConsistency`側だけに、`CheckCrossReference`と同型の門を置く**——
+サーマルリレーa/bを`EnergizedControlledRefs`／`InputControlledRefs`いずれにも算入せず素通しする。
+`Evaluator`・`ElementCatalog.IsInputControlled`本体には一切触れぬ。
+
+**【除外(門)と再分類、どちらでも良かったが除外を推す一点】** 実は「サーマルリレーを
+`InputControlledRefs`側へ再分類する」（`DesignRuleCheck`内だけのローカルな振り分け変更、
+`ElementCatalog.IsInputControlled`は変えぬ）という手も机上では成り立つ——OL+補助接点の
+false positiveは同じく消え、かつ「サーマルリレー＋無関係な励磁系接点」の命名衝突は
+（再分類なら）引き続き検出できる（6-3で詳述）。**されど除外の方が実装が単純（既存の門と完全に
+同型）で、2日の期限には除外を推す**——再分類が拾える追加の検出力（6-3）は極めて稀な命名衝突
+一種のみで、実装の単純さと引き換える値打ちに乏しいと判ずる。侍がより慎重を期すなら再分類でも
+よく、その場合はテストケースを組み替える要があると申し送る。
+
+### 6-2. 眼目2＝二重除外の無害確認
+
+`サーマル.gcadpart`自体の分類ロジックは本追補で一切変更せぬ——`IsInputControlled`のまま。
+対照テストで「サーマル単体は従来どおり」「サーマル＋無関係接点の組合せは従来どおり」を固定する。
+
+### 6-3. 眼目3＝本来鳴るべき混在が消えぬこと、および除外方式の既知の限界
+
+- **回帰**＝サーマルリレーと無関係な、通常のContactNO(Energized)とPushButtonNO(InputControlled)
+  の組合せは、従来どおり`DRC-TYPE-001`が出ること（サーマルリレー側の変更が無関係な判定へ
+  波及せぬことの確認）
+- **【除外方式の既知の限界・明記しておく】** サーマルリレーa/bを門で除外すると、
+  「サーマルリレー＋無関係な入力系接点（押釦等）が同一機器名」という**稀な命名衝突**は
+  検出できなくなる（除外された側は算入されず、hasEnergiedが立たぬゆえ）。これは6-1で述べた
+  トレードオフそのもの。**実装後、この限界を明示するテストを1件（`Assert`で「警告が出ぬ」ことを
+  確認し、コメントで限界と明記）残しておくことを勧める**——「検出漏れ」と「仕様どおりの限界」を
+  後から区別できるように
+
+### 6-4. RED先行証明
+
+既存API（`BasicPartTemplates.ThermalOverloadId`・`ThermalRelayNOId`/`NCId`）のみで構成できる。
+主眼のテスト（サーマル本体＋補助接点が同一機器名→`DRC-TYPE-001`が出ぬこと）は、現行コード
+（門なし）に対して実行すればRED（実際に出てしまう）、修正後GREENになる——RED先行証明が成立する。
+
+### 6-5. テストケース一覧（追補）
+
+```
+[Theory]
+[InlineData(BasicPartTemplates.ThermalRelayNOId)]
+[InlineData(BasicPartTemplates.ThermalRelayNCId)]
+CheckDeviceTypeConsistency_OL本体と補助接点が同一機器名の時_混在警告が出ぬ(string relayPartId)
+```
+- device"OL1"へ`ThermalOverloadId`＋`relayPartId`を配置、`TypeConflictEnergizedVsInput`が出ぬこと
+
+```
+[Fact]
+CheckDeviceTypeConsistency_サーマル単体は従来どおり警告を出さぬ()
+[Fact]
+CheckDeviceTypeConsistency_サーマルと無関係な励磁系接点の組合せは従来どおり警告が出る()
+[Fact]
+CheckDeviceTypeConsistency_通常の励磁系接点と入力系接点の混在は引き続き警告が出る()
+```
+（6-2・6-3前半の回帰網）
+
+```
+[Fact]
+CheckDeviceTypeConsistency_サーマルリレーと無関係な入力系接点の組合せは警告が出ぬ_既知の限界()
+```
+（6-3後半、除外方式の限界を明記する記録用テスト）
+
+以上、明日の実装がすぐ着手できる形に整えたと存ずる。
