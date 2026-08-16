@@ -43,7 +43,9 @@ UninstallDisplayName={#AppName}
 ; アイコンは exe へ焼き込んだもの（csproj の ApplicationIcon）を参照する。
 ; .ico を別途配布ファイルへ含める必要はない。
 UninstallDisplayIcon={app}\{#AppExeName},0
-; 管理者権限（ProgramFiles への書き込み・HKCR への関連付けに必要）
+; 管理者権限（ProgramFiles への書き込み・HKLM への関連付けに必要）。
+; PrivilegesRequiredOverridesAllowed は置かぬ——常に管理者モードで走らせることで、
+; [Registry] の HKA が必ず HKLM へ解決される（非管理者モードでは HKCU へ倒れる）。
 PrivilegesRequired=admin
 ; ファイル関連付けの変更をエクスプローラーに通知
 ChangesAssociations=yes
@@ -79,10 +81,26 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 ; .gcad ファイル関連付け。ダブルクリックで開けるようにするには、この登録と
 ; アプリ側の起動引数処理（StartupArguments.ResolveDocumentPath）の両方が要る。
 ; "%1" のダブルクォートは空白を含むパスのため必須。
-Root: HKCR; Subkey: "{#DocExt}"; ValueType: string; ValueName: ""; ValueData: "{#DocProgId}"; Flags: uninsdeletevalue
-Root: HKCR; Subkey: "{#DocProgId}"; ValueType: string; ValueName: ""; ValueData: "ecad2 回路図ファイル"; Flags: uninsdeletekey
-Root: HKCR; Subkey: "{#DocProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
-Root: HKCR; Subkey: "{#DocProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+;
+; 【T-151期・HKCR から HKA へ改めた。殿ご裁可2026-08-16】
+; Inno Setup 公式ヘルプ（[Registry] section）が「Using HKCR is not recommended, use HKA with
+; the Subkey parameter set to Software\Classes instead」と明記しておる。理由は着地先が
+; 環境によって割れるゆえ——Microsoft公式（HKEY_CLASSES_ROOT Key）に曰く、HKCR へ「値」を書き、
+; そのキーが既に HKCU\Software\Classes に在れば、システムは HKLM ではなくそちらへ書き込む。
+;
+; これが現に起きておった。旧 .iss は HKCR へ書いており、
+;   ・Ecad2.Document（新規キー）  → HKLM\Software\Classes へ着地
+;   ・.gcad（GuiEcad が HKCU に既に作っておったキー） → HKCU\Software\Classes へ吸い寄せられた
+; となり、拡張子と ProgID の紐付けだけが「その利用者だけのもの」になっておった。
+; 新規ローカルユーザーには届かず、シェルは ERROR_NO_ASSOCIATION を返す（忍者の実測2026-08-16）。
+;
+; HKA は管理者インストールモードで HKLM、それ以外で HKCU に解決される。本インストーラーは
+; PrivilegesRequired=admin ゆえ常に前者に定まり、着地先が環境によって割れることが無くなる。
+; uninsdeletevalue／uninsdeletekey の働きは Root に依らぬ（同ヘルプ Flags 節で確認）。
+Root: HKA; Subkey: "Software\Classes\{#DocExt}"; ValueType: string; ValueName: ""; ValueData: "{#DocProgId}"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\{#DocProgId}"; ValueType: string; ValueName: ""; ValueData: "ecad2 回路図ファイル"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\{#DocProgId}\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
+Root: HKA; Subkey: "Software\Classes\{#DocProgId}\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
 
 [Run]
 ; インストール完了後にアプリを起動（オプション）
