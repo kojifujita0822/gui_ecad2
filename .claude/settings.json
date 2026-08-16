@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "mcp__claude-peers__list_peers",
+      "mcp__claude-peers__check_messages",
+      "mcp__ide__getDiagnostics",
+      "Bash(tasklist *)"
+    ]
+  },
   "hooks": {
     "Stop": [
       {
