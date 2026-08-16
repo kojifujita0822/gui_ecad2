@@ -1937,7 +1937,13 @@
                 <!-- T-106(7)スコープ拡大(殿裁定2026-07-21): Style="{x:Null}"のまま(機能・押下
                      フィードバック対象外の既存扱いは変更しない)、背景色のみWPF既定のライト固定色
                      からDynamicResource化する。 -->
+                <!-- T-153(殿ご下命2026-08-16): 非表示。v0.7.0 を殿がご覧になり「押しても何も起きぬボタンが
+                     並んでおる」とご指摘なされた。2026-07-07の裁定「見た目だけ構想図と一致させる」は
+                     構想図に見た目を合わせる段のものにて、配布可能な形として世に出す段では前提が変わる。
+                     削除でなく Collapsed を採るのは、将来この位置の機能が定まった折に戻せる形を残すため
+                     ——グリフ・ToolTip・タブ除外の扱いはすべてそのまま保ってある。 -->
                 <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,4,0"
+                        Visibility="Collapsed"
                         AutomationProperties.Name="(未定アイコン1)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}"
                         Background="{DynamicResource ToolBarBackgroundBrush}">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
@@ -2013,7 +2019,14 @@
                      詳細画面機能を実装する際にTabオーダーへ復帰させること。
                      T-089(殿裁定2026-07-14): 未配線のため押下フィードバックの対象外、Style="{x:Null}"で
                      暗黙的スタイルを無効化(左端の小アイコン類と同様の扱い)。 -->
+                <!-- T-153(殿ご下命2026-08-16): 非表示。理由は左端の小アイコンと同じにござる
+                     ——押下無反応のまま配布する形を避ける。詳細画面（T-028）が実装される段で
+                     Visibility を解き、併せて上のコメントが述べるとおり Tab オーダーへ復帰させること。
+                     直前の「キャンセル」が持つ Margin="0,0,8,0" はそのまま残してあり、本ボタンが
+                     消えた分だけ右端の余白が広がる（Border の Padding=6 と合わせて 14px）。
+                     区切りとしてのマージンゆえ触れておらぬが、見え方の是非は実機の目に委ねる。 -->
                 <Button Content="拡張表示" VerticalAlignment="Center" AutomationProperties.Name="拡張表示"
+                        Visibility="Collapsed"
                         KeyboardNavigation.IsTabStop="False" Style="{x:Null}"/>
             </StackPanel>
         </Border>
