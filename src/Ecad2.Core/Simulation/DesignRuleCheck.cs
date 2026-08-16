@@ -145,6 +145,41 @@ public static class DesignRuleCheck
     }
 
     /// <summary>
+    /// 機器種別の整合性検査（<see cref="CheckDeviceTypeConsistency"/>）の集計から除く要素か
+    /// （T-152追補、殿ご裁可2026-08-16）。
+    /// <para>
+    /// <b>【何を塞いでおるか】</b>現場の通例では、サーマル(OL)本体と補助接点に<b>同じ機器名</b>を付ける。
+    /// ところが本体は <c>IsInputControlled</c> ゆえ入力系、補助接点は <c>Role=ContactNO/NC</c> ゆえ励磁系へ
+    /// 振り分けられ、<b>同一機器名に両系統が混在すると判ぜられて <c>DRC-TYPE-001</c>（Error）が誤発火する</b>。
+    /// T-133増分7で補助接点が新設されて初めて組める形になったもので、<b>いずれか単体の欠陥ではない</b>。
+    /// </para>
+    /// <para>
+    /// <b>【<see cref="IsExcludedFromCrossReference"/> を使い回しておらぬ理由】</b>あちらは
+    /// 自作パーツのマーカー <see cref="PartDefinition.IsExcludedFromCrossReference"/> も見る。
+    /// そのマーカーは<b>「クロスリファレンス検査から除外する」という文言でパーツエディタに出ておる</b>
+    /// （殿ご裁可の文言）。同じ述語をここで使えば、<b>利用者が承知したのと違う検査まで黙って外れる</b>
+    /// ——UIの文言と実際の効果が食い違う。ゆえに本検査は<b>組込みの固定Idだけを見る別の門</b>とし、
+    /// マーカーには一切依らぬ。
+    /// </para>
+    /// <para>
+    /// <b>【承知のうえで受け入れた限界・殿ご裁可2026-08-16】</b>この形では、サーマルリレーが
+    /// <b>無関係な接点と同じ機器名を付けられた場合の命名衝突</b>を検出できなくなる（除外された側は
+    /// どちらの系統にも算入されぬゆえ、混在が成立せぬ）。<c>DesignRuleCheck</c> の中だけで振り分け先を
+    /// 変える案（サーマルリレーを入力系へ寄せる）ならこの限界は生じぬが、実装の単純さと二日の期限を
+    /// 量って除外を採った。<b>家老が二案の違いを殿へお示ししたうえでのご裁可にござる。</b>
+    /// 限界そのものは <c>T152CrossReferenceExemptionTests</c> の記録用テスト2件が固定しておる
+    /// ——<b>「検出漏れ」ではなく「仕様どおりの限界」であることを、後から辿れるように。</b>
+    /// </para>
+    /// <para>
+    /// <b>【<c>Evaluator</c> には触れておらぬ】</b><see cref="ElementCatalog.IsInputControlled"/> 本体を
+    /// 書き換える案は退けられておる——あれは <c>Evaluator.IsConducting</c> のテストモード導通判定が
+    /// 参照しており、あちらは <c>Component</c>（<c>NetlistBuilder</c> 解決後）を相手にするゆえ
+    /// <c>PartId</c>／<c>PartLibrary</c> へ手が届かぬ。本門は <c>DesignRuleCheck</c> の内側で完結する。
+    /// </para></summary>
+    private static bool IsExcludedFromDeviceTypeConsistency(ElementInstance elem)
+        => elem.PartId is BuiltinPartIds.ThermalRelayNO or BuiltinPartIds.ThermalRelayNC;
+
+    /// <summary>
     /// 接点種別と機器実体の整合チェック（P2/P6）。
     /// 同一機器名に励磁系接点（ContactNO/NC）と入力系接点（押釦・タイマ等）が混在する場合、
     /// またはコイルで駆動される機器の接点種別が入力系になっている場合を診断する。
@@ -162,6 +197,7 @@ public static class DesignRuleCheck
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!PartResolver.CreatesComponent(elem, lib)) continue;
+                if (IsExcludedFromDeviceTypeConsistency(elem)) continue;   // T-152追補（殿ご裁可2026-08-16）
                 var kind = PartResolver.ComponentKind(elem, lib);
                 var cref = new CircuitRef(sheet.PageNumber, elem.Pos.Row + 1);
 

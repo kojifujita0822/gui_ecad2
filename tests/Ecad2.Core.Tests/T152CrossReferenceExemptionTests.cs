@@ -243,4 +243,196 @@ public class T152CrossReferenceExemptionTests
 
         Assert.True(Assert.Single(restored).IsExcludedFromCrossReference);
     }
+
+    /// <summary>図面（<c>.gcad</c>）の <c>library</c> へ埋め込まれた定義でも、マーカー欠落は既定 false で読まれること。
+    /// <para>
+    /// <b>【なぜ `.gcadpart` 単体の網では足りぬか】</b>上の後方互換テストが測るのは
+    /// <c>PartLibrarySerializer</c> の経路にて、<b>図面へ埋め込む経路（<c>GcadSerializer</c>）は別物</b>にござる。
+    /// 機序は同じ（いずれも <c>System.Text.Json</c> の自動反映）と読めるが、<b>経路が違えば別途測る要がある</b>
+    /// ——忍者が明日の実機検体を <c>library</c> 埋め込みの形で組まれた（`MK3`＝フィールドを書かぬ検体）ゆえ、
+    /// 実機の前に机上でこの経路を押さえておけば、万一食い違うた折に「実装が違う」のか「経路が違う」のかを
+    /// 切り分けられる。
+    /// </para></summary>
+    [Fact]
+    public void 図面へ埋め込まれた定義でもマーカー欠落は既定falseで読まれる()
+    {
+        // library 配下の定義から isExcludedFromCrossReference のキー自体を落としてある（MK3 と同型）。
+        const string gcadWithoutMarker = """
+            {
+              "schemaVersion": 1,
+              "info": { "title": "T152マーカー欠落", "drawingNo": "T152-MK3" },
+              "library": {
+                "byId": {
+                  "t152-embedded-coil": {
+                    "id": "t152-embedded-coil",
+                    "name": "埋め込みコイル",
+                    "widthCells": 1,
+                    "heightCells": 1,
+                    "role": "Coil",
+                    "ports": [],
+                    "primitives": []
+                  }
+                }
+              },
+              "sheets": [
+                {
+                  "pageNumber": 1,
+                  "name": "シート1",
+                  "grid": { "rows": 10, "columns": 20 },
+                  "elements": [
+                    { "partId": "t152-embedded-coil", "pos": { "row": 0, "column": 0 }, "deviceName": "MK3" }
+                  ]
+                }
+              ]
+            }
+            """;
+
+        var doc = GcadSerializer.Deserialize(gcadWithoutMarker);
+
+        var part = doc.Library!.Get("t152-embedded-coil");
+        Assert.NotNull(part);
+        Assert.False(part!.IsExcludedFromCrossReference);
+
+        // 既定 false ゆえ、検査は従来どおり働く（死にリレー警告が出る）。
+        Assert.Contains(DesignRuleCheck.CheckCrossReference(doc, doc.Library),
+            d => d.Code == DesignRuleCheck.CoilWithoutContact && d.DeviceName == "MK3");
+    }
+
+    // ==================================================================
+    // 6. 追補＝DRC-TYPE-001 誤発火（設計書6節）
+    //    本節は手当ての形（除外／再分類）に依らず成り立つ回帰網のみを置く。
+    //    両案で結果が分かれるケースは、方式が定まってから足す。
+    // ==================================================================
+
+    /// <summary>設計書6-2＝対照。サーマル(OL)単体は従来どおり警告を出さぬ
+    /// （<c>IsInputControlled</c> ゆえ入力系ただ一つに属し、混在にならぬ）。</summary>
+    [Fact]
+    public void サーマル単体は従来どおり種別混在の警告を出さぬ()
+    {
+        var doc = MakeDoc(PartElement(BasicPartTemplates.ThermalOverloadId, "OL1", row: 0));
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, BuiltinLibrary());
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput);
+    }
+
+    /// <summary>設計書6-3＝回帰。サーマル(OL)本体と無関係な励磁系接点が同一機器名なら、従来どおり警告が出る。
+    /// <para>
+    /// <b>サーマル本体の分類は本追補で一切変えておらぬ</b>ことを固定する対照にござる
+    /// ——手当てがサーマル本体まで巻き込めば、ここが鳴らなくなる。
+    /// </para></summary>
+    [Fact]
+    public void サーマル本体と無関係な励磁系接点の混在は従来どおり警告が出る()
+    {
+        var doc = MakeDoc(
+            PartElement(BasicPartTemplates.ThermalOverloadId, "OL9", row: 0),
+            PartElement(BasicPartTemplates.ContactNOId, "OL9", row: 1));
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, BuiltinLibrary());
+
+        Assert.Contains(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput && d.DeviceName == "OL9");
+    }
+
+    /// <summary>設計書6-3＝回帰。サーマル系とは無関係な、通常の励磁系接点と入力系接点の混在は引き続き警告が出る。
+    /// <b>本追補の変更が、無関係な判定へ波及しておらぬこと</b>の直接の固定にござる。</summary>
+    [Fact]
+    public void 通常の励磁系接点と入力系接点の混在は引き続き警告が出る()
+    {
+        var doc = MakeDoc(
+            PartElement(BasicPartTemplates.ContactNOId, "M1", row: 0),
+            PartElement(BasicPartTemplates.PushButtonNOId, "M1", row: 1));
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, BuiltinLibrary());
+
+        Assert.Contains(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput && d.DeviceName == "M1");
+    }
+
+    /// <summary>設計書6-5の主眼＝現場の通例（OL本体と補助接点は同一機器名）で誤発火せぬこと。
+    /// <para>
+    /// <b>これが本追補の発端</b>にござる。T-133増分7でサーマルリレーa/bが新設され、既存のサーマル(OL)本体と
+    /// 組み合わせて初めて生じた形にて、<b>いずれか単体の欠陥ではない</b>。
+    /// 補助接点は <c>Role=ContactNO/NC</c> ゆえ励磁系へ、本体は <c>IsInputControlled</c> ゆえ入力系へ
+    /// 振り分けられ、同一機器名で混在と判ぜられておった。
+    /// </para></summary>
+    [Theory]
+    [InlineData(BasicPartTemplates.ThermalRelayNOId)]
+    [InlineData(BasicPartTemplates.ThermalRelayNCId)]
+    public void OL本体と補助接点が同一機器名でも種別混在の警告が出ぬ(string relayPartId)
+    {
+        var doc = MakeDoc(
+            PartElement(BasicPartTemplates.ThermalOverloadId, "OL1", row: 0),
+            PartElement(relayPartId, "OL1", row: 1));
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, BuiltinLibrary());
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput);
+    }
+
+    /// <summary>
+    /// 設計書6-3後半＝<b>除外方式の既知の限界を記録する</b>。検出漏れではなく、承知のうえで受け入れた仕様にござる。
+    /// <para>
+    /// サーマルリレーを門で除いた結果、<b>それが無関係な接点と同じ機器名を付けられた場合の命名衝突</b>は
+    /// 検出できなくなる——除外された側はどちらの系統にも算入されぬゆえ、混在が成立せぬ。
+    /// </para>
+    /// <para>
+    /// <b>【二つのケースは性質が違う。壊す実測が示した】</b>初稿は「同型ゆえ両方を並べる」と書いたが、
+    /// 改変G（門を落とす）を当てたところ<b>押釦のケースだけが鳴り、a接点のケースは鳴らなんだ</b>。
+    /// <list type="bullet">
+    /// <item><b>押釦（入力系）</b>＝門が無ければサーマルリレー（励磁系）と混在して鳴る。
+    /// <b>門によって検出が失われる真の限界</b>にござる</item>
+    /// <item><b>a接点（励磁系）</b>＝門が無くとも両方が励磁系ゆえ元より混在にならぬ。
+    /// <b>門は何も失っておらぬ</b>——失うのは「再分類方式を採れば得られたはずの検出力」にすぎぬ</item>
+    /// </list>
+    /// ゆえに後者は<b>門の検出力を測る網ではなく、方式の違いを記録する網</b>にござる
+    /// （<c>samurai.md</c>「鳴らなかったテストを一つずつ見よ」に従い、実測してから書き改めたもの）。
+    /// </para>
+    /// <para>
+    /// <b>【この2件は「鳴らぬのが正しい」テストにござる】</b>将来これが鳴るようになったなら、それは
+    /// 実装が<b>再分類方式</b>（<c>DesignRuleCheck</c> の中でサーマルリレーを入力系へ寄せる）へ
+    /// 変わったことを意味する——その道なら励磁系との衝突は検出できる。
+    /// <b>すなわち本テストが落ちたときは、直す前に「方式が変わったのではないか」を疑われたい。</b>
+    /// 二案の違いは家老が殿へお示ししたうえで除外方式が裁可されており（2026-08-16）、
+    /// 方式を変えるならその裁可から改める筋にござる。
+    /// </para></summary>
+    [Theory]
+    [InlineData(BasicPartTemplates.PushButtonNOId)]   // 入力系との衝突（設計書が挙げた形）
+    [InlineData(BasicPartTemplates.ContactNOId)]      // 励磁系との衝突（同型ゆえ侍が補うた）
+    public void サーマルリレーと無関係な接点の命名衝突は検出できぬ_承知のうえの限界(string otherPartId)
+    {
+        var doc = MakeDoc(
+            PartElement(BasicPartTemplates.ThermalRelayNOId, "X1", row: 0),
+            PartElement(otherPartId, "X1", row: 1));
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, BuiltinLibrary());
+
+        Assert.DoesNotContain(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput);
+    }
+
+    /// <summary>
+    /// <b>自作パーツのマーカーは、機器種別の整合性検査には効かぬこと</b>（侍の判断で補うた網）。
+    /// <para>
+    /// <b>【なぜこれを固定するか】</b>マーカーは<b>「クロスリファレンス検査から除外する」という文言で
+    /// パーツエディタに出ておる</b>（殿ご裁可の文言）。もし実装が <c>CheckDeviceTypeConsistency</c> でも
+    /// 同じマーカーを見れば、<b>利用者が承知したのと違う検査まで黙って外れる</b>——UIの文言と実際の
+    /// 効果が食い違う形にござる。
+    /// </para>
+    /// <para>
+    /// 本テストは、マーカーを立てた自作の励磁系接点が<b>引き続き種別混在の判定に算入される</b>ことを
+    /// 確かめる。<c>DesignRuleCheck</c> が二つの門を持ち、<b>一方だけがマーカーを見る</b>という
+    /// 非対称そのものを固定しておる。
+    /// </para></summary>
+    [Fact]
+    public void マーカーは機器種別の整合性検査には効かぬ()
+    {
+        var lib = BuiltinLibrary();
+        lib.ById[CustomCoilId] = CustomPart(CustomCoilId, PartRole.ContactNO, excluded: true);
+        var doc = MakeDoc(
+            PartElement(CustomCoilId, "MX1", row: 0),                          // 自作の励磁系接点（マーカーtrue）
+            PartElement(BasicPartTemplates.PushButtonNOId, "MX1", row: 1));    // 入力系
+
+        var diagnostics = DesignRuleCheck.CheckDeviceTypeConsistency(doc, lib);
+
+        // マーカーが効いておれば混在が成立せず鳴らぬ。効いておらぬゆえ鳴るのが正しい。
+        Assert.Contains(diagnostics, d => d.Code == DesignRuleCheck.TypeConflictEnergizedVsInput && d.DeviceName == "MX1");
+    }
 }
