@@ -3317,8 +3317,16 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <summary>
     /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、合流先候補
     /// (T-102、殿裁定=案A)を列挙し合流先確認モードへ遷移する。候補が無ければ何も接続せず終了する。
-    /// </summary>
-    public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr)
+    /// <para>
+    /// <b>【T-153で <paramref name="comment"/> が加わった】</b>配置バーの入力欄をデバイス名と
+    /// コメントで共用する形（殿ご下命2026-08-16）にて、配置と同時に機器コメントの初期値を与える経路。
+    /// <b>既定値 <c>""</c> を置いたのは、コメントを渡すのが配置バーのただ一箇所ゆえ</b>——
+    /// 呼び出しは129箇所あり（大半がテスト）、そのすべてへ <c>""</c> を書けば変更が巨大化して
+    /// 本質が埋もれる。<b>「コメント無し」が従来の振る舞いをそのまま表す既定値である</b>ことも
+    /// 併せての判断にござる（<c>samurai.md</c>「既定値を付けるか否かは漏れを検出できるかで決めよ」
+    /// ——渡すべき所が一箇所ゆえ、渡し忘れの余地が小さいと判じた）。
+    /// </para></summary>
+    public void PlaceElementAtSelectedCell(string partId, string deviceName, bool isOr, string comment = "")
     {
         if (SelectedCell is not { } pos || CurrentSheet is not Sheet sheet) return;
         // T-071バグ修正: Motor(WidthCells=3)等の複数セル幅パーツに対応するため、配置するパーツの
@@ -3393,9 +3401,25 @@ public sealed class MainWindowViewModel : ViewModelBase
         // setterと同じ流儀: 新規デバイス名(未登録)のみ要素種別から解決したDeviceClass(T-045
         // P-020対応)で追加し、既存デバイス名なら既存エントリを維持(上書きしない)。デバイス名
         // 空欄の場合は機器表を一切操作しない。
+        // T-153(殿ご裁可2026-08-16): 配置バーで打ったコメントをここで入れる。新規登録なら生成時に併せて、
+        // 既存デバイス名なら上書きする。
+        // 【なぜコメントだけ T-036 の作法（既存エントリを上書きせぬ）を崩すか】
+        // 使い手が欄へ打った以上、反映されぬのは驚きが大きいゆえ——「打ったのに黙って消える」は
+        // 本プロジェクトが繰り返し戒めてきた型にござる（隠密の推し、殿がご裁可）。
+        // 【承知のうえの副作用】Device.Comment は機器単位で共有ゆえ（T-107の設計）、同じデバイス名を
+        // 持つ他の箇所のコメントも一斉に変わる。殿はこれをお聞きになったうえで上書きをお選びになった。
+        // 【空では上書きせぬ】欄が空なら「打っておらぬ」のであって「消したい」ではない、と読む。
+        // 既存コメントを消す経路はプロパティパネル（SelectedElementComment）に別途在り、そちらは
+        // 空文字を明示的に受ける。ここで空を通せば、コメント欄に触れずに配置しただけで既存の
+        // コメントが消えることになり、上の「驚きが大きい」を逆向きに犯す。
         bool deviceWasNewlyRegistered = deviceName.Length > 0 && !Document.Devices.ByName.ContainsKey(deviceName);
         if (deviceWasNewlyRegistered)
-            Document.Devices.ByName[deviceName] = new Device { Name = deviceName, Class = ResolveDeviceClass(newElement) };
+            Document.Devices.ByName[deviceName] = new Device
+            {
+                Name = deviceName, Class = ResolveDeviceClass(newElement), Comment = comment,
+            };
+        else if (deviceName.Length > 0 && comment.Length > 0)
+            Document.Devices.ByName[deviceName].Comment = comment;
         DeviceTable.Refresh();
 
         // T-079(P-058)バグ修正: SelectedCell自体は配置前後で値が変わらないため、SelectedCellの

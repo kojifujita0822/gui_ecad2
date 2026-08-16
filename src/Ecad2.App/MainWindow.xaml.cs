@@ -3972,6 +3972,11 @@ public partial class MainWindow : Window
         PlacementPartComboBox.SelectedItem = _viewModel.PartPalette.ResolveEntry(initialEntry.Definition.Id, isOr)
             ?? _viewModel.PartPalette.SelectionEntries.FirstOrDefault();
         PlacementDeviceNameBox.Text = "";
+        // T-153: 退避値とトグル状態も併せて初期化する。落とせば前回の配置で入れたコメントが
+        // 次の配置へ持ち越され、しかも入力欄には現れぬまま確定してしまう（隠密の申し送り）。
+        _placementSavedText = "";
+        PlacementCommentToggle.IsChecked = false;
+        PlacementInputLabel.Text = Views.PlacementInputRules.DeviceNameLabel;
         _viewModel.IsPlacementBarVisible = true;
         PositionPlacementBar(cell);
         // 隠密レビュー指摘(観点3、Microsoft Learn「Focus Overview - WPF」一次情報): Collapsed→
@@ -4271,7 +4276,14 @@ public partial class MainWindow : Window
             // (旧: `_placementIsOr == true && entry.Definition.IsOrEligible`)は本裁定で廃止する。
             // ORa接点で開いてもb接点へ切り替えればORを失う(明示的にORb接点を選べばOR並列b接点になる)。
             bool effectiveIsOr = entry.IsOr;
-            _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, PlacementDeviceNameBox.Text.Trim(), effectiveIsOr);
+            // T-153: 入力欄はデバイス名とコメントの共用ゆえ、表示中の値と退避中の値の両方から解く。
+            // 【ここが本件の要】表示中の値をそのまま渡す形では、コメントを打った直後に OK を押した折に
+            // コメントが落ちる——打った値がまだ退避へ移っておらぬゆえ（隠密が設計書2節で名指しした穴）。
+            // Resolve はトグル切替でも用いる同じ写像にて、「確定の時だけ退避を書き忘れる」形が起こり得ぬ。
+            var (placementDeviceName, placementComment) = Views.PlacementInputRules.Resolve(
+                PlacementCommentToggle.IsChecked == true, PlacementDeviceNameBox.Text, _placementSavedText);
+            _viewModel.PlaceElementAtSelectedCell(entry.Definition.Id, placementDeviceName.Trim(), effectiveIsOr,
+                                                 placementComment.Trim());
             // T-102(殿裁定=1-a): isOr配置が合流先確認モードへ遷移した場合は案内メッセージを出す
             // (T-041のTryBeginConnectorDraftと同様、一度だけ表示しUp/Down操作ごとには更新しない)。
             _viewModel.StatusMessage = _viewModel.Tool.Mode == ViewModels.ToolMode.ConfirmOrJoinTarget
@@ -4283,6 +4295,41 @@ public partial class MainWindow : Window
     }
 
     private void PlacementCancelButton_Click(object sender, RoutedEventArgs e) => ClosePlacementBar();
+
+    /// <summary>T-153: 入力欄に表示しておらぬ側の値（デバイス名かコメントの一方）を退避しておく場。
+    /// <para>
+    /// <b>変数は一つで足りる</b>——モードは <c>PlacementCommentToggle.IsChecked</c> が持ち、
+    /// 表示中の値は <c>PlacementDeviceNameBox.Text</c> が持つゆえ、裏に置く要があるのは残り一つのみ。
+    /// 二つ持てば「どちらが今表示中か」を二重に管理することになり、食い違いの余地が生まれる。
+    /// </para></summary>
+    private string _placementSavedText = "";
+
+    /// <summary>T-153（殿ご下命2026-08-16）: 入力欄をデバイス名とコメントで切り替える。
+    /// <para>
+    /// <b>【WPF の挙動に依っておる箇所を明示する】</b><c>ToggleButton</c> は <c>OnToggle()</c> で
+    /// <c>IsChecked</c> を反転させてから <c>Click</c> を発火する。ゆえに<b>本ハンドラへ入った時点で
+    /// <c>IsChecked</c> は既に「押した後」の値</b>にござる。押す前のモードはその反対と読む。
+    /// </para>
+    /// <para>
+    /// <b>退避と復元を手順で書かず、<see cref="PlacementInputRules.Resolve"/> を通す</b>——
+    /// 確定時（<c>PlacementOkButton_Click</c>）と同じ写像を用いるゆえ、
+    /// 「切替では退避したが確定では忘れた」という食い違いが起こり得ぬ。
+    /// </para></summary>
+    private void PlacementCommentToggle_Click(object sender, RoutedEventArgs e)
+    {
+        bool isCommentModeAfter = PlacementCommentToggle.IsChecked == true;
+
+        // 押す前のモードで現在の両値を確定させてから、押した後のモードで表示・退避を組み直す。
+        var (deviceName, comment) = Views.PlacementInputRules.Resolve(
+            !isCommentModeAfter, PlacementDeviceNameBox.Text, _placementSavedText);
+        var (visibleText, savedText) = Views.PlacementInputRules.ForMode(isCommentModeAfter, deviceName, comment);
+
+        PlacementDeviceNameBox.Text = visibleText;
+        _placementSavedText = savedText;
+        PlacementInputLabel.Text = Views.PlacementInputRules.LabelFor(isCommentModeAfter);
+        PlacementDeviceNameBox.Focus();
+        PlacementDeviceNameBox.CaretIndex = PlacementDeviceNameBox.Text.Length;
+    }
 
     // 分岐A(殿裁定=ツール保持で連続配置, T-021): 配置後もTool/SelectedCellをリセットしない。
     // 「移動(矢印)→配置(Enter)→命名→確定→また移動…」の一気通貫(案X)を継続できるよう、

@@ -1949,12 +1949,29 @@
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M3,3 L13,3 L13,9 L3,9 Z M5,3 L5,1 L11,1 L11,3 M6,9 L6,12 L10,12 L10,9"/>
                 </Button>
-                <Button Width="24" Height="24" Padding="2" VerticalAlignment="Center" Margin="0,0,8,0"
-                        AutomationProperties.Name="(未定アイコン2)" KeyboardNavigation.IsTabStop="False" Style="{x:Null}"
-                        Background="{DynamicResource ToolBarBackgroundBrush}">
+                <!-- T-153(殿ご下命2026-08-16): コメント入力への切替トグル。
+                     殿の御言葉＝「コメントボタンを押したらボタンをグレーアウトさせて『機器名』と
+                     『機器コメント』をトグルで表示させ、入力欄は同じものを使う」——幅が一切増えぬ形。
+                     元より吹き出しの意匠（コメントを想わせるグリフ）ゆえ、この位置が選ばれた。
+                     「グレーアウト」は押下状態の表示と読む（無効化と読めば往復できず「トグル」と噛み合わぬ、
+                     隠密の分節）。ゆえに ToggleButton の IsChecked で示す。
+                     Style="{x:Null}" は外した——あれは「押しても何も起きぬゆえ押下フィードバックの対象外」
+                     という T-089 の扱いにて、機能が付いた今は当たらぬ。WPF 既定の押下表示に委ねる。
+                     【見え方は未確認】隠密の断り＝既定の押下表示は薄い恐れがあり、弱ければ T-101 の
+                     ハイライトの流儀へ揃える要があるやも。侍は実機を持たぬゆえ、忍者の検分に委ねる。
+                     【Tab順は False のまま残した】拡張表示ボタンで「フォーカス中に Enter を押しても
+                     OK 確定が発火せぬ」実害が出た前例（下記コメント）と同じ形になるゆえ。
+                     デバイス名を打って Enter で確定、が主要な操作にて、そちらを守る側へ倒した。
+                     キーボードで到達できぬのはキーボードファーストの思想に反するゆえ、
+                     使い勝手の是非は殿・忍者の目に委ねる。 -->
+                <ToggleButton x:Name="PlacementCommentToggle" Width="24" Height="24" Padding="2"
+                              VerticalAlignment="Center" Margin="0,0,8,0"
+                              AutomationProperties.Name="コメント切替" KeyboardNavigation.IsTabStop="False"
+                              ToolTip="入力欄をデバイス名とコメントで切り替えます"
+                              Click="PlacementCommentToggle_Click">
                     <Path Style="{StaticResource PlacementToolBarIconStyle}"
                           Data="M2,3 L12,3 L12,9 L7,9 L4,13 L4,9 L2,9 Z"/>
-                </Button>
+                </ToggleButton>
                 <!-- 種別選択(T-033増分4/5、殿注文=省スペース化+表示どおりの動作): 文字表記から
                      シンボルのみ表示へ変更。項目は部品選択リストと同じ全種(ORa/ORb含む、
                      PartPaletteViewModel.SelectionEntries、並び順もリストと同一)。アイコンは
@@ -2004,6 +2021,11 @@
                 <TextBlock x:Name="SelectedPartNameText"
                            Text="{Binding SelectedItem.DisplayName, ElementName=PlacementPartComboBox}"
                            MinWidth="60" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <!-- T-153: 入力欄が今どちらを受けておるかを示すラベル。文言は PlacementInputRules が持つ
+                     （コードビハインドと二重に綴りを持たぬため。既定は「デバイス名:」）。
+                     語彙は殿ご裁可2026-08-16＝「デバイス名」に揃える（「機器名」ではなく）ゆえ、
+                     下の AutomationProperties.Name も現行のまま変えておらぬ。 -->
+                <TextBlock x:Name="PlacementInputLabel" Text="デバイス名:" VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBox x:Name="PlacementDeviceNameBox" Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
                          AutomationProperties.Name="デバイス名"
                          Background="{DynamicResource InputBackgroundBrush}"
