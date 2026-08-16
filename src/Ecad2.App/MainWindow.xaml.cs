@@ -2612,6 +2612,20 @@ public partial class MainWindow : Window
             // するため、下記EscapeケースのFindBar優先処理(コメント参照)に到達できず、検索バーの
             // Escapeが配置バー消滅後まで機能しなかった。配置バー自身のEsc/Enterは別経路(IsCancel/
             // IsDefault)で処理されるため本ガードの影響を受けず、ここで個別処理してもバッティングしない。
+            // T-153(殿ご裁可2026-08-16=「Ctrl+Mでいいよ」): コメント切替トグルは IsTabStop=False
+            // （拡張表示ボタンで「フォーカス中のEnterがOK確定を発火せぬ」実害が出た前例に倣う）ゆえ
+            // Tabでは到達できぬ。キーボードファーストの思想に反するのを、専用のキーで補う。
+            // 上のEscape個別処理と同じ形——早期returnより前に置くことで、バー表示中のみ効く。
+            // Key.M は src 内に既存の割当が無いことを確認済み（Key.M の一致0件）。
+            // なお他社システムでは Ctrl+M がシミュレーションモード移行に当てられておる例がある
+            // （docs/ecad2-ladder-reference-systems-survey-onmitsu.md:186）。ecad2 のテストモードとは
+            // 別のキーゆえ現時点で衝突は無いが、将来そちらへ割り当てる筋が出れば再考の要がある。
+            if (e.Key == Key.M && Keyboard.Modifiers == ModifierKeys.Control)
+            {
+                TogglePlacementCommentMode();
+                e.Handled = true;
+                return;
+            }
             if (e.Key == Key.Escape && _viewModel.Find.IsVisible)
             {
                 // T-070隠密独立調査(A-7再発、ecad2-t070-a7-escape-double-press-investigation-onmitsu.md):
@@ -3977,6 +3991,8 @@ public partial class MainWindow : Window
         _placementSavedText = "";
         PlacementCommentToggle.IsChecked = false;
         PlacementInputLabel.Text = Views.PlacementInputRules.DeviceNameLabel;
+        System.Windows.Automation.AutomationProperties.SetName(
+            PlacementDeviceNameBox, Views.PlacementInputRules.DeviceNameAutomationName);
         _viewModel.IsPlacementBarVisible = true;
         PositionPlacementBar(cell);
         // 隠密レビュー指摘(観点3、Microsoft Learn「Focus Overview - WPF」一次情報): Collapsed→
@@ -4315,7 +4331,22 @@ public partial class MainWindow : Window
     /// 確定時（<c>PlacementOkButton_Click</c>）と同じ写像を用いるゆえ、
     /// 「切替では退避したが確定では忘れた」という食い違いが起こり得ぬ。
     /// </para></summary>
-    private void PlacementCommentToggle_Click(object sender, RoutedEventArgs e)
+    private void PlacementCommentToggle_Click(object sender, RoutedEventArgs e) => ApplyPlacementCommentMode();
+
+    /// <summary>T-153: キーボード（<c>Ctrl+M</c>）からトグルを切り替える。殿ご裁可2026-08-16。
+    /// <para>
+    /// <b>状態を反転してから <see cref="ApplyPlacementCommentMode"/> を呼ぶ</b>——これは
+    /// <c>ToggleButton</c> がマウス押下で辿る順序（<c>OnToggle()</c> で <c>IsChecked</c> を反転してから
+    /// <c>Click</c> を発火する）を手で再現したものにござる。<b>同じ経路へ合流させるゆえ、
+    /// 値の退避・ラベル・UIA名・押下表示のすべてがマウス操作と揃う。</b>
+    /// </para></summary>
+    private void TogglePlacementCommentMode()
+    {
+        PlacementCommentToggle.IsChecked = PlacementCommentToggle.IsChecked != true;
+        ApplyPlacementCommentMode();
+    }
+
+    private void ApplyPlacementCommentMode()
     {
         bool isCommentModeAfter = PlacementCommentToggle.IsChecked == true;
 
@@ -4327,6 +4358,10 @@ public partial class MainWindow : Window
         PlacementDeviceNameBox.Text = visibleText;
         _placementSavedText = savedText;
         PlacementInputLabel.Text = Views.PlacementInputRules.LabelFor(isCommentModeAfter);
+        // 隠密の指摘2026-08-16: 視覚のラベルだけを切り替えて UIA 名を据え置けば、コメントを
+        // 入れておる最中も支援技術には「デバイス名」と伝わる。実機でUIAから引く者の取り違えも招く。
+        System.Windows.Automation.AutomationProperties.SetName(
+            PlacementDeviceNameBox, Views.PlacementInputRules.AutomationNameFor(isCommentModeAfter));
         PlacementDeviceNameBox.Focus();
         PlacementDeviceNameBox.CaretIndex = PlacementDeviceNameBox.Text.Length;
     }

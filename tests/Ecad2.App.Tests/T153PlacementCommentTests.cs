@@ -120,6 +120,43 @@ public class T153PlacementCommentTests : ViewModelTestBase
         Assert.Equal(expected, PlacementInputRules.LabelFor(isCommentMode));
     }
 
+    /// <summary>UIA名もモードに従うこと（隠密の指摘2026-08-16）。
+    /// <para>
+    /// 視覚のラベルだけを切り替えて UIA 名を据え置けば、<b>コメントを入れておる最中も支援技術には
+    /// 「デバイス名」と伝わる</b>。実機で UIA から引く者の取り違えの因にもなる。
+    /// <b>コロンが付かぬのは既存の作法</b>——XAML の <c>AutomationProperties.Name</c> は
+    /// 元より「デバイス名」にて、コロンは画面上の見出しの体裁にすぎ申さぬ。
+    /// </para></summary>
+    [Theory]
+    [InlineData(false, "デバイス名")]
+    [InlineData(true, "コメント")]
+    public void UIA名もモードに従う(bool isCommentMode, string expected)
+    {
+        Assert.Equal(expected, PlacementInputRules.AutomationNameFor(isCommentMode));
+    }
+
+    /// <summary>ラベルと UIA 名が同じ綴りを共有し、コロンの有無だけで違うこと。
+    /// <para>
+    /// 分けて持てば、片方だけ直した折に「画面には『コメント:』と出るが UIA には『デバイス名』」
+    /// という食い違いが生まれる。本テストはその食い違いを捕らえる。
+    /// </para>
+    /// <para>
+    /// <b>【射程を実測で区切った・侍の自己訂正2026-08-16】</b>初稿は「実装は <c>const</c> の連結で
+    /// 実体を一つにしてあり、本テストはその形が保たれておるかを見る」と書いておったが、<b>過大であった</b>。
+    /// <c>const</c> の連結をやめて直書きへ戻す改変を当てたところ、<b>本テストは鳴らなんだ</b>
+    /// ——値が同じである限り通るゆえ。<b>すなわち本テストが測るのは「値の一致」までにて、
+    /// 「綴りが一箇所に保たれておるか」は測れておらぬ。</b>
+    /// 二重管理そのものを禁ずる網ではなく、二重管理が食い違った時にだけ鳴る網にござる。
+    /// </para></summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ラベルはUIA名にコロンを足したものである(bool isCommentMode)
+    {
+        Assert.Equal(PlacementInputRules.AutomationNameFor(isCommentMode) + ":",
+                     PlacementInputRules.LabelFor(isCommentMode));
+    }
+
     // ==================================================================
     // 2. 保存経路（ViewModel）——配置と同時にコメントが機器表へ入る
     // ==================================================================

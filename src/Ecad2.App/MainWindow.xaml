@@ -2026,6 +2026,10 @@
                      語彙は殿ご裁可2026-08-16＝「デバイス名」に揃える（「機器名」ではなく）ゆえ、
                      下の AutomationProperties.Name も現行のまま変えておらぬ。 -->
                 <TextBlock x:Name="PlacementInputLabel" Text="デバイス名:" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <!-- AutomationProperties.Name はここでは初期値にすぎぬ——T-153 でモードに追随するようになり、
+                     実体は PlacementInputRules.AutomationNameFor が決める（バー表示時とトグル切替時に設定）。
+                     視覚のラベルだけ切り替えて UIA 名を据え置けば、コメント入力中も支援技術には
+                     「デバイス名」と伝わる（隠密の指摘2026-08-16）。 -->
                 <TextBox x:Name="PlacementDeviceNameBox" Width="220" VerticalAlignment="Center" Margin="0,0,8,0"
                          AutomationProperties.Name="デバイス名"
                          Background="{DynamicResource InputBackgroundBrush}"

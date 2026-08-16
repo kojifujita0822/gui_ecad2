@@ -50,17 +50,45 @@ public static class PlacementInputRules
     public static (string VisibleText, string SavedText) ForMode(bool isCommentModeAfter, string deviceName, string comment)
         => isCommentModeAfter ? (comment, deviceName) : (deviceName, comment);
 
-    /// <summary>トグル OFF 時（デバイス名を表示）の入力欄ラベル。</summary>
-    public const string DeviceNameLabel = "デバイス名:";
-
-    /// <summary>トグル ON 時（コメントを表示）の入力欄ラベル。
+    /// <summary>トグル OFF 時（デバイス名を表示）の、支援技術・UIA へ出す名。
     /// <para>
-    /// 殿ご裁可2026-08-16＝語彙は「デバイス名」に揃える（「機器名」ではなく）。コメント側は
-    /// プロパティパネルの「コメント:」へ揃えた——配置バーでは「デバイス名」と切り替わる形ゆえ、
+    /// 殿ご裁可2026-08-16＝語彙は「デバイス名」に揃える（「機器名」ではなく）。
+    /// </para></summary>
+    public const string DeviceNameAutomationName = "デバイス名";
+
+    /// <summary>トグル ON 時（コメントを表示）の、支援技術・UIA へ出す名。
+    /// <para>
+    /// プロパティパネルの「コメント」へ揃えた——配置バーでは「デバイス名」と切り替わる形ゆえ、
     /// どちらのコメントかは文脈から明らかにござる。
     /// </para></summary>
-    public const string CommentLabel = "コメント:";
+    public const string CommentAutomationName = "コメント";
 
-    /// <summary>モードに応じた入力欄ラベル。</summary>
+    /// <summary>トグル OFF 時の入力欄ラベル（見出しの体裁としてコロンを付す）。
+    /// <para>
+    /// <b>綴りは UIA 名の側が本体にて、ここはそれへコロンを足すのみ</b>——二つに分けて持てば、
+    /// 片方だけ直した折に「画面には『コメント:』と出るが UIA には『デバイス名』」という
+    /// 食い違いが生まれる。<c>const</c> の連結はコンパイル時に解けるゆえ、実体は一つにござる。
+    /// </para></summary>
+    public const string DeviceNameLabel = DeviceNameAutomationName + ":";
+
+    /// <summary>トグル ON 時の入力欄ラベル。綴りの扱いは <see cref="DeviceNameLabel"/> と同じ。</summary>
+    public const string CommentLabel = CommentAutomationName + ":";
+
+    /// <summary>モードに応じた入力欄ラベル（画面表示用。コロン付き）。</summary>
     public static string LabelFor(bool isCommentMode) => isCommentMode ? CommentLabel : DeviceNameLabel;
+
+    /// <summary>モードに応じた入力欄の UIA 名（コロンなし）。
+    /// <para>
+    /// <b>【なぜラベルと分けるか・隠密の指摘2026-08-16】</b>視覚のラベルだけを切り替えて UIA 名を
+    /// 据え置くと、<b>コメントを入れておる最中も支援技術には「デバイス名」と伝わる</b>。
+    /// 忍者が実機で UIA から引く折の取り違えの因にもなる
+    /// （<c>memory: ecad2_comparison_target_identity_pitfall</c>＝比較対象の同定を先に固定せよ、の型）。
+    /// </para>
+    /// <para>
+    /// <b>コロンを落としてあるのは既存の作法に揃えたゆえ</b>——XAML の
+    /// <c>AutomationProperties.Name</c> は元より「デバイス名」（コロンなし）にて、
+    /// コロンは画面上の見出しの体裁にすぎ申さぬ。
+    /// </para></summary>
+    public static string AutomationNameFor(bool isCommentMode)
+        => isCommentMode ? CommentAutomationName : DeviceNameAutomationName;
 }
