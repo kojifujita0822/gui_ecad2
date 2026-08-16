@@ -1247,11 +1247,13 @@ public sealed class DiagramRenderer
 
         if (!string.IsNullOrEmpty(e.DeviceName))
         {
-            // 個別の LabelDy があればそれ、無ければ種別の既定オフセット。
+            // 個別の LabelDy があればそれ、無ければ既定オフセット。
+            // T-151: 既定側の解決は PartResolver.DefaultLabelDy へ寄せた——自作パーツには種別既定を
+            // 適用せぬという規則（殿ご裁可2026-08-16）が、描画とプロパティパネルの双方へ同じ形で効く要があるゆえ。
             double dy = e.Params.TryGetValue(ParamKeys.LabelDy, out var s) &&
                 double.TryParse(s, System.Globalization.NumberStyles.Any,
                     System.Globalization.CultureInfo.InvariantCulture, out double v)
-                ? v : ElementCatalog.DefaultLabelDy(labelKind, orient);
+                ? v : PartResolver.DefaultLabelDy(e, _lib);
 
             // T-145: 横も同じ作法（個別値 Params["LabelDx"] 優先・無ければ種別の既定）。
             double dx = e.Params.TryGetValue(ParamKeys.LabelDx, out var sx) &&

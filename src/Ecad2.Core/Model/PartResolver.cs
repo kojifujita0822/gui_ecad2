@@ -166,4 +166,39 @@ public static class PartResolver
     /// </para></summary>
     public static string? LabelOrient(ElementInstance e, PartLibrary? lib)
         => lib?.Get(e.PartId) is not null ? null : e.Params.GetValueOrDefault(ParamKeys.Orient);
+
+    /// <summary>
+    /// 機器名ラベルの既定高さオフセット(mm、正で上)。要素に <c>Params["LabelDy"]</c> が無い場合に使う値。
+    /// <para>
+    /// <b>【自作パーツには種別既定を適用せぬ・殿ご裁可2026-08-16（T-151）】</b>
+    /// <see cref="ElementCatalog.DefaultLabelDy"/> の値は<b>組込み記号の幾何に較正されたもの</b>にて、
+    /// たとえばコイルの -5.72 は「組込みコイルの丸の中心」を指す（原本GuiEcadのコメント
+    /// 「コイルの丸の中あたりに表示（重なり回避）」がその意図を明言しておる）。<b>自作パーツは絵が違う</b>
+    /// ゆえ同じ位置が図形と重なる——実際、<c>Role=Coil</c> の自作ソレノイド（折れ線）で機器名が絵に重なった。
+    /// </para>
+    /// <para>
+    /// <b>【機構は元より正しかった】</b><see cref="LabelKind"/> が Role 由来の種別を返すこと自体は
+    /// 意図どおりにござる。噛み合わなんだのは<b>較正値と実形状</b>——ゆえに直すのは種別の解決ではなく、
+    /// 較正値を当てはめてよい相手の側にござる。
+    /// </para>
+    /// <para>
+    /// <b>【なぜ二箇所でなくここへ集めたか】</b>この既定値の消費者は<b>描画</b>（<c>DiagramRenderer</c>）と
+    /// <b>プロパティパネルの相対値の基準</b>（<c>MainWindowViewModel.DefaultLabelDyOf</c>）の二つあり、
+    /// T-145 が「片方だけ直せば、入力欄に0と出ておるのに絵は別の場所という食い違いが生じる」として
+    /// 一元化した経緯がある。<b>その一元化を崩さぬよう、分岐そのものを両者の手前へ置いた</b>
+    /// ——呼び手が二つに分かれておっても、規則は一つしか無い形にござる。
+    /// </para>
+    /// <para>
+    /// <b>【弁別の範囲】</b>自作と判ずるのは<b>ライブラリで実体を引けて、かつIdが組込みの固定Id集合に
+    /// 無い</b>場合のみ。未解決の <c>PartId</c>（<see cref="IsUnresolvedPartId"/>）と <c>Kind</c> 経路は
+    /// <b>従来どおり</b>にござる——前者は <c>DRC-PART-001</c> が警告しておる最中の要素にて、
+    /// 見た目まで変えれば別の混乱を招くゆえ。判定に Category（フォルダの物理配置）を用いておらぬのは
+    /// 家老裁定2026-08-15の方式に従うたもの（<see cref="BuiltinPartIds"/> 参照）。
+    /// </para></summary>
+    public static double DefaultLabelDy(ElementInstance e, PartLibrary? lib)
+    {
+        bool isCustomPart = lib?.Get(e.PartId) is not null && !BuiltinPartIds.Contains(e.PartId);
+        if (isCustomPart) return 0.0;
+        return ElementCatalog.DefaultLabelDy(LabelKind(e, lib), LabelOrient(e, lib));
+    }
 }

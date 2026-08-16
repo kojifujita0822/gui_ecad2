@@ -11,30 +11,36 @@ namespace Ecad2.Persistence;
 /// </summary>
 public static class BasicPartTemplates
 {
+    // 【T-151期・綴りの本体を Ecad2.Model.BuiltinPartIds へ移した】
+    // 組込みか自作かの弁別が PartResolver（Model層）で要るようになり、あちらから
+    // 本クラス（Persistence層）を参照すれば依存が相互に絡むゆえ、綴りだけを下層へ移してある。
+    // 以下は既存の呼び手（本ファイル・PartFolderStore・テスト群）を無改修に保つための転送にて、
+    // const の転送ゆえ値は一つしか無い——二重管理にはならぬ。
+
     /// <summary>a接点の固定Id。T-037往復3周目: 旧版JSON(IsOrEligible導入前)の後方互換補正
     /// (<see cref="PartFolderStore.Enumerate"/>)で参照する。</summary>
-    public const string ContactNOId = "basic-contact-no";
+    public const string ContactNOId = BuiltinPartIds.ContactNO;
     /// <summary>b接点の固定Id。用途は<see cref="ContactNOId"/>と同じ。</summary>
-    public const string ContactNCId = "basic-contact-nc";
+    public const string ContactNCId = BuiltinPartIds.ContactNC;
     /// <summary>コイルの固定Id。T-033増分4: 配置バー種別選択のシンボル表示で、既知5種を
     /// Idで判別するために公開する(ContactNOId/ContactNCIdと同じ用途)。</summary>
-    public const string CoilId = "basic-coil";
+    public const string CoilId = BuiltinPartIds.Coil;
     /// <summary>端子台の固定Id。用途は<see cref="CoilId"/>と同じ。</summary>
-    public const string TerminalId = "basic-terminal";
+    public const string TerminalId = BuiltinPartIds.Terminal;
     /// <summary>セレクトSWの固定Id。用途は<see cref="CoilId"/>と同じ。</summary>
-    public const string SelectSwitchId = "basic-select-switch";
+    public const string SelectSwitchId = BuiltinPartIds.SelectSwitch;
 
     // T-071: 経路B部品追加（10種）。固定Idの用途は上記5種と同じ。
-    public const string PushButtonNOId = "basic-pushbutton-no";
-    public const string PushButtonNCId = "basic-pushbutton-nc";
-    public const string LampId = "basic-lamp";
-    public const string MotorId = "basic-motor";
-    public const string TimerContactNOId = "basic-timer-contact-no";
-    public const string TimerContactNCId = "basic-timer-contact-nc";
-    public const string TimerInstantContactNOId = "basic-timer-instant-contact-no";
-    public const string TimerInstantContactNCId = "basic-timer-instant-contact-nc";
-    public const string ThermalOverloadId = "basic-thermal-overload";
-    public const string EmergencyStopId = "basic-emergency-stop";
+    public const string PushButtonNOId = BuiltinPartIds.PushButtonNO;
+    public const string PushButtonNCId = BuiltinPartIds.PushButtonNC;
+    public const string LampId = BuiltinPartIds.Lamp;
+    public const string MotorId = BuiltinPartIds.Motor;
+    public const string TimerContactNOId = BuiltinPartIds.TimerContactNO;
+    public const string TimerContactNCId = BuiltinPartIds.TimerContactNC;
+    public const string TimerInstantContactNOId = BuiltinPartIds.TimerInstantContactNO;
+    public const string TimerInstantContactNCId = BuiltinPartIds.TimerInstantContactNC;
+    public const string ThermalOverloadId = BuiltinPartIds.ThermalOverload;
+    public const string EmergencyStopId = BuiltinPartIds.EmergencyStop;
 
     // T-133増分7: 原本の組み込みパーツ2件（thermal-relay a/b）の移植。固定Idの用途は上記と同じ。
     /// <summary>サーマルリレーa接点の固定Id。
@@ -49,9 +55,9 @@ public static class BasicPartTemplates
     /// <b>前二者は組込み描画（<c>SymbolGlyphs</c>）にて実装形態からして別系統</b>ゆえ、Id も表示名も
     /// 取り違えぬよう区別できる語を採ってある。
     /// </para></summary>
-    public const string ThermalRelayNOId = "basic-thermal-relay-no";
+    public const string ThermalRelayNOId = BuiltinPartIds.ThermalRelayNO;
     /// <summary>サーマルリレーb接点の固定Id。用途・注意は<see cref="ThermalRelayNOId"/>と同じ。</summary>
-    public const string ThermalRelayNCId = "basic-thermal-relay-nc";
+    public const string ThermalRelayNCId = BuiltinPartIds.ThermalRelayNC;
 
     /// <summary>2端子（左=NetA / 右=NetB）の標準ポート。1セル幅の図形で共通。</summary>
     private static List<PortDef> TwoPorts() => new()

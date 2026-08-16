@@ -88,12 +88,18 @@ public static class ElementCatalog
     /// <b>殿裁定2026-08-06＝モータに限って迂回する（根であるT-046の構造は断たぬ）。</b>
     /// </para>
     /// <para>
-    /// <b>【綴りを二重に持つことになる】</b><c>BasicPartTemplates.MotorId</c> が本体だが、
-    /// あちらは <c>Persistence</c> 層にて、<c>Model</c> 層から参照すれば層の向きが逆になる。
-    /// <b>二つが食い違えば迂回が黙って効かなくなる</b>——絵は正しいのにラベルだけ元の位置へ戻り、
-    /// テストも実機も「何も起きておらぬ」ように見える。<b>ゆえに両者の一致をテストで固定してある。</b>
+    /// <b>【綴りの二重管理は T-151期に解消した】</b>かつては本定数と <c>BasicPartTemplates.MotorId</c> が
+    /// 各々に綴りを持ち、<b>二つが食い違えば迂回が黙って効かなくなる</b>——絵は正しいのにラベルだけ
+    /// 元の位置へ戻り、テストも実機も「何も起きておらぬ」ように見える——という罠を抱えておった。
+    /// <b>組込みIdの弁別が <see cref="PartResolver"/> でも要るようになったのを機に、綴りの本体を
+    /// <see cref="BuiltinPartIds"/>（<c>Model</c>層）へ集め、双方をそこへの転送に改めてある。</b>
+    /// </para>
+    /// <para>
+    /// <b>【一致を固定しておった既存テストは、検出力を失った】</b>両者が同じ const を指す以上、
+    /// 食い違いは原理的に起こらぬゆえ常にGREENとなる。<b>網を消したのではなく、守るべき対象の方が
+    /// 構造から消えた</b>——テストは記録として残してある。
     /// </para></summary>
-    public const string MotorPartId = "basic-motor";
+    public const string MotorPartId = BuiltinPartIds.Motor;
 
     /// <summary>ラベル位置の解決で「縦向き」と見なす <see cref="ParamKeys.Orient"/> の値か（T-145）。
     /// <b><c>SymbolGlyphs</c> のモータ描画と同じ規則でなければ、絵とラベルがずれる</b>

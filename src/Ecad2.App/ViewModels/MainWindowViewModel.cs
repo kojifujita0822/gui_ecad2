@@ -2482,11 +2482,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// <para>
     /// 向き(<see cref="ParamKeys.Orient"/>)も渡す——モータは向きによって本体大円の位置が変わり、
     /// 既定オフセットもそれに従うゆえ。
+    /// </para>
+    /// <para>
+    /// <b>【T-151で <c>PartResolver.DefaultLabelDy</c> へさらに寄せた】</b>「自作パーツには種別既定を
+    /// 適用せぬ」（殿ご裁可2026-08-16）という規則が加わり、<b>種別と向きを解いた後にもう一段の分岐が
+    /// 要るようになった</b>。その分岐を描画側と本メソッドの二箇所へ書けば、上の警告どおりの食い違いが
+    /// そのまま再来する——<b>ゆえに分岐ごと下層へ移し、両者は同じ一つの規則を呼ぶだけの形にした。</b>
     /// </para></summary>
     private double DefaultLabelDyOf(ElementInstance element)
-        => ElementCatalog.DefaultLabelDy(
-            PartResolver.LabelKind(element, PartLibrary),
-            PartResolver.LabelOrient(element, PartLibrary));
+        => PartResolver.DefaultLabelDy(element, PartLibrary);
 
     /// <summary>ラベル高さオフセットの相対値(mm、T-097、殿裁定=種別既定の表示位置(
     /// <see cref="ElementCatalog.DefaultLabelDy"/>)を0として+-で上下させる相対オフセット方式)。
