@@ -63,6 +63,7 @@ public static class DesignRuleCheck
             {
                 if (string.IsNullOrEmpty(elem.DeviceName)) continue;
                 if (!PartResolver.CreatesComponent(elem, lib)) continue;
+                if (IsExcludedFromCrossReference(elem, lib)) continue;   // T-152（殿ご裁可2026-08-16）
                 var kind = PartResolver.ComponentKind(elem, lib);
                 // リレー接点＝接点のうち外部入力駆動でないもの（ContactNO/NC・タイマ限時/瞬時接点）
                 bool isRelayContact = ElementCatalog.IsContact(kind) && !ElementCatalog.IsInputControlled(kind);
@@ -106,6 +107,41 @@ public static class DesignRuleCheck
                     u.RelayContacts));
         }
         return diagnostics;
+    }
+
+    /// <summary>
+    /// クロスリファレンス検査の集計から除く要素か（T-152、殿ご裁可2026-08-16＝案B）。
+    /// <para>
+    /// <b>【何を塞いでおるか】</b>役割を正した結果として残る、消しようのない警告にござる。
+    /// サーマルリレーa/b は電気的にa接点・b接点にて役割は正しいが、駆動する<b>コイルを持たぬ</b>
+    /// （動作するのは熱動素子ゆえ）。ソレノイド等の自作コイルは逆に<b>対になる接点を持たぬ</b>。
+    /// いずれも図面としては正しく、されど検査は片側だけを見て警告を出し続けておった。
+    /// </para>
+    /// <para>
+    /// <b>【二つの経路を一つの門にまとめてある】</b>組込みのサーマルリレーは固定Idで弁別でき、
+    /// 自作パーツは Id が可変ゆえ <see cref="PartDefinition.IsExcludedFromCrossReference"/> を見る。
+    /// 集計へ入る手前で揃って弾くゆえ、<b>接点側（<c>DRC-XREF-001</c>）とコイル側（<c>DRC-XREF-002</c>）の
+    /// 双方に同じ形で効く</b>。
+    /// </para>
+    /// <para>
+    /// <b>【なぜサーマルリレーの側は、テンプレートの定義に印を立てぬか】</b>
+    /// <c>BasicPartTemplates.ThermalRelayNO()</c> へマーカーを立てる形の方が一見きれいだが、
+    /// <b>それでは既存の環境に届かぬ</b>——<c>PartFolderStore.SeedBasics</c> は展開済みのファイルを
+    /// 上書きせぬ設計にて、コード側の定義を変えても利用者の「図形/」フォルダに既に在る
+    /// <c>.gcadpart</c> は古いままだからである（同じ機序で T-037・T-061・T-143 が後追いの補正を
+    /// 要した実例が <c>PartFolderStore</c> に残っておる）。
+    /// <b>PartId での直指定はディスクの内容に依らず効く</b>ゆえ、こちらを採った。
+    /// </para>
+    /// <para>
+    /// <b>【将来の統合について】</b>台帳（T-152節）は「PartId直指定は暫定でよく、後日マーカー側へ
+    /// 統一する道が開いておる」と記す。統一する際は、上記の展開済みファイル問題を
+    /// <c>PartFolderStore</c> の補正で先に解く要がある——<b>順序を違えれば、既存環境でのみ
+    /// 警告が復活するという形で現れる</b>。
+    /// </para></summary>
+    private static bool IsExcludedFromCrossReference(ElementInstance elem, PartLibrary? lib)
+    {
+        if (elem.PartId is BuiltinPartIds.ThermalRelayNO or BuiltinPartIds.ThermalRelayNC) return true;
+        return lib?.Get(elem.PartId)?.IsExcludedFromCrossReference == true;
     }
 
     /// <summary>

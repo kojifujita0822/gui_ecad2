@@ -85,6 +85,28 @@ public sealed class PartDefinition
     /// マッピングを持たぬ）。旧 <c>.gcadpart</c> に本フィールドが無ければ既定値のまま読まれる。
     /// </para></summary>
     public SheetAffinity SheetAffinity { get; set; } = SheetAffinity.Any;
+    /// <summary>クロスリファレンス検査（<c>DRC-XREF-001</c>／<c>DRC-XREF-002</c>）から除外するか
+    /// （T-152、殿ご裁可2026-08-16＝案B）。既定 false。
+    /// <para>
+    /// <b>【何のために要るか】</b>電磁弁のソレノイドは電気的にはコイルにて、役割も <c>Coil</c> が正しい。
+    /// されどリレーのコイルとは違い<b>対応する接点を持たぬ</b>ゆえ、死にリレー検査
+    /// （<c>コイルがありますが接点が図面上に一つもありません</c>）が消せぬ警告として出続けておった。
+    /// 役割を正した結果として現れる警告にて、役割の側を歪めて黙らせるのは筋が違う——ゆえに
+    /// <b>役割とは直交する印</b>を一つ置き、検査の側で除外する形を採った。
+    /// </para>
+    /// <para>
+    /// <b>【役割の選択肢を増やす案は退けられておる】</b>「コイル（接点なし）」という
+    /// <see cref="PartRole"/> を新設する案もあったが、<c>PartResolver.ComponentKind</c> の switch が
+    /// 未対応の役割で例外を投げる設計ゆえ、<b>洗い出し漏れがコンパイルエラーでなく実行時例外として
+    /// 現れる</b>（隠密の見立て）。加えて <see cref="IsOrEligible"/> と同じ「役割に依らぬ直交フラグ」の
+    /// 思想とも競合する。殿は案Bをお選びになった。
+    /// </para>
+    /// <para>
+    /// 永続化＝<c>JsonSerializer</c> による自動反映（<see cref="SheetAffinity"/> と同じ）。
+    /// <b>本フィールドを持たぬ旧 <c>.gcadpart</c> は既定の false で読まれる</b>——すなわち
+    /// 既存のパーツはすべて従来どおり検査の対象に留まる。
+    /// </para></summary>
+    public bool IsExcludedFromCrossReference { get; set; }
     /// <summary>接続点。2端子役割は先頭=NetA・末尾=NetB（境界オフセット昇順を想定）。</summary>
     public List<PortDef> Ports { get; set; } = new();
     public List<PartPrimitive> Primitives { get; set; } = new();

@@ -24,7 +24,8 @@ public class PartEditorUndoRulesTests
     /// <b>幅と高さに違う値（3と5）を入れてあるのは、両者を取り違える実装を検出するため</b>
     /// （同じ値だと入れ替えても等価になり、誤りが素通りする）。</summary>
     private static PartEditorExternalState Base()
-        => new(WidthCells: 3, HeightCells: 5, PartRole.ContactNO, SheetAffinity.Any);
+        => new(WidthCells: 3, HeightCells: 5, PartRole.ContactNO, SheetAffinity.Any,
+               IsExcludedFromCrossReference: false);   // T-152で項目が増えた。基準は既定のオフ
 
     [Fact]
     public void 何も変わっておらねば積まぬ()
@@ -46,6 +47,17 @@ public class PartEditorUndoRulesTests
     public void シート種別が変われば積む()
         => Assert.True(PartEditorUndoRules.ShouldRecord(
             Base(), Base() with { SheetAffinity = SheetAffinity.MainCircuitOnly }));
+
+    /// <summary>クロスリファレンス除外が変われば積む（T-152で加わった5項目目）。
+    /// <para>
+    /// <see cref="PartEditorUndoRules.ShouldRecord"/> はレコードの値等価性へ委ねてあるゆえ、
+    /// 項目を足すだけで判定は自動的に追随する。<b>本テストはその追随を測るものにて、
+    /// 将来この判定が手書きの項目比較へ変えられた折に、新項目の書き漏らしを捕らえる網</b>にござる。
+    /// </para></summary>
+    [Fact]
+    public void クロスリファレンス除外が変われば積む()
+        => Assert.True(PartEditorUndoRules.ShouldRecord(
+            Base(), Base() with { IsExcludedFromCrossReference = true }));
 
     /// <summary>
     /// 幅と高さを入れ替えた状態は「変わった」と判ずる。

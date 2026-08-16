@@ -102,6 +102,7 @@ public partial class PartEditorDialog : Window
             HeightBox.Text = edit.HeightCells.ToString();
             SelectRole(edit.Role);
             SelectAffinity(edit.SheetAffinity);
+            ExcludeFromCrossReferenceCheck.IsChecked = edit.IsExcludedFromCrossReference;   // T-152
         }
         else
         {
@@ -110,6 +111,9 @@ public partial class PartEditorDialog : Window
             HeightBox.Text = "1";
             RoleCombo.SelectedIndex = 0;
             AffinityCombo.SelectedIndex = 0;   // 既定＝どちらでも（AffinityChoices の先頭）
+            // T-152: 既定オフ。CheckBox の既定は未チェックゆえ明示は要らぬが、
+            // 「既定オフが殿ご裁可の要件である」ことを読み手へ残すために書いておく。
+            ExcludeFromCrossReferenceCheck.IsChecked = false;
         }
 
         // T-068増分3-b2: Undo/RedoのスナップショットはGuiEcad原本のEditorSnapshotと同じ5項目
@@ -333,7 +337,8 @@ public partial class PartEditorDialog : Window
         ParseCells(WidthBox.Text, MinCells),
         ParseCells(HeightBox.Text, MinCells),
         SelectedRole(),
-        SelectedAffinity());
+        SelectedAffinity(),
+        ExcludeFromCrossReferenceCheck.IsChecked == true);   // T-152
 
     private void RestoreExternalState(PartEditorExternalState state)
     {
@@ -346,6 +351,7 @@ public partial class PartEditorDialog : Window
             HeightBox.Text = state.HeightCells.ToString();
             SelectRole(state.Role);
             SelectAffinity(state.SheetAffinity);
+            ExcludeFromCrossReferenceCheck.IsChecked = state.IsExcludedFromCrossReference;   // T-152
         }
         finally
         {
@@ -426,6 +432,16 @@ public partial class PartEditorDialog : Window
     private void ExternalStateCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // InitializeComponent 中・項目の構築中は _lastRecordedExternal がまだ無い。
+        if (_restoringExternalState || _lastRecordedExternal is not { } before) return;
+        RecordExternalStateChangeIfAny(before);
+    }
+
+    /// <summary>クロスリファレンス除外のチェックが変わったとき、変更を1段の履歴として積む（T-152）。
+    /// <para>
+    /// コンボと処理は同じにて、<c>Checked</c>／<c>Unchecked</c> の二つのイベントを一つの口で受ける。
+    /// </para></summary>
+    private void ExternalStateCheck_Changed(object sender, RoutedEventArgs e)
+    {
         if (_restoringExternalState || _lastRecordedExternal is not { } before) return;
         RecordExternalStateChangeIfAny(before);
     }
@@ -515,17 +531,18 @@ public partial class PartEditorDialog : Window
         var primitives = PartOptimizer.MergeCollinearLines(ShapeCanvas.Primitives);
 
         var affinity = SelectedAffinity();   // T-136(A)増分2
+        bool excludedFromXref = ExcludeFromCrossReferenceCheck.IsChecked == true;   // T-152
         Result = _editing is { } original
             ? new PartDefinition
             {
                 Id = original.Id, Name = name, WidthCells = width, HeightCells = height, Role = role,
-                SheetAffinity = affinity,
+                SheetAffinity = affinity, IsExcludedFromCrossReference = excludedFromXref,
                 IsOrEligible = original.IsOrEligible, Ports = ports, Primitives = primitives,
             }
             : new PartDefinition
             {
                 Name = name, WidthCells = width, HeightCells = height, Role = role,
-                SheetAffinity = affinity,
+                SheetAffinity = affinity, IsExcludedFromCrossReference = excludedFromXref,
                 Ports = ports, Primitives = primitives,
             };
 

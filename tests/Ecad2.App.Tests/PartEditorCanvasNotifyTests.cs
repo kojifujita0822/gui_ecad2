@@ -33,7 +33,8 @@ public class PartEditorCanvasNotifyTests
     private static void RunSta(Action action) => StaTestRunner.Run(action);
 
     private static PartEditorExternalState State(int width = 3, int height = 5)
-        => new(width, height, PartRole.ContactNO, SheetAffinity.Any);
+        => new(width, height, PartRole.ContactNO, SheetAffinity.Any,
+               IsExcludedFromCrossReference: false);   // T-152で項目が増えた。本テスト群の観点は変えぬ
 
     /// <summary>
     /// 入力欄の変更を積む経路が <c>StateChanged</c> を発火させること。

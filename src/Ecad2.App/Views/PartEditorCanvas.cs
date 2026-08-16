@@ -21,7 +21,12 @@ public enum PartEditTool { Select, Line, Polyline, Rect, Circle, Arc, Rotate, Te
 /// 渡し忘れをコンパイラに検出させる側を採った（T-133増分3・T-136増分1と同じ作法）。
 /// </remarks>
 public sealed record PartEditorExternalState(
-    int WidthCells, int HeightCells, PartRole Role, SheetAffinity SheetAffinity);
+    int WidthCells, int HeightCells, PartRole Role, SheetAffinity SheetAffinity,
+    // T-152（殿ご裁可2026-08-16）: クロスリファレンス検査からの除外。配置先と同じく入力欄の一つゆえ、
+    // T-144 の「四項目の作法を揃える」に倣い Undo 対象へ加える。
+    // PartEditorUndoRules.ShouldRecord はレコードの値等価性へ委ねてあるゆえ、
+    // 本項目を足すだけで判定は自動的に追随する（比較の書き漏らしが構造的に起きぬ形）。
+    bool IsExcludedFromCrossReference);
 
 /// <summary>
 /// T-068増分3-b2: 自作パーツの形状編集キャンバス（選択/線/折れ線/矩形/円/弧/回転の7ツール）。

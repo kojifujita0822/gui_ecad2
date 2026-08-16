@@ -61,10 +61,19 @@
 
             <!-- T-136(A)増分2: 置けるシートの種別。RoleComboと同じ enum→日本語ラベルの形。 -->
             <TextBlock Text="配置先:" VerticalAlignment="Center" Margin="0,0,6,0"/>
-            <ComboBox x:Name="AffinityCombo" Width="150" VerticalAlignment="Center"
+            <ComboBox x:Name="AffinityCombo" Width="150" VerticalAlignment="Center" Margin="0,0,16,0"
                       SelectionChanged="ExternalStateCombo_SelectionChanged"
                       ToolTip="この部品を置けるシートを限ります（既定＝どちらでも）"
                       Background="{DynamicResource InputBackgroundBrush}"
+                      Foreground="{DynamicResource InputForegroundBrush}"/>
+
+            <!-- T-152(殿ご裁可2026-08-16): 対になる接点／コイルを持たぬ部品（電磁弁のソレノイド等）を
+                 クロスリファレンス検査から外す。既定オフ＝普通のコイル・接点が既定で、例外を明示する形。
+                 文言は殿ご裁可のものをそのまま用いる。 -->
+            <CheckBox x:Name="ExcludeFromCrossReferenceCheck" VerticalAlignment="Center"
+                      Content="クロスリファレンス検査から除外する"
+                      Checked="ExternalStateCheck_Changed" Unchecked="ExternalStateCheck_Changed"
+                      ToolTip="対になる接点やコイルを持たぬ部品（電磁弁のソレノイド等）に用います"
                       Foreground="{DynamicResource InputForegroundBrush}"/>
         </WrapPanel>
 
