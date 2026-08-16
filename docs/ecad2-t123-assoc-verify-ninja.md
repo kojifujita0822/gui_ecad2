@@ -288,6 +288,42 @@ HKCU\...\FileExts\.gcad\UserChoiceLatest\ProgId   ← 【サブキー】
 **(甲) が測るのは「`UserChoiceLatest` が無い状態」までにて、「履歴が一切無い状態」ではない。**
 `OpenWithProgids`／`OpenWithList` は残る。**新規環境へ一段近づくが、届きはせぬ。**
 
+## 6-6. 【測る前に書き置く・六度目】アンインストールの前後
+
+殿ご裁可＝アンインストールのみ行い、関連付けは 8/18 まで空のままとする。
+**本節はアンインストールの前に書いた。事前状態も採取済み**（下記）。
+
+### 採った事前状態（13:46）
+
+| 項 | 値 |
+|---|---|
+| `C:\Program Files\ecad2\` | **438ファイル・153,981,360バイト**（一覧＝`t123-installdir-before.txt`） |
+| アンインストーラ | `unins000.exe`（4,470,396B）／`unins000.dat`（70,476B） |
+| ショートカット | `ProgramData\...\Start Menu\Programs\ecad2` 在り／`Public\Desktop\ecad2.lnk` 在り |
+| Uninstall レジストリ | `ecad2` / `0.6.0` / `"C:\Program Files\ecad2\unins000.exe"` |
+| ユーザーデータ | `…\ドキュメント\Ecad2\` **24ファイル**（MD5 一覧＝`t123-userdata-before.txt`） |
+| `CloseApplications` | **`yes`**（`.iss:53`）＝**起動中でも自動終了されるゆえ、殿が開いたままでも進められる** |
+
+### 予測
+
+| # | 予測 | 根拠 |
+|---|---|---|
+| 1 | `HKLM\...\.gcad` の既定値が**消える** | `Flags: uninsdeletevalue` |
+| 2 | `HKLM\...\Ecad2.Document` が**キーごと消える** | `Flags: uninsdeletekey` |
+| 3 | `C:\Program Files\ecad2\` が消える | ただし**残骸の目あり**——インストール後に生成された物（ログ・設定）は `[Files]` の管轄外 |
+| 4 | ショートカット二つが消える | `[Icons]` |
+| 5 | **ユーザーデータ24件は無傷** | インストーラーは `MyDocuments` に触れておらぬ |
+| 6 | **`FileExts\.gcad` はそのまま残る** | インストーラーの管轄外。**`Hash` だけの不整合も残る** |
+
+### 【予測に添える一事】我らの検証が、新たな残骸を一つ作り申す
+
+**`OpenWithProgids` の `Ecad2.Document` は残る一方、ProgId の実体は消える。**
+すなわち**「名前だけ残って実体の無い登録」が Ecad2 側にも生まれる**——
+**本日朝に見つけた `gcad_auto_file`（実在せぬ `Gui_cad\` を指す残骸）と、同じ形**にござる。
+
+**朝は「この残骸は誰がいつ作ったか追えぬ」と申したが、こちらは我らが作ったと判っておる。**
+**記録に残しておけば、次に誰かが `.gcad` を調べた時、由来を辿れ申す。**
+
 ## 7. 操作手法・現況
 
 - 測定はすべて読み取りのみ。書き換えは一切行うており申さぬ
