@@ -145,13 +145,69 @@
 
 **これは実測せねば分からぬ**——推測にござる。
 
+### 【実測で埋めた】生きた登録はどれか——殿へ名指しできる形
+
+2026-08-16、家老の下命により追って調べた分にござる。読み取りのみ。
+
+| 候補 | 在り処 | 指すパス | 生死 |
+|---|---|---|---|
+| `GuiEcad.Document` | **HKLM**\SOFTWARE\Classes | `C:\Program Files\GuiEcad\GuiEcad.App.exe` | **生きておる** |
+| `gcad_auto_file` | **HKCU**\Software\Classes | `C:\Program Files\Gui_cad\…` | 死んでおる |
+| `Applications\GuiEcad.App.exe` | **HKCU**\Software\Classes | 同上 `Gui_cad\…` | 死んでおる |
+| `Ecad2.Document` | — | — | 不在 |
+
+**死んだ登録は二つとも HKCU 側、生きた登録は HKLM 側**にきれいに分かれ申した。
+`Applications\GuiEcad.App.exe` の `FriendlyAppName` は空にて、
+「プログラムから開く」に出る表示名は exe のメタから引かれる形。
+**同じ「GuiEcad」の名が複数並ぶ恐れがあるが、これは実測しておらぬ——推測にござる。**
+
+### 【実測で埋めた】インストーラーの現物は在る。ただし版数に注意
+
+`C:\Users\kojif\Desktop\生産物\gui_ecad\installer\` に五版が実在
+（`1.0.4` / `1.0.5` / `1.0.6` / `1.0.7` / `1.0.61`。いずれも約71.8MB）。
+
+**現在インストールされておるのは `1.0.6`**（`C:\Program Files\GuiEcad\GuiEcad.App.exe` の
+`ProductVersion` = `1.0.6+83582ef…`、更新 2026-07-01 00:05:28）。
+すなわち**版を動かさずに戻すなら `GuiEcad_Setup_1.0.6.exe`** にござる。
+`1.0.61` を入れれば殿の GuiEcad の版が上がる——検証のための復旧が、別の変更を持ち込む形になり申す。
+
+### 【最重要】GuiEcad の `.iss` も `Root: HKCR` を使うており申す
+
+`installer\GuiEcad_Setup.iss:61`——
+
+```
+Root: HKCR; Subkey: ".gcad"; ValueType: string; ValueName: ""; ValueData: "GuiEcad.Document"; Flags: uninsdeletevalue
+```
+
+**侍が Ecad2 の `.iss` から割った機序（HKCRへ書くと、既にHKCUに在るキーへ吸い寄せられる）が、
+GuiEcad の再インストールにもそのまま当てはまり申す。**
+現況で `HKCU\Software\Classes\.gcad` のキーは実在するゆえ、
+**再インストールしても HKCU 側へ着地する公算が高い。**
+
+ただし**HKCU へ着地しても関連付けとしては働く**（HKCU が優先されるゆえ）。
+戻し手として成立せぬわけではござらぬ——**着地先が HKLM にならぬ、というだけ**にござる。
+`ChangesAssociations=yes` ゆえエクスプローラーへの通知も行われる。
+
+### 再インストールに伴う副作用（殿へ先にお伝えすべきもの）
+
+同 `.iss` より：
+
+- `[InstallDelete] Type: filesandordirs; Name: "{app}"` ——**`C:\Program Files\GuiEcad\` を
+  丸ごと削除してから入れ直す。** 殿の GuiEcad が一時的に消え申す
+- `PrivilegesRequired=admin` ——殿のお手が要る
+- `CloseApplications=yes` ——GuiEcad 起動中なら自動終了される
+- `[Run]` ——完了後に GuiEcad が起動する（チェックを外せば起きぬ）
+
 ### 候補（いずれも家老・殿のご判断を仰ぐ）
 
 | 案 | 中身 | 見立て |
 |---|---|---|
-| (a) 殿が「プログラムから開く」で GuiEcad を選ぶ | 手は一度きり | 上記のとおり死んだ側を掴む恐れ。選んだ後に `FindExecutable` で確かめれば判る |
-| (b) GuiEcad のインストーラーを再実行 | 関連付けが書き直される | 最も確実と見るが、インストーラーの現物が手元に在るかを確かめておらぬ。`unins000.exe` は Inno Setup のアンインストーラーゆえ修復機能は持たぬ |
+| **(b) `GuiEcad_Setup_1.0.6.exe` を再実行** | 関連付けが書き直される | **最も確実。**現物あり・版も動かぬ。ただし `{app}` 丸ごと削除を伴い、殿のお手（昇格）を要す |
+| (a) 殿が「プログラムから開く」で GuiEcad を選ぶ | 手は一度きり | 死んだ候補が二つ並んでおり、掴み誤る恐れ。選んだ後に `FindExecutable` で確かめれば判るが、誤れば選び直しになり申す |
 | (c) レジストリを直接書く | 一発で戻る | **家老が禁じておられる。**候補として挙げるのみ |
+
+**忍者の見立て＝(b) を推す。** (a) は手が軽い代わりに、死んだ登録を掴めば
+「関連付けは付いたのに起動せぬ」という、最も判りにくい壊れ方をし申す。
 
 **順序の注意**——Ecad2 の検証が済んだ後に Ecad2 をアンインストールすると、`.gcad` は
 再び「どこにも向かぬ」状態へ戻る公算が高い（8/14がまさにそれにござった）。
