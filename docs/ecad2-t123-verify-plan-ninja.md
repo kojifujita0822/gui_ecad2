@@ -82,14 +82,35 @@
 
 ### 観点A: 着地先が HKLM になったか（`HKA` 改修の直接の証）
 
-- `HKLM\SOFTWARE\Classes\.gcad` の既定値（`GetValue('')` で）
-- `HKLM\SOFTWARE\Classes\Ecad2.Document\shell\open\command`
-- HKCU 側の残骸（既定値の空いた `.gcad` キー）が残るか消えるか
-- `HKCR\.gcad` の統合ビューが HKLM・HKCU いずれを写しておるか
+**【2026-08-16 改訂】改修後の `.iss`（`b483ab5`）を現物で読んで観測項目を確定した。**
+`Root: HKA; Subkey: "Software\Classes\…"` の四行にて、`PrivilegesRequired=admin` ゆえ
+**HKA は HKLM に定まる**（`.iss:98` に侍の注釈あり）。ゆえに見るべきは以下の四箇所。
 
-侍が `.iss` から割った機序（HKCRへ書くと既にHKCUに在るキーへ吸い寄せられる）が正しければ、
-改修後は HKLM に着地し、HKCU の空キーは残ったまま「負けておる」状態になる筈。
-**残骸が残ること自体は異常ではない**——どちらが勝つかが要点にござる。
+| 見る場所 | 期待値 |
+|---|---|
+| `HKLM\SOFTWARE\Classes\.gcad` の既定値 | `Ecad2.Document` |
+| `HKLM\SOFTWARE\Classes\Ecad2.Document` の既定値 | `ecad2 回路図ファイル` |
+| 同 `\DefaultIcon` | `<app>\Ecad2.App.exe,0` |
+| 同 `\shell\open\command` | `"<app>\Ecad2.App.exe" "%1"` |
+
+いずれも `(Get-Item $path).GetValue('')` で読むこと（`-Name '(default)'` では読めぬ。1節の断り）。
+
+### 観点A-2: 【予測を先に立てておく】HKCU の空キーに負けぬこと
+
+**本日の実測（家老案の検分、5節の表）から、忍者は次を予測しておる**——
+
+> `HKLM` に `.gcad` の既定値が書かれ、`HKCU` 側には既定値の無い `.gcad` キーが残る。
+> **これは `.eml` とまったく同じ形**にて、**統合ビューには HKLM の既定値が出る**筈。
+
+**すなわち `HKCR\.gcad` の既定値が `Ecad2.Document` と読めれば、予測が当たったことになる。**
+
+**併せて、HKCU 側は「変わらぬのが期待値」にござる**——`HKA`（=HKLM）へのみ書くゆえ、
+HKCU の空キーは触られぬ。**残骸が残ること自体は異常ではなく、どちらが勝つかが要点。**
+（`ninja.md`「対照で差が出ぬことが期待値である場合がある」）
+
+**予測を先に書いておく意味**＝T-151 で効いた作法をそのまま用いるものにござる。
+**「動いた／動かぬ」を後から解釈するのではなく、先に数と形を予測して突き合わせる。**
+**外れた場合は、`.eml` から立てた読み（マージは値単位）の側を疑う手がかりになり申す。**
 
 ### 観点B: `.gcad` の解決（非侵襲 → 侵襲の順）
 
