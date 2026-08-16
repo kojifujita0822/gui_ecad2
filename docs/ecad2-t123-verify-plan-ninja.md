@@ -20,10 +20,10 @@
 |---|---|
 | `C:\Program Files\Ecad2\` 等 | 不在（(x86)・LOCALAPPDATA\Programs も同じ） |
 | `FindExecutable('.gcad検体')` | 戻り値 **31**（`SE_ERR_NOASSOC`）、結果は空文字列 |
-| `AssocQueryString` id=1 COMMAND | `0x80070483`（ERROR_NO_ASSOCIATION） |
-| 同 id=2 EXECUTABLE | `0x80070483` |
+| `AssocQueryString` id=1 COMMAND | `0x80070483`（ERROR_NO_ASSOCIATION）※下記の断りを読まれたい |
+| 同 id=2 EXECUTABLE | `0x80070483` ※**この値は何も意味せぬ。下記参照** |
 | 同 id=3 FRIENDLYDOCNAME | `GuiEcad 回路図ファイル` |
-| 同 id=4 FRIENDLYAPPNAME | `0x80070483` |
+| 同 id=4 FRIENDLYAPPNAME | `0x80070483` ※同上 |
 | `HKLM\SOFTWARE\Classes\.gcad` | **キー自体が不在** |
 | `HKCU\Software\Classes\.gcad` | キーは在るが既定値が未設定 |
 | `HKCU\...\FileExts\.gcad\UserChoice` | キー不在 |
@@ -38,11 +38,45 @@
 要は、`.gcad` は現在どのアプリにも解決され申さぬ。文書の呼び名だけが `GuiEcad.Document` の
 残骸から引かれておる状態にござる。
 
-### 測り方の落とし穴（本日踏んだ）
+### 測り方の落とし穴、その一（本日踏んだ）
 
 レジストリの既定値を `Get-ItemProperty -Name '(default)'` で問うと、キーが在っても
 「不在」と返り申す。`(Get-Item $path).GetValue('')` で問い直すこと。
 初回の測定はこれを誤り、HKCU 側のキーの実在を見落としかけ申した。
+
+### 【重要】測り方の落とし穴、その二——`AssocQueryString` は本件の測定に使えぬ
+
+**本書の初版は「`FindExecutable` と `AssocQueryString` の二軸で採る」と書いておったが、これは誤りにござった。**
+
+同日、素朴なベースラインを混ぜて測ったところ、**この環境では `.txt` も `.pdf` も
+`ASSOCSTR_EXECUTABLE`（id=2）で `0x80070483` を返し申した。**
+すなわち**この API はどの拡張子でも NOASSOC を返しており、`.gcad` が NOASSOC でも何も言えぬ。**
+
+| 拡張子 | `AssocQueryString` id=2 | `FindExecutable` |
+|---|---|---|
+| `.txt` | NOASSOC | **Notepad.exe** |
+| `.pdf` | NOASSOC | **Acrobat.exe** |
+| `.cbz` | NOASSOC | **NeeView.exe** |
+| `.rar` | NOASSOC | **NeeView.exe** |
+| `.eml` | NOASSOC | **thunderbird.exe** |
+| `.png` | NOASSOC | err=31（下記） |
+| `.gcad` | NOASSOC | err=31 |
+
+**`FindExecutable` は正しく働いており申す。**ゆえに解決の測定はこちらを主軸とする。
+
+**`.png` が err=31 を返すのは、既定アプリが「フォト」＝パッケージアプリゆえと見る**
+（`FindExecutable` は従来型 exe しか返せぬ）。**Ecad2・GuiEcad はいずれも通常の exe ゆえ本件では障らぬ。**
+
+**二軸目は `AssocQueryString` ではなく、レジストリを自分で辿る形へ改める**——
+`.gcad` の既定値 → その ProgId → `shell\open\command`。
+すなわち「シェルに問う」と「己で辿る」の二軸にござる。
+
+**【この誤りが露見した経緯】** 家老の案（後述）を検分するため、
+`.gcad` 以外の拡張子でも同じ測定を行ったところ、`.txt` まで NOASSOC を返して初めて気づき申した。
+**`.gcad` だけを測っておれば、最後まで気づかなんだ。**
+`memory: feedback_control_experiment_needs_naive_baseline`（対照実験には素朴なベースラインを混ぜる）
+および `ninja.md`「疑うべきは観測対象だけでなく、観測手段そのものでもある」がそのまま効いた形。
+**後者は本日の朝、忍者自身が落とした条にござる。**
 
 ## 2. 観点別の測り方
 
@@ -62,8 +96,12 @@
 **非侵襲（起動もダイアログも伴わぬ。二軸で採る）**
 
 1. `FindExecutable`（shell32）——1節で対照済み。改修後に `C:\Program Files\Ecad2\Ecad2.App.exe`
-   が返れば解決は通った証
-2. `AssocQueryString` id 1〜8 の全掃き——同じく1節で対照済み
+   が返れば解決は通った証。**本件で唯一使える「シェルに問う」手段にござる**
+2. **レジストリを己で辿る**——`.gcad` の既定値 → その ProgId → `shell\open\command`。
+   HKLM・HKCU の双方を見て、どちらが勝っておるかも併せて採る
+
+**`AssocQueryString` は使わぬ**（1節の断りのとおり、この環境ではどの拡張子でも NOASSOC を返す）。
+ただし id=3 FRIENDLYDOCNAME だけは値を返すゆえ、**ProgId の表示名の確認には使える**。
 
 **侵襲（実際に起動する）**
 
@@ -208,6 +246,39 @@ GuiEcad の再インストールにもそのまま当てはまり申す。**
 
 **忍者の見立て＝(b) を推す。** (a) は手が軽い代わりに、死んだ登録を掴めば
 「関連付けは付いたのに起動せぬ」という、最も判りにくい壊れ方をし申す。
+
+### 【追加】(d) 家老案——`HKCU\Software\Classes\.gcad` の既定値へ `GuiEcad.Document` を書く
+
+家老より「一値で済み副作用も無い」との案が出申した。忍者が実測で検分した結果を記す。
+
+**懸念されたのは `UserChoiceLatest` に `Hash` だけが残っておる点**——これが解決を妨げぬか。
+
+**実測＝妨げ申さぬ。**同じ形の拡張子が三つ在り、いずれも正しく解決しており申した。
+
+| 拡張子 | `UserChoice` | `UserChoiceLatest` | `.ext` の既定値の在り処 | `FindExecutable` |
+|---|---|---|---|---|
+| `.cbz` | **無し** | **Hash のみ** | **HKCU** → `cbz_auto_file` | **NeeView.exe** |
+| `.rar` | 無し | Hash のみ | HKLM → `ArchiveFolder` | NeeView.exe |
+| `.eml` | 無し | Hash のみ | HKLM → `Outlook.File.eml.15` | thunderbird.exe |
+| `.gcad` | 無し | Hash のみ | **（既定値そのものが無い）** | err=31 |
+
+**すなわち `.gcad` が解決されぬのは `Hash` のせいではなく、`.ext` の既定値が無いゆえ**にござる。
+四つの並びで、**違うておるのは既定値の有無ただ一つ。**
+
+**とりわけ `.cbz` が効き申す**——**HKCU 側の既定値で解決しており、家老案とまったく同じ構図。**
+すなわち**案(d)は、既に他の拡張子で成立しておる形をなぞるもの**にござる。
+
+**忍者の検分＝穴は見え申さぬ。** 加えて申し添えると、**案(d)と案(b)は同じ終着点へ別の道で至り申す**
+——GuiEcad の `.iss` も `Root: HKCR` ゆえ、現況では HKCU へ着地する公算。
+**インストーラーが書く先と、手で書く先が同じ**という形にござる。
+
+**ただし案(d)には、技術と別筋の難がひとつ**——**手で書いた値は、後から見て「誰が書いたか」が判らぬ。**
+本日まさに `Gui_cad\` という死んだパスの由来を追えなんだが、あれと同じ型の残骸を一つ増やす形にござる。
+**案(b)なら「GuiEcad のインストーラーが書いた」と後から辿れる。**
+軽さを取るか、辿れることを取るかの分かれ目にて、**そこは殿のご判断を仰ぐ筋**と存ずる。
+
+**限界の断り**＝上表はいずれも `FindExecutable` で測ったものにて、
+**エクスプローラーのダブルクリックと同一経路である保証は無い**（6節の断りと同じ）。
 
 **順序の注意**——Ecad2 の検証が済んだ後に Ecad2 をアンインストールすると、`.gcad` は
 再び「どこにも向かぬ」状態へ戻る公算が高い（8/14がまさにそれにござった）。
