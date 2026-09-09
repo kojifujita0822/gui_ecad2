@@ -52,6 +52,16 @@ public class PartShapeGeometryTests
     }
 
     [Theory]
+    [InlineData(0.0)]
+    [InlineData(-0.25)]
+    public void Snap_刻み0以下なら丸めず素通しする(double fraction)
+    {
+        // T-156(殿ご下命2026-09-09): 作図スナップのトグルOFF時、PartEditorCanvas は fractionCells=0 を渡す。
+        // GridLinesAt の「0以下は空」と同じ退化入力の扱い。
+        Assert.Equal(0.31415, PartShapeGeometry.Snap(0.31415, fractionCells: fraction), Precision);
+    }
+
+    [Theory]
     [InlineData(0.0, 0.0)]
     [InlineData(7.0, 0.0)]         // 半刻み未満は0度
     [InlineData(8.0, 15.0)]        // 半刻み超は15度

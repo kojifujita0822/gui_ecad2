@@ -69,9 +69,11 @@ public static class PartShapeGeometry
 
     // ===== スナップ =====
 
-    /// <summary>座標値を刻み幅の倍数へ丸める。</summary>
+    /// <summary>座標値を刻み幅の倍数へ丸める。
+    /// <paramref name="fractionCells"/> が 0 以下なら丸めず素通しする（T-156＝作図スナップのトグルOFF。
+    /// <see cref="GridLinesAt"/> の「0以下は空」と同じ退化入力の扱い）。</summary>
     public static double Snap(double value, double fractionCells = DefaultSnapFractionCells)
-        => Math.Round(value / fractionCells) * fractionCells;
+        => fractionCells <= 0 ? value : Math.Round(value / fractionCells) * fractionCells;
 
     /// <summary>角度を刻み角の倍数へ丸める。</summary>
     public static double SnapAngleDeg(double deg, double snapDeg = DefaultRotateSnapDeg)

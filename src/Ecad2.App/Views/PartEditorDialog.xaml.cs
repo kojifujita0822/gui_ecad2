@@ -228,6 +228,15 @@ public partial class PartEditorDialog : Window
         ShapeCanvas.Focus();
     }
 
+    // T-156(殿ご下命2026-09-09): 作図スナップの入切。既定オフ（XAMLで IsChecked 未指定＝false）。
+    // ダイアログを開くたびオフへ戻る（状態は保持しない）。接続点の整数丸めには影響しない。
+    private void SnapToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (ShapeCanvas is null) return;   // InitializeComponent 中に発火しうる（Tool_Checked と同じ理由）
+        ShapeCanvas.SnapEnabled = SnapToggle.IsChecked == true;
+        ShapeCanvas.Focus();
+    }
+
     /// <summary>文字ツールで配置する文字列を入力してもらう（キャンセル・空入力ならnull）。</summary>
     private string? AskShapeText()
     {

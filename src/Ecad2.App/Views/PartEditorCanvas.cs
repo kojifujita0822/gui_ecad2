@@ -53,6 +53,12 @@ public sealed class PartEditorCanvas : FrameworkElement
 
     private PartEditTool _tool = PartEditTool.Select;
 
+    /// <summary>作図（線・折れ線・矩形・円・弧・文字・回転）の座標を刻みへ丸めるか（T-156、殿ご下命2026-09-09）。
+    /// 既定 false＝自由（連続座標）。ツールバーの「スナップ」トグルで切り替える。
+    /// 接続点は本フラグと無関係に <see cref="PartShapeGeometry.ClampPort"/> で常に整数セル格子へ丸められる
+    /// （電気的結線の基準ゆえ据え置き）。</summary>
+    public bool SnapEnabled { get; set; }
+
     // 選択状態は「図形」と「接続点」の2系統。同時に両方が選ばれることはなく、片方を選んだら
     // もう片方は解除する（削除・Undo等の分岐が二重に効くのを防ぐ）。
     private int _selectedIndex = -1;
@@ -259,7 +265,12 @@ public sealed class PartEditorCanvas : FrameworkElement
         return new Point2D((worldMmX - _geo.MarginMm) / _geo.CellMm, (worldMmY - _geo.MarginMm) / _geo.CellMm);
     }
 
-    private static Point2D SnapCell(Point2D p) => new(PartShapeGeometry.Snap(p.X), PartShapeGeometry.Snap(p.Y));
+    // T-156: SnapEnabled=false のときは fractionCells=0 を渡して素通しさせる（作図の自由化）。
+    private Point2D SnapCell(Point2D p)
+    {
+        double f = SnapEnabled ? PartShapeGeometry.DefaultSnapFractionCells : 0.0;
+        return new(PartShapeGeometry.Snap(p.X, f), PartShapeGeometry.Snap(p.Y, f));
+    }
 
     /// <summary>セル座標を内側変換の基準（余白を含まない mm）へ移す。</summary>
     private Point2D CellToLocalMm(double cellX, double cellY) => new(cellX * _geo.CellMm, cellY * _geo.CellMm);

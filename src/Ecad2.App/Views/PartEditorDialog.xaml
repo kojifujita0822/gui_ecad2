@@ -96,6 +96,12 @@
             <RadioButton Content="接続点" GroupName="PartEditTool" Checked="Tool_Checked" Tag="Port" Margin="4,0"
                          ToolTip="クリックした位置に接続点を置きます。移動と削除は選択ツールで行います"/>
             <Separator/>
+            <!-- T-156(殿ご下命2026-09-09): 作図(線・矩形・円・弧・文字・回転)のスナップの入切。既定オフ＝自由。
+                 接続点は本トグルと無関係に常に整数セル格子へ丸められる(電気的結線の基準)。 -->
+            <ToggleButton x:Name="SnapToggle" Content="スナップ" Margin="4,0"
+                          Checked="SnapToggle_Changed" Unchecked="SnapToggle_Changed"
+                          ToolTip="作図の座標を1辺4等分のマス目へ吸着させます（既定オフ＝自由）。接続点は常にマス目へ吸着します"/>
+            <Separator/>
             <Button x:Name="UndoButton" Content="元に戻す" Click="Undo_Click" ToolTip="Ctrl+Z"/>
             <Button x:Name="RedoButton" Content="やり直し" Click="Redo_Click" ToolTip="Ctrl+Y"/>
             <Button x:Name="DeleteShapeButton" Content="選択を削除" Click="DeleteShape_Click" ToolTip="Delete"/>
