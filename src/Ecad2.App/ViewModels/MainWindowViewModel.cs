@@ -5,6 +5,7 @@ using Ecad2.App.Commands;
 using Ecad2.App.Diagnostics;
 using Ecad2.Model;
 using Ecad2.Persistence;
+using Ecad2.Rendering;
 using Ecad2.Simulation;
 
 namespace Ecad2.App.ViewModels;
@@ -1512,6 +1513,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         set
         {
             ForceCancelDragFrameIfAny();
+            ForceCancelResizeFrameIfAny();   // T-155
             SetProperty(ref _selectedFrame, value);
             OnPropertyChanged(nameof(HasSelectedFrame));
             OnPropertyChanged(nameof(HasNoPropertySelection));
@@ -1558,58 +1560,109 @@ public sealed class MainWindowViewModel : ViewModelBase
         return true;
     }
 
-    // T-067: GroupFrameのドラッグ移動(BeginDragElementと同型、GridPos単位)。他要素との重複は
-    // 許容する(GroupFrameはグルーピング表示のため占有判定の対象外、境界チェックのみ)。
+    // T-067: GroupFrameのドラッグ移動(GridPos単位)。他要素との重複は許容する(GroupFrameは
+    // グルーピング表示のため占有判定の対象外、境界チェックのみ)。
+    // T-155(殿ご裁可2026-09-09): 移動もゴースト表示。確定までframeへ触れず_dragFramePreviewTopLeft
+    // のみ動かし、LadderCanvasがFrameDragPreviewを半透明で描く。
     private GroupFrame? _draggingFrame;
     private GridPos _dragFrameOrigTopLeft;
+    private GridPos _dragFramePreviewTopLeft;
 
     /// <summary>枠をドラッグ中か。</summary>
     public bool IsDraggingFrame => _draggingFrame is not null;
 
-    /// <summary>ドラッグ中の枠を外部要因により強制的にキャンセルする(ForceCancelDragElementIfAnyと
-    /// 同型)。</summary>
+    /// <summary>ドラッグ中の枠のゴースト形状(LadderCanvasの半透明描画用)。ドラッグ中でなければnull。
+    /// 自由式(Visual*Mm設定済み)の枠はmm座標も開始位置からのセル差分だけずらして見せる。</summary>
+    public GroupFrame? FrameDragPreview
+    {
+        get
+        {
+            if (_draggingFrame is not GroupFrame f) return null;
+            int dr = _dragFramePreviewTopLeft.Row - _dragFrameOrigTopLeft.Row;
+            int dc = _dragFramePreviewTopLeft.Column - _dragFrameOrigTopLeft.Column;
+            return new GroupFrame
+            {
+                Label = f.Label, BorderStyle = f.BorderStyle,
+                TopLeft = _dragFramePreviewTopLeft, Width = f.Width, Height = f.Height,
+                VisualXMm = f.VisualXMm is double vx ? vx + dc * GridGeometry.DefaultCellMm : null,
+                VisualYMm = f.VisualYMm is double vy ? vy + dr * GridGeometry.DefaultCellMm : null,
+                VisualWidthMm = f.VisualWidthMm,
+                VisualHeightMm = f.VisualHeightMm,
+            };
+        }
+    }
+
+    /// <summary>ドラッグ中の枠を外部要因により強制的にキャンセルする(ForceCancelDragElementIfAnyと同型)。</summary>
     private void ForceCancelDragFrameIfAny()
         => ForceCancelIfAny(
             () => _draggingFrame is not null,
             CancelDragFrame,
-            () => OnPropertyChanged(nameof(IsDraggingFrame)));
+            () => { OnPropertyChanged(nameof(IsDraggingFrame)); OnPropertyChanged(nameof(FrameDragPreview)); });
 
     /// <summary>枠のドラッグ(移動)を開始する(T-067)。</summary>
     public void BeginDragFrame(GroupFrame frame)
     {
         _draggingFrame = frame;
-        _dragFrameOrigTopLeft = frame.TopLeft;
+        _dragFrameOrigTopLeft = _dragFramePreviewTopLeft = frame.TopLeft;
+        OnPropertyChanged(nameof(IsDraggingFrame));
+        OnPropertyChanged(nameof(FrameDragPreview));
     }
 
-    /// <summary>ドラッグ中のマウス位置(グリッド座標)に応じて枠の位置を更新する(T-067)。境界内
-    /// (IsFrameWithinGridBounds)を満たす場合のみ位置更新する(満たさなければその場に留まる、
-    /// UpdateDragElement踏襲の挙動)。</summary>
+    /// <summary>ドラッグ中のマウス位置(グリッド座標)に応じてゴーストの位置を更新する(T-067)。境界内
+    /// (IsFrameWithinGridBounds)を満たす場合のみ更新する(満たさなければ据え置き、UpdateDragElement踏襲)。</summary>
     public void UpdateDragFrame(GridPos topLeft)
     {
         if (_draggingFrame is not GroupFrame frame || CurrentSheet is not Sheet sheet) return;
-        if (IsFrameWithinGridBounds(topLeft, frame.Width, frame.Height, sheet))
-            frame.TopLeft = topLeft;
+        if (topLeft != _dragFramePreviewTopLeft && IsFrameMoveAllowed(frame, topLeft, sheet))
+        {
+            _dragFramePreviewTopLeft = topLeft;
+            OnPropertyChanged(nameof(FrameDragPreview));
+        }
     }
 
-    /// <summary>枠のドラッグを確定する(T-067、ConfirmDragElementと同型。開始時から実際に位置が
-    /// 変化していれば、一旦開始時位置へ戻してRecordSnapshotを呼んでから確定値へ戻す)。</summary>
+    /// <summary>枠の移動先が許されるか。グリッド式(Visual*Mm=null)は従来どおりグリッド範囲に収める。
+    /// 自由式(T-155でリサイズ済み)は、その Width/Height がmm矩形から丸めた近似値にすぎず、かつ枠は
+    /// 元々グリッド範囲を超えて広がりうる設計(主回路シートの MainCircuitVirtualRows 参照)のため、
+    /// 自由線・接続点と同じく下限(行・列 &gt;= 0)のみを見る。</summary>
+    private static bool IsFrameMoveAllowed(GroupFrame frame, GridPos topLeft, Sheet sheet)
+        => frame.VisualXMm is not null
+            ? topLeft.Row >= 0 && topLeft.Column >= 0
+            : IsFrameWithinGridBounds(topLeft, frame.Width, frame.Height, sheet);
+
+    /// <summary>枠のドラッグを確定する(T-067)。開始時から実際に位置が変化していればRecordSnapshotして
+    /// から確定する。自由式の枠はVisual*Mmもセル差分ぶんずらす(T-155)。</summary>
     public void ConfirmDragFrame()
     {
-        if (_draggingFrame is not GroupFrame frame) { _draggingFrame = null; return; }
-        if (frame.TopLeft != _dragFrameOrigTopLeft)
+        if (_draggingFrame is not GroupFrame frame) { ClearFrameDrag(); return; }
+        if (_dragFramePreviewTopLeft != _dragFrameOrigTopLeft)
         {
-            var confirmedPos = frame.TopLeft;
-            frame.TopLeft = _dragFrameOrigTopLeft;
+            int dr = _dragFramePreviewTopLeft.Row - _dragFrameOrigTopLeft.Row;
+            int dc = _dragFramePreviewTopLeft.Column - _dragFrameOrigTopLeft.Column;
             UndoManager.RecordSnapshot(Document);
-            frame.TopLeft = confirmedPos;
+            frame.TopLeft = _dragFramePreviewTopLeft;
+            ShiftFrameMm(frame, dr, dc);
             MarkDirty();
         }
-        _draggingFrame = null;
+        ClearFrameDrag();
     }
 
-    /// <summary>枠のドラッグをキャンセルし、開始時の位置へ復元する(Esc、T-067)。</summary>
-    public void CancelDragFrame()
-        => CancelDrag(ref _draggingFrame, frame => frame.TopLeft = _dragFrameOrigTopLeft);
+    /// <summary>枠のドラッグをキャンセルする(Esc、T-067)。モデルには触れていないのでゴーストを消すだけ。</summary>
+    public void CancelDragFrame() => ClearFrameDrag();
+
+    private void ClearFrameDrag()
+    {
+        _draggingFrame = null;
+        OnPropertyChanged(nameof(IsDraggingFrame));
+        OnPropertyChanged(nameof(FrameDragPreview));
+    }
+
+    /// <summary>自由式(Visual*Mm設定済み)の枠のmm座標を、セル差分ぶん平行移動する。グリッド式(null)の
+    /// 枠は何もしない。移動ドラッグ・矢印キー移動で使う(行シフトは<see cref="RowOps"/>が別途担う)。</summary>
+    private static void ShiftFrameMm(GroupFrame f, int deltaRow, int deltaColumn)
+    {
+        if (f.VisualXMm is double vx) f.VisualXMm = vx + deltaColumn * GridGeometry.DefaultCellMm;
+        if (f.VisualYMm is double vy) f.VisualYMm = vy + deltaRow * GridGeometry.DefaultCellMm;
+    }
 
     /// <summary>SelectedFrameを矢印キー1回分(Shift無し、殿裁定2026-07-21=既存の独立選択状態群
     /// (Connector/WireBreak/FreeLine/ConnectionDot/Image)と同一の無修飾矢印キー割当)平行移動する
@@ -1621,11 +1674,121 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (SelectedFrame is not GroupFrame frame || CurrentSheet is not Sheet sheet) return false;
         var newTopLeft = new GridPos(frame.TopLeft.Row + deltaRow, frame.TopLeft.Column + deltaColumn);
         if (newTopLeft == frame.TopLeft) return false;
-        if (!IsFrameWithinGridBounds(newTopLeft, frame.Width, frame.Height, sheet)) return false;
+        if (!IsFrameMoveAllowed(frame, newTopLeft, sheet)) return false;
         UndoManager.RecordSnapshot(Document);
         frame.TopLeft = newTopLeft;
+        ShiftFrameMm(frame, deltaRow, deltaColumn);   // T-155: 自由式の枠はmm座標も追随
         MarkDirty();
         return true;
+    }
+
+    // ── T-155: GroupFrameのリサイズ(8ハンドル、mm自由、殿ご裁可2026-09-09) ────────────────
+    // 画像リサイズ(BeginResizeImage系)と同型だが、こちらは確定までモデルへ触れずゴースト
+    // (FrameResizePreview)のみ動かす。リサイズを一度かけると枠は「自由式」へ移行する
+    // (Visual*Mmを全て設定。GuiEcad原本と同じ「グリッド近似値とmm実座標を両方持つ」方式)。
+
+    /// <summary>枠リサイズの最小辺長(mm)。グリッド1セル。</summary>
+    private const double FrameMinSizeMm = GridGeometry.DefaultCellMm;
+
+    private sealed class FrameResizeState
+    {
+        public required GroupFrame Target;
+        public required FrameResizeHandle Handle;
+        public double OrigX, OrigY, OrigW, OrigH;   // 開始時のmm矩形(materialize済み)
+        public double CurX, CurY, CurW, CurH;       // 現在のゴースト矩形
+        public double MaxXMm, MaxYMm;               // ページ境界
+    }
+    private FrameResizeState? _frameResize;
+
+    /// <summary>枠をリサイズ中か。</summary>
+    public bool IsResizingFrame => _frameResize is not null;
+
+    /// <summary>リサイズ中の枠のゴースト形状(LadderCanvasの半透明描画用)。リサイズ中でなければnull。</summary>
+    public GroupFrame? FrameResizePreview => _frameResize is { } r
+        ? new GroupFrame
+        {
+            Label = r.Target.Label, BorderStyle = r.Target.BorderStyle,
+            TopLeft = r.Target.TopLeft, Width = r.Target.Width, Height = r.Target.Height,
+            VisualXMm = r.CurX, VisualYMm = r.CurY, VisualWidthMm = r.CurW, VisualHeightMm = r.CurH,
+        }
+        : null;
+
+    /// <summary>リサイズ中の枠を外部要因により強制的にキャンセルする。</summary>
+    private void ForceCancelResizeFrameIfAny()
+        => ForceCancelIfAny(
+            () => _frameResize is not null,
+            CancelResizeFrame,
+            () => { OnPropertyChanged(nameof(IsResizingFrame)); OnPropertyChanged(nameof(FrameResizePreview)); });
+
+    /// <summary>枠のリサイズを開始する(T-155、ドラッグハンドル方式、殿ご裁可)。startXMm..startHMmは
+    /// 現在の枠のmm矩形(ViewがLadderCanvas.FrameRectMmで算出して渡す)。maxXMm/maxYMmはページ境界。</summary>
+    public void BeginResizeFrame(GroupFrame frame, FrameResizeHandle handle,
+        double startXMm, double startYMm, double startWMm, double startHMm, double maxXMm, double maxYMm)
+    {
+        _frameResize = new FrameResizeState
+        {
+            Target = frame, Handle = handle,
+            OrigX = startXMm, OrigY = startYMm, OrigW = startWMm, OrigH = startHMm,
+            CurX = startXMm, CurY = startYMm, CurW = startWMm, CurH = startHMm,
+            MaxXMm = maxXMm, MaxYMm = maxYMm,
+        };
+        OnPropertyChanged(nameof(IsResizingFrame));
+        OnPropertyChanged(nameof(FrameResizePreview));
+    }
+
+    /// <summary>ドラッグ中のマウス位置(mm実座標)でゴースト矩形を更新する(T-155)。掴んだハンドルに
+    /// 応じて左右いずれかの辺(隅なら両軸)を動かし、最小辺長FrameMinSizeMmとページ境界[0, max]を守る。
+    /// 各ハンドルは対辺を開始位置に固定したまま片側だけ動かすため、辺ごとに独立してクランプできる。</summary>
+    public void UpdateResizeFrame(double mouseXMm, double mouseYMm)
+    {
+        if (_frameResize is not { } r) return;
+        double left = r.OrigX, top = r.OrigY, right = r.OrigX + r.OrigW, bottom = r.OrigY + r.OrigH;
+
+        if (r.Handle is FrameResizeHandle.TopLeft or FrameResizeHandle.Left or FrameResizeHandle.BottomLeft)
+            left = Math.Clamp(mouseXMm, 0, right - FrameMinSizeMm);
+        if (r.Handle is FrameResizeHandle.TopRight or FrameResizeHandle.Right or FrameResizeHandle.BottomRight)
+            right = Math.Clamp(mouseXMm, left + FrameMinSizeMm, r.MaxXMm);
+        if (r.Handle is FrameResizeHandle.TopLeft or FrameResizeHandle.Top or FrameResizeHandle.TopRight)
+            top = Math.Clamp(mouseYMm, 0, bottom - FrameMinSizeMm);
+        if (r.Handle is FrameResizeHandle.BottomLeft or FrameResizeHandle.Bottom or FrameResizeHandle.BottomRight)
+            bottom = Math.Clamp(mouseYMm, top + FrameMinSizeMm, r.MaxYMm);
+
+        r.CurX = left; r.CurY = top; r.CurW = right - left; r.CurH = bottom - top;
+        OnPropertyChanged(nameof(FrameResizePreview));
+    }
+
+    /// <summary>枠のリサイズを確定する(T-155)。開始時から矩形が変わっていればRecordSnapshotしてから
+    /// 確定する(画像リサイズと同じUndo契約)。確定で枠は自由式へ移行し、グリッド近似値
+    /// (TopLeft/Width/Height)もmm矩形から振り直す(RowOpsの行シフト判定用)。</summary>
+    public void ConfirmResizeFrame(GridGeometry geo)
+    {
+        if (_frameResize is not { } r) return;
+        var frame = r.Target;
+        bool changed = r.CurX != r.OrigX || r.CurY != r.OrigY || r.CurW != r.OrigW || r.CurH != r.OrigH;
+        if (changed)
+        {
+            UndoManager.RecordSnapshot(Document);
+            frame.VisualXMm = r.CurX;
+            frame.VisualYMm = r.CurY;
+            frame.VisualWidthMm = r.CurW;
+            frame.VisualHeightMm = r.CurH;
+            frame.TopLeft = new GridPos(Math.Max(0, geo.FrameRowAt(r.CurY)), Math.Max(0, geo.BoundaryAt(r.CurX)));
+            frame.Width = Math.Max(1, (int)Math.Round(r.CurW / geo.CellMm));
+            frame.Height = Math.Max(1, (int)Math.Round(r.CurH / geo.CellMm));
+            MarkDirty();
+        }
+        _frameResize = null;
+        OnPropertyChanged(nameof(IsResizingFrame));
+        OnPropertyChanged(nameof(FrameResizePreview));
+    }
+
+    /// <summary>枠のリサイズをキャンセルする(Esc、T-155)。モデルには触れていないのでゴーストを消すだけ。</summary>
+    public void CancelResizeFrame()
+    {
+        if (_frameResize is null) return;
+        _frameResize = null;
+        OnPropertyChanged(nameof(IsResizingFrame));
+        OnPropertyChanged(nameof(FrameResizePreview));
     }
 
     // T-067: 枠の新規作成(キーボードステップ方式、_freeLineDraftと同型)。Anchorは左上セル固定

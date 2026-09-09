@@ -412,4 +412,80 @@ public class RowOpsTests
         Assert.Empty(sheet.RungComments);
         Assert.Empty(sheet.Frames);
     }
+
+    // ---- T-155(P-050対処): 自由式の枠(Visual*Mm 設定済み)の mm 座標が行挿入・削除に追随する ----
+
+    private const double Cell = 9.0;
+
+    private static GroupFrame FreeformFrame(int topRow, int height, double visualYMm, double visualHeightMm)
+        => new()
+        {
+            Label = "枠", TopLeft = new GridPos(topRow, 1), Width = 3, Height = height,
+            VisualXMm = 50, VisualYMm = visualYMm, VisualWidthMm = 27, VisualHeightMm = visualHeightMm,
+        };
+
+    [Fact]
+    public void InsertRow_自由式枠_開始行が挿入点以降_VisualYMmも1セル分下がる()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(FreeformFrame(topRow: 5, height: 2, visualYMm: 100, visualHeightMm: 20));
+
+        RowOps.InsertRow(sheet, targetRow: 5);
+
+        Assert.Equal(6, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(100 + Cell, sheet.Frames[0].VisualYMm);
+        Assert.Equal(20, sheet.Frames[0].VisualHeightMm);   // 位置シフトのみ、高さ不変
+    }
+
+    [Fact]
+    public void InsertRow_自由式枠_挿入点が枠の内側_VisualHeightMmが1セル分増える()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(FreeformFrame(topRow: 3, height: 3, visualYMm: 60, visualHeightMm: 30));
+
+        RowOps.InsertRow(sheet, targetRow: 4);
+
+        Assert.Equal(3, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(60, sheet.Frames[0].VisualYMm);        // 位置不変
+        Assert.Equal(30 + Cell, sheet.Frames[0].VisualHeightMm);
+    }
+
+    [Fact]
+    public void DeleteRow_自由式枠_開始行が削除点より後ろ_VisualYMmも1セル分上がる()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(FreeformFrame(topRow: 5, height: 2, visualYMm: 100, visualHeightMm: 20));
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Equal(4, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(100 - Cell, sheet.Frames[0].VisualYMm);
+        Assert.Equal(20, sheet.Frames[0].VisualHeightMm);
+    }
+
+    [Fact]
+    public void DeleteRow_自由式枠_削除点が枠の内側_VisualHeightMmが1セル分減る()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(FreeformFrame(topRow: 3, height: 3, visualYMm: 60, visualHeightMm: 30));
+
+        RowOps.DeleteRow(sheet, targetRow: 4);
+
+        Assert.Equal(3, sheet.Frames[0].TopLeft.Row);
+        Assert.Equal(60, sheet.Frames[0].VisualYMm);
+        Assert.Equal(30 - Cell, sheet.Frames[0].VisualHeightMm);
+    }
+
+    [Fact]
+    public void DeleteRow_グリッド式枠_Visual座標はnullのまま_従来挙動を壊さない()
+    {
+        var sheet = MakeSheet();
+        sheet.Frames.Add(new GroupFrame { Label = "枠", TopLeft = new GridPos(5, 1), Width = 3, Height = 2 });
+
+        RowOps.DeleteRow(sheet, targetRow: 3);
+
+        Assert.Equal(4, sheet.Frames[0].TopLeft.Row);
+        Assert.Null(sheet.Frames[0].VisualYMm);
+        Assert.Null(sheet.Frames[0].VisualHeightMm);
+    }
 }

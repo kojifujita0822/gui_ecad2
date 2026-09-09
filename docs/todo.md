@@ -56,6 +56,94 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 
 ## 生きているタスク
 
+### T-155 グループ枠のリサイズ機能と、作成/移動/リサイズのゴースト表示 — Done（2026-09-09、殿ご下命。単独セッション。殿の実機確認5観点すべて問題なし）
+
+起票＝殿の御言葉「追加したい機能は枠のリサイズ機能と描画時にゴースト表示させるようにしたい」。
+現物検分の結果、(1)設置後の枠リサイズは未実装 (2)作成ドラッグ中のゴーストも未結線
+（T-067設計コメントに「半透明描画用」と意図はあったが `FrameDraftPreview` が `Draw()` へ渡されておらず、
+マウスを離すまで何も見えぬ状態）と判明。
+
+【殿ご裁可 2026-09-09（AskUserQuestionで三問）】
+- 吸着単位＝mm自由リサイズ（休眠フィールド `Visual*Mm` を活かす。`P-050` の行シフト非追随を同時に始末）
+- 操作方法＝ハンドルをドラッグ（四隅＋四辺の8ハンドル、画像リサイズ T-064 と同型）
+- ゴースト範囲＝作成・リサイズ・移動すべて（確定までモデルへ触れず半透明プレビューを見せる）
+
+【設計】枠は「グリッド式（`Visual*Mm` 全 null、従来どおり）」と「自由式（全設定）」の二態。
+作成直後はグリッド式。リサイズを一度かけると自由式へ移行（GuiEcad原本の「グリッド近似値と mm 実座標を
+両方持つ」方式）。自由式の枠は移動・矢印キー移動・行シフトで `Visual*Mm` も追随する。
+自由式の枠の移動は下限（行・列 >= 0）のみを見る（`Width`/`Height` が丸め近似ゆえグリッド上限判定は使えぬ。
+自由線・接続点と同じ扱い）。
+
+【増分と手を入れた箇所】
+- 増分1（Core）＝`RowOps.InsertRow`/`DeleteRow` に `cellMm` 引数を足し、`VisualYMm`/`VisualHeightMm` を
+  セル数のシフトと同じ向きに動かす（`P-050` 対処）。`GridGeometry` へ `DefaultCellMm`/`FrameTopMm`/
+  `FrameRowAt` を新設。
+- 増分2（App/VM）＝`FrameResizeHandle` enum（8方位）。`BeginResizeFrame`/`UpdateResizeFrame`/
+  `ConfirmResizeFrame(GridGeometry)`/`CancelResizeFrame`、`FrameResizePreview`、`IsResizingFrame`。
+  最小辺長=1セル・ページ境界クランプ。確定でグリッド近似値も mm 矩形から振り直す。
+- 増分3（App/VM）＝移動を即時反映からゴースト方式へ（`FrameDragPreview`、`_dragFramePreviewTopLeft`、
+  `ClearFrameDrag`）。`ShiftFrameMm` を新設し移動ドラッグ・矢印キー移動から呼ぶ。`SelectedFrame` setter・
+  `LostMouseCapture`・Esc から `ForceCancelResizeFrameIfAny`。
+- 増分4（View）＝`LadderCanvas` に8ハンドル描画・3種ゴースト描画・`HitTestFrameResizeHandle`・
+  `FrameHandlePoints`・`Geometry` アクセサ。`MainWindow.xaml.cs` にマウス配線
+  （Down=ハンドルヒット→BeginResize、Move=UpdateResize、Up=ConfirmResize、Esc/LostCapture=Cancel）。
+  `FrameRectMm` を internal 化し `geo.FrameTopMm` へ寄せた（`Cell*0.4` の重複を1つ解消）。
+
+【既存テストへの変更】T-067枠テスト2件を書き換え（移動が即時反映からゴースト方式へ変わったため、
+`UpdateDragFrame` 直後の検証を `frame.TopLeft` から `vm.FrameDragPreview!.TopLeft` へ）。既存の期待値の
+書き換えはこの2件のみ、削除ゼロ。
+
+【テスト】新規20件（`T155FrameResizeTests` 12＝リサイズ状態機械・ゴースト・自由式追随／
+`T155FrameResizeViewTests` 3＝ハンドルのヒットテスト配線／`RowOpsTests` +5＝`P-050`）。
+全スイート2075件green（Core 606＋App 1469）、失敗ゼロ。
+
+【検証】単独セッションゆえ隠密の静的レビュー・忍者の実機確認は未実施。代わりに殿ご自身が開発ビルドを
+実機で操作し、5観点（ハンドルドラッグでのリサイズ／破線ドラッグでの移動／リサイズ後の保存・PDF反映／
+枠ツールでの新規作成／リサイズ・移動中のEsc取消）すべて問題なしとご確認（2026-09-09）。
+
+【残り】
+- 隠密の静的レビュー・忍者のテストコード網羅性点検は後日回す余地あり（殿のご判断次第）。
+- ページ境界クランプは「グリッドの右下端まで」。主回路シートで枠をグリッド外へ広げる需要が出れば別途。
+- `docs/proposed.md` の `P-050` は本タスクで解消（done へ改めた）。
+
+---
+
+### T-154 機器表のメーカー・数量列を編集可能にする — Done（2026-09-09、殿ご下命。単独セッションにて実装・テスト完了）
+
+起票＝殿の御言葉「機器表へのメーカーと数量の入力ができない」。現物を検分したところ不具合ではなく、
+`T-066`（殿裁定2026-07-12）で「型式列のみ編集可、メーカー・数量は今回スコープ外」と定めた結果で
+あった（`docs/spec/ecad2-spec-device-table.md`6節・不明点に明記済み）。殿は「単独セッションで修正
+を行うつもり」と仰せ。
+
+【殿ご裁可 2026-09-09＝入力手段の方式】AskUserQuestionで三案（グリッドに列追加／プロパティ
+パネルに欄追加／BOM編集ダイアログ新設）を諮り、「機器表グリッドに列追加」をお選びになった。
+GuiEcad原本のBOM編集も機器名/種別/型式/メーカー/数量の5項目で、型式・メーカー・数量が編集可。
+
+【実装 2026-09-09】
+- `MainWindow.xaml`：`DeviceTableGrid`へ「メーカー」（`{Binding Maker}`）「数量」（`{Binding Quantity}`）
+  の2列を型式列の後ろに追加。5列構成。数量は`int`ゆえ数値以外はDataGrid既定の型変換エラーで確定を拒む
+  （範囲検証は入れておらぬ——`spec`不明点に残した）。
+- `DeviceTableGrid_CellEditEnding`を列のBindingパスで対象を判別する形へ一般化。同値ガード判定を
+  `DeviceTableCellEdit.HasChanged`（新設、`src/Ecad2.App/DeviceTableCellEdit.cs`）へ切り出し、
+  STAなしで単体テスト可能にした（`samurai.md`「テストしにくいは設計の匂い」）。
+- `BeginningEdit`のテストモードガード（`T-114`/`P-081`）は全編集列へ一律かかるため無改修。
+- 永続化（`GcadSerializer`はドキュメントグラフ全体をSystem.Text.Jsonでシリアライズ）と
+  PDF出力のBOM表（`DiagramRenderer.RenderBomPage`はメーカー・数量列を既に描画）は無改修で反映。
+
+【テスト】新規16件（`DeviceTableCellEditTests`＝同値ガード15件／`DeviceTableGridColumnsTests`＝
+5列の構成1件）。全スイート2055件（Core 601＋App 1454）green、既存の書き換えゼロ。
+
+【検証パイプライン】単独セッションゆえ隠密の静的レビュー・忍者の実機確認は未実施。殿の実機
+確認をもって完了とするか、後日パイプラインを回すかは殿のご判断を仰ぐ（下記【報告】）。
+
+【報告・殿のご判断待ち 2026-09-09】
+- 実機確認が未了。殿がお手元で「メーカー・数量が打てる／保存される／PDFのBOM表に出る」を
+  ご確認いただくのが早い。
+- 数量の範囲検証（負数・0を弾くか）は入れておらぬ。GX Works3／GuiEcad原本の扱いも未確認。
+  要否は殿のご下命があれば別増分で。
+
+---
+
 ### T-153 配置バーの未配線ボタン三つの始末（二つは非表示、一つはコメント入力へ） — Done（2026-08-16、検証パイプライン完了）
 
 起票＝殿が v0.7.0 をご覧になり、配置バー（`ElementPlacementBar`、`MainWindow.xaml:1923` 以降）に

@@ -20,8 +20,13 @@ BOM表・クロスリファレンス表は、`PdfExporter.Export`（`src/Ecad2.P
 
 **T-107（2026-07-21）でDevice.Commentプロパティが新設**された（Model/Makerと同じ位置づけ、
 同一デバイス名の全要素間で共有される注記）。ただし**機器表グリッド（`DeviceTableGrid`）自体には
-Commentの表示・編集列が無い**（機器名・種別・型式の3列のみ、下記6節参照）。編集はプロパティ
-パネル（選択中要素の`SelectedElementComment`、`Document.Devices.ByName`経由）から行う。PDF出力
+Commentの表示・編集列が無い**（機器名・種別・型式・メーカー・数量の5列、下記6節参照）。Comment編集は
+プロパティパネル（選択中要素の`SelectedElementComment`、`Document.Devices.ByName`経由）から行う。
+
+T-154（2026-09-09、殿ご下命）で機器表グリッドにメーカー・数量列を追加した。型式列と同じく
+その場で直接編集でき（`Binding="{Binding Maker}"`/`{Binding Quantity}"`）、数量は`int`のため
+数値以外を打つとDataGridが確定を拒む（既定の型変換エラー表示）。編集確定時の同値ガードは
+`DeviceTableCellEdit.HasChanged`（`src/Ecad2.App/DeviceTableCellEdit.cs`）に一本化。PDF出力
 のクロスリファレンス表（`CrossReference`、機器表とは別ページ）のコメント列にはDevice.Commentが
 反映される（`docs/spec/ecad2-spec-placement.md`参照、機器名ラベル下にラダー図本体でも表示）。
 
@@ -43,8 +48,8 @@ Commentの表示・編集列が無い**（機器名・種別・型式の3列の�
 `PartPalette.Entries`から`element.PartId`一致エントリを検索し、`Category==""`かつ`Role=ContactNO`
 かつ`IsOrEligible=false`なら`SelectSwitch`固定、それ以外は`PartResolver.CreatesComponent`→
 `ComponentKind`→マッピング、非対応パーツは`Other`にフォールバック。**登録時に一度だけ決定され、
-以後要素種別が変わっても再計算されない**（`Model`/`Maker`/`Quantity`同様、値の後追い変更手段は
-存在しない）。
+以後要素種別が変わっても再計算されない**（`Class`のみ。`Model`/`Maker`/`Quantity`は機器表グリッドで
+後から編集できる——`Model`はT-066、`Maker`/`Quantity`はT-154）。
 
 ---
 
@@ -128,12 +133,28 @@ DeviceClassマッピング自体はT-045増分Bで実装済みと判明、T-053�
 ### T-066「BOM編集」（完全Done、2026-07-12、コミット`fe11e30`/`fd67ed9`）
 
 着手前調査（`docs/ecad2-t065-t066-pre-investigation-onmitsu.md`）を踏まえ、殿裁定で**型式（Model）
-列のみ**編集可能とする案が確定・実装された（メーカー・数量列は編集UI自体を追加していない）。
+列のみ**編集可能とする案が確定・実装された（当時、メーカー・数量列は編集UI自体を追加していない
+——後にT-154で追加、下記参照）。
 
-`MainWindow.xaml:459-466`：`DeviceTableGrid`（`AutoGenerateColumns="False"`、
-`CanUserAddRows="False"`、`CanUserDeleteRows="False"`）の3列のうち、機器名・種別は
-`IsReadOnly="True"`のまま、**型式列のみ`IsReadOnly`指定なし＝編集可能**
-（`Binding="{Binding Model}"`）。
+`DeviceTableGrid`（`AutoGenerateColumns="False"`、`CanUserAddRows="False"`、
+`CanUserDeleteRows="False"`）の当時の3列のうち、機器名・種別は`IsReadOnly="True"`のまま、
+**型式列のみ`IsReadOnly`指定なし＝編集可能**（`Binding="{Binding Model}"`）。
+
+### T-154「機器表のメーカー・数量列を編集可能にする」（Done、2026-09-09、殿ご下命）
+
+起票＝殿が「機器表へのメーカーと数量の入力ができない」とご指摘。上記T-066でスコープ外とされた
+2列を、殿ご下命により機器表グリッドへ追加した（方式は殿ご裁可＝グリッドに列追加）。
+
+- `MainWindow.xaml`：`DeviceTableGrid`へ`<DataGridTextColumn Header="メーカー" Binding="{Binding Maker}"/>`
+  ・`<DataGridTextColumn Header="数量" Binding="{Binding Quantity}"/>`を型式列の後ろに追加。5列構成。
+- 数量は`int`のため数値以外の入力はDataGridの既定の型変換エラー表示で確定が拒まれる（別途の
+  範囲検証は入れていない）。
+- `DeviceTableGrid_CellEditEnding`（`MainWindow.xaml.cs`）は列のBindingパスで対象を判別する形に
+  一般化。同値ガード判定は`DeviceTableCellEdit.HasChanged`（新設、`src/Ecad2.App/DeviceTableCellEdit.cs`）へ
+  切り出し、STAなしで単体テスト可能にした（`DeviceTableCellEditTests`／列構成は`DeviceTableGridColumnsTests`）。
+- `BeginningEdit`のテストモードガード（T-114/P-081）は全編集列に一律かかるため無改修。
+- 永続化（`GcadSerializer`はドキュメントグラフ全体をSystem.Text.Jsonでシリアライズ）とPDF出力の
+  BOM表（`DiagramRenderer.RenderBomPage`はメーカー・数量列を既に描画）は無改修で反映される。
 
 `CellEditEnding="DeviceTableGrid_CellEditEnding"`（`MainWindow.xaml.cs:197-204`）：Bindingが
 `Device.Model`へ直接書き戻すため、ハンドラ自体は`MarkDirty()`呼び出しのみを担う。ただし
@@ -180,7 +201,9 @@ DeviceClassマッピング自体はT-045増分Bで実装済みと判明、T-053�
 
 ## 不明点
 
-- `Device.Maker`/`Quantity`への値セット手段は現状も皆無（T-066は型式(Model)列のみを対象として
-  完了、メーカー・数量列の編集UIは今回スコープ外のまま）。
+- `Device.Maker`/`Quantity`はT-154で機器表グリッドから編集可能になった（上記6節）。数量の範囲
+  検証（負数・0の是非）は入れておらず、GX Works3／GuiEcad原本の扱いも未確認。
 - `DeviceClass`が登録時一度だけ決定され後から再計算されない設計の妥当性（要素種別変更時に追従
-  すべきかどうかは未検討。T-066は型式列編集のみでこの論点には触れておらず、未解決のまま残る）。
+  すべきかどうかは未検討。T-066・T-154とも種別列の編集には触れておらず、未解決のまま残る）。
+- `Maker`列をクリアすると`Device.Maker`は`null`でなく空文字になる（型式列と同じ挙動）。PDF出力の
+  `d.Maker ?? "—"`は空文字を素通しするため、クリア後は「—」でなく空欄で出力される。

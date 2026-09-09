@@ -146,7 +146,7 @@ ecad2仕様書1節の`ResolveDeviceClass`にある「`PartPalette.Entries`ベー
 | Deviceの削除 | 削除ロジックなし、残存し続ける | 参照0件で自動削除 |
 | 機器名改名の反映範囲 | 要素の`DeviceName`のみ、`Devices.ByName`キー移行なし | 要素と`Devices.ByName`キーの両方を移行 |
 | 機器一覧の常設画面表示 | 単一文字列ListView、要素走査から都度構築 | 3列DataGrid、ViewModelスナップショット |
-| BOM列の編集可否 | 型式・メーカー・数量の3列編集可 | 型式(Model)のみ編集可（T-066完全Done、メーカー・数量は編集UIなし） |
+| BOM列の編集可否 | 型式・メーカー・数量の3列編集可 | 型式(T-066)・メーカー・数量(T-154)の3列編集可（GuiEcadと同じ3項目に揃った。ただしGuiEcadはダイアログ、ecad2は常設グリッドで直接編集） |
 | BOM表PDF出力の到達可能性 | 到達可能（結線済み） | 到達不能設計（仕様書0節） |
 | 種別ラベルの画面/PDF統一性 | 画面用/PDF用が別実装・別粒度 | 統一設計（T-053裁定） |
 | BOM編集内容のUndo対象性 | `MarkDirty()`のみ、対象外 | 同左（`MainWindow.xaml.cs:203`も`MarkDirty()`のみ、一致点） |

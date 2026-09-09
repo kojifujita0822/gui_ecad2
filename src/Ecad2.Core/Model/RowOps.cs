@@ -1,3 +1,5 @@
+using Ecad2.Rendering;
+
 namespace Ecad2.Model;
 
 /// <summary>
@@ -11,8 +13,12 @@ public static class RowOps
     /// targetRowの前に1行挿入し、挿入点以降の4種(ElementInstance/VerticalConnector/WireBreak/RungComment)の
     /// Rowを+1シフトする。GroupFrameは、開始行が挿入点以降なら位置のみ+1シフト（Height不変）、
     /// 開始行が挿入点より前だが範囲が挿入点にかかるならHeight++（内部挿入、位置不変）。
+    /// <para>
+    /// T-155(P-050対処): 自由式の枠(<c>Visual*Mm</c> 設定済み)は、セル数のシフトと同じ向きに
+    /// <c>VisualYMm</c>／<c>VisualHeightMm</c> も <paramref name="cellMm"/> だけ動かす。
+    /// </para>
     /// </summary>
-    public static void InsertRow(Sheet sheet, int targetRow)
+    public static void InsertRow(Sheet sheet, int targetRow, double cellMm = GridGeometry.DefaultCellMm)
     {
         foreach (var e in sheet.Elements)
             if (e.Pos.Row >= targetRow) e.Pos = e.Pos with { Row = e.Pos.Row + 1 };
@@ -27,8 +33,16 @@ public static class RowOps
             if (rc.Row >= targetRow) rc.Row += 1;
         foreach (var f in sheet.Frames)
         {
-            if (f.TopLeft.Row >= targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row + 1 };
-            else if (f.TopLeft.Row + f.Height > targetRow) f.Height++;
+            if (f.TopLeft.Row >= targetRow)
+            {
+                f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row + 1 };
+                if (f.VisualYMm is double vy) f.VisualYMm = vy + cellMm;
+            }
+            else if (f.TopLeft.Row + f.Height > targetRow)
+            {
+                f.Height++;
+                if (f.VisualHeightMm is double vh) f.VisualHeightMm = vh + cellMm;
+            }
         }
     }
 
@@ -45,7 +59,7 @@ public static class RowOps
     /// 終端行(TopLeft.Row+Height-1)がtargetRow以降なら内部詰め(Height--)。
     /// </summary>
     /// <returns>削除されたElementInstanceの一覧（呼び出し元での機器表クリーンアップ用）。</returns>
-    public static IReadOnlyList<ElementInstance> DeleteRow(Sheet sheet, int targetRow)
+    public static IReadOnlyList<ElementInstance> DeleteRow(Sheet sheet, int targetRow, double cellMm = GridGeometry.DefaultCellMm)
     {
         // T-133増分4(隠密の死角調査「漏れ2」、殿裁定2026-07-28=(D-1)): 高さ2以上の要素は
         // 複数行を占める(中心基準。占有行数＝2×ElementInstance.RowSpanOf(H)+1)。
@@ -71,7 +85,11 @@ public static class RowOps
         foreach (var f in sheet.Frames.ToList())
         {
             if (f.TopLeft.Row == targetRow) sheet.Frames.Remove(f);
-            else if (f.TopLeft.Row < targetRow && f.TopLeft.Row + f.Height - 1 >= targetRow) f.Height--;
+            else if (f.TopLeft.Row < targetRow && f.TopLeft.Row + f.Height - 1 >= targetRow)
+            {
+                f.Height--;
+                if (f.VisualHeightMm is double vh) f.VisualHeightMm = Math.Max(cellMm, vh - cellMm);
+            }
         }
 
         foreach (var e in sheet.Elements)
@@ -87,7 +105,11 @@ public static class RowOps
             if (rc.Row > targetRow) rc.Row -= 1;
 
         foreach (var f in sheet.Frames)
-            if (f.TopLeft.Row > targetRow) f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row - 1 };
+            if (f.TopLeft.Row > targetRow)
+            {
+                f.TopLeft = f.TopLeft with { Row = f.TopLeft.Row - 1 };
+                if (f.VisualYMm is double vy) f.VisualYMm = vy - cellMm;
+            }
 
         return removedElements;
     }

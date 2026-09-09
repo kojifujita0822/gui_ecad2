@@ -171,6 +171,17 @@ public sealed class LadderCanvas : FrameworkElement
         _ => SelectedFrameDashedPen,
     };
 
+    // T-155(殿ご下命2026-09-09): 枠の作成・移動・リサイズ中のゴースト(半透明の塗り＋枠と同じ
+    // 破線ペン)。3操作で共用する。確定前であることを塗りの薄さで示す(ImageDraftFillBrushと同系統)。
+    private static readonly Brush FrameGhostFillBrush = CreateFrozenFill(Colors.OrangeRed, 0.10);
+
+    private static Brush CreateFrozenFill(System.Windows.Media.Color color, double opacity)
+    {
+        var brush = new SolidColorBrush(color) { Opacity = opacity };
+        brush.Freeze();
+        return brush;
+    }
+
     // GroupFrameのヒットテスト許容誤差上限(mm、T-067)。GuiEcad原本(MainPage.xaml.cs.HitTestFrame)の
     // margin = Math.Min(CellMm * 0.15, 3.0) をそのまま移植。枠は塗りつぶし無し(点線境界のみ)のため、
     // HitTestImageのような内部全域ヒットではなく、境界線近傍のみをヒット対象とする
@@ -208,7 +219,9 @@ public sealed class LadderCanvas : FrameworkElement
         ImageInsert? selectedImage = null, ImageInsert? imageInsertDraft = null,
         GroupFrame? selectedFrame = null,
         SimState? sim = null, DeviceTable? devices = null,
-        VerticalConnector? orJoinTargetPreview = null)
+        VerticalConnector? orJoinTargetPreview = null,
+        GroupFrame? frameDraftPreview = null, GroupFrame? frameDragPreview = null,
+        GroupFrame? frameResizePreview = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -312,10 +325,24 @@ public sealed class LadderCanvas : FrameworkElement
             }
 
             // 選択中のGroupFrame(グループ枠)のハイライト(T-067)。DiagramRenderer.DrawFramesと
-            // 同じ矩形位置(FrameRectDip)を専用Penで上書き再描画する(画像等と同型パターン、次段階
-            // (2)〜(5)=キーボード配線・ドラッグ作成・ラベル編集・右クリックメニューは未実装)。
-            if (selectedFrame is { } frame)
-                dc.DrawRectangle(null, SelectedFramePenFor(frame.BorderStyle), FrameRectDip(frame));
+            // 同じ矩形位置(FrameRectDip)を専用Penで上書き再描画する(画像等と同型パターン)。
+            // T-155: 選択中はさらに四隅＋四辺の8リサイズハンドル(白い小四角、画像と同色)を描く。
+            // ただしドラッグ・リサイズ中はゴースト側にハンドル無しの枠だけを見せる。
+            if (selectedFrame is { } frame && frameDragPreview is null && frameResizePreview is null)
+            {
+                var rect = FrameRectDip(frame);
+                dc.DrawRectangle(null, SelectedFramePenFor(frame.BorderStyle), rect);
+                foreach (var (pt, _) in FrameHandlePoints(rect))
+                    dc.DrawRectangle(Brushes.White, SelectedImagePen,
+                        new Rect(pt.X - ImageResizeHandleSizeDip / 2, pt.Y - ImageResizeHandleSizeDip / 2,
+                            ImageResizeHandleSizeDip, ImageResizeHandleSizeDip));
+            }
+
+            // T-155(殿ご下命): 枠の作成・移動・リサイズ中のゴースト(半透明の塗り＋枠と同じ破線)。
+            // 3操作のうち非nullのものを描く(同時には1つだけ立つ)。
+            foreach (var ghost in new[] { frameDraftPreview, frameDragPreview, frameResizePreview })
+                if (ghost is { } g)
+                    dc.DrawRectangle(FrameGhostFillBrush, SelectedFramePenFor(g.BorderStyle), FrameRectDip(g));
 
             // 記入中(未確定)の画像挿入プレビュー(T-064、殿裁定「案A」配置待機モード)。半透明の塗り+
             // 破線枠で配置枠を示す(実画像内容の描画は行わない、シンプルさ優先)。
@@ -591,16 +618,47 @@ public sealed class LadderCanvas : FrameworkElement
     private static Rect ImageRectDip(ImageInsert image)
         => new(image.XMm * MmToDip, image.YMm * MmToDip, image.WidthMm * MmToDip, image.HeightMm * MmToDip);
 
+    /// <summary>図面レンダラの幾何(セル寸法・余白)。T-155で ConfirmResizeFrame へ渡す。</summary>
+    internal GridGeometry Geometry => _renderer.Geometry;
+
+    /// <summary>T-155: 選択中の枠の8リサイズハンドル(四隅＋四辺の中点)の中心点(ローカルDIP)。
+    /// 描画とヒットテストで共有する(HitTestImageResizeHandleの4隅版に対応)。隅を先に列挙し、
+    /// 極小の枠で隅と辺の当たり判定が重なったときは隅を優先させる。</summary>
+    private static IEnumerable<(Point Pt, ViewModels.FrameResizeHandle Handle)> FrameHandlePoints(Rect r)
+    {
+        double midX = r.Left + r.Width / 2, midY = r.Top + r.Height / 2;
+        yield return (new Point(r.Left, r.Top), ViewModels.FrameResizeHandle.TopLeft);
+        yield return (new Point(r.Right, r.Top), ViewModels.FrameResizeHandle.TopRight);
+        yield return (new Point(r.Right, r.Bottom), ViewModels.FrameResizeHandle.BottomRight);
+        yield return (new Point(r.Left, r.Bottom), ViewModels.FrameResizeHandle.BottomLeft);
+        yield return (new Point(midX, r.Top), ViewModels.FrameResizeHandle.Top);
+        yield return (new Point(r.Right, midY), ViewModels.FrameResizeHandle.Right);
+        yield return (new Point(midX, r.Bottom), ViewModels.FrameResizeHandle.Bottom);
+        yield return (new Point(r.Left, midY), ViewModels.FrameResizeHandle.Left);
+    }
+
+    /// <summary>T-155: 選択中の枠のリサイズハンドル上にクリック位置があるか判定する(HitTestImage
+    /// ResizeHandleと同型)。ヒットすれば掴んだハンドルを返す。</summary>
+    internal ViewModels.FrameResizeHandle? HitTestFrameResizeHandle(Point localPositionDip, GroupFrame frame)
+    {
+        var rect = FrameRectDip(frame);
+        double half = ImageResizeHandleSizeDip / 2 + 2.0;
+        foreach (var (pt, handle) in FrameHandlePoints(rect))
+            if (Math.Abs(localPositionDip.X - pt.X) <= half && Math.Abs(localPositionDip.Y - pt.Y) <= half)
+                return handle;
+        return null;
+    }
+
     /// <summary>GroupFrameの矩形をmm実座標で返す(T-067)。DiagramRenderer.DrawFramesと同じ計算式
     /// (Visual*Mm優先、無ければTopLeft/Width/Height由来)をView側で再現する(HitTestConnector等の
     /// 既存パターン踏襲、Core層描画ロジックの重複はやむを得ない設計)。殿裁定=配置単位はグリッド
     /// セル単位のため新規作成の枠はVisual*Mmが常にnullだが、旧ファイル互換で値が入っている場合も
     /// 描画位置とヒットテスト位置を一致させるため描画側と同じフォールバック式を用いる。</summary>
-    private Rect FrameRectMm(GroupFrame frame)
+    internal Rect FrameRectMm(GroupFrame frame)
     {
         var geo = _renderer.Geometry;
         double x = frame.VisualXMm ?? geo.X(frame.TopLeft.Column);
-        double y = frame.VisualYMm ?? (geo.YRow(frame.TopLeft.Row) - geo.CellMm * 0.4);
+        double y = frame.VisualYMm ?? geo.FrameTopMm(frame.TopLeft.Row);
         double w = frame.VisualWidthMm ?? frame.Width * geo.CellMm;
         double h = frame.VisualHeightMm ?? frame.Height * geo.CellMm;
         // 隠密レビュー指摘(T-067(1)、2026-07-18): 旧ファイル互換のVisual*Mm・破損データ経由で

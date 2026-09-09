@@ -1584,6 +1584,10 @@
                                         <DataGridTextColumn Header="機器名" Binding="{Binding Name}" IsReadOnly="True"/>
                                         <DataGridTextColumn Header="種別" Binding="{Binding Class, Converter={StaticResource DeviceClassToText}}" IsReadOnly="True"/>
                                         <DataGridTextColumn Header="型式" Binding="{Binding Model}"/>
+                                        <!-- T-154(殿ご下命): メーカー・数量も型式と同じくその場で編集可能。数量は int のため
+                                             数値以外を打つと DataGrid が確定を拒む(既定の型変換エラー表示)。 -->
+                                        <DataGridTextColumn Header="メーカー" Binding="{Binding Maker}"/>
+                                        <DataGridTextColumn Header="数量" Binding="{Binding Quantity}"/>
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </avalonDock:LayoutAnchorable>

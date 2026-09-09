@@ -79,6 +79,11 @@ public partial class MainWindow : Window
     private bool _frameDragStarted;
     private bool _frameDragConsumedByEscape;
 
+    // T-155: GroupFrame(枠)リサイズの同種の状態(画像リサイズと同型)。
+    private Point _frameResizePressPositionDip;
+    private bool _frameResizeStarted;
+    private bool _frameResizeConsumedByEscape;
+
     // T-067(3): GroupFrame新規作成(マウスドラッグ)中のEscape消費フラグ。しきい値判定は不要
     // (クリックのみでも1x1の枠として有効なため、他ドラッグ系と異なり*Started相当の状態は持たない)。
     private bool _frameCreateDragConsumedByEscape;
@@ -1128,7 +1133,8 @@ public partial class MainWindow : Window
                 _viewModel.FreeLineDraftPreview, _viewModel.SelectedConnectionDot,
                 _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.SelectedFrame,
                 _viewModel.CurrentTestSession?.State, _viewModel.Document.Devices,
-                _viewModel.OrJoinTargetPreview);
+                _viewModel.OrJoinTargetPreview,
+                _viewModel.FrameDraftPreview, _viewModel.FrameDragPreview, _viewModel.FrameResizePreview);
         else
             LadderCanvasHost.Clear();
     }
@@ -1328,17 +1334,19 @@ public partial class MainWindow : Window
             _viewModel.ApplyDocumentInfo(dialog.Result);
     }
 
-    // 機器表(型式列)のセル編集確定(T-066)。Bindingが直接Device.Modelへ書き戻すため、ここでは
-    // MarkDirty()のみ呼ぶ(キャンセル時はEditAction==Cancelのため呼ばない)。まだBindingが確定する
-    // 前のタイミングで発火するため、編集要素(TextBox)の新値と旧値(Device.Model)を比較し、実際に
-    // 変化した場合のみMarkDirty()する(隠密静的レビュー指摘C、往復1周目。同値ガード規約に合わせる)。
+    // 機器表のセル編集確定(型式=T-066、メーカー・数量=T-154)。Bindingが直接Deviceへ書き戻すため、
+    // ここではMarkDirty()のみ呼ぶ(キャンセル時はEditAction==Cancelのため呼ばない)。まだBindingが
+    // 確定する前のタイミングで発火するため、編集要素(TextBox)の新値と旧値を比較し、実際に変化した
+    // 場合のみMarkDirty()する(隠密静的レビュー指摘C、往復1周目。同値ガード規約に合わせる)。
+    // どの列かは列のBindingパスで判ずる(判定本体はDeviceTableCellEdit.HasChanged、STAなしで測れる形)。
     private void DeviceTableGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
     {
         if (e.EditAction != DataGridEditAction.Commit) return;
         if (e.Row.Item is not Ecad2.Model.Device device) return;
         if (e.EditingElement is not TextBox textBox) return;
-        if (textBox.Text == (device.Model ?? "")) return;
-        _viewModel.MarkDirty();
+        var bindingPath = ((e.Column as DataGridBoundColumn)?.Binding as Binding)?.Path.Path;
+        if (DeviceTableCellEdit.HasChanged(bindingPath, textBox.Text, device))
+            _viewModel.MarkDirty();
     }
 
     // T-114(P-081対処、隠密所見2026-07-14): 機器表「型式」列がCanEditDiagram未ガードのまま
@@ -1823,6 +1831,25 @@ public partial class MainWindow : Window
             }
         }
 
+        // T-155(殿ご下命): 選択中の枠のリサイズハンドル(四隅＋四辺)を押下したらリサイズを開始する
+        // (画像リサイズと同型、ドラッグ移動より先に判定する——ハンドルは枠の境界線に重なるため)。
+        if (_viewModel.SelectedFrame is Ecad2.Model.GroupFrame resizeFrame
+            && _viewModel.CurrentSheet is Ecad2.Model.Sheet frameResizeSheet
+            && LadderCanvasHost.HitTestFrameResizeHandle(position, resizeFrame) is ViewModels.FrameResizeHandle frameHandle)
+        {
+            var rectMm = LadderCanvasHost.FrameRectMm(resizeFrame);
+            var geo = LadderCanvasHost.Geometry;
+            // ページ境界(mm)=グリッドの右下端。ViewModelは幾何を知らない設計のためここで計算して渡す。
+            double maxXMm = geo.X(frameResizeSheet.Grid.Columns);
+            double maxYMm = geo.MarginMm + frameResizeSheet.Grid.Rows * geo.CellMm;
+            _viewModel.BeginResizeFrame(resizeFrame, frameHandle,
+                rectMm.X, rectMm.Y, rectMm.Width, rectMm.Height, maxXMm, maxYMm);
+            if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelResizeFrame(); return; }
+            _frameResizePressPositionDip = position;
+            _frameResizeStarted = false;
+            return;
+        }
+
         // T-067(2): 選択中の枠(SelectedFrame)の境界線を押下したらドラッグ(移動)を開始する
         // (要素ドラッグT-088と同型パターン、殿裁定④=移動はドラッグ)。掴む判定はヒットテストと
         // 同じ境界線近傍(HitTestFrame)——枠は塗りつぶしが無いため内部クリックでは掴まない。
@@ -1960,6 +1987,20 @@ public partial class MainWindow : Window
             return;
         }
 
+        // T-155: 枠リサイズ中。マウス位置(mm実座標)でゴースト矩形を更新する(画像リサイズと同型)。
+        if (_viewModel.IsResizingFrame)
+        {
+            if (!_frameResizeStarted)
+            {
+                if ((position - _frameResizePressPositionDip).Length < DragStartThresholdDip) return;
+                _frameResizeStarted = true;
+            }
+            var (rxMm, ryMm) = LadderCanvasHost.ToMmPoint(position);
+            _viewModel.UpdateResizeFrame(rxMm, ryMm);
+            RedrawCanvas();
+            return;
+        }
+
         // T-067(3): 枠新規作成ドラッグ中(FrameDraftPreview!=null)、現在のマウス位置のセルまで
         // 右下方向へ矩形を伸縮する(Anchor=左上固定、GuiEcad原本のドラッグ追従を翻案)。
         // AdjustFrameDraftは差分方式のため、目標サイズとの差分を都度計算して渡す
@@ -1997,7 +2038,8 @@ public partial class MainWindow : Window
         // (これをスキップしないと、離した位置がたまたま別要素の上にあると誤選択されてしまう)。
         if (_connectorDragConsumedByEscape || _wireBreakDragConsumedByEscape || _freeLineDragConsumedByEscape
             || _connectionDotDragConsumedByEscape || _imageDragConsumedByEscape || _imageResizeConsumedByEscape
-            || _elementDragConsumedByEscape || _frameDragConsumedByEscape || _frameCreateDragConsumedByEscape)
+            || _elementDragConsumedByEscape || _frameDragConsumedByEscape || _frameResizeConsumedByEscape
+            || _frameCreateDragConsumedByEscape)
         {
             LadderCanvasHost.ReleaseMouseCapture();
             _connectorDragConsumedByEscape = false;
@@ -2008,6 +2050,7 @@ public partial class MainWindow : Window
             _imageResizeConsumedByEscape = false;
             _elementDragConsumedByEscape = false;
             _frameDragConsumedByEscape = false;
+            _frameResizeConsumedByEscape = false;
             _frameCreateDragConsumedByEscape = false;
             return;
         }
@@ -2081,6 +2124,14 @@ public partial class MainWindow : Window
             _viewModel.ConfirmDragFrame();
             LadderCanvasHost.ReleaseMouseCapture();
             _frameDragStarted = false;
+            RedrawCanvas();
+            return;
+        }
+        if (_viewModel.IsResizingFrame)
+        {
+            _viewModel.ConfirmResizeFrame(LadderCanvasHost.Geometry);
+            LadderCanvasHost.ReleaseMouseCapture();
+            _frameResizeStarted = false;
             RedrawCanvas();
             return;
         }
@@ -2502,6 +2553,12 @@ public partial class MainWindow : Window
             _frameDragStarted = false;
             RedrawCanvas();
         }
+        if (_viewModel.IsResizingFrame)
+        {
+            _viewModel.CancelResizeFrame();
+            _frameResizeStarted = false;
+            RedrawCanvas();
+        }
         // T-067(3): 枠新規作成ドラッグ中にキャプチャを失った場合(Alt+Tab等)もドラフトを破棄する
         // (他ドラッグ系と同型の安全網)。
         if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceFrame && _viewModel.FrameDraftPreview is not null)
@@ -2517,6 +2574,7 @@ public partial class MainWindow : Window
         _imageResizeConsumedByEscape = false;
         _elementDragConsumedByEscape = false;
         _frameDragConsumedByEscape = false;
+        _frameResizeConsumedByEscape = false;
         _frameCreateDragConsumedByEscape = false;
     }
 
@@ -2771,6 +2829,17 @@ public partial class MainWindow : Window
                     _viewModel.CancelDragFrame();
                     _frameDragStarted = false;
                     _frameDragConsumedByEscape = true;
+                    RedrawCanvas();
+                    FocusCanvas();
+                    e.Handled = true;
+                    break;
+                }
+                if (_viewModel.IsResizingFrame)
+                {
+                    // T-155: 枠リサイズ中のEscも同型の独立最優先層(画像リサイズと同じ)。
+                    _viewModel.CancelResizeFrame();
+                    _frameResizeStarted = false;
+                    _frameResizeConsumedByEscape = true;
                     RedrawCanvas();
                     FocusCanvas();
                     e.Handled = true;

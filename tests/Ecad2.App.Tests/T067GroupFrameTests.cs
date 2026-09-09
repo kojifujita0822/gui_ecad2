@@ -228,7 +228,9 @@ public class T067GroupFrameTests : ViewModelTestBase
         vm.BeginDragFrame(frame);
         vm.UpdateDragFrame(new GridPos(-1, 5));
 
-        Assert.Equal(new GridPos(5, 5), frame.TopLeft);
+        // T-155: 移動はゴースト方式。境界外は据え置き=ゴーストが開始位置のまま。
+        Assert.Equal(new GridPos(5, 5), vm.FrameDragPreview!.TopLeft);
+        Assert.Equal(new GridPos(5, 5), frame.TopLeft);   // 確定前ゆえモデルは不変
     }
 
     [Fact]
@@ -244,7 +246,8 @@ public class T067GroupFrameTests : ViewModelTestBase
         vm.BeginDragFrame(frame);
         vm.UpdateDragFrame(new GridPos(8, 9));
 
-        Assert.Equal(new GridPos(8, 9), frame.TopLeft);
+        // T-155: 移動はゴースト方式。占有判定を経ずゴーストが目標位置まで動く。
+        Assert.Equal(new GridPos(8, 9), vm.FrameDragPreview!.TopLeft);
     }
 
     [Fact]
