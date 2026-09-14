@@ -42,7 +42,7 @@
   },
   "sheets": [
     {
-      "id": "c90b47a1-da3f-4518-9367-109350620fb0",
+      "id": "b39c3324-5502-4491-9590-7a90121dd81a",
       "pageNumber": 1,
       "name": "制御回路",
       "grid": {
@@ -55,7 +55,7 @@
       },
       "elements": [
         {
-          "id": "49f31cd0-bcf4-4408-99b3-40a908dbe3bb",
+          "id": "85211f6e-127b-417e-9d74-bb4a1c05cc78",
           "kind": "contactNO",
           "pos": {
             "row": 0,
@@ -69,11 +69,11 @@
           "rowSpan": 0
         },
         {
-          "id": "ebb8618f-d892-4ed7-a74a-12ae9077bf45",
+          "id": "bd86dfcf-cc48-4376-8b93-b24e1c5f254c",
           "kind": "contactNO",
           "pos": {
             "row": 0,
-            "column": 2
+            "column": 4
           },
           "cellWidth": 1,
           "cellHeight": 1,
@@ -83,7 +83,7 @@
           "rowSpan": 0
         },
         {
-          "id": "7cb3fabf-86aa-410f-9515-5b41ffc8d24f",
+          "id": "5a62c6b1-0cc0-413a-b4d2-c5c54286e52c",
           "kind": "contactNO",
           "pos": {
             "row": 0,
@@ -97,7 +97,7 @@
           "rowSpan": 0
         },
         {
-          "id": "9ca4c8e3-221c-4ed3-a340-988ad161ef69",
+          "id": "520410bb-4f27-4240-9498-fd4b1468a64f",
           "kind": "contactNO",
           "pos": {
             "row": 1,
@@ -113,7 +113,7 @@
       ],
       "connectors": [
         {
-          "column": 2,
+          "column": 3,
           "topRow": 0,
           "bottomRow": 1
         }

@@ -16,8 +16,12 @@ namespace NlToLadderPoc;
 /// </summary>
 public static class SelfHoldBuilder
 {
+    // レイアウト間隔（殿ご指摘2026-09-14＝可読性優先の標準仕様。gaibu-sample.gcadの配置作法に倣う）。
+    // パーツ同士を隙間なく隣接させると記号が重なって見づらく、自己保持の縦コネクタも要素境界へ
+    // ぴったり重なって紛らわしい。パーツ間に空セルを1つ以上空け、縦コネクタはその空セルの中へ通す。
     private const int SetColumn = 1;
-    private const int ResetColumn = 2;
+    private const int SelfHoldConnectorColumn = 3;   // SetとResetの間の空セルへ縦線を通す
+    private const int ResetColumn = 4;
     private const int CoilColumn = 10;
 
     public static LadderDocument Build(SelfHoldSpec spec)
@@ -67,7 +71,7 @@ public static class SelfHoldBuilder
             PartId = BuiltinPartIds.ContactNO,
         });
 
-        sheet.Connectors.Add(new VerticalConnector { Column = SetColumn + 1, TopRow = 0, BottomRow = 1 });
+        sheet.Connectors.Add(new VerticalConnector { Column = SelfHoldConnectorColumn, TopRow = 0, BottomRow = 1 });
 
         doc.Sheets.Add(sheet);
         CircuitNumberer.Number(doc);
