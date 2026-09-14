@@ -3703,7 +3703,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             if (baseElement is null) continue;
 
             int leftColumn = Math.Min(baseElement.Pos.Column, pos.Column);
-            int rightColumn = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
+            int rightColumnAdjacent = Math.Max(baseElement.Pos.Column, pos.Column) + cellWidth;
+            // 殿ご指摘2026-09-14: 右の縦線を要素へ密着させず、1マス空けた位置へ立てる(可読性優先、
+            // sample/gaibu-sample.gcadの配置作法に倣う)。グリッド右端でこの余白が確保できない
+            // (右母線の列を超える)場合のみ、従来どおり要素へ密着させるフォールバックとする。
+            int rightColumn = rightColumnAdjacent + 1 <= sheet.Grid.Columns
+                ? rightColumnAdjacent + 1
+                : rightColumnAdjacent;
             bool needsLeftConnector = !NothingBetweenRailAndColumn(sheet, pos.Row, leftColumn)
                 || !NothingBetweenRailAndColumn(sheet, row, leftColumn);
             candidates.Add(new OrJoinCandidate(row, leftColumn, rightColumn, needsLeftConnector));

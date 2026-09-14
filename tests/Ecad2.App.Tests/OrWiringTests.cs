@@ -9,7 +9,11 @@ namespace Ecad2.App.Tests;
 /// docs/ecad2-t044-presurvey-onmitsu.md)。配置行・基準行の両方でOR左接続点と左母線の間に既存要素が
 /// 無い場合のみ左縦分岐を省略する(トポロジー等価保証ケース限定)。いずれかの行に既存要素があれば
 /// 誤ったバイパス配線を防ぐため縦分岐を維持する。右(合流側)縦分岐は常に生成される(従来維持)。
-/// </summary>
+/// <para>
+/// 【殿ご指摘2026-09-14で右縦分岐の列番号が+1された】右の縦線を要素へ密着させず1マス空けた位置へ
+/// 立てる仕様変更（可読性優先）に伴い、本ファイルの右列期待値をすべて+1した。左縦分岐の列・
+/// 省略要否の判定ロジック自体は無改修（`BuildOrJoinCandidates`の`leftColumn`計算は変更していない）。
+/// </para></summary>
 public class OrWiringTests : ViewModelTestBase
 {
     private static VerticalConnector? FindConnector(MainWindowViewModel vm, int column, int topRow, int bottomRow)
@@ -29,7 +33,7 @@ public class OrWiringTests : ViewModelTestBase
         vm.ConfirmOrJoinTarget();  // T-102: isOr配置は合流先確認モードへ遷移するため、既定候補(旧baseRow相当)で確定する
 
         Assert.Null(FindConnector(vm, column: 0, topRow: 0, bottomRow: 1));
-        Assert.NotNull(FindConnector(vm, column: 1, topRow: 0, bottomRow: 1));
+        Assert.NotNull(FindConnector(vm, column: 2, topRow: 0, bottomRow: 1));
     }
 
     [Fact]
@@ -45,7 +49,7 @@ public class OrWiringTests : ViewModelTestBase
         vm.ConfirmOrJoinTarget();  // T-102: 既定候補(旧baseRow相当)で確定する
 
         Assert.Null(FindConnector(vm, column: 2, topRow: 0, bottomRow: 1));
-        Assert.NotNull(FindConnector(vm, column: 3, topRow: 0, bottomRow: 1));
+        Assert.NotNull(FindConnector(vm, column: 4, topRow: 0, bottomRow: 1));
     }
 
     [Fact]
@@ -64,7 +68,7 @@ public class OrWiringTests : ViewModelTestBase
 
         // 基準行(列0)に既存要素があるため、これをバイパスしないよう左縦分岐は維持される。
         Assert.NotNull(FindConnector(vm, column: 2, topRow: 0, bottomRow: 1));
-        Assert.NotNull(FindConnector(vm, column: 3, topRow: 0, bottomRow: 1));
+        Assert.NotNull(FindConnector(vm, column: 4, topRow: 0, bottomRow: 1));
     }
 
     [Fact]
@@ -83,7 +87,7 @@ public class OrWiringTests : ViewModelTestBase
 
         // 配置行(列0)に既存要素があるため、これをバイパスしないよう左縦分岐は維持される。
         Assert.NotNull(FindConnector(vm, column: 2, topRow: 0, bottomRow: 1));
-        Assert.NotNull(FindConnector(vm, column: 3, topRow: 0, bottomRow: 1));
+        Assert.NotNull(FindConnector(vm, column: 4, topRow: 0, bottomRow: 1));
     }
 
     [Fact]
@@ -111,8 +115,29 @@ public class OrWiringTests : ViewModelTestBase
 
         Assert.NotNull(FindConnector(vm, column: 2, topRow: 0, bottomRow: 1));
         Assert.NotNull(FindConnector(vm, column: 2, topRow: 1, bottomRow: 2));
-        Assert.NotNull(FindConnector(vm, column: 3, topRow: 0, bottomRow: 1));
-        Assert.NotNull(FindConnector(vm, column: 3, topRow: 1, bottomRow: 2));
+        Assert.NotNull(FindConnector(vm, column: 4, topRow: 0, bottomRow: 1));
+        Assert.NotNull(FindConnector(vm, column: 4, topRow: 1, bottomRow: 2));
+    }
+
+    /// <summary>殿ご指摘2026-09-14＝右の縦線は1マス空けた位置が既定だが、グリッド右端でその余白が
+    /// 確保できない(右母線の列Columnsを超える)場合は、従来どおり要素へ密着させるフォールバックとなる。
+    /// 既定のGrid.Columns=20(<see cref="MainWindowViewModel.NewDocument"/>)で、列19(配置可能な最右列、
+    /// cellWidth=1)にOR配置すると、密着位置(20)がちょうどColumnsと一致し、+1すると超えるためフォール
+    /// バックが効く。</summary>
+    [Fact]
+    public void PlaceOr_AtGridRightEdge_FallsBackToAdjacentRightConnector()
+    {
+        var vm = CreateViewModel();
+        vm.NewDocument();
+        vm.SelectedCell = new GridPos(0, 19);
+        vm.PlaceElementAtSelectedCell("contact-no", "", isOr: false);   // 基準行(行0)、グリッド最右列
+
+        vm.SelectedCell = new GridPos(1, 19);
+        vm.PlaceElementAtSelectedCell("contact-no", "X1", isOr: true);  // 配置行(行1)、同じ最右列
+        vm.ConfirmOrJoinTarget();
+
+        // 密着位置(20)がColumnsちょうどのため、+1(21)は超過してフォールバックする。
+        Assert.NotNull(FindConnector(vm, column: 20, topRow: 0, bottomRow: 1));
     }
 
     [Fact]
