@@ -1,0 +1,140 @@
+﻿{
+  "schemaVersion": 1,
+  "info": {
+    "companyName": "",
+    "title": "自己保持回路（NL-to-Ladder PoC生成）",
+    "drawingNo": "",
+    "customer": "",
+    "designer": "",
+    "drafter": "",
+    "checker": "",
+    "revisions": []
+  },
+  "settings": {
+    "defaultBus": {
+      "leftName": "N24",
+      "rightName": "P24"
+    },
+    "enableBorder": true,
+    "paperSize": "a4"
+  },
+  "devices": {
+    "byName": {
+      "PB1": {
+        "name": "PB1",
+        "class": "pushButton",
+        "quantity": 1,
+        "comment": "自己保持ON入力"
+      },
+      "PB2": {
+        "name": "PB2",
+        "class": "pushButton",
+        "quantity": 1,
+        "comment": "自己保持OFF入力"
+      },
+      "CR1": {
+        "name": "CR1",
+        "class": "relay",
+        "quantity": 1,
+        "comment": "自己保持コイル"
+      }
+    }
+  },
+  "sheets": [
+    {
+      "id": "c90b47a1-da3f-4518-9367-109350620fb0",
+      "pageNumber": 1,
+      "name": "制御回路",
+      "grid": {
+        "rows": 6,
+        "columns": 15
+      },
+      "bus": {
+        "leftName": "N24",
+        "rightName": "P24"
+      },
+      "elements": [
+        {
+          "id": "49f31cd0-bcf4-4408-99b3-40a908dbe3bb",
+          "kind": "contactNO",
+          "pos": {
+            "row": 0,
+            "column": 1
+          },
+          "cellWidth": 1,
+          "cellHeight": 1,
+          "deviceName": "PB1",
+          "partId": "basic-pushbutton-no",
+          "params": {},
+          "rowSpan": 0
+        },
+        {
+          "id": "ebb8618f-d892-4ed7-a74a-12ae9077bf45",
+          "kind": "contactNO",
+          "pos": {
+            "row": 0,
+            "column": 2
+          },
+          "cellWidth": 1,
+          "cellHeight": 1,
+          "deviceName": "PB2",
+          "partId": "basic-pushbutton-nc",
+          "params": {},
+          "rowSpan": 0
+        },
+        {
+          "id": "7cb3fabf-86aa-410f-9515-5b41ffc8d24f",
+          "kind": "contactNO",
+          "pos": {
+            "row": 0,
+            "column": 10
+          },
+          "cellWidth": 1,
+          "cellHeight": 1,
+          "deviceName": "CR1",
+          "partId": "basic-coil",
+          "params": {},
+          "rowSpan": 0
+        },
+        {
+          "id": "9ca4c8e3-221c-4ed3-a340-988ad161ef69",
+          "kind": "contactNO",
+          "pos": {
+            "row": 1,
+            "column": 1
+          },
+          "cellWidth": 1,
+          "cellHeight": 1,
+          "deviceName": "CR1",
+          "partId": "basic-contact-no",
+          "params": {},
+          "rowSpan": 0
+        }
+      ],
+      "connectors": [
+        {
+          "column": 2,
+          "topRow": 0,
+          "bottomRow": 1
+        }
+      ],
+      "wireBreaks": [],
+      "frames": [],
+      "lines": [
+        {
+          "row": 0,
+          "circuitNumber": 1
+        },
+        {
+          "row": 1,
+          "circuitNumber": 2
+        }
+      ],
+      "rungComments": [],
+      "freeLines": [],
+      "connectionDots": [],
+      "images": [],
+      "mainCircuit": false
+    }
+  ]
+}
