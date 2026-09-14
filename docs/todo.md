@@ -56,6 +56,51 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 
 ## 生きているタスク
 
+### T-159 v0.9.1 リリース — Done（2026-09-14、殿ご下命。T-158 を収載）
+
+殿ご下命「コミット、プッシュ、リリースに進んで」。`memory: ecad2_release_procedure` の手順に従い実施。
+
+- 版数 `0.9.1` を `src/Ecad2.App/Ecad2.App.csproj` `<Version>` と `installer/Ecad2_Setup.iss`
+  `#define AppVersion` の2箇所へ（コミット `78c5456`、publish より前）。
+- クリーンビルド0エラー・全2089件green（Core 614／App 1475）。
+- 自己完結 publish＝436ファイル（v0.9.0と一致）。`ProductVersion=0.9.1+78c5456d6fdc2795306af9f40f2cf1918adbfea0`。
+- publish exe の起動→終了を実測（正常）。
+- インストーラー生成＝`ISCC.exe installer\Ecad2_Setup.iss`。警告0・エラー0。
+- 配布物＝`C:\ECAD2\version\v0.9.1\Ecad2_Setup_0.9.1.exe`（47.4MB、
+  SHA256 `3B84F5D5DE512C59EFE5ED708F930D258E8A4DC455693FD5C0E36D8F2EBEDE35`）。
+- 殿の端末へのインストールは殿の役儀。家老は配布物生成・push・タグまで。
+
+### T-158 外部接点A/Bの組込み昇格とDRC異常なし表示 — Done（2026-09-14、殿ご下命。単独セッション）
+
+起票＝殿の御言葉「`sample/gaibu-sample.gcad`の自作図形の外部接点Aを組み込み図形にしてテストモード時には
+クリック操作でトグルでき、通電確認も取れる仕様にしたい。外部接点は使用率が高い為、組み込み図形で利用したい。
+保存先は『パーツ』→『その他図形』また、外部接点BもNC接点として追加したい」。
+
+【機構調査】外部接点A（当初 `sample/gaibu-sample.gcad` 埋め込み、Role=InputNO）はPushButtonNOと同じ
+`ElementKind`へ写像されテストモードでモーメンタリ（押している間だけON）動作になる設計であった。
+殿ご指摘2026-09-14＝「外部接点はinput系ではない」により、Role=ContactNO/NCへ正した。ContactNO/NCは
+既存の接点操作経路（`MainWindowViewModel.IsRealContactElement`→`TestSession.ToggleInput`、テスト中の
+クリックで強制ON/OFFを保持するトグル）に自然に乗るため、新規の分岐追加なしにトグル・通電確認を実現できる。
+
+【実装】
+- `BuiltinPartIds`／`BasicPartTemplates`に`basic-external-contact-no`（外部接点A、Role=ContactNO）・
+  `basic-external-contact-nc`（外部接点B、Role=ContactNC）を追加。座標は殿が自作パーツエディタで描いた
+  `外部接点A.gcadpart`／`外部接点B.gcadpart`のprimitivesをそのまま移植。
+- 両者とも`IsExcludedFromCrossReference=true`（T-152の直交フラグ）を設定——外部接点は現場の物理入力信号で
+  対応する駆動コイルを図面上に持たぬのが正常なため、DRC-XREF-001（コイルなし警告）が誤って出ぬようにした
+  （殿からの追加確認「コイル無しと判定される問題を除外できるか」への対処）。
+- `IsOrEligible=false`（ThermalRelayNO/NCと同じ理由、OR a接点/OR b接点への参入は要求外ゆえ表示件数を
+  無用に増やさぬ）。
+- `MainWindow.xaml`「パーツ」→「その他図形」メニュー末尾（既存11項目の添字を保つため）に2項目追加。
+- 別件、殿ご指摘「設計チェックで問題が無い場合に何も表示されないと、判定されたのか未実行なのか
+  分かりにくい」への対処＝`OutputPanelViewModel.ShowNoIssuesMessage`を新設し、DRC実行済みかつ0件の時だけ
+  出力パネルへ「異常なし」プレースホルダ（`SystemColors.GrayTextBrushKey`、既存のGray色規約に準拠）を表示。
+
+【検証】単独セッションゆえ隠密の静的レビュー・忍者の実機確認は未実施。新規回帰テスト9件
+（`ExternalContactPartsTests`6件・`OutputPanelShowNoIssuesTests`3件）を追加。組込み部品数の増加に伴い
+既存テスト5件の期待値を正当に更新（17→19件・19→21件・11→13項目・Gray色規約6→7件）。全2089件green
+（Core 614／App 1475）。殿ご自身が実機で外部接点A/Bの機能を確認し「問題なかった」とご確認（2026-09-14）。
+
 ### T-157 v0.9.0 リリース — Done（2026-09-09、殿ご下命。T-154/T-155/T-156 を収載）
 
 殿ご下命「V0.9としてプッシュとリリース」。`memory: ecad2_release_procedure` の手順に従い実施。
