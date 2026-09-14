@@ -59,6 +59,14 @@ public static class BasicPartTemplates
     /// <summary>サーマルリレーb接点の固定Id。用途・注意は<see cref="ThermalRelayNOId"/>と同じ。</summary>
     public const string ThermalRelayNCId = BuiltinPartIds.ThermalRelayNC;
 
+    // 外部接点A/B（殿ご依頼2026-09-14）。自作パーツ「外部接点A」(id=05a84cfb...)・「外部接点B」
+    // (id=d213fc09...)からの組込み昇格。使用率が高い現場入力接点（センサー等の外部信号）を、
+    // 都度自作せずとも配置できるようにする。
+    /// <summary>外部接点A（NO）の固定Id。用途はContactNOIdと同じ。</summary>
+    public const string ExternalContactNOId = BuiltinPartIds.ExternalContactNO;
+    /// <summary>外部接点B（NC）の固定Id。用途はContactNOIdと同じ。</summary>
+    public const string ExternalContactNCId = BuiltinPartIds.ExternalContactNC;
+
     /// <summary>2端子（左=NetA / 右=NetB）の標準ポート。1セル幅の図形で共通。</summary>
     private static List<PortDef> TwoPorts() => new()
     {
@@ -108,6 +116,8 @@ public static class BasicPartTemplates
         EmergencyStop(),
         ThermalRelayNO(),
         ThermalRelayNC(),
+        ExternalContactNO(),
+        ExternalContactNC(),
     };
 
     // a接点(NO): 2ブレード＋左右リード
@@ -510,6 +520,64 @@ public static class BasicPartTemplates
             new PartLine(0.625, 0.0625, 0.375, 0.3125),       // ×印（右上→左下）
             new PartLine(0.375, 0.0625, 0.625, 0.3125),       // ×印（左上→右下）
             new PartLine(0.125, 0.1875, 0.875, 0.1875),       // 横線（下側）
+        },
+    };
+
+    // 外部接点A/B（殿ご依頼2026-09-14）。座標は殿が自作パーツエディタで描いた
+    // 外部接点A.gcadpart／外部接点B.gcadpartの primitives をそのまま移植（T-133増分7の
+    // サーマルリレーa/bと同じ理由——原本の .gcadpart 座標規約は PartDefinition と同一ゆえ変換不要）。
+    //
+    // 【Role=ContactNO/NCへ正した】殿ご指摘2026-09-14＝「外部接点はinput系ではない」。当初の自作パーツ
+    // 「外部接点A」はRole=InputNOで作られていたが、これは誤りであった。InputNO/NCは押釦と同じ
+    // ElementKindへ写像されテストモードではモーメンタリ（押している間のみON）動作になる
+    // （PartResolver.ComponentKind）。外部接点が求める「クリックでON/OFFをトグル保持」する挙動は、
+    // 既存ではContactNO/NCが唯一持つ経路（MainWindowViewModel.IsRealContactElement→TestSession.ToggleInput）
+    // ゆえ、Roleを通常接点へ揃えることで新規の分岐追加なしに実現できる。
+    //
+    // 【IsExcludedFromCrossReference=trueとした理由】外部接点は現場のセンサー等、物理的な外部入力信号
+    // であり、対応する駆動コイルを図面上に持たぬのが正常。素のContactNO/NCのままだと
+    // DRC-XREF-001（接点はあるがコイルが無い）が誤って出続ける——殿ご指摘のとおり。T-152で
+    // サーマルリレーa/b・ソレノイド向けに導入された直交フラグ（役割は正しいが対応する片側を
+    // 持たない部品向け）がそのまま当てはまるため、既定オフをオプトインでtrueにする。
+    //
+    // 【IsOrEligibleは付けぬ】通常のa接点/b接点と違い、ツールバーのOR a接点/OR b接点(Shift+F5/F6)
+    // 選択肢へ加える要求は今回無い。ThermalRelayNO/NCと同じ理由（PartPaletteViewModel.Load）——
+    // 付ければ部品選択リストへORa/ORb論理エントリが2件（外部接点A/Bぶん）増え、要求されていない
+    // 範囲まで表示件数を変えてしまう。要る段になれば殿の指示で足せる。
+
+    // 外部接点A(NO): 端子円2つ＋横長矩形（外部接点A.gcadpart由来。role=contactNO）
+    private static PartDefinition ExternalContactNO() => new()
+    {
+        Id = ExternalContactNOId,
+        Name = "外部接点A",
+        WidthCells = 1,
+        HeightCells = 1,
+        Role = PartRole.ContactNO,
+        IsExcludedFromCrossReference = true,
+        Ports = TwoPorts(),
+        Primitives =
+        {
+            new PartCircle(0.12876751821063936, 0.006357523816763681, 0.15490115533654072),
+            new PartCircle(0.8294307857850152, 0.006357523816763291, 0.15490115533654109),
+            new PartRect(-0.005182812355049372, -0.4985321837000656, 0.9994755434516824, 0.1957735600575461),
+        },
+    };
+
+    // 外部接点B(NC): 端子円2つ＋横長矩形（外部接点B.gcadpart由来。role=contactNC）
+    private static PartDefinition ExternalContactNC() => new()
+    {
+        Id = ExternalContactNCId,
+        Name = "外部接点B",
+        WidthCells = 1,
+        HeightCells = 1,
+        Role = PartRole.ContactNC,
+        IsExcludedFromCrossReference = true,
+        Ports = TwoPorts(),
+        Primitives =
+        {
+            new PartCircle(0.8864678161278333, -0.0038572104964834444, 0.10693076567521961),
+            new PartCircle(0.12453685397701303, -0.009673477383130721, 0.10174311727086936),
+            new PartRect(0.01984405001735917, 0.12991692789640774, 0.9771328369567778, 0.23846694235254673),
         },
     };
 }

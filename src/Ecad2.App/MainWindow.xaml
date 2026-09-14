@@ -17,6 +17,7 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility"/>
         <converters:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVisibility"/>
+        <converters:ShowNoIssuesToVisibilityConverter x:Key="ShowNoIssuesToVisibility"/>
         <converters:DiagnosticSeverityToBrushConverter x:Key="SeverityToBrush"/>
         <converters:DiagnosticSeverityToTextConverter x:Key="SeverityToText"/>
         <converters:ToolModeToTextConverter x:Key="ToolModeToText"/>
@@ -1069,6 +1070,10 @@
                     <MenuItem Header="電磁接触器 主接点 縦" Tag="ContactorMain3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="サーマル(OL) 2極 横" Tag="ThermalOverload3P#H" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
                     <MenuItem Header="サーマル(OL) 2極 縦" Tag="ThermalOverload3P#V" Click="OtherSymbolMenuItem_Click" IsEnabled="{Binding CanPlaceOnMainCircuit}"/>
+                    <!-- 外部接点A/B（殿ご依頼2026-09-14）。既存11項目の添字を保つため末尾へ足す
+                         （上のコメント同旨。ピン留めセクションより手前・既存項目より後ろ）。 -->
+                    <MenuItem Header="外部接点A" Tag="part:basic-external-contact-no" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
+                    <MenuItem Header="外部接点B" Tag="part:basic-external-contact-nc" Click="OtherPartMenuItem_Click" IsEnabled="{Binding CanEditDiagram}"/>
                 </MenuItem>
             </MenuItem>
             <MenuItem Header="ヘルプ(_H)">
@@ -1835,6 +1840,19 @@
                                                                 Width="140"/>
                                         </DataGrid.Columns>
                                     </DataGrid>
+                                    <!-- 殿ご指摘2026-09-14: 設計チェックで指摘0件の時、DataGridが空のままだと
+                                         「判定済みで問題なし」か「未実行」かが見た目で区別できない。実行済み0件の
+                                         ときだけプレースホルダを重ねて出す(上のDataGrid2枚と同型のVisibility切替)。 -->
+                                    <TextBlock Text="異常なし" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="{DynamicResource {x:Static SystemColors.GrayTextBrushKey}}"
+                                               FontStyle="Italic" IsHitTestVisible="False">
+                                        <TextBlock.Visibility>
+                                            <MultiBinding Converter="{StaticResource ShowNoIssuesToVisibility}">
+                                                <Binding Path="Find.IsVisible"/>
+                                                <Binding Path="OutputPanel.ShowNoIssuesMessage"/>
+                                            </MultiBinding>
+                                        </TextBlock.Visibility>
+                                    </TextBlock>
                                 </Grid>
                             </DockPanel>
                         </avalonDock:LayoutAnchorable>

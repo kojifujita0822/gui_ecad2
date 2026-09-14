@@ -45,6 +45,8 @@ public static class BuiltinPartIds
     public const string EmergencyStop = "basic-emergency-stop";
     public const string ThermalRelayNO = "basic-thermal-relay-no";
     public const string ThermalRelayNC = "basic-thermal-relay-nc";
+    public const string ExternalContactNO = "basic-external-contact-no";
+    public const string ExternalContactNC = "basic-external-contact-nc";
 
     /// <summary>全組込みId。並びは現在 <c>BasicPartTemplates.All()</c> と同じにしてある——照合を目で
     /// 追えるようにという便宜にて、<b>順序そのものは要件ではない</b>（テストも集合と員数のみを固定しておる）。</summary>
@@ -54,6 +56,7 @@ public static class BuiltinPartIds
         PushButtonNO, PushButtonNC, Lamp, Motor,
         TimerContactNO, TimerContactNC, TimerInstantContactNO, TimerInstantContactNC,
         ThermalOverload, EmergencyStop, ThermalRelayNO, ThermalRelayNC,
+        ExternalContactNO, ExternalContactNC,
     };
 
     private static readonly HashSet<string> Set = new(All, StringComparer.Ordinal);

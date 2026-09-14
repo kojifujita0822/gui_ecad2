@@ -27,16 +27,17 @@ public class MainWindowGrayForegroundTests
     /// 観点8＝巻き込み防止の網（設計書§4.1）。「Grayを消す」作業が正当なコード
     /// （SystemColors.GrayTextBrushKey、無効状態のグレー文字表現）まで巻き込んでいないことの対照。
     /// これが無ければ「全部消した」と「正しく2件だけ消した」を区別できない。
+    /// 【殿ご依頼2026-09-14で7件目】出力パネルの「異常なし」プレースホルダに同じ表現を新規採用。
     /// </summary>
     [Fact]
-    public void App_xamlとMainWindow_xamlのGrayTextBrushKeyは6件のまま残る()
+    public void App_xamlとMainWindow_xamlのGrayTextBrushKeyは7件のまま残る()
     {
         var appContent = File.ReadAllText(GetAppXamlPath());
         var mainWindowContent = File.ReadAllText(GetMainWindowXamlPath());
         var count = CountOccurrences(appContent, "SystemColors.GrayTextBrushKey")
             + CountOccurrences(mainWindowContent, "SystemColors.GrayTextBrushKey");
 
-        Assert.Equal(6, count);
+        Assert.Equal(7, count);
     }
 
     private static int CountOccurrences(string content, string pattern)

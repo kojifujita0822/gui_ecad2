@@ -28,28 +28,29 @@ namespace Ecad2.App.Tests;
 public class T133Increment7PaletteCountTests : ViewModelTestBase
 {
     /// <summary>
-    /// 部品選択リストの表示件数は19件。<b>忍者の実機確認における基準値そのもの</b>
+    /// 部品選択リストの表示件数は21件（殿ご依頼2026-09-14で外部接点A/Bを足し、19→21。
+    /// 両件ともIsOrEligible=falseゆえOR論理は増えぬ）。<b>忍者の実機確認における基準値そのもの</b>
     /// （増分6までは17件であった）。
     /// </summary>
     [Fact]
-    public void 部品選択リストは十九件である()
+    public void 部品選択リストは二十一件である()
     {
         var vm = CreateViewModel();
 
-        Assert.Equal(19, vm.PartPalette.SelectionEntries.Count);
+        Assert.Equal(21, vm.PartPalette.SelectionEntries.Count);
     }
 
     /// <summary>
-    /// 19件の内訳が「テンプレート17件＋OR論理2件」であること。
+    /// 21件の内訳が「テンプレート19件＋OR論理2件」であること。
     /// <b>総数だけでは内訳の入れ替わりを捕らえられぬ</b>ゆえ、両側から押さえる。
     /// </summary>
     [Fact]
-    public void 十九件の内訳はテンプレート十七件とOR論理二件である()
+    public void 二十一件の内訳はテンプレート十九件とOR論理二件である()
     {
         var vm = CreateViewModel();
         var entries = vm.PartPalette.SelectionEntries;
 
-        Assert.Equal(17, entries.Count(e => !e.IsOr));
+        Assert.Equal(19, entries.Count(e => !e.IsOr));
         Assert.Equal(2, entries.Count(e => e.IsOr));
     }
 

@@ -37,6 +37,20 @@ public sealed class OutputPanelViewModel : ViewModelBase
 
     public ICommand RunDrcCommand { get; }
 
+    /// <summary>設計チェックを実行済みで、指摘が0件だったか（殿ご指摘2026-09-14＝「問題なしの場合に
+    /// 何も表示されないと、判定されたのか未実行なのか分かりにくい」）。
+    /// <para>
+    /// <b>Diagnostics.Countだけでは「未実行」と「実行済み0件」を区別できない</b>——いずれも空コレクション
+    /// のまま変わらぬため、実行有無を独立に持つ。<see cref="RunDrc"/> の末尾で計算し、
+    /// <see cref="ClearResults"/>（新規/開くでの文書差し替え時）ではfalseへ戻す。
+    /// </para></summary>
+    private bool _showNoIssuesMessage;
+    public bool ShowNoIssuesMessage
+    {
+        get => _showNoIssuesMessage;
+        private set => SetProperty(ref _showNoIssuesMessage, value);
+    }
+
     public OutputPanelViewModel(MainWindowViewModel owner)
     {
         _owner = owner;
@@ -61,6 +75,7 @@ public sealed class OutputPanelViewModel : ViewModelBase
     {
         Diagnostics.Clear();
         SelectedDiagnostic = null;
+        ShowNoIssuesMessage = false;
     }
 
     private void RunDrc()
@@ -82,6 +97,7 @@ public sealed class OutputPanelViewModel : ViewModelBase
 
         Diagnostics.Clear();
         foreach (var diagnostic in results) Diagnostics.Add(diagnostic);
+        ShowNoIssuesMessage = results.Count == 0;
     }
 
     // 該当箇所(ページ-行)のシート・セルへ選択を移す。同じ行に選択中診断のDeviceNameと一致する

@@ -67,18 +67,19 @@ public class T136Increment5PortKindAssignmentTests
         => Assert.Equal(17, KindsWithPorts().Count);
 
     /// <summary>
-    /// 自作テンプレートは17件（T-133増分7でサーマルリレーa/bを足し、15→17）。理由は上と同じ。
+    /// 自作テンプレートは19件（殿ご依頼2026-09-14で外部接点A/Bを足し、17→19）。理由は上と同じ。
     /// <para>
-    /// <b>【この17は<c>All()</c>自体の件数であり、部品リストの表示件数19とは別の単位】</b>
-    /// 表示件数は<c>All()</c>17件＋OR論理2件（<c>ContactNO</c>／<c>ContactNC</c>の
-    /// <c>IsOrEligible</c>分、<c>PartPaletteViewModel.cs:75-76</c>）＝19件。
-    /// <b>増分7の前は「<c>All()</c>15件・表示17件」であった</b>——
-    /// <b>同じ「17」が前後で別の意味を指すゆえ、単位を明記しておく</b>（隠密の検算、2026-08-06）。
+    /// <b>【この19は<c>All()</c>自体の件数であり、部品リストの表示件数21とは別の単位】</b>
+    /// 表示件数は<c>All()</c>19件＋OR論理2件（<c>ContactNO</c>／<c>ContactNC</c>の
+    /// <c>IsOrEligible</c>分、<c>PartPaletteViewModel.cs:75-76</c>。外部接点A/BはIsOrEligible=falseゆえ
+    /// OR論理は増えぬ）＝21件。
+    /// <b>増分7の前は「<c>All()</c>15件・表示17件」、外部接点追加前は「<c>All()</c>17件・表示19件」であった</b>
+    /// ——<b>「17」「19」が時期によって別の意味を指すゆえ、単位を明記しておく</b>（隠密の検算、2026-08-06）。
     /// </para>
     /// </summary>
     [Fact]
-    public void 自作テンプレートは17件()
-        => Assert.Equal(17, BasicPartTemplates.All().Count);
+    public void 自作テンプレートは19件()
+        => Assert.Equal(19, BasicPartTemplates.All().Count);
 
     /// <summary>
     /// 主回路3極記号3種は接続点を持たぬ（＝17件の外にある）ことの対照。
@@ -148,14 +149,14 @@ public class T136Increment5PortKindAssignmentTests
         Assert.Empty(motor.Ports);
     }
 
-    /// <summary>自作テンプレートのモータ以外16件は、すべての接続点が赤
-    /// （T-133増分7でサーマルリレーa/bが加わり14→16。両件とも接点ゆえ赤）。</summary>
+    /// <summary>自作テンプレートのモータ以外18件は、すべての接続点が赤
+    /// （殿ご依頼2026-09-14で外部接点A/Bが加わり16→18。両件とも接点ゆえ赤）。</summary>
     [Fact]
-    public void 自作テンプレート_モータ以外16件の接続点はすべて赤()
+    public void 自作テンプレート_モータ以外18件の接続点はすべて赤()
     {
         var others = BasicPartTemplates.All().Where(p => p.Id != BasicPartTemplates.MotorId).ToList();
 
-        Assert.Equal(16, others.Count);
+        Assert.Equal(18, others.Count);
         foreach (var part in others)
             Assert.All(part.Ports, p => Assert.Equal(PortKind.Power, p.Kind));
     }

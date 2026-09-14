@@ -131,21 +131,26 @@ public class MenuPlacementToolTests
     // ===== 観点A: メニューの中身 =====
 
     /// <summary>
-    /// 既存4件（増分6）＋三相モータ縦1件（増分8段2）＋3種×縦横6件（増分4-C）で11項目。
-    /// <b>増減があれば鳴る。</b>
+    /// 既存4件（増分6）＋三相モータ縦1件（増分8段2）＋3種×縦横6件（増分4-C）＋外部接点A/B2件
+    /// （殿ご依頼2026-09-14）で13項目。<b>増減があれば鳴る。</b>
     /// <para>
     /// <b>【原本の10エントリとは員数が揃わなくなった】</b>増分6までは原本 <c>OtherBuiltins</c> の
     /// 10エントリと一致しておったが、<b>原本に縦向きモータは無い</b>（侍が原本を実測）。
     /// <b>殿裁定5により ecad2 が新たに設けた1件ゆえ、原本より1件多いのが正である。</b>
     /// </para>
+    /// <para>
+    /// <b>外部接点A/Bは既存項目の添字を保つため末尾（11・12番目）へ足した</b>——
+    /// <see cref="FirstSymbolIndex"/>・<see cref="MotorPartIndex"/> 等の直書き添字はいずれも0-10の
+    /// 範囲内にて、本追加による影響を受けぬ。
+    /// </para>
     /// </summary>
     [Fact]
-    public void その他図形は十一項目を持つ()
+    public void その他図形は十三項目を持つ()
         => StaTestRunner.Run(() =>
         {
             var window = new MainWindow();
 
-            Assert.Equal(11, window.OtherSymbolsMenu.Items.Count);
+            Assert.Equal(13, window.OtherSymbolsMenu.Items.Count);
         });
 
     /// <summary>
