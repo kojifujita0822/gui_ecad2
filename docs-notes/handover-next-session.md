@@ -16,8 +16,9 @@
 | nl-to-ladder-poc（自然言語→ラダー図生成PoC） | 実機確認済み（自己保持回路のみ）。`poc/nl-to-ladder-poc/` |
 | T-160 OR配置の縦分岐を1マス空ける | Done。殿ご指摘・実機確認済み |
 | T-161 v0.9.2リリース | Done。タグ`v0.9.2`（`4e6ad4d`）push済み |
+| Claude Codeアップデート影響調査（v2.1.226→v2.1.270） | Done。殿ご下命。手を打つ要は無し。詳細は`docs/ecad2-claude-code-update-impact-onmitsu.md`6節 |
 
-全2090件green（Core 614／App 1476）。`origin/main`は`b118d63`まで push 済み、作業ツリー清浄。
+全2090件green（Core 614／App 1476）。`origin/main`は`b32e75f`まで push 済み、作業ツリー清浄。
 配布物＝`C:\ECAD2\version\v0.9.2\Ecad2_Setup_0.9.2.exe`（47.4MB、
 SHA256 `1D340582F8EEF625DC550585ACF526127A36E25C099C41E1707D361ACD633834`）。
 
