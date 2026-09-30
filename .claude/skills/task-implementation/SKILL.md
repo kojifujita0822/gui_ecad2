@@ -32,20 +32,13 @@ ECAD2プロジェクト（`C:\ECAD2\`、WPF/.NET 10）で、家老から委譲�
 - You MUST treat the delegated scope as the outer boundary: 指示にない機能追加・仕様変更・最適化・ついでのリファクタリング/整形は厳禁
 
 ### 2. 実装
-`src/` 配下（Ecad2.Core / Ecad2.Rendering.Wpf / Ecad2.Pdf / Ecad2.App）と `tests/Ecad2.Core.Tests/` を編集する。
+`src/` 配下（Ecad2.Core / Ecad2.Rendering.Wpf / Ecad2.Pdf / Ecad2.App）と `tests/Ecad2.Core.Tests/`・`tests/Ecad2.App.Tests/` を編集する。
 
 **Constraints:**
 - If a change outside the delegated scope becomes necessary, You MUST stop and send the issue back to 家老 via `send_message`, because 理由が正当でも侍の一存での範囲外実装は禁止されているため
 - If the task involves any UI/UX decision（画面配置・パネル構成・操作方式・見た目・キー割当・情報の見せ方）, You MUST present options to 殿 (the human) and MUST NOT let 家老 or yourself decide, because 過去にT-026で家老裁量承認が殿の選択（B案）と食い違った実害があるため
 - You MUST NOT modify `poc/` as part of main implementation because poc は実験場として本実装と分離維持されているため
-- If the task adds a new selectable state（既存の`SelectedCell`/`SelectedConnector`/`SelectedElement`/`SelectedImage`等に並ぶ新しい`Selected*`）, You MUST check consistency across all of the following existing touchpoints, because T-082・T-069・T-064で独立に、このうちどれか1箇所の更新漏れが同型の往復バグを引き起こしたため（詳細=`docs-notes/roles/samurai.md`「新規選択可能状態の横展開チェックリスト」）:
-  1. 選択排他setter（新状態をセットする際、他の選択状態を正しくクリア/共存させる一貫したロジック）
-  2. Escキーの選択解除条件リスト
-  3. 矢印キー等、記入中ドラフト中の入力に対する分岐（対称性：Escapeで効くならこちらでも効くべきか）
-  4. 削除コマンドのOR連鎖（Deleteキーが複数の選択種別を順に判定する経路、新状態が正しい優先順位に入っているか）
-  5. 右クリックメニューのヒットテストチェーン（左クリックの選択経路と対称か）
-  6. 未確定編集の確定処理（`UpdateSourceTrigger=Explicit`な入力欄がある場合、選択状態を変更する前に対応する確定処理（例：`CommitDeviceNameEdit()`）を呼んでいるか。P-071・2026-07-13追記——`CommitDeviceNameEdit()`呼び忘れがT-049・T-066・T-069で3回連続再発したことを受けた軽量対策）
-  7. 矢印キーによる選択状態自体の平行移動（`MoveSelectedXxxByKey`）：新状態が独立した位置（mm座標または行/列）を持つ場合、同switch内のSelected*連鎖の末尾に分岐を追加したか。項目3（記入中ドラフト中の入力分岐）とは対象コードのタイミングが異なる（記入中の未確定placement vs 確定済みの選択中）ため別項目として点検する（2026-07-13追記——T-064で画像選択中の矢印キーがSelectedImageを見ず既定のセル移動処理へフォールスルーし選択解除される副作用が発生した実例）
+- If the task adds a new selectable state（既存の`SelectedCell`/`SelectedConnector`/`SelectedElement`/`SelectedImage`等に並ぶ新しい`Selected*`）, You MUST run the checklist in `docs-notes/roles/samurai.md`「新規選択可能状態の横展開チェックリスト」（9項目）before implementing, because T-082・T-069・T-064で独立に、いずれか1箇所の更新漏れが同型の往復バグを引き起こしたため
 - If a new property uses `SetProperty` where the value is an index/key that can coincidentally match across different underlying entities（例：`CurrentSheetIndex`）, You MUST verify that the equality check does not skip a necessary clear/redraw cascade when the underlying entity actually changed, because T-019・T-041増分5・T-082の3タスクで早期return罠が独立に再発したため（詳細=`docs-notes/roles/samurai.md`「SetProperty早期return罠の確認」、台帳PR-03）
 - If the task adds a new coordinate-handling primitive or placement operation, You MUST self-check the 4-point boundary/clamp checklist（既存要素との整合・Grid範囲・画面外周/ページ境界・min>maxガード）, because T-033・T-041増分7・T-051・T-055増分1の4タスクで境界検証の個別実装分散が再発したため（詳細=`docs-notes/roles/samurai.md`「新規プリミティブ・座標処理の境界検証チェックリスト」、台帳PR-04、最多再発型）
 - If the task adds or changes a document/sheet-configuration-changing process（`ReplaceDocument`・シート追加/削除/並べ替え等）, You MUST check the 4-point state reset checklist（UndoManagerクリア・OutputPanelクリア・SelectedSheet通知・SelectedCell再クランプ）, because T-051・T-055増分1で状態クリア責務への追従漏れが再発したため（詳細=`docs-notes/roles/samurai.md`「文書/シート構成変更処理の状態リセットチェックリスト」、台帳PR-05）
