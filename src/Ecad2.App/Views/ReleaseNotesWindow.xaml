@@ -1,0 +1,10 @@
+<Window x:Class="Ecad2.App.Views.ReleaseNotesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="リリースノート" Height="600" Width="720"
+        Background="{DynamicResource DialogBackgroundBrush}"
+        Foreground="{DynamicResource DialogForegroundBrush}">
+    <!-- P-192(殿ご承認2026-09-14): 「使い方」ウィンドウから目次を除いた形。中身は1ファイルゆえ
+         目次は要らぬ(新しい版が上に来るよう書き足していく)。 -->
+    <FlowDocumentScrollViewer x:Name="ContentViewer" Margin="12" VerticalScrollBarVisibility="Auto"/>
+</Window>

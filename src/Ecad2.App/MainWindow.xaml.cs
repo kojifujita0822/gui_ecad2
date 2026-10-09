@@ -1321,6 +1321,24 @@ public partial class MainWindow : Window
     }
     private void UsageMenuItem_Click(object sender, RoutedEventArgs e) => ShowUsageWindow();
 
+    // 「リリースノート」(P-192、殿ご承認2026-09-14)。使い方と同じく非モーダルで開き、既に開いて
+    // おれば前へ出すのみ(インスタンスを覚えて多重起動を防ぐ作法も同じ)。
+    private Views.ReleaseNotesWindow? _releaseNotesWindow;
+
+    private void ReleaseNotesMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        if (_releaseNotesWindow is null)
+        {
+            _releaseNotesWindow = new Views.ReleaseNotesWindow { Owner = this };
+            _releaseNotesWindow.Closed += (_, _) => _releaseNotesWindow = null;
+            _releaseNotesWindow.Show();
+        }
+        else
+        {
+            _releaseNotesWindow.Activate();
+        }
+    }
+
     // T-058増分4(殿裁定=保存タイミング両方の1つ、明示コマンド)。表示メニュー・Ctrl+Alt+S共通。
     private void SaveDockingLayoutMenuItem_Click(object sender, RoutedEventArgs e) => SaveDockingLayoutAsDefault();
 
@@ -1500,9 +1518,12 @@ public partial class MainWindow : Window
         Ecad2.Simulation.CircuitNumberer.Number(_viewModel.Document);
         var xref = Ecad2.Simulation.CrossReferenceBuilder.Build(_viewModel.Document, _viewModel.PartLibrary);
 
+        // 殿ご下命2026-10-09: 前回この図面をPDF出力した時の保存先を、保存ダイアログの初期値にする。
+        // 覚えるのは起動中だけ(殿ご裁可)——図面ファイルには書かぬ。
         var dialog = new Views.PdfPreviewDialog(_viewModel.Document, _viewModel.PartLibrary, xref,
-            _viewModel.Document.Settings.EnableBorder) { Owner = this };
+            _viewModel.Document.Settings.EnableBorder) { Owner = this, SuggestedPath = _viewModel.LastPdfExportPath };
         dialog.ShowDialog();
+        if (dialog.ExportedPath is string exportedPath) _viewModel.LastPdfExportPath = exportedPath;
     }
 
     // I/O例外をそのままユーザーに見せず、保存エラーダイアログへ変換する(隠密調査

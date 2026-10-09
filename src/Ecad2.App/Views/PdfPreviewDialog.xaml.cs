@@ -27,6 +27,33 @@ public partial class PdfPreviewDialog : Window
     private int _currentIndex;
     private double _zoom = 1.0;
 
+    /// <summary>保存ダイアログへ初めに出す保存先（殿ご下命2026-10-09）。この図面を前回PDF出力した時の
+    /// パスを呼び手が渡す。null・空なら従来どおりタイトルから名を作る。</summary>
+    public string? SuggestedPath { get; init; }
+
+    /// <summary>実際に出力したパス。出力に成功した時のみ非 null（呼び手が次回の
+    /// <see cref="SuggestedPath"/> として覚える）。</summary>
+    public string? ExportedPath { get; private set; }
+
+    /// <summary>
+    /// 保存ダイアログの初期値を決める。前回の保存先が在ればその名とフォルダ、無ければ
+    /// ドキュメント情報のタイトル（空なら <c>diagram</c>）。
+    /// <para>
+    /// <b>【フォルダは在る時だけ渡す】</b>消えたフォルダを <c>InitialDirectory</c> へ渡しても
+    /// ダイアログが既定の場所へ落ちるだけだが、渡さねば Windows が覚えておる直近の場所が使われる
+    /// ——そちらの方が前回の出力先に近い見込みが高い。
+    /// </para></summary>
+    internal static (string FileName, string? InitialDirectory) ResolveSaveDefaults(string? suggestedPath, string? title)
+    {
+        string fallback = string.IsNullOrWhiteSpace(title) ? "diagram" : title;
+        if (string.IsNullOrWhiteSpace(suggestedPath)) return (fallback, null);
+
+        string name = System.IO.Path.GetFileName(suggestedPath);
+        string? directory = System.IO.Path.GetDirectoryName(suggestedPath);
+        return (name.Length > 0 ? name : fallback,
+                !string.IsNullOrEmpty(directory) && System.IO.Directory.Exists(directory) ? directory : null);
+    }
+
     public PdfPreviewDialog(LadderDocument document, PartLibrary? library, CrossReference xref, bool enableBorder)
     {
         _document = document;
@@ -139,17 +166,20 @@ public partial class PdfPreviewDialog : Window
     // 同型パターンへ統一する(T-060隠密静的レビュー指摘E対応、ex.Messageの生の技術文面は出さない)。
     private void ExportButton_Click(object sender, RoutedEventArgs e)
     {
+        var (fileName, initialDirectory) = ResolveSaveDefaults(SuggestedPath, _document.Info.Title);
         var dialog = new Microsoft.Win32.SaveFileDialog
         {
             Filter = "PDF ファイル (*.pdf)|*.pdf",
             DefaultExt = ".pdf",
-            FileName = string.IsNullOrWhiteSpace(_document.Info.Title) ? "diagram" : _document.Info.Title,
+            FileName = fileName,
         };
+        if (initialDirectory is not null) dialog.InitialDirectory = initialDirectory;
         if (dialog.ShowDialog(this) != true) return;
 
         try
         {
             PdfExporter.Export(_document, _library, dialog.FileName);
+            ExportedPath = dialog.FileName;
             DialogResult = true;
         }
         catch (Exception)

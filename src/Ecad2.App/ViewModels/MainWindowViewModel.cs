@@ -255,6 +255,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// 上書き保存が可能か(パスがあるか)の判定に使う。</summary>
     public string? CurrentFilePath { get; private set; }
 
+    /// <summary>
+    /// この図面を前回PDF出力した時の保存先（殿ご下命2026-10-09）。次のPDF出力で保存ダイアログの
+    /// 初期値になる。一度も出力しておらねば null。
+    /// <para>
+    /// <b>【起動中だけ覚える】</b>（殿ご裁可）図面ファイルにも設定にも書かぬ。新規・開くで図面が
+    /// 入れ替われば忘れる（<c>ReplaceDocument</c>）。Undo・Redo は同じ図面の内の巻き戻しゆえ忘れぬ。
+    /// </para></summary>
+    public string? LastPdfExportPath { get; set; }
+
     private bool _isDirty;
 
     /// <summary>未保存の変更があるか(T-019)。新規/開くでの上書き確認に使う。GuiEcadはUndo履歴depth
@@ -4377,6 +4386,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         // 自体は図面を跨いで貼れるよう残す。
         _rangeAnchor = null;
         if (_tool.Mode == ToolMode.Paste) Tool = ToolState.SelectDefault;
+        // PDFの保存先の記憶は図面ごと(LastPdfExportPath 参照)。別の図面へ持ち越せば、
+        // 前の図面のPDFを誤って上書きする名が初期値に出る。
+        LastPdfExportPath = null;
         // T-041増分1隠密レビュー指摘(観点2 CONFIRMED#4): 上の_selectedCellはsetterをバイパスする
         // 直接代入のため、SelectedCellのsetterに集約した自動クリア(上記参照)が効かない。旧文書の
         // VerticalConnector参照を持ち越さないよう、ここでも明示的にクリアする。SelectedConnectorは

@@ -50,6 +50,15 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- P-192(殿ご承認2026-09-14、V1.0で実装): 「リリースノート」ウィンドウの中身。使い方と同じく
+       docs 側を単一の真実源とし、再ビルドで自動反映される。リリースのたびに docs/release-notes.md の
+       先頭へ新しい版の節を足す。 -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\release-notes.md">
+      <LogicalName>Ecad2.App.ReleaseNotes.release-notes.md</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -57,6 +66,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <Version>1.0.0</Version>
+    <!-- P-191(殿ご承認2026-09-14、V1.0で実装): 著作権表記。年は固定(殿ご裁可＝2026)。
+         バージョン情報ダイアログが AssemblyCopyrightAttribute から読んで表示する。exe のプロパティ
+         (詳細タブの「著作権」)にも同じ文言が出る。 -->
+    <Copyright>Copyright © 2026 FK TEQUNO</Copyright>
     <!-- T-123: アプリアイコン。GuiEcadのAppIcon.icoへ「2」を重ねた意匠（殿裁定2026-08-14＝案C）。
          16px〜256pxの7サイズを内蔵し、32px以下は「2」が潰れぬよう別寸法で描いてある。 -->
     <ApplicationIcon>Assets\AppIcon.ico</ApplicationIcon>
