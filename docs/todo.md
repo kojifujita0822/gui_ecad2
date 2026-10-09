@@ -56,6 +56,96 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 
 ## 生きているタスク
 
+### T-165 v0.9.5 リリース — Done（2026-10-09、殿ご下命。T-162〜T-164 を収載）
+
+殿ご下命「V0.9.5としてリリース作法にそってリリースしてほしい」。`memory: ecad2_release_procedure` の
+手順に従い実施（単独セッション）。
+
+- 版数 `0.9.5` を `src/Ecad2.App/Ecad2.App.csproj` `<Version>` と `installer/Ecad2_Setup.iss`
+  `#define AppVersion` の2箇所へ（コミット `362d199`、publish より前）。
+- クリーンビルド0エラー・全2188件green（Core 673／App 1515）。
+- 自己完結 publish＝436ファイル／142.6MB（v0.9.2 と件数一致）。
+  `ProductVersion=0.9.5+362d1994da9232ca0a5aee9218773af13892112e`。
+- publish exe の起動→終了を実測（正常）。
+- インストーラー生成＝`ISCC.exe /O… /F… installer\Ecad2_Setup.iss`。収録436件（publish と一致）、
+  警告0・エラー0。
+- 配布物＝`C:\ECAD2\version\v0.9.5\Ecad2_Setup_0.9.5.exe`（45.2MB、
+  SHA256 `170FF5A2BFF83183E6350EA3193DAB3BDBC1F18A0B110DB8B4C39139A6103289`）。
+- 殿の端末へのインストールは殿の役儀。
+- **【未了】T-164 のマウスドラッグ・キー入力は実機で未確認のまま収載しておる**（T-164 の【検証】参照）。
+
+### T-164 範囲選択のコピー・貼り付け — Done（2026-10-09、殿ご下命。単独セッション・実機未確認）
+
+殿ご下命＝「範囲選択してコピー・ペースト機能が欲しい」。殿ご裁可の仕様は次のとおり。
+
+- 範囲の選び方＝Shift+矢印キーとマウスドラッグの両方。
+- 写す対象＝要素・縦コネクタ・配線分断・グループ枠。**行コメントは写さぬ**。
+- 貼った要素の機器名は空。
+- 貼り付け先が塞がっておれば、**行を挿入して割り込む**。
+- 切り取りは設けぬ。シートを跨いで貼れる。
+- 貼り付け位置は**ゴースト表示**（Ctrl+V で確認へ入り、矢印キー・マウスで動かし、Enter・クリックで確定、
+  Esc で取りやめ）。右クリックメニューからも可。
+
+【実装】Core＝`src/Ecad2.Core/Model/RangeClipboard.cs`（`CellRange`／`RangeClipboard.Copy`／
+`RangePaste.Plan`・`Apply`・`Materialize`）。ViewModel＝`SelectedRange`／`SelectRange`／
+`ExtendSelectionTo`／`CopySelection`／`BeginPaste`／`ConfirmPaste`／`CancelPaste`／`PastePreview`、
+`ToolMode.Paste` を新設。View＝`LadderCanvas.Draw` へ範囲の塗りとゴーストを追加、
+`MainWindow.xaml.cs` へキー（Shift+矢印・Ctrl+C・Ctrl+V・Enter・Esc）とマウス（範囲ドラッグ・
+ホバー追従）、編集メニューと右クリックメニューの項目を追加。
+
+【家老裁量に当たる細部＝殿へお示しのうえ進めた】貼る位置は選択セルを左上の角とする／塞がりの判定は
+貼り付け先の矩形に既存の要素・縦コネクタ・配線分断が掛かるか（枠は数えぬ）／挿入する行数はコピーした
+行数／列がはみ出す場合は貼らず理由を出す／範囲に丸ごと収まるものだけを写す／自由線・接続点・画像は
+対象外／選択中の要素の上から始めたドラッグは従来どおり要素の移動（T-088）。
+
+【テスト】Core `RangeClipboardTests`、App `RangeCopyPasteTests`・`RangeCopyPasteCanvasTests`（STA）。
+
+【検証】**隠密の静的レビュー・忍者の実機確認は未実施**。キャンバスの再描画への結線とゴーストの描画は
+STAテストで測ったが、**マウスドラッグ・キー入力のハンドラそのものは実機で未確認**——とりわけ
+(a) 選択モードの素のクリックで新たにマウスキャプチャを取るようにした点（従来のクリック選択・配置に
+響かぬか）、(b) 貼り付け位置の確認中のホバー追従が矢印キー操作を引き戻さぬか、の二点は実機で
+確かめるべき所にござる。`docs/spec/ecad2-spec-menu-toolbar.md` の「未結線」記述は未更新
+（使い方 `docs/usage/ecad2-usage-menu-toolbar.md` は更新済み）。
+
+### T-163 機器番号の挿入と詰め — Done（2026-10-09、殿ご下命。単独セッション・実機未確認）
+
+殿ご下命＝「CR1〜7 を使用済みで CR4 の位置へ新しくコイルを足したい。順送りにできぬか」
+「逆に CR1 を削除した場合に CR2 以降を -1 できぬか」。殿ご裁可＝専用の明示操作とする（配置時に
+尋ねる案は不採用）／選択要素の機器名を起点とする／欠番を含め末尾まで送る／英字＋数字の名すべてが対象。
+
+【実装】`src/Ecad2.Core/Simulation/DeviceNumberShifter.cs`（既存 `DeviceRenamer.Rename` を、挿入は
+番号の大きい順・詰めは小さい順に掛ける）。ViewModel＝`InsertDeviceNumberAtSelectedElement`／
+`RemoveDeviceNumberAtSelectedElement`。編集メニューと要素の右クリックメニューに二項目。
+送り先が塞がっておれば（詰める先の番号が残っておる等）送らず、ステータスバーへ理由を出す。Undo 一回。
+
+【承知の癖】0埋めの名は桁数を保つ（CR08→CR09）が、CR09 は CR10 になった時点で0埋めの手掛かりを
+失い、詰め戻すと CR9 になる。
+
+【テスト】Core `DeviceNumberShifterTests`、App `InsertDeviceNumberTests`。
+【検証】隠密の静的レビュー・忍者の実機確認は未実施。
+
+### T-162 パーツ編集を開いておる図面へ反映 — Done（2026-10-09、殿ご指摘。単独セッション・実機未確認）
+
+殿ご指摘＝「自作パーツを配置した場合に線番が自動採番されない。種別をコイルにしても採番されない」。
+真因＝図面は定義を配置時点の写しで抱え（T-151）、`EmbedPartDefinition` は既に在る Id を上書きせぬ
+ゆえ、**非シミュレートで一度置いたパーツは後から種別を直しても図面の中では非シミュレートのまま**
+——結線に加わらず線番が付かなんだ。図面側の写しを更新する経路がどこにも無かった
+（T-068増分3-b3 の「編集したら配置済みにも反映」の意図が、T-151 以後に効かなくなっておった）。
+
+殿ご裁可＝**案A（パーツエディタで保存した時、開いておる図面に同じ Id の写しが在れば自動で更新）**。
+T-151 の「開いただけ・置いただけでは上書きせぬ」はそのまま残す。
+
+【実装】`MainWindowViewModel.SaveEditedPart`／`RefreshEmbeddedPartDefinition`。同値なら Undo も
+変更ありも積まぬ。Undo 一回で図面側の定義が編集前へ戻る（ローカルのパーツファイルは戻らぬ）。
+
+【届かぬ範囲＝未着手】閉じておる別の図面／機器表の `Device.Class`（非シミュレートの時に名付けた
+機器は「その他」のまま）／配置済み要素の `CellWidth`・`CellHeight`（パーツの幅・高さを変えても
+占有は配置時のまま）。
+
+【テスト】App `EditedPartEmbedRefreshTests`。既存 `T151PartLibraryEmbedPlacementTests` の該当コメントを
+新しい分担（パレット単体は図面に触れぬ／図面を改める責は ViewModel）に合わせて改めた。
+【検証】隠密の静的レビュー・忍者の実機確認は未実施。
+
 ### T-161 v0.9.2 リリース — Done（2026-09-14、殿ご下命。T-160 を収載）
 
 殿ご下命「V0.92でリリースして」。`memory: ecad2_release_procedure` の手順に従い実施。
