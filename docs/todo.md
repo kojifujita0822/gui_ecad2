@@ -56,6 +56,66 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 
 ## 生きているタスク
 
+### T-172 v1.0.0 リリース — Done（2026-10-09、殿ご下命。T-169〜T-171 を収載）
+
+殿ご下命「V1.0としたい」。V1.0 向けに `docs/proposed.md` へ記帳されておった三件のうち、
+**P-191（著作権表記）と P-192（リリースノート）を収め、P-193（シェアウェア化）は切り離した**
+（殿ご裁可2026-10-09）。`memory: ecad2_release_procedure` の手順に従い実施（単独セッション）。
+
+- 版数 `1.0.0` を `src/Ecad2.App/Ecad2.App.csproj` `<Version>` と `installer/Ecad2_Setup.iss`
+  `#define AppVersion` の2箇所へ（コミット `9bc89fd`、publish より前）。
+- **【今回の順序＝版数コミットを機能コミットより先に置いた】** T-171 のテストが「今の版の節が
+  リリースノートに在ること」を確かめるゆえ、機能を先に入れると、そのコミットの時点（版数 0.9.6）で
+  テストが落ちる。版数を先に上げることで、どのコミットでも全テストが通る形にした。
+  ビルド元は機能コミット `4ec5eb0`（版数変更を含む）にて、`ProductVersion` の sha もこちらを指す。
+- クリーンビルド0エラー・全2214件green（Core 680／App 1534）。
+- 自己完結 publish＝436ファイル／142.6MB（v0.9.6 と件数一致）。
+  `ProductVersion=1.0.0+4ec5eb0b4311c44c0ab725ee1b47c9870c94afc3`、
+  `LegalCopyright=Copyright © 2026 FK TEQUNO`。
+- publish exe の起動→終了を実測（正常）。
+- インストーラー生成＝収録436件（publish と一致）、警告0・エラー0。
+- 配布物＝`C:\ECAD2\version\v1.0\Ecad2_Setup_1.0.0.exe`（45.2MB、
+  SHA256 `C02D82C594C432CE6045E1690F1FF48D2DDE1703729C8C1DF6BCFCE964D0AD83`）。
+- タグ `v1.0` はビルド元 `4ec5eb0` へ打った（`ProductVersion` の sha と一致する方）。
+- 殿の端末へのインストールは殿の役儀。
+- v0.9.6 収載分（T-167）は**殿が実機で動作を確認なされた**（2026-10-09、殿ご証言「動作確認できた」）。
+  T-169〜T-171 は実機未確認のまま収載。
+
+### T-171 リリースノート機能（P-192） — Done（2026-10-09、殿ご承認2026-09-14。単独セッション・実機未確認）
+
+`docs/release-notes.md` を埋め込みリソースとし、ヘルプメニューの「リリースノート」から非モーダルで開く
+（`Views/ReleaseNotesWindow`）。使い方ウィンドウと同じ仕組み（`MarkdownFlowDocumentConverter`）で、
+中身が1ファイルゆえ目次は持たぬ。**記載は v1.0.0 から始める**（殿ご裁可2026-10-09。過去の版へは遡らぬ）。
+
+**【運用】リリースのたびに `docs/release-notes.md` の先頭へ新しい版の節を足す。**
+`ReleaseNotesAndCopyrightTests.LoadReleaseNotes_ContainsSectionForCurrentVersion` が「今の版の節が
+在ること」を確かめるゆえ、版数だけ上げて書き忘れればテストで落ちる。
+
+【テスト】App `ReleaseNotesAndCopyrightTests`。【検証】隠密の静的レビュー・忍者の実機確認は未実施。
+
+### T-170 バージョン情報へ著作権表記（P-191） — Done（2026-10-09、殿ご承認2026-09-14。単独セッション・実機未確認）
+
+csproj へ `<Copyright>Copyright © 2026 FK TEQUNO</Copyright>` を新設し、`AboutDialog` が
+`AssemblyCopyrightAttribute` から読んで1行で表示する（年は固定の2026＝殿ご裁可2026-10-09）。
+exe のプロパティ（`LegalCopyright`）にも同じ文言が出ることを publish 物で実測。
+
+【テスト】App `ReleaseNotesAndCopyrightTests`。【検証】隠密の静的レビュー・忍者の実機確認は未実施。
+
+### T-169 PDF出力の保存先を起動中だけ覚える — Done（2026-10-09、殿ご指摘。単独セッション・実機未確認）
+
+殿ご指摘＝「PDF出力で保存した名前は記憶されないのか、名前を変更して保存しても前回保存した名前に
+ならない」。保存ダイアログの初期値を、毎回ドキュメント情報のタイトル（無ければ `diagram`）から
+作っておった。殿ご裁可＝**起動中だけ覚える**（図面ファイルへ保存する案・図面ファイル名を既定にする案は
+不採用）。
+
+【実装】`MainWindowViewModel.LastPdfExportPath`（図面ごと。`ReplaceDocument` で忘れ、Undo・Redo では
+忘れぬ）。`PdfPreviewDialog.SuggestedPath`／`ExportedPath`／`ResolveSaveDefaults`。前回のフォルダが
+消えておれば名だけを引き継ぐ。
+
+【テスト】App `PdfExportPathMemoryTests`。
+【検証】保存ダイアログは Windows の部品ゆえ、測れたのは「初期値に何を渡すか」まで。前回のフォルダが
+実際に開くかは実機未確認。隠密の静的レビュー・忍者の実機確認は未実施。
+
 ### T-168 v0.9.6 リリース — Done（2026-10-09、殿ご下命。T-167 を収載）
 
 殿ご下命「V0.9.6としてリリースまで進めて」。`memory: ecad2_release_procedure` の手順に従い実施
