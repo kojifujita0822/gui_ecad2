@@ -905,13 +905,12 @@
                 <Separator/>
                 <MenuItem Header="PDF出力(_P)" InputGestureText="Ctrl+P" Click="PdfExportMenuItem_Click" IsEnabled="{Binding HasProject}"/>
                 <Separator/>
-                <MenuItem Header="終了(_X)"/>
+                <MenuItem Header="終了(_X)" InputGestureText="Alt+F4" Click="ExitMenuItem_Click"/>
             </MenuItem>
             <MenuItem Header="編集(_E)">
                 <MenuItem Header="元に戻す(_U)" InputGestureText="Ctrl+Z" Command="{Binding UndoCommand}"/>
                 <MenuItem Header="やり直し(_R)" InputGestureText="Ctrl+Y" Command="{Binding RedoCommand}"/>
                 <Separator/>
-                <MenuItem Header="切り取り(_T)" InputGestureText="Ctrl+X"/>
                 <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C" Click="CopyMenuItem_Click"
                           IsEnabled="{Binding CanEditDiagram}"/>
                 <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V" Click="PasteMenuItem_Click"

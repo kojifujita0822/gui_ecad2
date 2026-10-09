@@ -1625,6 +1625,17 @@ public partial class MainWindow : Window
         SaveDockingLayoutAsDefault();
     }
 
+    // 「終了」メニュー(殿ご下命2026-10-09)。ウィンドウを閉じるだけにて、未保存確認とレイアウトの
+    // 保存は×ボタン・Alt+F4と同じ Window_Closing が受け持つ(確認でキャンセルすれば閉じぬ)。
+    // メニュークリックは機器名欄の編集中にも届くゆえ、未確定の入力を先に確定する——確定せねば
+    // 変更ありにならず、未保存確認が出ぬまま打ちかけの名が失われる。
+    private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CommitDeviceNameEdit();
+        CommitDeviceTableEdit();
+        Close();
+    }
+
     // T-061修正E-1(静的レビューPR-07該当): 行範囲チェック式が3箇所(テストモード左クリック・
     // 右クリックのrowInRange・ShowTestModeContextMenu)に手書き重複していたため共有化する。
     private static bool IsRowInRange(int row, Ecad2.Model.Sheet sheet) => row >= 0 && row < sheet.Grid.Rows;
