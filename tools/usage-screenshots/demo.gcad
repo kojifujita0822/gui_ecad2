@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "info": {
+    "companyName": "",
+    "title": "使い方の説明用見本",
+    "drawingNo": "",
+    "customer": "",
+    "designer": "",
+    "drafter": "",
+    "checker": "",
+    "revisions": []
+  },
+  "settings": {
+    "defaultBus": { "leftName": "N24", "rightName": "P24" },
+    "enableBorder": true,
+    "paperSize": "a4"
+  },
+  "devices": {
+    "byName": {
+      "PB1": { "name": "PB1", "class": "pushButton", "quantity": 1, "comment": "運転" },
+      "PB2": { "name": "PB2", "class": "pushButton", "quantity": 1, "comment": "停止" },
+      "CR1": { "name": "CR1", "class": "relay", "quantity": 1, "comment": "運転" },
+      "PL1": { "name": "PL1", "class": "lamp", "quantity": 1, "comment": "運転中" }
+    }
+  },
+  "sheets": [
+    {
+      "id": "5a000000-0000-4000-8000-000000000001",
+      "pageNumber": 1,
+      "name": "制御回路1",
+      "grid": { "rows": 10, "columns": 20 },
+      "bus": { "leftName": "N24", "rightName": "P24" },
+      "elements": [
+        { "id": "5a000000-0000-4000-8000-000000000101", "kind": "contactNO", "pos": { "row": 0, "column": 2 }, "cellWidth": 1, "deviceName": "PB1", "partId": "basic-pushbutton-no", "params": {} },
+        { "id": "5a000000-0000-4000-8000-000000000102", "kind": "contactNO", "pos": { "row": 0, "column": 5 }, "cellWidth": 1, "deviceName": "PB2", "partId": "basic-pushbutton-nc", "params": {} },
+        { "id": "5a000000-0000-4000-8000-000000000103", "kind": "contactNO", "pos": { "row": 0, "column": 19 }, "cellWidth": 1, "deviceName": "CR1", "partId": "basic-coil", "params": {} },
+        { "id": "5a000000-0000-4000-8000-000000000104", "kind": "contactNO", "pos": { "row": 1, "column": 2 }, "cellWidth": 1, "deviceName": "CR1", "partId": "basic-contact-no", "params": {} },
+        { "id": "5a000000-0000-4000-8000-000000000105", "kind": "contactNO", "pos": { "row": 3, "column": 2 }, "cellWidth": 1, "deviceName": "CR1", "partId": "basic-contact-no", "params": {} },
+        { "id": "5a000000-0000-4000-8000-000000000106", "kind": "contactNO", "pos": { "row": 3, "column": 19 }, "cellWidth": 1, "deviceName": "PL1", "partId": "basic-lamp", "params": {} }
+      ],
+      "connectors": [
+        { "column": 1, "topRow": 0, "bottomRow": 1 },
+        { "column": 4, "topRow": 0, "bottomRow": 1 }
+      ],
+      "wireBreaks": [],
+      "frames": [],
+      "lines": [],
+      "rungComments": [
+        { "row": 0, "text": "運転（自己保持）" },
+        { "row": 3, "text": "運転表示灯" }
+      ],
+      "freeLines": [],
+      "connectionDots": [],
+      "images": [],
+      "mainCircuit": false
+    }
+  ]
+}

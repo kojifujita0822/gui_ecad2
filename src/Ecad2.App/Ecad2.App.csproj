@@ -50,6 +50,16 @@
     </EmbeddedResource>
   </ItemGroup>
 
+  <!-- 使い方の説明図(殿ご下命2026-10-09＝スクリーンショット＋矢印)。docs/usage/images/ の PNG を
+       丸ごと埋め込む。リソース名はファイル名で付ける(UsageWindow.LoadEmbeddedImage がファイル名で引く)。
+       絵そのものは tools/usage-screenshots/ のスクリプトが生成する——手で描き足さぬこと
+       (画面が変わるたびに再生成するゆえ、手の加筆は次の再生成で消える)。 -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\docs\usage\images\*.png">
+      <LogicalName>Ecad2.App.UsageContent.images.%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
   <!-- P-192(殿ご承認2026-09-14、V1.0で実装): 「リリースノート」ウィンドウの中身。使い方と同じく
        docs 側を単一の真実源とし、再ビルドで自動反映される。リリースのたびに docs/release-notes.md の
        先頭へ新しい版の節を足す。 -->

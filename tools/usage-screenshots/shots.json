@@ -1,0 +1,10 @@
+{
+  "window": { "width": 1400, "height": 900 },
+  "shots": [
+    {
+      "name": "overview",
+      "document": "demo.gcad",
+      "annotations": []
+    }
+  ]
+}

@@ -45,7 +45,36 @@ public partial class UsageWindow : Window
     private void TopicList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (TopicList.SelectedItem is not UsageTopic topic) return;
-        ContentViewer.Document = MarkdownFlowDocumentConverter.Convert(LoadEmbeddedMarkdown(topic.ResourceFileName));
+        ContentViewer.Document = MarkdownFlowDocumentConverter.Convert(
+            LoadEmbeddedMarkdown(topic.ResourceFileName), LoadEmbeddedImage);
+    }
+
+    /// <summary>
+    /// 使い方の本文が参照する画像（<c>![説明](images/xxx.png)</c>）を埋め込みリソースから引く
+    /// （殿ご下命2026-10-09＝スクリーンショット＋矢印の説明図）。絵は <c>docs/usage/images/</c> に置き、
+    /// 文章と同じく docs 側を唯一の原本とする。<b>引けねば null</b>——絵が欠けても本文は読めるよう、
+    /// 変換器の側が説明文だけを代わりに出す。
+    /// <para>
+    /// <b>【ファイル名だけで引く】</b>Markdown 側のパスはフォルダ込み（<c>images/xxx.png</c>）だが、
+    /// リソース名はファイル名で付けてある。フォルダの区切りはリソース名で <c>.</c> に化けるうえ、
+    /// 置き場を変えても本文とコードの双方を直さずに済む。
+    /// </para>
+    /// internal はIVT経由のテスト用（本文が参照する絵がすべて埋め込まれておることの検証）。</summary>
+    internal static System.Windows.Media.ImageSource? LoadEmbeddedImage(string path)
+    {
+        string resourceName = $"Ecad2.App.UsageContent.images.{Path.GetFileName(path)}";
+        using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
+        if (stream is null) return null;
+
+        var bitmap = new System.Windows.Media.Imaging.BitmapImage();
+        bitmap.BeginInit();
+        // OnLoad＝この場で読み切る。既定の遅延読み込みのままでは、using を抜けた後に閉じた
+        // ストリームを読みに行く。
+        bitmap.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad;
+        bitmap.StreamSource = stream;
+        bitmap.EndInit();
+        bitmap.Freeze();
+        return bitmap;
     }
 
     /// <summary>internalはIVT経由のテスト用(全11リソースが実際に読み込めることの検証)。</summary>

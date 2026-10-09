@@ -8,14 +8,28 @@ namespace Ecad2.App.Views;
 
 /// <summary>Markdown→FlowDocument変換(T-077増分1、殿裁定=案B「FlowDocument自作変換、新規依存なし」の
 /// PoC実装)。対応構文(見出しH1-H3・段落・箇条書き・番号付きリスト・コードブロック・水平線・
-/// インライン強調/インラインコード・表)。
+/// インライン強調/インラインコード・表・画像)。
 /// 増分5(家老采配2026-07-21): docs/usage平易版に表構文が多用されている(11領域中6領域)ことを受け、
 /// Markdown表(ヘッダー行+`|---|---|`区切り線+データ行)をWPF Tableへ変換する対応を追加。
 /// 対応範囲はヘッダー行1段+単純な左揃えセルのみ(`:---:`等の位置指定拡張構文は非対応、
 /// docs/usage全11領域の実測範囲で必要十分と確認済み)。</summary>
 public static class MarkdownFlowDocumentConverter
 {
-    public static FlowDocument Convert(string markdown)
+    /// <summary>行全体が画像の記法 <c>![説明](パス)</c> か（使い方へのスクリーンショット掲載、殿ご下命2026-10-09）。
+    /// 段落の途中に埋まった画像は扱わぬ——説明図は文章と別の段に置くものゆえ、行単位で足りる。</summary>
+    private static readonly Regex ImageLine = new(@"^!\[(.*?)\]\((.+?)\)\s*$", RegexOptions.Compiled);
+
+    /// <summary>本文が参照する画像のパスを、現れる順に返す（重複は除かぬ）。埋め込み漏れを
+    /// テストで確かめるために使う。</summary>
+    public static IEnumerable<string> EnumerateImagePaths(string markdown) =>
+        markdown.Replace("\r\n", "\n").Split('\n')
+            .Select(line => ImageLine.Match(line))
+            .Where(match => match.Success)
+            .Select(match => match.Groups[2].Value);
+
+    /// <param name="imageResolver">画像のパス（Markdown に書かれたまま）から絵を引く関数。
+    /// null、または引けなんだ絵は、説明文だけを代わりに出す（絵が欠けても本文は読めるように）。</param>
+    public static FlowDocument Convert(string markdown, Func<string, ImageSource?>? imageResolver = null)
     {
         var document = new FlowDocument();
         document.SetResourceReference(TextElement.ForegroundProperty, "DialogForegroundBrush");
@@ -27,6 +41,14 @@ public static class MarkdownFlowDocumentConverter
             string line = lines[i];
 
             if (string.IsNullOrWhiteSpace(line)) { i++; continue; }
+
+            var imageMatch = ImageLine.Match(line);
+            if (imageMatch.Success)
+            {
+                document.Blocks.Add(CreateImageBlock(imageMatch.Groups[1].Value, imageMatch.Groups[2].Value, imageResolver));
+                i++;
+                continue;
+            }
 
             var headingMatch = Regex.Match(line, @"^(#{1,3})\s+(.*)$");
             if (headingMatch.Success)
@@ -104,6 +126,7 @@ public static class MarkdownFlowDocumentConverter
             i++;
             while (i < lines.Length
                 && !string.IsNullOrWhiteSpace(lines[i])
+                && !ImageLine.IsMatch(lines[i])
                 && !Regex.IsMatch(lines[i], @"^(#{1,3})\s+")
                 && !Regex.IsMatch(lines[i], @"^-{3,}$")
                 && !lines[i].TrimStart().StartsWith("```")
@@ -118,6 +141,33 @@ public static class MarkdownFlowDocumentConverter
         }
 
         return document;
+    }
+
+    /// <summary>
+    /// 画像の段を作る。絵は<b>元の大きさより拡大せず</b>、ウィンドウが狭ければ幅に合わせて縮む
+    /// （<see cref="StretchDirection.DownOnly"/>）——スクリーンショットは拡大すると文字がぼやける。
+    /// <para>
+    /// <b>【画素数をそのまま幅にする】</b><c>BitmapSource.Width</c> は画像に記録された DPI で換算した
+    /// 値を返すゆえ、拡大率 150% の画面で撮った絵（144dpi と記録される）は 2/3 の大きさに化ける。
+    /// 説明図は「撮った画素数どおり」に見せたいので <c>PixelWidth</c> を上限にする。
+    /// </para></summary>
+    private static Block CreateImageBlock(string altText, string path, Func<string, ImageSource?>? imageResolver)
+    {
+        var source = imageResolver?.Invoke(path);
+        if (source is null)
+            return CreateParagraph(altText.Length > 0 ? $"［図: {altText}］" : "［図］");
+
+        var image = new System.Windows.Controls.Image
+        {
+            Source = source,
+            Stretch = Stretch.Uniform,
+            StretchDirection = System.Windows.Controls.StretchDirection.DownOnly,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            ToolTip = altText.Length > 0 ? altText : null,
+        };
+        if (source is System.Windows.Media.Imaging.BitmapSource bitmap) image.MaxWidth = bitmap.PixelWidth;
+        System.Windows.Automation.AutomationProperties.SetName(image, altText);
+        return new BlockUIContainer(image) { Margin = new Thickness(0, 4, 0, 12) };
     }
 
     private static Paragraph CreateHeading(string text, int level)
