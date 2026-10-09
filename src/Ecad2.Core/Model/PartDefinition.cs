@@ -15,6 +15,16 @@ public enum PartRole
     // 分岐がデッドコード化していた(docs/ecad2-t061-a1-select-switch-design-onmitsu.md 1節)。専用Role
     // を追加しマッピングを完成させる。
     SelectSwitch,
+    // 殿ご下命2026-10-09: 「その他」。動作はコイルと同じ（通電で励磁する負荷）だが、リレーではない機器
+    // （ソレノイド等）のための役割。コイルとの違いは二つ——(1) クロスリファレンス検査から常に除く
+    // （対になる接点を持たぬゆえ。IsExcludedFromCrossReference を立てたコイルと同じ扱い）、
+    // (2) 機器表の種別が「リレー」でなく「その他」になる。
+    // 【T-152で退けられた「コイル（接点なし）」の役割新設との違い】あちらは検査の除外だけが目的で、
+    // 直交フラグ（IsExcludedFromCrossReference）で足りた。こちらは機器表の種別という、フラグでは
+    // 表せぬ違いを持つ。PartResolver.ComponentKind の switch への追加漏れは実行時例外になるゆえ、
+    // PartResolverOtherRoleTests が全役割を回して確かめておる。
+    // 【末尾へ足すこと】JSON は名前で保存するゆえ順序に意味は無いが、既存の並びを動かす理由も無い。
+    Other,
 }
 
 /// <summary>

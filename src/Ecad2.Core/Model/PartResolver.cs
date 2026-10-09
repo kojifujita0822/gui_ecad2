@@ -121,6 +121,8 @@ public static class PartResolver
             // T-061 A-1構造対処: SelectSwitchロールをElementKind.SelectSwitchへマッピングし、
             // Evaluator.IsConducting/NetlistBuilderのノッチ判定を到達可能にする。
             PartRole.SelectSwitch => ElementKind.SelectSwitch,
+            // 殿ご下命2026-10-09: 「その他」は電気的にはコイルと同じに振る舞う（PartRole.Other 参照）。
+            PartRole.Other => ElementKind.Coil,
             _ => throw new InvalidOperationException(
                 $"ComponentKind called for role '{part.Role}'. Check CreatesComponent before calling ComponentKind."),
         };

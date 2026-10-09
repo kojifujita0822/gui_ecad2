@@ -26,6 +26,9 @@ public partial class PartEditorDialog : Window
         (PartRole.Coil, "コイル"),
         (PartRole.Lamp, "表示灯"),
         (PartRole.Terminal, "端子台"),
+        // 殿ご下命2026-10-09: 動作はコイルと同じだが、機器表の種別は「その他」になり、
+        // クロスリファレンス検査からも外れる（リレーでない負荷＝ソレノイド等のため）。
+        (PartRole.Other, "その他"),
         (PartRole.NonSimulated, "非シミュレート"),
         (PartRole.InputNO, "外部入力 a接点 (NO)"),
         (PartRole.InputNC, "外部入力 b接点 (NC)"),

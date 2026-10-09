@@ -141,7 +141,9 @@ public static class DesignRuleCheck
     private static bool IsExcludedFromCrossReference(ElementInstance elem, PartLibrary? lib)
     {
         if (elem.PartId is BuiltinPartIds.ThermalRelayNO or BuiltinPartIds.ThermalRelayNC) return true;
-        return lib?.Get(elem.PartId)?.IsExcludedFromCrossReference == true;
+        // 役割「その他」（殿ご下命2026-10-09）は印の有無に依らず常に除く——リレーでない負荷のための
+        // 役割にて、対になる接点を持たぬのが前提ゆえ。
+        return lib?.Get(elem.PartId) is { } part && (part.IsExcludedFromCrossReference || part.Role == PartRole.Other);
     }
 
     /// <summary>

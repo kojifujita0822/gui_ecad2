@@ -3695,10 +3695,22 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// その組が実在するか否かに関わらず結果へ影響し得ない（侍が写像を、隠密が全文精読で不参照を確認）。
     /// 回帰の網は <c>MainWindowViewModelTests.SelectSwitchClassificationCases</c> のケースA〜E。
     /// </para></summary>
-    private DeviceClass ResolveDeviceClass(ElementInstance element)
-        => PartResolver.CreatesComponent(element, PartLibrary)
-            ? MapToDeviceClass(PartResolver.ComponentKind(element, PartLibrary))
+    private DeviceClass ResolveDeviceClass(ElementInstance element) => ResolveDeviceClass(element, PartLibrary);
+
+    /// <summary>ライブラリを指定して解く版。パーツ定義の差し替えの前後で種別を比べるために要る
+    /// （<see cref="RefreshEmbeddedPartDefinition"/>）。
+    /// <para>
+    /// <b>【役割「その他」は種別も「その他」】</b>（殿ご下命2026-10-09）電気的にはコイルゆえ
+    /// <c>ComponentKind</c> は <see cref="ElementKind.Coil"/> を返し、そのまま写せば「リレー」になる。
+    /// リレーでない負荷のための役割ゆえ、写像の手前で分ける。
+    /// </para></summary>
+    private static DeviceClass ResolveDeviceClass(ElementInstance element, PartLibrary library)
+    {
+        if (library.Get(element.PartId)?.Role == PartRole.Other) return DeviceClass.Other;
+        return PartResolver.CreatesComponent(element, library)
+            ? MapToDeviceClass(PartResolver.ComponentKind(element, library))
             : DeviceClass.Other;
+    }
 
     /// <summary>
     /// パーツ定義を図面へ埋め込む（T-151）。既に同じ Id が埋め込まれていれば<b>何もせぬ</b>。
@@ -3792,8 +3804,9 @@ public sealed class MainWindowViewModel : ViewModelBase
     /// </para>
     /// <para>
     /// <b>【届かぬ範囲】</b>閉じておる別の図面には届かぬ。また配置済み要素の
-    /// <see cref="ElementInstance.CellWidth"/>／<see cref="ElementInstance.CellHeight"/> と、機器表の
-    /// <see cref="Device.Class"/> は配置・命名の時点で決まった値のまま残る（本メソッドは定義のみを改める）。
+    /// <see cref="ElementInstance.CellWidth"/>／<see cref="ElementInstance.CellHeight"/> は配置の時点で
+    /// 決まった値のまま残る。機器表の <see cref="Device.Class"/> は、役割の変更で種別が変わる場合に限り
+    /// 合わせる（<see cref="SyncDeviceClassOfPart"/>）。
     /// </para></summary>
     public bool SaveEditedPart(PartDefinition part, string oldPath)
     {
@@ -3820,10 +3833,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (ResolveCustomPartDefinition(partId) is not PartDefinition local) return false;
         if (PartLibrarySerializer.SerializeOne(embedded) == PartLibrarySerializer.SerializeOne(local)) return false;
 
+        var probe = new ElementInstance { PartId = partId };
+        var oldClass = ResolveDeviceClass(probe, new PartLibrary { ById = { [partId] = embedded } });
+        var newClass = ResolveDeviceClass(probe, new PartLibrary { ById = { [partId] = local } });
+
         UndoManager.RecordSnapshot(Document);
         embeddedLibrary.ById[partId] = PartLibrarySerializer.CloneOne(local);
+        if (oldClass != newClass) SyncDeviceClassOfPart(partId, oldClass, newClass);
         MarkDirty();
         return true;
+    }
+
+    /// <summary>
+    /// パーツの役割が変わって機器表の種別が変わる場合、そのパーツを使う機器の種別も合わせる
+    /// （殿ご下命2026-10-09）。機器表の種別は名付けた時点で決まるゆえ、放っておけば
+    /// 「コイルを『その他』へ直したのに機器表はリレーのまま」という形で古い値が残る。
+    /// <para>
+    /// <b>【旧い種別のままの機器だけを改める】</b>種別が旧い役割から導かれた値と違う機器は、
+    /// 別の経路で決まった値を持っておる（同じ機器名を先に別の部品へ付けた等）。それまで
+    /// 書き換えれば、このパーツと関わりの無い事情を潰す。
+    /// </para></summary>
+    private void SyncDeviceClassOfPart(string partId, DeviceClass oldClass, DeviceClass newClass)
+    {
+        var deviceNames = Document.Sheets.SelectMany(s => s.Elements)
+            .Where(e => e.PartId == partId && !string.IsNullOrEmpty(e.DeviceName))
+            .Select(e => e.DeviceName!)
+            .Distinct(StringComparer.Ordinal);
+        foreach (string name in deviceNames)
+            if (Document.Devices.ByName.TryGetValue(name, out var device) && device.Class == oldClass)
+                device.Class = newClass;
+        DeviceTable.Refresh();
     }
 
     /// <summary>
