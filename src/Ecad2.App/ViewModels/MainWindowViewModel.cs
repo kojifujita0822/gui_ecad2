@@ -40,10 +40,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 隠密再レビュー指摘: IsEnabledガード無しだと無効時も_tool(値型)のボクシングが
             // 無条件発生する(finding7と同根)。短絡評価でfalse時は_toolへ触れないようにする。
             object? oldValue = TraceLog.IsEnabled ? _tool : null;
+            bool pasteModeInvolved = _tool.Mode == ToolMode.Paste || value.Mode == ToolMode.Paste;
             _tool = value;
             OnPropertyChanged(nameof(Tool), oldValue);
             OnPropertyChanged(nameof(IsPartSelectionVisible));
             OnPropertyChanged(nameof(ActiveToolTag));
+            // 貼り付けのゴーストは Tool.Mode==Paste の間だけ出る。ツールバー等から別のツールへ
+            // 切り替えられた折にも消えるよう、出入りの双方で通知する(Tool 自体は再描画の契機でない)。
+            if (pasteModeInvolved) OnPropertyChanged(nameof(PastePreview));
         }
     }
 
@@ -473,6 +477,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             // 経由の同一シートジャンプで早期returnにより後続処理が丸ごと飛ばされた実例への対処)。
             // 縦コネクタをクリック選択する経路は、この副作用を踏まえてSelectedCell=null→
             // SelectedConnector=connectorの順で呼ぶ(MainWindow.xaml.cs)。
+            //
+            // 範囲選択の起点も同じ入口で畳む(殿ご下命2026-10-09)。SelectRange だけが
+            // _extendingRange を立てて起点を保ったままカーソルを動かす——それ以外の経路
+            // (矢印移動・クリック・シート切替・Undo)はすべてここで範囲が解ける。
+            bool hadRange = _rangeAnchor is not null;
+            if (!_extendingRange) _rangeAnchor = null;
             SelectedConnector = null;
             // T-041増分3: 配線分断(WireBreak)も同じ排他対象として扱う(SelectedWireBreak参照)。
             SelectedWireBreak = null;
@@ -525,12 +535,239 @@ public sealed class MainWindowViewModel : ViewModelBase
                 // 通知の順序は移す前と完全に同一に保たれる。
                 OnPropertyChanged(nameof(SelectedCellDisplay));
                 NotifySelectedElementChanged();
+                // 貼り付け位置の確認中は、ゴーストが選択セルに付いて動く。その位置へ貼れるか・
+                // 行を挿入するかを、確定の前にステータスバーへ出す。
+                if (Tool.Mode == ToolMode.Paste) UpdatePasteStatusMessage();
             }
+            if (hadRange || _rangeAnchor is not null) OnPropertyChanged(nameof(SelectedRange));
         }
     }
 
     /// <summary>SelectedCellのステータスバー表示用文字列。</summary>
     public string SelectedCellDisplay => SelectedCell is { } pos ? $"行{pos.Row + 1}/列{pos.Column}" : "未選択";
+
+    // ===== 範囲選択とコピー・貼り付け(殿ご下命2026-10-09) =====
+
+    private GridPos? _rangeAnchor;
+    private bool _extendingRange;
+
+    /// <summary>
+    /// 選択中の矩形範囲。起点（<c>_rangeAnchor</c>）と <see cref="SelectedCell"/> を対角とする。
+    /// 範囲選択をしておらぬ・起点とカーソルが同じセル、のいずれも null。
+    /// <para>
+    /// <b>【カーソルは SelectedCell のまま】</b>範囲選択のための別の「現在位置」は持たぬ。
+    /// Shift+矢印もドラッグも <see cref="SelectedCell"/> を動かし、起点だけを別に覚える
+    /// ——既存の選択枠・プロパティパネル・スクロール追従がそのまま働く。
+    /// </para></summary>
+    public CellRange? SelectedRange =>
+        _rangeAnchor is { } anchor && SelectedCell is { } cursor && anchor != cursor
+            ? CellRange.FromCorners(anchor, cursor)
+            : null;
+
+    /// <summary>範囲選択のカーソルを <paramref name="cursor"/> へ動かす（Shift+矢印）。起点が無ければ
+    /// 今の選択セルを起点にする。選択セルが無ければ単にそのセルを選ぶ。</summary>
+    public void ExtendSelectionTo(GridPos cursor)
+    {
+        if (SelectedCell is not { } current) { SelectedCell = cursor; return; }
+        SelectRange(_rangeAnchor ?? current, cursor);
+    }
+
+    /// <summary>
+    /// <paramref name="anchor"/> を起点、<paramref name="cursor"/> をカーソルとして範囲を選ぶ（マウスドラッグ）。
+    /// 双方をグリッドの内側（行 0〜Rows-1・列 0〜Columns-1）へ収める——<see cref="SelectedCell"/> 自体は
+    /// 範囲外も取りうるが、写し取る相手はグリッドの内にしか居らぬ。
+    /// </summary>
+    public void SelectRange(GridPos anchor, GridPos cursor)
+    {
+        if (CurrentSheet is not Sheet sheet) return;
+        _rangeAnchor = ClampToGrid(anchor, sheet);
+        _extendingRange = true;
+        try { SelectedCell = ClampToGrid(cursor, sheet); }
+        finally { _extendingRange = false; }
+    }
+
+    private static GridPos ClampToGrid(GridPos pos, Sheet sheet) =>
+        new(Math.Clamp(pos.Row, 0, sheet.Grid.Rows - 1), Math.Clamp(pos.Column, 0, sheet.Grid.Columns - 1));
+
+    private RangeClipboard? _clipboard;
+    private IReadOnlyList<PartDefinition> _clipboardPartDefinitions = Array.Empty<PartDefinition>();
+
+    /// <summary>コピーした中身が在るか。</summary>
+    public bool HasClipboard => _clipboard is not null;
+
+    /// <summary>
+    /// 選択範囲を写し取る（Ctrl+C）。範囲が無ければ選択セル1つ——そこに要素が在れば、
+    /// その要素の占有セル全体を範囲と見る（幅や高さを持つ部品を1セルの選択で写せるように）。
+    /// 写せるものが無ければ、前のコピーは捨てずに false を返す。
+    /// <para>
+    /// <b>【図面の外には出さぬ】</b>OS のクリップボードは使わず、この ViewModel が抱える。
+    /// シートを跨いでも、別の図面を開いても貼れる。別の図面でも自作パーツの絵が失われぬよう、
+    /// その定義も一緒に写しておく（貼る時に図面へ埋め込む）。
+    /// </para></summary>
+    public bool CopySelection()
+    {
+        if (!CanEditDiagram || HasAnyDraft || CurrentSheet is not Sheet sheet) return false;
+        if (SelectedCell is not { } cursor)
+        {
+            StatusMessage = "コピーする範囲を選択してください";
+            return false;
+        }
+
+        CellRange range;
+        if (SelectedRange is { } selected) range = selected;
+        else if (HitTestElement(cursor) is ElementInstance hit)
+            range = new CellRange(hit.Pos.Row - hit.RowSpan, hit.Pos.Column,
+                                  hit.Pos.Row + hit.RowSpan, hit.Pos.Column + Math.Max(1, hit.CellWidth) - 1);
+        else range = new CellRange(cursor.Row, cursor.Column, cursor.Row, cursor.Column);
+
+        var clip = RangeClipboard.Copy(sheet, range);
+        if (clip.IsEmpty)
+        {
+            StatusMessage = "選択範囲にコピーできるものがありません（範囲に丸ごと収まるものだけを写します）";
+            return false;
+        }
+
+        var library = PartLibrary;
+        _clipboardPartDefinitions = clip.Elements
+            .Select(e => e.PartId)
+            .Where(id => !string.IsNullOrEmpty(id) && !BuiltinPartIds.Contains(id!))
+            .Distinct(StringComparer.Ordinal)
+            .Select(id => library.Get(id))
+            .Where(def => def is not null)
+            .Select(def => PartLibrarySerializer.CloneOne(def!))
+            .ToList();
+        _clipboard = clip;
+        OnPropertyChanged(nameof(HasClipboard));
+        StatusMessage = $"{clip.ItemCount}個をコピーしました（貼り付け: Ctrl+V）";
+        return true;
+    }
+
+    /// <summary>
+    /// 貼り付け位置の確認へ入る（Ctrl+V）。選択セルを左上の角としてゴーストが出、
+    /// <see cref="ConfirmPaste"/> で確定、<see cref="CancelPaste"/> で取りやめる。
+    /// </summary>
+    public bool BeginPaste()
+    {
+        if (!CanEditDiagram || HasAnyDraft) return false;
+        if (_clipboard is null)
+        {
+            StatusMessage = "貼り付けるものがありません。先に範囲を選んでコピーしてください";
+            return false;
+        }
+
+        CancelResidualDraftForToolSwitch();
+        // 写し元の範囲表示は畳む。残せば、ゴーストと範囲の塗りが重なって貼り付け先が読めぬ。
+        if (_rangeAnchor is not null)
+        {
+            _rangeAnchor = null;
+            OnPropertyChanged(nameof(SelectedRange));
+        }
+        Tool = new ToolState(ToolMode.Paste);
+        UpdatePasteStatusMessage();
+        return true;
+    }
+
+    /// <summary>貼り付け位置の確認を取りやめ、選択モードへ戻す。図面には何も足さぬ。</summary>
+    public void CancelPaste()
+    {
+        if (Tool.Mode != ToolMode.Paste) return;
+        Tool = ToolState.SelectDefault;
+    }
+
+    /// <summary>確定前の貼り付けの見た目（ゴースト）。貼り付け位置の確認中で、選択セルが在る時のみ非 null。</summary>
+    public RangePastePreview? PastePreview
+    {
+        get
+        {
+            if (Tool.Mode != ToolMode.Paste || _clipboard is not RangeClipboard clip) return null;
+            if (SelectedCell is not { } anchor || CurrentSheet is not Sheet sheet) return null;
+            var library = PasteLibrary();
+            return new RangePastePreview(
+                RangePaste.Materialize(clip, anchor),
+                new CellRange(0, 0, clip.Rows - 1, clip.Columns - 1).MovedTo(anchor),
+                RangePaste.Plan(sheet, clip, anchor, library),
+                library);
+        }
+    }
+
+    /// <summary>
+    /// 貼り付けを確定する（Enter・クリック）。選択セルを左上の角として貼り、選択モードへ戻る。
+    /// 貼れぬ位置では何も積まず、理由をステータスバーへ出して確認中のまま留まる。
+    /// <para>
+    /// <b>【Undo は一回】</b>行の挿入・定義の埋め込み・中身の追加を、先頭の一つのスナップショットで
+    /// 丸ごと戻す。行の挿入に既存の <c>InsertRowBeforeCommand</c> を使わぬのはそのため
+    /// （あちらは Undo の対象外で、通知も一行ごとに飛ぶ）。
+    /// </para>
+    /// <para>
+    /// <b>【定義の埋め込みはスナップショットの後】</b>配置（<c>PlaceElementAtSelectedCell</c>）と同じ理由
+    /// ——前に置けば、Undo で貼り付けを取り消しても埋め込みだけが図面に孤児として残る。
+    /// </para></summary>
+    public bool ConfirmPaste()
+    {
+        if (Tool.Mode != ToolMode.Paste || _clipboard is not RangeClipboard clip) return false;
+        if (!CanEditDiagram || CurrentSheet is not Sheet sheet) return false;
+        if (SelectedCell is not { } anchor)
+        {
+            StatusMessage = "貼り付け先のセルを選択してください";
+            return false;
+        }
+
+        var plan = RangePaste.Plan(sheet, clip, anchor, PasteLibrary());
+        if (!plan.CanPaste)
+        {
+            StatusMessage = PasteRejectionMessage(plan.Status);
+            return false;
+        }
+
+        UndoManager.RecordSnapshot(Document);
+        foreach (var definition in _clipboardPartDefinitions) EmbedPartDefinition(definition);
+        RangePaste.Apply(sheet, clip, anchor, plan);
+        MarkDirty();
+
+        Tool = ToolState.SelectDefault;
+        NotifyCurrentSheetChanged();
+        NotifySelectedElementChanged();
+        int addedRows = plan.RowsToInsert + plan.RowsToAppend;
+        StatusMessage = addedRows > 0
+            ? $"{clip.ItemCount}個を貼り付けました（{addedRows}行を{(plan.RowsToInsert > 0 ? "挿入" : "追加")}）"
+            : $"{clip.ItemCount}個を貼り付けました";
+        return true;
+    }
+
+    /// <summary>貼る中身の解決に使うライブラリ。図面の定義に、コピー時に写した定義を足したもの
+    /// ——別の図面からコピーした自作パーツは、貼るまで図面側に定義が無い。図面に同じ Id が既に在れば
+    /// 図面側が勝つ（<see cref="EmbedPartDefinition"/> が上書きせぬのと同じ向き）。</summary>
+    private PartLibrary PasteLibrary()
+    {
+        var library = PartLibrary;
+        foreach (var definition in _clipboardPartDefinitions) library.ById.TryAdd(definition.Id, definition);
+        return library;
+    }
+
+    private void UpdatePasteStatusMessage()
+    {
+        if (Tool.Mode != ToolMode.Paste || _clipboard is not RangeClipboard clip) return;
+        if (SelectedCell is not { } anchor || CurrentSheet is not Sheet sheet)
+        {
+            StatusMessage = "貼り付け: 貼り付け先のセルを選び、Enter またはクリックで確定（Esc で取りやめ）";
+            return;
+        }
+        var plan = RangePaste.Plan(sheet, clip, anchor, PasteLibrary());
+        StatusMessage = !plan.CanPaste ? PasteRejectionMessage(plan.Status)
+            : plan.RowsToInsert > 0 ? $"貼り付け: {plan.RowsToInsert}行を挿入して貼ります。Enter またはクリックで確定（Esc で取りやめ）"
+            : plan.RowsToAppend > 0 ? $"貼り付け: 末尾に{plan.RowsToAppend}行を追加して貼ります。Enter またはクリックで確定（Esc で取りやめ）"
+            : "貼り付け: Enter またはクリックで確定（Esc で取りやめ）";
+    }
+
+    private static string PasteRejectionMessage(RangePasteStatus status) => status switch
+    {
+        RangePasteStatus.AnchorOutOfGrid => "貼り付けできません: 選択したセルはグリッド範囲外です",
+        RangePasteStatus.ColumnsOverflow => "貼り付けできません: 右へはみ出します。もっと左のセルを選んでください",
+        RangePasteStatus.RowLimitExceeded => $"貼り付けできません: 行数が上限（{GridSpec.MaxRows}行）を超えます",
+        RangePasteStatus.BlockedByTallElement => "貼り付けできません: 複数行を占める部品の途中へは割り込めません",
+        RangePasteStatus.NotAllowedOnSheet => "貼り付けできません: このシートの種別には置けないものが含まれています",
+        _ => "貼り付けできません",
+    };
 
     private bool _selectedEndpointIsStart = true;
 
@@ -2436,6 +2673,68 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 選択中の要素の機器名を挿入位置として、機器番号を挿入する（殿ご下命2026-10-09）。
+    /// 同じ接頭辞で番号がそれ以上の機器名を全シートにわたり一つずつ後ろへ送り、選択中の名を空ける
+    /// ——CR4 を選んで実行すれば CR4 以降が CR5 以降になり、新しいコイルへ CR4 を付けられる。
+    /// 送る規則は <see cref="DeviceNumberShifter"/> が持つ。図面を書き換えたら true を返す。
+    /// <para>
+    /// <b>【Undo は一回】</b>改名は機器の数だけ走るが、使い手から見れば一つの操作ゆえ、
+    /// スナップショットは先頭で一度だけ積む。
+    /// </para>
+    /// <para>
+    /// <b>【実行できぬ時は理由をステータスバーへ出す】</b>編集メニューの項目は「削除」と同じく
+    /// 選択の中身までは見ずに有効化しておるゆえ、押しても何も起きぬ場合がある。黙って何もせねば
+    /// 使い手には壊れて見える。
+    /// </para></summary>
+    public bool InsertDeviceNumberAtSelectedElement() => ShiftDeviceNumbersFromSelectedElement(insert: true);
+
+    /// <summary>
+    /// 選択中の要素の機器名を起点として、機器番号を前へ詰める（殿ご下命2026-10-09）。
+    /// <see cref="InsertDeviceNumberAtSelectedElement"/> の逆——CR1 を消した後に CR2 を選んで実行すれば
+    /// CR2 以降が CR1 以降になる。<b>詰める先の番号がまだ使われておれば実行せぬ</b>（CR1 が残ったまま
+    /// CR2 を詰めれば、別々の機器が同じ名になるゆえ）。図面を書き換えたら true を返す。
+    /// </summary>
+    public bool RemoveDeviceNumberAtSelectedElement() => ShiftDeviceNumbersFromSelectedElement(insert: false);
+
+    private bool ShiftDeviceNumbersFromSelectedElement(bool insert)
+    {
+        string operation = insert ? "機器番号を挿入" : "機器番号を詰める";
+        if (!CanEditDiagram || HasAnyDraft) return false;
+        if (SelectedElement?.DeviceName is not string origin
+            || !DeviceNumberShifter.TryParse(origin, out _, out _))
+        {
+            StatusMessage = $"{operation}: 番号付きの機器名（例: CR4）を持つ要素を選択してください";
+            return false;
+        }
+
+        var plan = insert ? DeviceNumberShifter.Plan(Document, origin) : DeviceNumberShifter.PlanRemoval(Document, origin);
+        if (plan.Conflict is not null)
+        {
+            StatusMessage = $"{(insert ? "機器番号を挿入できません" : "機器番号を詰められません")}: {plan.Conflict}";
+            return false;
+        }
+        if (plan.Renames.Count == 0) return false;
+
+        UndoManager.RecordSnapshot(Document);
+        if (insert) DeviceNumberShifter.InsertAt(Document, origin);
+        else DeviceNumberShifter.RemoveAt(Document, origin);
+        MarkDirty();
+        OnPropertyChanged(nameof(SelectedElementDeviceName));
+        DeviceTable.Refresh();
+
+        // Renames は適用順（挿入＝番号の大きい順／詰め＝小さい順）。起点の名は挿入なら末尾、詰めなら先頭。
+        var lowest = insert ? plan.Renames[^1] : plan.Renames[0];
+        var highest = insert ? plan.Renames[0] : plan.Renames[^1];
+        string range = plan.Renames.Count == 1
+            ? $"{lowest.From} を {lowest.To} へ"
+            : $"{lowest.From}〜{highest.From} の{plan.Renames.Count}件を一つずつ{(insert ? "後ろ" : "前")}へ";
+        StatusMessage = insert
+            ? $"{operation}: {range}送りました。{origin} が空きました"
+            : $"{operation}: {range}送りました";
+        return true;
+    }
+
     /// <summary>T-107増分2(殿裁定=デバイス単位で共有、GX3準拠): 選択中要素のコメント
     /// (Device.Comment、ラダー図上は機器シンボル直下に緑色で表示)。同一デバイス名の全要素間で
     /// 共有される(Element側には持たない)。DeviceNameが未設定の要素は紐づくDeviceが無いため
@@ -3478,6 +3777,56 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// パーツエディタでの編集を保存し、<b>開いておる図面に同じ Id の埋め込みが在ればそれも最新へ改める</b>
+    /// （殿ご裁可2026-10-09＝案A）。図面側を改めたら true を返す。
+    /// <para>
+    /// <b>【何が起きておったか】</b>図面は定義を配置時点の写しで抱え、<see cref="EmbedPartDefinition"/> は
+    /// 既に在る Id を上書きせぬ（T-151）。ゆえに<b>非シミュレートで一度置いたパーツは、後から種別を
+    /// コイルへ直しても図面の中では非シミュレートのまま</b>——結線に加わらず線番が付かなんだ（殿ご指摘）。
+    /// 編集導線に残る再描画（T-068増分3-b3）も、図面側の古い写しを描き直すだけで効いておらなんだ。
+    /// </para>
+    /// <para>
+    /// <b>【T-151の眼目は崩さぬ】</b>あちらが避けたのは「他所の図面を<b>開いただけ・置いただけ</b>で
+    /// 手元の同名パーツへすり替わる」こと。ここで改めるのは<b>使い手が自らそのパーツを編集して保存した時</b>
+    /// だけにて、<see cref="EmbedPartDefinition"/> の「上書きせぬ」はそのまま残してある。
+    /// </para>
+    /// <para>
+    /// <b>【届かぬ範囲】</b>閉じておる別の図面には届かぬ。また配置済み要素の
+    /// <see cref="ElementInstance.CellWidth"/>／<see cref="ElementInstance.CellHeight"/> と、機器表の
+    /// <see cref="Device.Class"/> は配置・命名の時点で決まった値のまま残る（本メソッドは定義のみを改める）。
+    /// </para></summary>
+    public bool SaveEditedPart(PartDefinition part, string oldPath)
+    {
+        PartPalette.SaveEditedPart(part, oldPath);
+        return RefreshEmbeddedPartDefinition(part.Id);
+    }
+
+    /// <summary>図面に埋め込まれた定義を、ローカルのカタログの現在値で改める。埋め込みが無い・
+    /// 組込みである・中身が同じ、のいずれかなら何もせず false を返す。
+    /// <para>
+    /// <b>【引数の定義でなくカタログから引く理由】</b>配置時の埋め込み（<see cref="ResolveCustomPartDefinition"/>）と
+    /// 同じ出所に揃えるため——カタログはディスクから読み直した値にて、読み込み時の正規化
+    /// （<c>PartOptimizer.MergeCollinearLines</c>）を経ておる。出所が違えば、同じパーツでも
+    /// 「置いた時」と「編集した時」で埋まる中身が食い違う。
+    /// </para>
+    /// <para>
+    /// <b>【同値なら積まぬ】</b>何も変えずに保存しただけで「押しても何も変わらぬUndo」が一回挟まり、
+    /// 図面が変更ありになるのを避ける（<c>SelectedElementDeviceName</c> 等の同値ガードと同じ配慮）。
+    /// </para></summary>
+    private bool RefreshEmbeddedPartDefinition(string partId)
+    {
+        if (Document.Library is not { } embeddedLibrary || embeddedLibrary.Get(partId) is not PartDefinition embedded)
+            return false;
+        if (ResolveCustomPartDefinition(partId) is not PartDefinition local) return false;
+        if (PartLibrarySerializer.SerializeOne(embedded) == PartLibrarySerializer.SerializeOne(local)) return false;
+
+        UndoManager.RecordSnapshot(Document);
+        embeddedLibrary.ById[partId] = PartLibrarySerializer.CloneOne(local);
+        MarkDirty();
+        return true;
+    }
+
+    /// <summary>
     /// SelectedCellへ要素を配置する(T-026段階4新配置フロー)。isOr=trueの場合、合流先候補
     /// (T-102、殿裁定=案A)を列挙し合流先確認モードへ遷移する。候補が無ければ何も接続せず終了する。
     /// <para>
@@ -3984,6 +4333,11 @@ public sealed class MainWindowViewModel : ViewModelBase
         CurrentFilePath = filePath;
         _currentSheetIndex = 0;
         _selectedCell = null;
+        // 範囲選択の起点も同様(殿ご下命2026-10-09)。SelectedCellのsetterで畳む作りゆえ、setterを
+        // バイパスするここでは明示する。貼り付け位置の確認中であればそれも解く——コピーした中身
+        // 自体は図面を跨いで貼れるよう残す。
+        _rangeAnchor = null;
+        if (_tool.Mode == ToolMode.Paste) Tool = ToolState.SelectDefault;
         // T-041増分1隠密レビュー指摘(観点2 CONFIRMED#4): 上の_selectedCellはsetterをバイパスする
         // 直接代入のため、SelectedCellのsetterに集約した自動クリア(上記参照)が効かない。旧文書の
         // VerticalConnector参照を持ち越さないよう、ここでも明示的にクリアする。SelectedConnectorは

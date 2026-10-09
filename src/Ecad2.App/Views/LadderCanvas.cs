@@ -87,6 +87,35 @@ public sealed class LadderCanvas : FrameworkElement
     // (副作用=プロパティの実行時書換えが無いことをsrc全体のgrepで確認済み、隠密の独立検分と一致)。
     private static readonly Pen SelectedCellPen = CreateFrozenPen(Brushes.OrangeRed, 2.0);
 
+    // 範囲選択の塗りと枠(殿ご下命2026-10-09)。選択セルの橙赤と見分けがつくよう青系にする
+    // (原本GuiEcadの複数選択も半透明の青、docs/spec/guiecad-spec-canvas-display.md)。
+    private static readonly Brush SelectedRangeFillBrush = CreateFrozenFill(Colors.DodgerBlue, 0.15);
+    private static readonly Pen SelectedRangePen = CreateFrozenPen(Brushes.DodgerBlue, 1.5);
+
+    // 貼り付け位置の確認中のゴースト(殿ご下命2026-10-09)。枠の色で貼り付けの段取りを示す
+    // ——青=そのまま貼れる／橙=行を挿入して貼る／赤=その位置へは貼れぬ。
+    private const byte PasteGhostAlpha = 130;
+    private static readonly Pen PasteGhostLinePen = CreateDraftPen();
+    private static readonly Brush PasteGhostMarkBrush = CreateFrozenFill(Colors.DodgerBlue, 0.6);
+    private static readonly Brush PasteOkFillBrush = CreateFrozenFill(Colors.DodgerBlue, 0.10);
+    private static readonly Pen PasteOkPen = CreateFrozenDashPen(Brushes.DodgerBlue);
+    private static readonly Brush PasteInsertFillBrush = CreateFrozenFill(Colors.DarkOrange, 0.12);
+    private static readonly Pen PasteInsertPen = CreateFrozenDashPen(Brushes.DarkOrange);
+    private static readonly Brush PasteRejectedFillBrush = CreateFrozenFill(Colors.Red, 0.12);
+    private static readonly Pen PasteRejectedPen = CreateFrozenDashPen(Brushes.Red);
+
+    private static Pen CreateFrozenDashPen(Brush brush)
+    {
+        var pen = new Pen(brush, 2.0) { DashStyle = new DashStyle(new double[] { 4, 3 }, 0) };
+        pen.Freeze();
+        return pen;
+    }
+
+    /// <summary>セル範囲の矩形(DIP)。左上と右下のセル矩形を包む。グリッドの外へ出る範囲でも計算できる
+    /// (貼り付け先が下へはみ出す場合のゴーストに要る)。</summary>
+    private Rect RangeRectDip(CellRange range) =>
+        Rect.Union(CellRectDip(new GridPos(range.Top, range.Left)), CellRectDip(new GridPos(range.Bottom, range.Right)));
+
     // 選択中の配線プリミティブのハイライト線(T-041増分1)。SelectedCellPenと同色・やや太めにして
     // 「配線が選択されている」ことを線そのものの強調で示す(セルの矩形ハイライトとは表現を変える)。
     private static readonly Pen SelectedConnectorPen = CreateFrozenPen(Brushes.OrangeRed, 3.5);
@@ -221,7 +250,8 @@ public sealed class LadderCanvas : FrameworkElement
         SimState? sim = null, DeviceTable? devices = null,
         VerticalConnector? orJoinTargetPreview = null,
         GroupFrame? frameDraftPreview = null, GroupFrame? frameDragPreview = null,
-        GroupFrame? frameResizePreview = null)
+        GroupFrame? frameResizePreview = null,
+        CellRange? selectedRange = null, RangePastePreview? pastePreview = null)
     {
         _lastSheet = sheet;
         _lastLibrary = library;
@@ -249,6 +279,39 @@ public sealed class LadderCanvas : FrameworkElement
             // T-061: sim(テストモード中のみ非null)を渡すと通電配線・励磁要素が通電色でハイライトされる。
             // T-107増分2: devicesを渡すと機器コメント(Device.Comment)が描画される。
             _renderer.Render(wpfRenderer, sheet, library, sim, devices: devices);
+
+            // 範囲選択(殿ご下命2026-10-09)。選択セルの枠より先に塗り、カーソルの位置が埋もれぬようにする。
+            if (selectedRange is { } range)
+                dc.DrawRectangle(SelectedRangeFillBrush, SelectedRangePen, RangeRectDip(range));
+
+            // 貼り付け位置の確認中のゴースト(殿ご下命2026-10-09)。貼る中身を薄い色でそのまま描き、
+            // 貼り付け先の範囲を「そのまま貼れる／行を挿入して貼る／貼れぬ」で色分けした枠で囲む。
+            if (pastePreview is { } paste)
+            {
+                var fg = _theme.Foreground;
+                var ghostColor = new Ecad2.Rendering.Color(PasteGhostAlpha, fg.R, fg.G, fg.B);
+                foreach (var ghostElement in paste.Content.Elements)
+                    _renderer.DrawPreview(wpfRenderer, ghostElement, ghostColor, paste.Library);
+                foreach (var ghostConnector in paste.Content.Connectors)
+                {
+                    var (p1, p2) = ConnectorEndpointsDip(ghostConnector.Column, ghostConnector.TopRow, ghostConnector.BottomRow);
+                    dc.DrawLine(PasteGhostLinePen, p1, p2);
+                }
+                foreach (var ghostBreak in paste.Content.WireBreaks)
+                {
+                    var geo = _renderer.Geometry;
+                    double r = geo.CellMm * 0.15 * MmToDip;
+                    dc.DrawEllipse(PasteGhostMarkBrush, null,
+                        new Point(geo.X(ghostBreak.Boundary) * MmToDip, geo.YRow(ghostBreak.Row) * MmToDip), r, r);
+                }
+                foreach (var ghostFrame in paste.Content.Frames)
+                    dc.DrawRectangle(null, PasteGhostLinePen, FrameRectDip(ghostFrame));
+
+                var (fill, pen) = !paste.Plan.CanPaste ? (PasteRejectedFillBrush, PasteRejectedPen)
+                    : paste.Plan.RowsToInsert > 0 ? (PasteInsertFillBrush, PasteInsertPen)
+                    : (PasteOkFillBrush, PasteOkPen);
+                dc.DrawRectangle(fill, pen, RangeRectDip(paste.Rect));
+            }
 
             if (selectedCell is { } cell)
                 dc.DrawRectangle(null, SelectedCellPen, CellRectDip(cell));

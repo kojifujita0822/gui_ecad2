@@ -157,11 +157,15 @@ public class T151PartLibraryEmbedPlacementTests : ViewModelTestBase
         Assert.Equal("T151自作X", embedded.Name);
     }
 
-    /// <summary>3節の応用＝使い手の実際の編集導線（パーツエディタ＝<c>SaveEditedPart</c>）を通しても、
+    /// <summary>3節の応用＝ローカルへの保存（<c>PartPalette.SaveEditedPart</c>）<b>だけ</b>では、
     /// 既存図面の埋め込み定義は配置時点のまま。台帳T-151節の検証観点
     /// 「ローカルでパーツを直しても既存図面が変わらぬこと（仕様どおりであることの確認）」に対応する。
     /// <para>上のテストと違い、こちらは参照共有を弁別できぬ（ディスク往復で別インスタンスになるため）。
-    /// 検出力は上に譲り、本テストは導線の実地確認を担う。</para></summary>
+    /// 検出力は上に譲り、本テストは導線の実地確認を担う。</para>
+    /// <para><b>【殿ご裁可2026-10-09＝案Aで射程が変わった】</b>パーツエディタの導線は
+    /// <c>MainWindowViewModel.SaveEditedPart</c> を経るようになり、<b>そちらは図面側も改める</b>
+    /// （<see cref="EditedPartEmbedRefreshTests"/>）。本テストが固定するのはパレット単体の振る舞い
+    /// ——図面を改める責はパレットでなくViewModelに在る、という分担にござる。</para></summary>
     [Fact]
     public void PlaceElementAtSelectedCell_ThenSaveEditedPart_EmbeddedValueStaysAtPlacementTime()
     {

@@ -12,7 +12,9 @@ namespace Ecad2.App.ViewModels;
 // T-102(殿裁定=案A・1-a・2-a・解釈(i)): OR自動配線の合流先確認モード。要素配置(PlaceElementAtSelectedCell)
 // の完了後、isOr=trueかつ合流先候補が存在すれば自動的にこのモードへ遷移する(T-041のPlaceConnectorと
 // 同型、確定後自動遷移方式)。
-public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak, PlaceImage, ConfirmOrJoinTarget }
+// 殿ご下命2026-10-09: Paste＝貼り付け位置の確認モード。Ctrl+V で入り、選択セルを左上の角として
+// ゴーストを出す。Enter・クリックで確定、Esc で取りやめ(ConfirmOrJoinTarget と同じ「仮置きして確定」の作法)。
+public enum ToolMode { Select, PlaceElement, PlaceConnector, PlaceFrame, PlaceLine, PlaceDot, PlaceWireBreak, PlaceImage, ConfirmOrJoinTarget, Paste }
 
 /// <summary>現在の配置ツール状態。Kind/PartId/Orient/IsOr は Mode==PlaceElement のときのみ意味を持つ。</summary>
 public readonly record struct ToolState(

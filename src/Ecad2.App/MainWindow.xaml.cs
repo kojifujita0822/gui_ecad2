@@ -651,12 +651,14 @@ public partial class MainWindow : Window
         var dialog = new Views.PartEditorDialog(entry.Definition, _viewModel.IsDarkMode) { Owner = this };
         if (dialog.ShowDialog() != true) return;
 
-        _viewModel.PartPalette.SaveEditedPart(dialog.Result, entry.FilePath);
+        // 殿ご裁可2026-10-09＝案A: パレット直ではなくViewModelを経る。T-151以後、配置済みのパーツは
+        // 図面に埋め込まれた写しで解決されるゆえ、ローカルへ保存するだけでは図面へ届かぬ
+        // (種別を直しても線番が付かぬ、殿ご指摘)。図面側の写しの更新はあちらが受け持つ。
+        _viewModel.SaveEditedPart(dialog.Result, entry.FilePath);
 
         // T-068増分3-b3(家老采配2026-07-25、侍の着手前調査1.9): 形状を編集して保存しても、既に
-        // 配置済みのパーツの見た目が変わらなかった。PartPaletteViewModel.LoadはPartLibrary.ByIdの
-        // 中身を入れ替えるがキャンバスの再描画までは起こさないため。増分3-b2までは形状自体を
-        // 編集できず顕在化していなかった。
+        // 配置済みのパーツの見た目が変わらなかった。保存だけではキャンバスの再描画までは
+        // 起こらないため。増分3-b2までは形状自体を編集できず顕在化していなかった。
         RedrawCanvas();
     }
 
@@ -968,6 +970,10 @@ public partial class MainWindow : Window
             // T-102: 合流先確認モードの候補プレビュー切替(Up/Down)・取消(Esc)を、他のDraftPreview系
             // プロパティと同じ自動再描画契機に含める。
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.OrJoinTargetPreview)
+            // 範囲選択と貼り付けのゴースト(殿ご下命2026-10-09)。SelectedCell が動かぬまま変わる場合
+            // (範囲の解除・貼り付け位置の確認への出入り)があるゆえ、独立した契機として要る。
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.SelectedRange)
+            || e.PropertyName == nameof(ViewModels.MainWindowViewModel.PastePreview)
             || e.PropertyName == nameof(ViewModels.MainWindowViewModel.Mode)
             // T-133増分5往復1周目(忍者実機再検証・隠密指摘): ComboBoxで種別を変えても、選択を
             // 外すまでラベル・ELBのテストボタンが更新されなかった欠陥。TextBox系6件は
@@ -1134,7 +1140,8 @@ public partial class MainWindow : Window
                 _viewModel.SelectedImage, _viewModel.ImageInsertDraftPreview, _viewModel.SelectedFrame,
                 _viewModel.CurrentTestSession?.State, _viewModel.Document.Devices,
                 _viewModel.OrJoinTargetPreview,
-                _viewModel.FrameDraftPreview, _viewModel.FrameDragPreview, _viewModel.FrameResizePreview);
+                _viewModel.FrameDraftPreview, _viewModel.FrameDragPreview, _viewModel.FrameResizePreview,
+                _viewModel.SelectedRange, _viewModel.PastePreview);
         else
             LadderCanvasHost.Clear();
     }
@@ -1861,7 +1868,39 @@ public partial class MainWindow : Window
             if (!LadderCanvasHost.CaptureMouse()) { _viewModel.CancelDragFrame(); return; }
             _frameDragPressPositionDip = position;
             _frameDragStarted = false;
+            return;
         }
+
+        // 範囲選択のドラッグ(殿ご下命2026-10-09)。上のどれも掴まなかった押下＝空きセルや未選択の
+        // 要素の上から始まる左ドラッグは、これまで使われておらなんだ。押した時点では起点を覚えて
+        // キャプチャするのみにて、しきい値を超えて動くまでは範囲にせぬ——動かずに離せば従来どおりの
+        // クリック(Up 側のセル選択)として扱う。行コメントの帯はセルの概念に載らぬゆえ始めぬ
+        // (Up 側がクリックを無視するのと同じ線引き)。
+        if (_viewModel.CanEditDiagram && _viewModel.CurrentSheet is Ecad2.Model.Sheet rangeDragSheet
+            && !ShouldSkipSelectionForRungCommentAreaClick(LadderCanvasHost.HitTestRungCommentRow(position, rangeDragSheet)))
+        {
+            if (!LadderCanvasHost.CaptureMouse()) return;
+            _rangeDragAnchorCell = LadderCanvasHost.ToGridPos(position);
+            _rangeDragPressPositionDip = position;
+            _rangeDragStarted = false;
+        }
+    }
+
+    // 範囲選択のドラッグの状態(殿ご下命2026-10-09)。起点セルが非nullの間が「押下中」。
+    // 他のドラッグ系と違いViewModel側にドラッグ中の状態は持たぬ——動かすのは選択(SelectedCell と
+    // 範囲の起点)だけで、確定・取消で巻き戻すべき図面の変更が無いゆえ。
+    private Ecad2.Model.GridPos? _rangeDragAnchorCell;
+    private Point _rangeDragPressPositionDip;
+    private bool _rangeDragStarted;
+
+    // 直近の MouseMove のマウス位置(ウィンドウ基準)。合成された MouseMove(マウスは動いておらぬ)を
+    // 見分けるために覚える。貼り付け位置の確認中のホバー追従が使う。
+    private Point _lastMouseMoveWindowPosition;
+
+    private void ResetRangeDrag()
+    {
+        _rangeDragAnchorCell = null;
+        _rangeDragStarted = false;
     }
 
     // T-041増分7: ドラッグ中(キャプチャ中)のみ処理する。しきい値未満の移動はクリックとの区別のため
@@ -1881,8 +1920,41 @@ public partial class MainWindow : Window
             return;
         }
 
+        // 貼り付け位置の確認中(殿ご下命2026-10-09)は、ゴーストがマウスに付いて動く——画像挿入の
+        // 配置待機と同じくキャプチャ無しのホバー追従。ゴーストの位置は SelectedCell そのものゆえ、
+        // 矢印キーで動かすのと同じ状態を動かしておる(再描画は SelectedCell の通知が受け持つ)。
+        // グリッドの内へ収めるのは、外へ出たゴーストを見せても貼れぬため。
+        // 【実際に動いた時だけ追従する】WPFは再描画でビジュアルが入れ替わるたびにマウス位置を
+        // 評価し直し、マウスが止まっておっても MouseMove を合成して寄越す。それに応じれば、矢印キーで
+        // 動かしたゴーストが、キャンバス上に置きっぱなしのマウスの位置へ引き戻される。ウィンドウ基準の
+        // 座標で比べるのは、キャンバス基準ではスクロール(矢印キーの追従)だけで値が変わるため。
+        var windowPosition = e.GetPosition(this);
+        bool mouseActuallyMoved = windowPosition != _lastMouseMoveWindowPosition;
+        _lastMouseMoveWindowPosition = windowPosition;
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.Paste && _viewModel.CurrentSheet is Ecad2.Model.Sheet pasteSheet)
+        {
+            if (!mouseActuallyMoved) return;
+            var hoverCell = LadderCanvasHost.ToGridPos(e.GetPosition(LadderCanvasHost));
+            hoverCell = new Ecad2.Model.GridPos(
+                Math.Clamp(hoverCell.Row, 0, pasteSheet.Grid.Rows - 1),
+                Math.Clamp(hoverCell.Column, 0, pasteSheet.Grid.Columns - 1));
+            if (_viewModel.SelectedCell != hoverCell) _viewModel.SelectedCell = hoverCell;
+            return;
+        }
+
         if (!LadderCanvasHost.IsMouseCaptured) return;
         var position = e.GetPosition(LadderCanvasHost);
+
+        if (_rangeDragAnchorCell is { } rangeDragAnchor)
+        {
+            if (!_rangeDragStarted)
+            {
+                if ((position - _rangeDragPressPositionDip).Length < DragStartThresholdDip) return;
+                _rangeDragStarted = true;
+            }
+            _viewModel.SelectRange(rangeDragAnchor, LadderCanvasHost.ToGridPos(position));
+            return;
+        }
 
         if (_viewModel.IsDraggingConnector)
         {
@@ -2053,6 +2125,19 @@ public partial class MainWindow : Window
             _frameResizeConsumedByEscape = false;
             _frameCreateDragConsumedByEscape = false;
             return;
+        }
+
+        // 範囲選択のドラッグ(殿ご下命2026-10-09)。しきい値を超えて動いておれば範囲は既に選ばれて
+        // おるゆえ、下の通常クリック処理(離した位置のセルを選び直す)へ落とさぬ——落とせば範囲が解ける。
+        // 動かずに離した場合は従来どおりのクリックとして下へ流す。状態を先に畳んでからキャプチャを
+        // 放すのは、ReleaseMouseCapture が LostMouseCapture を同期で呼ぶため(順序を逆にすれば
+        // あちらが先に状態を畳み、ここで「動いたか」を読めなくなる)。
+        if (_rangeDragAnchorCell is not null)
+        {
+            bool rangeSelected = _rangeDragStarted;
+            ResetRangeDrag();
+            LadderCanvasHost.ReleaseMouseCapture();
+            if (rangeSelected) return;
         }
 
         // T-041増分7: ドラッグ中だった場合はここで確定し、以降の通常クリック処理(セル選択/配線
@@ -2366,6 +2451,7 @@ public partial class MainWindow : Window
                 Command = _viewModel.DeleteRowAtCommand,
                 CommandParameter = pos.Row,
             });
+            AddClipboardContextMenuItems(menu, pos);
         }
 
         LadderCanvasHost.ContextMenu = menu;
@@ -2440,6 +2526,36 @@ public partial class MainWindow : Window
         };
         menu.Items.Add(renameItem);
 
+        // 機器番号の挿入(殿ご下命2026-10-09)。番号付きの機器名を持つ要素でのみ有効にし、
+        // どの名から送るかを見出しへ出す(実行前に挿入位置を目で確かめられるように)。
+        string? hitDeviceName = _viewModel.HitTestElement(pos)?.DeviceName;
+        bool canInsertNumber = Ecad2.Simulation.DeviceNumberShifter.TryParse(hitDeviceName, out _, out _);
+        var insertNumberItem = new MenuItem
+        {
+            Header = canInsertNumber ? $"機器番号を挿入（{hitDeviceName} 以降を順送り）" : "機器番号を挿入（以降を順送り）",
+            IsEnabled = canInsertNumber,
+        };
+        insertNumberItem.Click += (s, e) =>
+        {
+            _viewModel.SelectedCell = pos;
+            InsertDeviceNumberMenuItem_Click(s, e);
+        };
+        menu.Items.Add(insertNumberItem);
+
+        // 機器番号の詰め(挿入の逆)。詰める先が塞がっておるか否かまではここで見ず、
+        // 実行時にステータスバーへ理由を出す(見出しを作るたびに全シートを走査せぬため)。
+        var removeNumberItem = new MenuItem
+        {
+            Header = canInsertNumber ? $"機器番号を詰める（{hitDeviceName} 以降を前へ）" : "機器番号を詰める（以降を前へ）",
+            IsEnabled = canInsertNumber,
+        };
+        removeNumberItem.Click += (s, e) =>
+        {
+            _viewModel.SelectedCell = pos;
+            RemoveDeviceNumberMenuItem_Click(s, e);
+        };
+        menu.Items.Add(removeNumberItem);
+
         if (!sheet.MainCircuit && pos.Row >= 0 && pos.Row < Ecad2.Rendering.DiagramRenderer.TotalRows(sheet))
         {
             var commentItem = new MenuItem { Header = "コメント編集" };
@@ -2450,6 +2566,8 @@ public partial class MainWindow : Window
             };
             menu.Items.Add(commentItem);
         }
+
+        AddClipboardContextMenuItems(menu, pos);
     }
 
     // T-067(5): GroupFrame(グループ枠)上での右クリックメニュー項目(線種変更/削除、GuiEcad
@@ -2505,6 +2623,8 @@ public partial class MainWindow : Window
             _testModePressedDevice = null;
             RedrawCanvas();
         }
+        // 範囲選択のドラッグ: 押下中の状態だけ畳む。そこまでに選ばれた範囲は残す(図面を変えておらぬ)。
+        ResetRangeDrag();
         if (_viewModel.IsDraggingConnector)
         {
             _viewModel.CancelDragConnector();
@@ -2583,6 +2703,14 @@ public partial class MainWindow : Window
     // (家老采配「両経路で挙動を揃える」)。SelectedCellのnull/占有チェックはTryPlaceElement側で行う。
     private void TryPlaceActiveTool()
     {
+        // 貼り付け位置の確認中(殿ご下命2026-10-09)は、Enter・クリックが貼り付けの確定になる。
+        // 貼れぬ位置では ConfirmPaste が理由をステータスバーへ出し、確認中のまま留まる。
+        if (_viewModel.Tool.Mode == ViewModels.ToolMode.Paste)
+        {
+            if (_viewModel.ConfirmPaste()) RedrawCanvas();
+            return;
+        }
+
         if (_viewModel.Tool.Mode != ViewModels.ToolMode.PlaceElement) return;
 
         // T-133増分4-C: Kind 経路（主回路3極記号）。従来ここは `Tool.PartId is not string` で
@@ -2881,7 +3009,20 @@ public partial class MainWindow : Window
                 // ("配置するセルを先に選択してください"等)を設定しうるため、層2/層3のどちらの条件も
                 // 満たさず層4へ落ちてもメッセージが残らぬよう、条件分岐の外でクリアする(隠密レビュー指摘)。
                 _viewModel.StatusMessage = "";
-                if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement)
+                // 範囲選択のドラッグ中のEsc: 押下を畳んでキャプチャを放す。範囲そのものは下の層3
+                // (SelectedCell=null)が解く。畳まねば、次のマウス移動で同じ起点から範囲が選び直される。
+                if (_rangeDragAnchorCell is not null)
+                {
+                    ResetRangeDrag();
+                    LadderCanvasHost.ReleaseMouseCapture();
+                }
+                if (_viewModel.Tool.Mode == ViewModels.ToolMode.Paste)
+                {
+                    // 層2(殿ご下命2026-10-09): 貼り付け位置の確認中 → 取りやめて選択モードへ戻す。
+                    // 何も貼らぬ。ゴーストは PastePreview の通知で消える。
+                    _viewModel.CancelPaste();
+                }
+                else if (_viewModel.Tool.Mode == ViewModels.ToolMode.PlaceElement)
                 {
                     // 層2: 配置モード中 → 選択モードへ戻す。SelectedCellは保持し、続けて別ツールで
                     // 同じセルへ配置し直せるようにする。
@@ -3104,6 +3245,33 @@ public partial class MainWindow : Window
                 ResizeSelectedFreeLineByKey(e.Key);
                 e.Handled = true;
                 break;
+            case Key.Up or Key.Down or Key.Left or Key.Right when shift && IsCanvasFocused()
+                    && _viewModel.CanEditDiagram && _viewModel.Tool.Mode == ViewModels.ToolMode.Select
+                    && _viewModel.SelectedCell is not null:
+                // 範囲選択(殿ご下命2026-10-09): Shift+矢印で、今の選択セルを起点に範囲を広げる。
+                // 上の3つのShift分岐(縦コネクタ記入中の列調整・選択中の縦コネクタ/自由線の端点伸縮)は
+                // いずれも SelectedCell が null の状態でしか成り立たぬゆえ、条件は重ならぬ
+                // (プリミティブを選ぶ経路は必ず SelectedCell=null を先に通す)。
+                ExtendSelectionByKey(e.Key);
+                e.Handled = true;
+                break;
+            case Key.Enter when noModifier && IsCanvasFocused()
+                    && _viewModel.Tool.Mode == ViewModels.ToolMode.Paste:
+                // 貼り付け位置の確認中のEnter → 確定。クリックでの確定と同じ TryPlaceActiveTool へ委ねる。
+                TryPlaceActiveTool();
+                e.Handled = true;
+                break;
+            case Key.C when Keyboard.Modifiers == ModifierKeys.Control && IsCanvasFocused():
+                // コピー(殿ご下命2026-10-09)。IsCanvasFocused を条件にせねば、機器名欄・検索欄・機器表の
+                // 文字のコピーを奪う(本ハンドラはTunnelingゆえ、こちらが先に受ける)。
+                _viewModel.CopySelection();
+                e.Handled = true;
+                break;
+            case Key.V when Keyboard.Modifiers == ModifierKeys.Control && IsCanvasFocused():
+                // 貼り付け位置の確認へ入る。IsCanvasFocused の理由はコピーと同じ。
+                _viewModel.BeginPaste();
+                e.Handled = true;
+                break;
             case Key.Tab when noModifier && IsCanvasFocused() && _viewModel.HasSelectedLinePrimitive:
                 // T-041増分7(殿裁定P-033=案2): 操作対象端点(始点/終点)をトグルする。表示は
                 // ステータスバーのSelectedEndpointDisplayバインディングで自動反映される。
@@ -3315,6 +3483,73 @@ public partial class MainWindow : Window
             RedrawCanvas();
     }
 
+    // 「コピー」「貼り付け」メニュー(殿ご下命2026-10-09)。キー(Ctrl+C/Ctrl+V)と同じViewModelの
+    // 入口を呼ぶ。メニュークリックは機器名欄の編集中にも届くゆえ、未確定の入力を先に確定する
+    // (「削除」と同じ作法)。貼り付けは確認モードへ入るだけで、確定はEnter・クリックが担う
+    // ——その Enter をキャンバスが受けられるよう、フォーカスを戻しておく。
+    private void CopyMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CommitDeviceNameEdit();
+        _viewModel.CopySelection();
+    }
+
+    private void PasteMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CommitDeviceNameEdit();
+        if (_viewModel.BeginPaste())
+            Dispatcher.BeginInvoke(new Action(FocusCanvas), DispatcherPriority.Background);
+    }
+
+    // 右クリックメニューへ「コピー」「貼り付け」を足す(殿ご下命2026-10-09)。
+    // 【コピー】選択範囲の内側を右クリックしたなら、範囲をそのまま写す。外側なら、押した位置の
+    // セルを選んでから写す(SelectedCell の代入は範囲を解くゆえ、内側では代入してはならぬ)。
+    // 【貼り付け】押した位置を貼り付け先として確認モードへ入る。
+    // 選択の切替をClickハンドラの中(実行直前)で行うのは BuildElementContextMenuItems と同じ理由
+    // ——メニューを出しただけで作業起点を壊さぬため。
+    private void AddClipboardContextMenuItems(ContextMenu menu, Ecad2.Model.GridPos pos)
+    {
+        menu.Items.Add(new Separator());
+
+        var copyItem = new MenuItem { Header = "コピー", InputGestureText = "Ctrl+C" };
+        copyItem.Click += (s, e) =>
+        {
+            bool insideRange = _viewModel.SelectedRange is { } range
+                && range.Top <= pos.Row && pos.Row <= range.Bottom
+                && range.Left <= pos.Column && pos.Column <= range.Right;
+            if (!insideRange) _viewModel.SelectedCell = pos;
+            CopyMenuItem_Click(s, e);
+        };
+        menu.Items.Add(copyItem);
+
+        var pasteItem = new MenuItem { Header = "貼り付け", InputGestureText = "Ctrl+V", IsEnabled = _viewModel.HasClipboard };
+        pasteItem.Click += (s, e) =>
+        {
+            _viewModel.SelectedCell = pos;
+            PasteMenuItem_Click(s, e);
+        };
+        menu.Items.Add(pasteItem);
+    }
+
+    // 「機器番号を挿入（以降を順送り）」(殿ご下命2026-10-09)。選択中の要素の機器名を挿入位置とする。
+    // 「削除」と同じくメニュークリックはDeviceNameBox編集中にも到達しうるゆえ、未確定入力を先に確定する
+    // ——確定前の名で順送りすれば、打ちかけの名が挿入位置にならぬ。
+    // 再描画を遅延させるのは右クリックメニューからも呼ぶため(BuildFrameContextMenuItemsの線種変更と
+    // 同じ事情: ContextMenuのクローズ処理と競合し、直に呼ぶと画面へ反映されぬ場合がある)。
+    private void InsertDeviceNumberMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CommitDeviceNameEdit();
+        if (_viewModel.InsertDeviceNumberAtSelectedElement())
+            Dispatcher.BeginInvoke(new Action(RedrawCanvas), DispatcherPriority.Background);
+    }
+
+    // 「機器番号を詰める（以降を前へ）」(殿ご下命2026-10-09)。上の挿入の逆で、作法も同じ。
+    private void RemoveDeviceNumberMenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        CommitDeviceNameEdit();
+        if (_viewModel.RemoveDeviceNumberAtSelectedElement())
+            Dispatcher.BeginInvoke(new Action(RedrawCanvas), DispatcherPriority.Background);
+    }
+
     private bool IsCanvasFocused() => IsWithin(LadderCanvasHost, Keyboard.FocusedElement as DependencyObject);
 
     // T-082: Alt+上下キーがシートナビゲーション(SheetNavList)宛かを見る判定(IsCanvasFocusedと対)。
@@ -3328,6 +3563,29 @@ public partial class MainWindow : Window
         var command = _viewModel.SheetNavigation.MoveSheetCommand;
         var param = (fromIndex, fromIndex + delta);
         if (command.CanExecute(param)) command.Execute(param);
+    }
+
+    // 範囲選択(殿ご下命2026-10-09): Shift+矢印でカーソルを1セル動かし、起点との間を範囲にする。
+    // MoveSelectedCell と違い右母線の列(Column==Columns)へは出さぬ——写し取る相手はグリッドの
+    // 内にしか居らぬ。カーソルが見える所までスクロールするのは同じ(母線側へ広げる配慮は要らぬ)。
+    private void ExtendSelectionByKey(Key key)
+    {
+        if (_viewModel.CurrentSheet is not Ecad2.Model.Sheet currentSheet) return;
+        if (_viewModel.SelectedCell is not { } current) return;
+
+        var grid = currentSheet.Grid;
+        int row = Math.Clamp(current.Row, 0, grid.Rows - 1);
+        int column = Math.Clamp(current.Column, 0, grid.Columns - 1);
+        switch (key)
+        {
+            case Key.Up: row = Math.Max(0, row - 1); break;
+            case Key.Down: row = Math.Min(grid.Rows - 1, row + 1); break;
+            case Key.Left: column = Math.Max(0, column - 1); break;
+            case Key.Right: column = Math.Min(grid.Columns - 1, column + 1); break;
+        }
+        var newCell = new Ecad2.Model.GridPos(row, column);
+        _viewModel.ExtendSelectionTo(newCell);
+        if (newCell != current) LadderCanvasHost.BringIntoView(LadderCanvasHost.CellRectDip(newCell));
     }
 
     private void MoveSelectedCell(Key key)

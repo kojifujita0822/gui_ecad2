@@ -912,10 +912,17 @@
                 <MenuItem Header="やり直し(_R)" InputGestureText="Ctrl+Y" Command="{Binding RedoCommand}"/>
                 <Separator/>
                 <MenuItem Header="切り取り(_T)" InputGestureText="Ctrl+X"/>
-                <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C"/>
-                <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V"/>
+                <MenuItem Header="コピー(_C)" InputGestureText="Ctrl+C" Click="CopyMenuItem_Click"
+                          IsEnabled="{Binding CanEditDiagram}"/>
+                <MenuItem Header="貼り付け(_P)" InputGestureText="Ctrl+V" Click="PasteMenuItem_Click"
+                          IsEnabled="{Binding CanEditDiagram}"/>
                 <Separator/>
                 <MenuItem Header="削除(_D)" InputGestureText="Delete" Click="DeleteMenuItem_Click"
+                          IsEnabled="{Binding CanEditDiagram}"/>
+                <Separator/>
+                <MenuItem Header="機器番号を挿入（以降を順送り）(_I)" Click="InsertDeviceNumberMenuItem_Click"
+                          IsEnabled="{Binding CanEditDiagram}"/>
+                <MenuItem Header="機器番号を詰める（以降を前へ）(_M)" Click="RemoveDeviceNumberMenuItem_Click"
                           IsEnabled="{Binding CanEditDiagram}"/>
             </MenuItem>
             <MenuItem Header="図面(_D)">
