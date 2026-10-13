@@ -349,6 +349,142 @@
         },
         "padding": 0
       }
+    },
+    {
+      "name": "range-select",
+      "document": "demo.gcad",
+      "intrusive": true,
+      "steps": [
+        {
+          "action": "click",
+          "xy": [
+            365,
+            268
+          ],
+          "waitMs": 500
+        },
+        {
+          "action": "keys",
+          "keys": "+{RIGHT}",
+          "repeat": 3,
+          "waitMs": 200
+        },
+        {
+          "action": "keys",
+          "keys": "+{DOWN}",
+          "waitMs": 600
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "xy": [
+              420,
+              319
+            ]
+          },
+          "badgeOffset": [
+            0,
+            60
+          ]
+        },
+        {
+          "number": 2,
+          "target": {
+            "xy": [
+              466,
+              302
+            ]
+          },
+          "badgeOffset": [
+            62,
+            42
+          ]
+        }
+      ],
+      "crop": {
+        "target": {
+          "automationId": "CanvasArea"
+        },
+        "padding": 0
+      }
+    },
+    {
+      "name": "paste-ghost",
+      "document": "demo.gcad",
+      "intrusive": true,
+      "steps": [
+        {
+          "action": "click",
+          "xy": [
+            365,
+            268
+          ],
+          "waitMs": 500
+        },
+        {
+          "action": "keys",
+          "keys": "+{RIGHT}",
+          "repeat": 3,
+          "waitMs": 200
+        },
+        {
+          "action": "keys",
+          "keys": "+{DOWN}",
+          "waitMs": 600
+        },
+        {
+          "action": "keys",
+          "keys": "^c",
+          "waitMs": 400
+        },
+        {
+          "action": "keys",
+          "keys": "^v",
+          "waitMs": 700
+        },
+        {
+          "action": "keys",
+          "keys": "{DOWN}",
+          "repeat": 4,
+          "waitMs": 900
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "xy": [
+              520,
+              489
+            ]
+          },
+          "badgeOffset": [
+            0,
+            50
+          ]
+        },
+        {
+          "number": 2,
+          "target": {
+            "xy": [
+              467,
+              437
+            ]
+          },
+          "badgeOffset": [
+            -70,
+            0
+          ]
+        }
+      ],
+      "crop": {
+        "target": {
+          "automationId": "CanvasArea"
+        },
+        "padding": 0
+      }
     }
   ]
 }
