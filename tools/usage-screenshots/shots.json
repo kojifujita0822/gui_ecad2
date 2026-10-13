@@ -152,6 +152,68 @@
         },
         "padding": 0
       }
+    },
+    {
+      "name": "part-editor",
+      "document": "demo.gcad",
+      "capture": "dialog",
+      "steps": [
+        {
+          "action": "menu",
+          "path": [
+            "パーツ(P)",
+            "新規作成(N)..."
+          ],
+          "waitMs": 1500
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "automationId": "NameBox",
+            "at": "topRight"
+          },
+          "box": true
+        },
+        {
+          "number": 2,
+          "target": {
+            "automationId": "RoleCombo",
+            "at": "topRight"
+          },
+          "box": true
+        },
+        {
+          "number": 3,
+          "target": {
+            "automationId": "AffinityCombo",
+            "at": "bottomRight"
+          },
+          "box": true
+        },
+        {
+          "number": 4,
+          "target": {
+            "name": "円",
+            "controlType": "RadioButton",
+            "at": "bottom"
+          },
+          "badgeOffset": [
+            0,
+            44
+          ]
+        },
+        {
+          "number": 5,
+          "target": {
+            "name": "OK",
+            "controlType": "Button",
+            "at": "topLeft"
+          },
+          "box": true
+        }
+      ]
     }
   ]
 }

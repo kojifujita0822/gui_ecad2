@@ -57,6 +57,25 @@ function Invoke-UsageShotStep {
             elseif ($element.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) { $pattern.Toggle() }   # トグルボタン(テストモード等)
             else { throw "操作の相手が Invoke も Toggle も持たぬ: $value" }
         }
+        'menu' {
+            # メニューバーの項目を UIA で開き、配下の項目を押す。"path" は ["パーツ(P)", "新規作成(N)..."] の形。
+            # メニューのポップアップはメイン窓の UIA 木の配下に現れる(2026-10-13 実測)。
+            $root = [System.Windows.Automation.AutomationElement]::FromHandle($Handle)
+            $scope = [System.Windows.Automation.TreeScope]::Descendants
+            $current = $root
+            $names = @($Step.path)
+            for ($i = 0; $i -lt $names.Count; $i++) {
+                $condition = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::NameProperty), $names[$i]
+                $element = $current.FindFirst($scope, $condition)
+                if (-not $element) { throw "メニュー項目が見つからぬ: $($names[$i])" }
+                if ($i -lt $names.Count - 1) {
+                    $element.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern).Expand()
+                    Start-Sleep -Milliseconds 500
+                    $current = $element
+                }
+                else { $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
+            }
+        }
         'wait' { }
         default { throw "未知の操作: $($Step.action)" }
     }
@@ -80,6 +99,25 @@ try {
             $handle = $process.MainWindowHandle
             foreach ($step in @($shot.steps)) { if ($step) { Invoke-UsageShotStep -Step $step -Handle $handle } }
 
+            # "capture": "dialog" の絵は、メイン窓でなく、開いた別窓(ダイアログ等)を撮る。
+            if ($shot.capture -eq 'dialog') {
+                $cond = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::ProcessIdProperty), $process.Id
+                $main = [int]$handle
+                $dialogWindow = $null
+                for ($try = 0; $try -lt 20 -and -not $dialogWindow; $try++) {
+                    # 所有窓(ダイアログ)はデスクトップ直下でなく、メイン窓の配下に現れることがある。両方を探す。
+                    $windowType = New-Object System.Windows.Automation.PropertyCondition ([System.Windows.Automation.AutomationElement]::ControlTypeProperty), ([System.Windows.Automation.ControlType]::Window)
+                    $mainRoot = [System.Windows.Automation.AutomationElement]::FromHandle($process.MainWindowHandle)
+                    $candidates = @($mainRoot.FindAll([System.Windows.Automation.TreeScope]::Descendants, $windowType)) + @([System.Windows.Automation.AutomationElement]::RootElement.FindAll([System.Windows.Automation.TreeScope]::Children, $cond))
+                    foreach ($w in $candidates) {
+                        if ($w.Current.NativeWindowHandle -ne 0 -and $w.Current.NativeWindowHandle -ne $main) { $dialogWindow = $w; break }
+                    }
+                    if (-not $dialogWindow) { Start-Sleep -Milliseconds 400 }
+                }
+                if (-not $dialogWindow) { throw "$($shot.name): 別窓が現れなんだ" }
+                $handle = [IntPtr]$dialogWindow.Current.NativeWindowHandle
+                Start-Sleep -Milliseconds 800
+            }
             $anchors = @(Get-UsageShotAnchors -Handle $handle)
             if ($ListAnchors) {
                 $anchors | Sort-Object Y, X | Format-Table ControlType, AutomationId, Name, X, Y, Width, Height -AutoSize | Out-String -Width 220 | Write-Host
