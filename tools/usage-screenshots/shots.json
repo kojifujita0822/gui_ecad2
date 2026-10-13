@@ -1,19 +1,157 @@
 {
-  "window": { "width": 1400, "height": 900 },
+  "window": {
+    "width": 1400,
+    "height": 900
+  },
   "shots": [
     {
       "name": "overview",
       "document": "demo.gcad",
       "annotations": [
-        { "number": 1, "target": { "name": "ヘルプ(H)", "at": "right", "nudge": [6, 0] }, "badgeOffset": [60, 0] },
-        { "number": 2, "target": { "name": "テストモード (Ctrl+T)", "at": "right", "nudge": [6, 0] }, "badgeOffset": [60, 0] },
-        { "number": 3, "target": { "automationId": "SheetNavList" }, "box": true },
-        { "number": 4, "target": { "automationId": "CanvasArea", "at": "bottom", "nudge": [0, -70] }, "box": true },
-        { "number": 5, "target": { "automationId": "DeviceTableGrid", "at": "bottom", "nudge": [0, -60] }, "box": true },
-        { "number": 6, "target": { "name": "要素を選択してください", "at": "right", "nudge": [8, 0] }, "badgeOffset": [70, 0] },
-        { "number": 7, "target": { "automationId": "OutputGrid" }, "box": true },
-        { "number": 8, "target": { "name": "ズーム: 100%", "at": "right", "nudge": [8, 0] }, "badgeOffset": [60, -28] }
+        {
+          "number": 1,
+          "target": {
+            "name": "ヘルプ(H)",
+            "at": "right",
+            "nudge": [
+              6,
+              0
+            ]
+          },
+          "badgeOffset": [
+            60,
+            0
+          ]
+        },
+        {
+          "number": 2,
+          "target": {
+            "name": "テストモード (Ctrl+T)",
+            "at": "right",
+            "nudge": [
+              6,
+              0
+            ]
+          },
+          "badgeOffset": [
+            60,
+            0
+          ]
+        },
+        {
+          "number": 3,
+          "target": {
+            "automationId": "SheetNavList"
+          },
+          "box": true
+        },
+        {
+          "number": 4,
+          "target": {
+            "automationId": "CanvasArea",
+            "at": "bottom",
+            "nudge": [
+              0,
+              -70
+            ]
+          },
+          "box": true
+        },
+        {
+          "number": 5,
+          "target": {
+            "automationId": "DeviceTableGrid",
+            "at": "bottom",
+            "nudge": [
+              0,
+              -60
+            ]
+          },
+          "box": true
+        },
+        {
+          "number": 6,
+          "target": {
+            "name": "要素を選択してください",
+            "at": "right",
+            "nudge": [
+              8,
+              0
+            ]
+          },
+          "badgeOffset": [
+            70,
+            0
+          ]
+        },
+        {
+          "number": 7,
+          "target": {
+            "automationId": "OutputGrid"
+          },
+          "box": true
+        },
+        {
+          "number": 8,
+          "target": {
+            "name": "ズーム: 100%",
+            "at": "right",
+            "nudge": [
+              8,
+              0
+            ]
+          },
+          "badgeOffset": [
+            60,
+            -28
+          ]
+        }
       ]
+    },
+    {
+      "name": "testmode",
+      "document": "demo.gcad",
+      "steps": [
+        {
+          "action": "invoke",
+          "name": "テストモード (Ctrl+T)",
+          "waitMs": 1200
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "xy": [
+              290,
+              267
+            ]
+          },
+          "badgeOffset": [
+            28,
+            -48
+          ]
+        },
+        {
+          "number": 2,
+          "target": {
+            "xy": [
+              466,
+              270
+            ]
+          },
+          "badgeOffset": [
+            0,
+            52
+          ]
+        }
+      ],
+      "crop": {
+        "target": {
+          "automationId": "CanvasArea"
+        },
+        "padding": 0
+      }
     }
   ]
 }

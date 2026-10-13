@@ -52,7 +52,10 @@ function Invoke-UsageShotStep {
             $condition = New-Object System.Windows.Automation.PropertyCondition $property, $value
             $element = $root.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condition)
             if (-not $element) { throw "操作の相手が見つからぬ: $value" }
-            $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            $pattern = $null
+            if ($element.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref]$pattern)) { $pattern.Invoke() }
+            elseif ($element.TryGetCurrentPattern([System.Windows.Automation.TogglePattern]::Pattern, [ref]$pattern)) { $pattern.Toggle() }   # トグルボタン(テストモード等)
+            else { throw "操作の相手が Invoke も Toggle も持たぬ: $value" }
         }
         'wait' { }
         default { throw "未知の操作: $($Step.action)" }
