@@ -214,6 +214,66 @@
           "box": true
         }
       ]
+    },
+    {
+      "name": "pdf-preview",
+      "document": "demo.gcad",
+      "capture": "dialog",
+      "steps": [
+        {
+          "action": "menu",
+          "path": [
+            "ファイル(F)",
+            "PDF出力(P)"
+          ],
+          "waitMs": 3000
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "automationId": "PrevBtn",
+            "at": "topLeft"
+          },
+          "box": true
+        },
+        {
+          "number": 2,
+          "target": {
+            "automationId": "ZoomOutBtn",
+            "at": "topLeft"
+          },
+          "box": true
+        },
+        {
+          "number": 3,
+          "target": {
+            "name": "幅に合わせる",
+            "controlType": "Button",
+            "at": "topLeft"
+          },
+          "box": true
+        },
+        {
+          "number": 4,
+          "target": {
+            "name": "PDF出力",
+            "controlType": "Button",
+            "at": "topLeft"
+          },
+          "box": true
+        },
+        {
+          "number": 5,
+          "target": {
+            "name": "閉じる",
+            "controlType": "Button",
+            "at": "topLeft"
+          },
+          "box": true
+        }
+      ]
     }
   ]
 }
