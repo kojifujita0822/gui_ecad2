@@ -78,21 +78,17 @@ Styleへ既定値Setter群を追加。検証＝クリーン起動2回連続正�
 - **まだ走らせておらぬ所**＝注釈の焼き込み（`Add-UsageShotAnnotations`）と切り抜きは書いただけで
   一度も実行しておらぬ。`shots.json` は `overview` の注釈が空のまま。README も未作成。
 
-**【2026-10-13 追記＝画面全体図（overview）が通った。未コミット】**
-- `shots.json` の `overview` へ注釈8件（メニュー・ツールバー・シート一覧・キャンバス・機器表・
-  プロパティ・出力パネル・ステータスバー）を書き、`docs/usage/images/overview.png`（1386x893）を生成。
-  焼き込み・UIA 的引きは初めて実走して通った。
-- `ecad2-usage-menu-toolbar.md` 冒頭へ「画面の構成」節を足した。使い方ウィンドウで絵が出ることを
-  自ら起動した別プロセスで確かめた（メニューは名前「使い方(G)」で UIA 操作。`main-layout.xml` 不変）。
-- 殿の目視はまだ（絵の見た目・番号の置き場所）。
+**【2026-10-13 追記＝5題すべて入った（コミット済み）】**
+- 絵7枚（`docs/usage/images/`）: overview（画面全体）／testmode／part-editor／pdf-preview／placement-bar／
+  range-select／paste-ghost。使い方の該当文書へ組み込み済み（`menu-toolbar`・`pdf-testmode`・`part-management`・`placement`）。
+- 撮影道具に `menu`（メニュー操作）・`capture: dialog`（別窓を撮る）・`click`／`move`／`keys`（実マウス・キー送出、
+  `-AllowIntrusive` 要）を追加。インデント付きの画像行は変換器が拾わぬ（行頭から書くこと）。
+- 副産物: `ecad2-usage-part-management.md` の「自作パーツ作成画面は無い」は古かったため、エディタの説明へ書き換えた
+  （メニュー「パーツ」→「新規作成」、編集・削除は「自作パーツ」から）。
+- `tools/usage-screenshots/README.md` を新設。リリース手順（`memory: ecad2_release_procedure` の1.6）へ「絵の撮り直しと目視」を追加。
+- 殿の目視はまだ（絵の見た目・番号の置き場所・文面）。
 
-**【次の一手】**
-1. 殿に overview の見た目を見ていただく（`docs/usage/images/overview.png`）。
-2. （済）
-3. 残る4題。**メニューを開いた姿・配置バー・貼り付けのゴースト・パーツエディタは、キー送出や
-   実マウスが要る**（定義の `"intrusive": true`＋`-AllowIntrusive`。操作の種類 `keys`／`click` は未実装）
-   ——その間は殿の画面とマウスを借りるゆえ、お手すきの折に纏めて撮る。
-4. リリース手順へ「絵の再生成と目視」を足す（増分4）。
+**【残り】** 殿の目視で出た直しの反映。既定レイアウトへ戻す手当て・ダークモード版は未着手（下の懸念）。
 
 **【承知の懸念】**
 - 撮影は殿の保存済みレイアウト（`main-layout.xml`）で起動した姿になる。絵を出荷時の配置で揃えるなら、
