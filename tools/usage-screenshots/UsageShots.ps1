@@ -24,6 +24,11 @@ public class UsageShotNative {
     [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr h, int x, int y, int w, int ht, bool repaint);
     [DllImport("user32.dll")] public static extern bool PrintWindow(IntPtr h, IntPtr hdc, uint flags);
     [DllImport("user32.dll")] public static extern uint GetDpiForWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT p);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint flags, uint dx, uint dy, uint data, UIntPtr extra);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X, Y; }
     [DllImport("dwmapi.dll")] public static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT r, int size);
 }
 "@
@@ -232,4 +237,29 @@ function Add-UsageShotAnnotations {
     finally {
         $format.Dispose(); $font.Dispose(); $haloBrush.Dispose(); $accentBrush.Dispose(); $g.Dispose()
     }
+}
+
+# 撮影用アプリを前面に出す(キー送出・実マウスの前に必ず要る)。殿の画面を借りる操作ゆえ -AllowIntrusive の時だけ呼ぶ。
+function Set-UsageShotForeground {
+    param([Parameter(Mandatory)][IntPtr]$Handle)
+    [UsageShotNative]::SetForegroundWindow($Handle) | Out-Null
+    Start-Sleep -Milliseconds 400
+}
+
+# 絵の上の座標(Get-UsageShotAnchors と同じ、見えておる枠の左上が原点)を左クリックする。
+function Invoke-UsageShotClick {
+    param([Parameter(Mandatory)][IntPtr]$Handle, [Parameter(Mandatory)][double]$X, [Parameter(Mandatory)][double]$Y, [switch]$Right)
+    $frame = Get-UsageShotFrame -Handle $Handle
+    [UsageShotNative]::SetCursorPos([int]($frame.Left + $X), [int]($frame.Top + $Y)) | Out-Null
+    Start-Sleep -Milliseconds 150
+    $down, $up = if ($Right) { 0x0008, 0x0010 } else { 0x0002, 0x0004 }
+    [UsageShotNative]::mouse_event($down, 0, 0, 0, [UIntPtr]::Zero)
+    [UsageShotNative]::mouse_event($up, 0, 0, 0, [UIntPtr]::Zero)
+}
+
+# 絵の上の座標へカーソルだけを動かす(ホバーや、貼り付けのゴーストの追従を撮る時)。
+function Move-UsageShotCursor {
+    param([Parameter(Mandatory)][IntPtr]$Handle, [Parameter(Mandatory)][double]$X, [Parameter(Mandatory)][double]$Y)
+    $frame = Get-UsageShotFrame -Handle $Handle
+    [UsageShotNative]::SetCursorPos([int]($frame.Left + $X), [int]($frame.Top + $Y)) | Out-Null
 }

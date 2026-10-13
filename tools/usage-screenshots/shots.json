@@ -274,6 +274,81 @@
           "box": true
         }
       ]
+    },
+    {
+      "name": "placement-bar",
+      "document": "demo.gcad",
+      "intrusive": true,
+      "steps": [
+        {
+          "action": "click",
+          "xy": [
+            620,
+            438
+          ],
+          "waitMs": 500
+        },
+        {
+          "action": "keys",
+          "keys": "{F5}",
+          "waitMs": 900
+        }
+      ],
+      "annotations": [
+        {
+          "number": 1,
+          "target": {
+            "xy": [
+              621,
+              437
+            ]
+          },
+          "badgeOffset": [
+            -60,
+            -4
+          ]
+        },
+        {
+          "number": 2,
+          "target": {
+            "automationId": "PlacementPartComboBox",
+            "at": "bottom"
+          },
+          "badgeOffset": [
+            0,
+            38
+          ]
+        },
+        {
+          "number": 3,
+          "target": {
+            "automationId": "PlacementDeviceNameBox",
+            "at": "bottom"
+          },
+          "badgeOffset": [
+            0,
+            38
+          ]
+        },
+        {
+          "number": 4,
+          "target": {
+            "name": "OK",
+            "controlType": "Button",
+            "at": "bottom"
+          },
+          "badgeOffset": [
+            0,
+            38
+          ]
+        }
+      ],
+      "crop": {
+        "target": {
+          "automationId": "CanvasArea"
+        },
+        "padding": 0
+      }
     }
   ]
 }

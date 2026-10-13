@@ -43,6 +43,7 @@ if (Test-Path $layoutPath) {
 
 function Invoke-UsageShotStep {
     param([Parameter(Mandatory)]$Step, [Parameter(Mandatory)][IntPtr]$Handle)
+    if ($Step.action -in 'click', 'move', 'keys' -and -not $AllowIntrusive) { throw "$($Step.action) は画面とマウスを借りる操作。絵に intrusive: true を付け、-AllowIntrusive で実行すること" }
     switch ($Step.action) {
         'invoke' {
             # UIA の InvokePattern。前面化もマウス移動も伴わぬ。
@@ -76,6 +77,22 @@ function Invoke-UsageShotStep {
                 else { $element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke() }
             }
         }
+        'click' {
+            Set-UsageShotForeground -Handle $Handle
+            Invoke-UsageShotClick -Handle $Handle -X $Step.xy[0] -Y $Step.xy[1] -Right:([bool]$Step.right)
+        }
+        'move' {
+            Set-UsageShotForeground -Handle $Handle
+            Move-UsageShotCursor -Handle $Handle -X $Step.xy[0] -Y $Step.xy[1]
+        }
+        'keys' {
+            # SendKeys 書式(例: "{F5}" "+{RIGHT 3}" "^c")。"repeat" で繰り返す。
+            Set-UsageShotForeground -Handle $Handle
+            for ($n = 0; $n -lt $(if ($Step.repeat) { [int]$Step.repeat } else { 1 }); $n++) {
+                [System.Windows.Forms.SendKeys]::SendWait([string]$Step.keys)
+                Start-Sleep -Milliseconds 120
+            }
+        }
         'wait' { }
         default { throw "未知の操作: $($Step.action)" }
     }
@@ -94,6 +111,8 @@ try {
         $document = if ($shot.document) { Join-Path $toolDir $shot.document } else { $null }
         $width = if ($shot.window.width) { [int]$shot.window.width } else { [int]$definition.window.width }
         $height = if ($shot.window.height) { [int]$shot.window.height } else { [int]$definition.window.height }
+        $cursorBefore = New-Object UsageShotNative+POINT
+        [UsageShotNative]::GetCursorPos([ref]$cursorBefore) | Out-Null
         $process = Start-UsageShotApp -ExePath $exePath -DocumentPath $document -Width $width -Height $height
         try {
             $handle = $process.MainWindowHandle
@@ -149,6 +168,7 @@ try {
         }
         finally {
             Stop-UsageShotApp -Process $process -ExePath $exePath
+            if ($shot.intrusive) { [UsageShotNative]::SetCursorPos($cursorBefore.X, $cursorBefore.Y) | Out-Null }   # 殿のカーソルを元へ戻す
         }
     }
 }
